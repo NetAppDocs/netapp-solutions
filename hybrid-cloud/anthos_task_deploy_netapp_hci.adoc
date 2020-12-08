@@ -1,0 +1,95 @@
+---
+sidebar: sidebar
+permalink: anthos_task_deploy_netapp_hci.html
+summary: Task NVA-1143 5.4 Deploy NetApp HCI with the NDE
+keywords: NDE, vCenter, vSphere, Active IQ
+---
+
+= 3. Deploy NetApp HCI with the NetApp Deployment Engine
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+NDE delivers a simple and streamlined deployment experience for the NetApp HCI solution.
+
+These steps begin after the nodes have been racked, and cabled, and the IPMI port has been configured on each node using the console.
+
+A detailed guide to using NDE 1.6 to deploy your NetApp HCI system can be found https://library.netapp.com/ecm/ecm_download_file/ECMLP2856899[here].
+
+To Deploy the NetApp HCI solution using NDE, complete the following steps:
+
+1. Access the out-of-band management console for one of the storage nodes in the cluster and log in with the default credentials ADMIN/ADMIN.
++
+image::nde_login.PNG[NDE Login]
+
+2. Click the Remote Console Preview image in the center of the screen to download a JNLP file launched by Java Web Start, which launches an interactive console to the system.
+3. With the virtual console launched, a user can log in to the HCI Storage node, using the ADMIN/ADMIN username and password combination.
+4. The Bond1G interface must have an IP, a netmask, and a gateway set statically; its VLAN set to 3480; and DNS servers defined for the environment.
++
+
+image::nde_bond10g_MTU_config.PNG[Bond1G Interface Configuration]
++
+NOTE:	Select an IP that is within the subnet you intend to use for in-band management, but not an IP you would like to use in production. NDE reconfigures the node with a production IP after initial access.
++
+
+NOTE:	This task must only be performed on the first storage node. Afterward, the other nodes in the infrastructure are discovered by the Automatic Private IP Address (APIPA) addresses assigned to each storage interface when left unconfigured.
+
+5. The Bond 10G interface must have its MTU setting changed to enable jumbo frames and its bond mode changed to LACP.
++
+
+image::nde_bond10g_MTU_config.PNG[Bond10G MTU Configuration]
++
+
+NOTE:	Configure each of the four storage nodes in the NetApp HCI solution this way. The NDE process is then able to discover all the nodes in the solution and configure them. You do not need to modify the Bond10g interfaces on the two compute nodes.
+
+6. After completion, open a web browser and visit the IP address you configured for the management port to start the NetApp HCI configuration with NDE.
+7. On the Welcome to NetApp HCI page, click the Get Started button.
+8. Check each associated box on the Prerequisites page and click Continue.
+9. The next page presents End User Licenses for NetApp HCI and VMware vSphere. If you accept the terms, click I Accept at the end of each agreement and then click Continue.
+10. Click Configure a New vSphere Deployment, select vSphere 6.5U2, and enter the Fully Qualified Domain Name (FQDN) of your vCenter Server. Then click Continue.
++
+
+image::nde_vsphere_config.JPG[vSphere Configuration]
+
+11. NDE asks for the credentials to be used in the environment. This is used for VMware vSphere, the NetApp Element storage cluster, and the NetApp Mnode, which provides management functionality for the cluster. When you are finished, click Continue.
++
+
+image::nde_credentials.JPG[vSphere Credentials]
+
+12. NDE then prompts for the network topology used to cable the NetApp HCI environment. The validated solution in this document has been deployed using the 2 Cable Option for the compute nodes, and the 4 Cable Option for the storage nodes. Click Continue.
++
+
+image::nde_network_topology.JPG[Network Topology]
+
+13.	The next page presented by NDE is the inventory of the environment as discovered by the APIPA addressed on the storage network. The storage node that is currently running NDE is already selected with a green check mark. Select the corresponding boxes to add additional nodes to the NetApp HCI environment. Click Continue.
++
+
+image::nda_inventory.JPG[NDA Inventory]
++
+
+NOTE:	If there are any nodes missing from the inventory screen, wait a few minutes and click Refresh Inventory. If the node still fails to appear, additional investigation of environment networking may be required.
+
+14. You must next configure the permanent network settings for the NetApp HCI deployment. The first page configures infrastructure services (DNS and NTP), vCenter networking, and Mnode networking.
++
+
+image::nda_network_settings.JPG[Network Settings]
+
+15. The next page allows you to configure each node in the environment. For the compute nodes, it allows you to configure the host name, management network, vMotion network, and storage network. For the storage nodes, name the storage cluster and configure the management and storage networks being used for each node. Click Continue.
++
+
+image::nda_compute_node_networking.JPG[Compute Node Networking]
+
+16. On the next page, review all the settings that have been defined for the environment by expanding each section, and, if necessary, click Edit to make corrections. There is also a check box on this page that enables or disables the Mnode from sending real-time health and diagnostics information to NetApp Active IQ®. If all the information is correct, click Start Deployment.
++
+
+NOTE:	If you want to enable Active IQ, verify that your management network can reach the internet. If NDE is unable to reach Active IQ, the deployment can fail.
+
+17. A summary page appears along with a progress bar for each component of the NetApp HCI solution, as well as the overall solution. When complete, you are presented with an option to launch the vSphere client and begin working with your environment.
++
+image::nda_setup_complete.PNG[Your Setup is Complete]
+
+link:anthos_task_configure_the_vcenter_server.html[Next: Configure the vCenter Server]

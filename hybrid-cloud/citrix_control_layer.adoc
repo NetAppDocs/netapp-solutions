@@ -1,0 +1,119 @@
+---
+sidebar: sidebar
+permalink: citrix_control_layer.html
+keywords: App Layering, delivery controller, database, director, license, provisioning services, studio, Workspace Environment Management
+summary: TR-4852
+---
+
+= Control Layer
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 0.9 (July 10, 2020)
+//
+// 2020-07-31 10:32:38.884629
+//
+
+[.lead]
+
+=== App Layering
+
+Layering is a technology to separate the OS, applications, and user settings and data, each hosted on its own virtual disks or group of virtual disks. These components are then merged with the OS as if they were all on same machine image. Users can continue with their work without any additional training. Layers make it easy to assign, patch,  and update. A layer is simply a container for file system and registry entries unique to that layer.
+
+Citrix App Layering allows you to manage master images for Citrix Virtual Apps and Desktops as well as for the VMware Horizon environment.  App layering also allows you to provision applications to users on demand; these apps are attached while logging in. The user personalization layer allows users to install custom apps and store the data on their dedicated layer. Therefore, you can have a personal desktop experience even when you are using a shared desktop model.
+
+Citrix App Layering creates merged layers to create the master image and does not have any additional performance penalty. With Elastic Layers, the user login time increases.
+
+image:citrix_image33.png[Error: Missing Graphic Image]
+
+Citrix App Layering uses a single virtual appliance to manage the layers and hands off using the image and application delivery to another platform. The Citrix Enterprise Layer Manager (ELM) portal must be accessed from web browsers that supports Microsoft Silverlight 4.0. A cloud- based management portal is also available if local management interface requirements cannot be met.
+
+Initial configuration includes the creation of platform connectors of two types; the first is a platform connector for layer creation, and the other is a platform connector for image publishing.
+
+image:citrix_image34.png[Error: Missing Graphic Image]
+
+A layer repository is an SMB file share configured with ELM where Elastic Layers are stored. A layer work disk is where all the layers created by ELM are stored.  The disk is attached to the appliance and is consumed as a block device on which a local Linux file system is used. The layer work disk is used as scratch area where the layer images are put together. After the master image is created, it is pushed to the provisioning platform.
+
+image:citrix_image35.png[Error: Missing Graphic Image]
+
+When there are common or shared files on multiple layers, by default the high priority layer ID wins. Layer ID is incremented whenever a new layer is created. If would like to control layer priority, use the support utility on the  https://support.citrix.com/article/CTX225934[Citrix LayerPriority Utility page^].
+
+ELM also supports authentication and role- based access control with integration with Active Directory and LDAP.
+
+=== Delivery Controller
+
+The delivery controller is responsible for user access, brokering, and optimizing connections. It also provides Machine Creation Services (MCS) for provisioning virtual machines in an effective manner. At least one delivery controller is required per site, and typically additional controllers are added for redundancy and scalability.
+
+Virtual desktop agents (VDA) must register with the delivery controller to make it available to users. During VDA deployment, the initial registration options can be provided manually through GPO based on the Active Directory OU. This process can also be handled with MCS.
+
+Delivery controllers keep a local host cache in case a controller loses its connectivity to database server.
+
+=== Database
+
+A SQL Server database is used for site configuration data, logging, and monitoring. There should be at least one database per site. To provide high availability, use Microsoft SQL Server features like AlwaysOn availability groups, database mirroring, or SQL clustering. At a minimum, consider using the hypervisor high- availability feature for a SQL VM.
+
+Even though the controller has a local host cache, it doesn’t affect any existing connections. However, for new connections, NetApp recommends database connectivity.
+
+=== Director
+
+Citrix Director provides a monitoring solution for Citrix Virtual Apps and Desktops. Help Desk users can search for a specific user session and get a complete picture for troubleshooting. When Citrix Virtual Apps and Desktop Resources are hosted on Citrix Hypervisor, Help Desk users have the option to launch a console session from the Director portal.
+
+image:citrix_image36.png[Error: Missing Graphic Image]
+
+=== License
+
+The Citrix license server manages the repository of all Citrix licenses so that licenses can be easily consumed by applications. The license server provides a management portal for advanced troubleshooting. For regular operations, Citrix Studio can also be used.
+
+=== Provisioning Services
+
+Provisioning services enable the provisioning of desktop images even to bare metal workstations by using PXE boot. An ISO or CDROM-based boot option is also available to support environments in which network changes aren’t allowed for PXE boot. The DHCP server options that we used in our lab is provided in the following figure. CP.HCIEUC.Demo and PVS.HCIEUC.Demo are the load balancer virtual IPs that point to two provisioning servers. When option 011 and 017 are available, options 066 and 067 are ignored.
+
+image:citrix_image37.png[Error: Missing Graphic Image]
+
+The high-level operation to create a machine catalog based on Citrix provisioning is as follows:
+
+. On the template VM, install the target agent before installing VDA.
+
+. Assign an additional disk for caching and format it with MBR. This step is optional. At least verify that the PVS store has a write cache path.
+
+. Start the Target Image Wizard and respond to its questions. Remember to provide a single Citrix Provisioning server when prompted.
+
+. The device boots with PXE or with ISO. The Imaging wizard continues to capture the image.
+
+. Select the vDisk that is created and right click to select Load Balancing and enable it.
+
+. For vDisk Properties, change the access mode to Standard and the Cache Type to Cache in Device RAM with Overflow on Hard Disk.
+
+. Right click on the site to pick the Create Virtual Desktops Setup Wizard and respond to the questions.
+
+=== Studio
+
+Citrix Studio is the central management console used by the Citrix Virtual Apps and Desktops. The management of machine catalogs, delivery groups, applications, policies, and the configuration of resource hosting, licenses, zones, roles, and scopes are handled by the Citrix Studio. Citrix Studio also provides PowerShell snap-ins to manage Citrix Virtual Apps and Desktops.
+
+=== Workspace Environment Management
+
+Workspace Environment Management (WEM) provides intelligent resource management and profile management technologies to deliver the best possible performance, desktop login, and application response times for Citrix Virtual Apps and Desktops in a software-only, driver-free solution.
+
+WEM requires a SQL database to store configuration information. To provide high availability to infrastructure services, multiple instances are used with a load balancer virtual server connection. The following figure depicts the WEM architecture.
+
+image:citrix_image38.png[Error: Missing Graphic Image]
+
+The following figure depicts the WEM console.
+
+image:citrix_image39.png[Error: Missing Graphic Image]
+
+The key features of WEM are as follows:
+
+* The ability to control resources for certain tasks or applications
+
+* An easy interface to manage windows icons, network drives, start menu items, and so on
+
+* The ability to reuse an old machine and manage it as a thin client
+
+* Role-based access control
+
+* Control policies based on various filters

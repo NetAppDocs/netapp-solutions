@@ -1,0 +1,123 @@
+---
+sidebar: sidebar
+permalink: rh-os-rhv_solution_overview.html
+keywords: NVA-1149, Red Hat, virtualization, Openshift, containers, containerized, Trident, KVM, RHV-M
+summary:
+---
+
+= NVA-1149: NetApp HCI for Red Hat OpenShift on Red Hat Virtualization
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 0.9 (June 4, 2020)
+//
+// 2020-06-25 14:31:33.537397
+//
+
+Alan Cowles and Nikhil M Kulkarni, NetApp
+
+NetApp HCI for Red Hat OpenShift on Red Hat Virtualization (RHV) is a best-practice deployment guide for the fully automated install of Red Hat OpenShift through the Installer Provisioned Infrastructure (IPI) method onto the verified enterprise architecture of link:redhat_virtualization_solution_overview__netapp_hci_with_rhv.html[NVA-1148: NetApp HCI with Red Hat Virtualization]. The purpose of this NetApp Verified Architecture deployment guide is to provide a concise set of verified instructions to be followed for the deployment of the solution. The architecture and deployment methods described in this document have been validated jointly by subject matter experts at NetApp and Red Hat to provide a best-practice implementation of the solution.
+
+=== Use Cases
+
+The NetApp HCI for Red Hat OpenShift on RHV solution is architected to deliver exceptional value for customers with the following use cases:
+
+* Infrastructure to scale on demand with NetApp HCI
+
+* Enterprise virtualized workloads in RHV
+
+* Enterprise containerized workloads in Red Hat OpenShift
+
+=== Business Value
+
+Enterprises are increasingly adopting DevOps practices to create new products, shorten release cycles, and rapidly add new features. Because of their innate agile nature, containers and microservices play a crucial role in supporting DevOps practices. However, practicing DevOps at a production scale in an enterprise environment presents its own challenges and imposes certain requirements on the underlying infrastructure, such as the following:
+
+* High availability at all layers in the stack
+
+* Ease of deployment procedures
+
+* Nondisruptive operations and upgrades
+
+* API-driven and programmable infrastructure to keep up with microservices agility
+
+* Multitenancy with performance guarantees
+
+* Ability to run virtualized and containerized workloads simultaneously
+
+* Ability to scale infrastructure independently based on workload demands
+
+NetApp HCI for Red Hat OpenShift on RHV acknowledges these challenges and presents a solution that helps address each concern by implementing the fully automated deployment of RedHat OpenShift IPI on the RHV enterprise hypervisor. The remainder of this document details the components used in this verified architecture.
+
+=== Technology Overview
+
+==== NetApp HCI
+
+NetApp HCI is an enterprise-scale, disaggregated hybrid cloud infrastructure (HCI) solution that delivers compute and storage resources in an agile, scalable, and easy-to-manage two-rack unit (2RU), four-node building block. It can also be configured with 1RU compute and server nodes. The minimum deployment depicted in the figure below consists of four NetApp HCI storage nodes and two NetApp HCI compute nodes. The compute nodes are installed as Red Hat Virtualization Hosts (RHV-H) hypervisors in a high-availability (HA) cluster. This minimum deployment can be easily scaled to fit customer enterprise workload demands by adding additional NetApp HCI storage or compute nodes to expand available resources.
+
+image:redhat_openshift_image1.png[Error: Missing Graphic Image]
+
+The design for NetApp HCI for Red Hat Virtualization consists of the following components in a minimum starting configuration:
+
+* NetApp H-Series all-flash storage nodes running NetApp Element software
+
+* NetApp H-Series compute nodes running the Red Hat Virtualization RHV-H hypervisor
+
+For more information about compute and storage nodes in NetApp HCI, see https://www.netapp.com/us/media/ds-3881.pdf[NetApp HCI Datasheet^].
+
+==== NetApp Trident
+
+Trident is a NetApp open-source and fully supported storage orchestrator for containers and Kubernetes distributions, including Red Hat OpenShift. It works with the entire NetApp storage portfolio, including the NetApp Element storage system that is deployed as a part of the NetApp HCI solution. Trident provides the ability to accelerate the DevOps workflow by allowing end users to provision and manage storage from their NetApp storage systems, without requiring intervention from a storage administrator. An administrator can configure a number of storage backends based on project needs, and storage system models that allow for any number of advanced storage features, such as: compression, specific disk types, or QoS levels that guarantee a certain performance. After they are defined, these backends can be leveraged by developers as part of their projects to create persistent volume claims (PVCs) and attach persistent storage to their containers on demand.
+
+image:redhat_openshift_image2.png[Error: Missing Graphic Image]
+
+==== Red Hat Virtualization
+
+RHV is an enterprise virtual data center platform that runs on Red Hat Enterprise Linux (RHEL) and uses the KVM hypervisor.
+
+For more information about RHV, see the https://www.redhat.com/en/technologies/virtualization/enterprise-virtualization[Red Hat Virtualization website^].
+
+RHV provides the following features:
+
+* *Centralized management of VMs and hosts.* The RHV manager runs as a physical or virtual machine (VM) in the deployment and provides a web-based GUI for the management of the solution from a central interface.
+
+* *Self-hosted engine.* To minimize the hardware requirements, RHV allows RHV Manager (RHV-M) to be deployed as a VM on the same hosts that run guest VMs.
+
+* *High availability.* In event of host failures, to avoid disruption, RHV allows VMs to be configured for high availability. The highly available VMs are controlled at the cluster level using resiliency policies.
+
+* *High scalability.* A single RHV cluster can have up to 200 hypervisor hosts enabling it to support requirements of massive VMs to hold resource-greedy,  enterprise-class workloads.
+
+* *Enhanced security.*  Inherited from RHV, Secure Virtualization (sVirt) and Security Enhanced Linux (SELinux) technologies are employed by RHV for the purposes of elevated security and hardening for the hosts and VMs. The key advantage from these features is logical isolation of a VM and its associated resources.
+
+===== Red Hat Virtualization Manager
+
+RHV-M provides centralized enterprise-grade management for the physical and logical resources within the RHV virtualized environment. A web-based GUI with different role-based portals are provided to access RHV-M features.
+
+RHV-M exposes configuration and management of RHV resources via open-source, community-driven RESTful API. It also supports full-fledged integration with Red Hat CloudForms and Red Hat Ansible for automation and orchestration.
+
+===== Red Hat Virtualization Hosts
+
+Hosts (also called hypervisors) are the physical servers that provide hardware resources for the VMs to run on. Kernel-based Virtual Machine (KVM) provides full virtualization support, and Virtual Desktop Server Manager (VDSM) is the host agent that is responsible for communication of the hosts with the RHV-M.
+
+Two types of hosts are supported in RHV are RHV-H and RHEL hosts:
+
+* RHV-H is a light-weight minimal operating system based on RHEL, optimized for ease of setting up physical servers as RHV hypervisors.
+
+* RHEL hosts are servers that run the standard RHEL operating system and are later configured with the required subscriptions to install the packages required to permit the physical servers to be used as RHV hosts.
+
+===== Red Hat Virtualization Architecture
+
+RHV can be deployed in two different architectures: with the RHV-M as a physical server in the infrastructure or with the RHV-M configured as a self-hosted engine. The self-hosted engine deployment, where the RHV-M is a VM hosted in the same environment as other VMs, is recommended and used specifically in this deployment guide.
+
+A minimum of two self-hosted nodes are required for high availability of guest VMs and RHV-M as depicted in the figure below.  For ensuring the high availability of the manager VM, HA services are enabled and run on all the self-hosted engine nodes.
+
+image:redhat_openshift_image3.png[Error: Missing Graphic Image]
+
+==== Red Hat OpenShift Container Platform
+
+Red Hat OpenShift Container Platform is a fully supported enterprise Kubernetes platform. Red Hat makes several enhancements to open-source Kubernetes to deliver an application platform with all the components fully integrated to build, deploy, and manage containerized applications. With Red Hat OpenShift 4.4, the installation and management processes have been streamlined through the IPI method which has been deployed in this solution. By leveraging this deployment method, a fully functional OpenShift cluster providing metering and monitoring at both the cluster and application level can be fully configured and deployed on top of Red Hat Virtualization in less than an hour. OpenShift nodes are based upon RHEL CoreOS, an immutable system image designed to run containers, based on RHEL, which can be upgraded or scaled easily on demand as the needs of the end user require, helping to deliver the benefits of the public cloud to the local data center.
+
+image:redhat_openshift_image4.png[Error: Missing Graphic Image]

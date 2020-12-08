@@ -1,0 +1,162 @@
+---
+sidebar: sidebar
+permalink: anthos_task_install_and_configure_trident.html
+summary: Task NVA-1143 5.12 Install and Configure NetApp Trident Storage Provisioner
+keywords: Trident, ONTAP, AFF, FAS, SolidFire
+---
+
+= 11. Install and Configure NetApp Trident Storage Provisioner: NetApp HCI with Anthos
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+Trident is a storage orchestrator for containers. With Trident, microservices and containerized applications can take advantage of enterprise-class storage services provided by the full NetApp portfolio of storage systems for persistent storage mounts. Depending on an application’s requirements, Trident dynamically provisions storage for ONTAP-based products such as NetApp AFF and FAS systems and Element storage systems like NetApp SolidFire® and NetApp HCI.
+
+To install Trident on the deployed user cluster and provision a persistent volume, complete the following steps:
+
+1.	Download the installation archive to the admin workstation and extract the contents. The current version of Trident is 19.10, which can be downloaded https://github.com/NetApp/trident/releases/tag/v19.10.0[here].
++
+----
+ubuntu@Anthos-Admin-Workstation:~$ wget https://github.com/NetApp/trident/releases/download/v19.10.0/trident-installer-19.10.0.tar.gz
+--2019-11-07 16:45:33--  https://github.com/NetApp/trident/releases/download/v19.10.0/trident-installer-19.10.0.tar.gz
+Resolving github.com (github.com)... 140.82.118.4
+Connecting to github.com (github.com)|140.82.118.4|:443... connected.
+HTTP request sent, awaiting response... 302 Found
+Location: https://github-production-release-asset-2e65be.s3.amazonaws.com/77179634/4d3b5900-
+Resolving github-production-release-asset-2e65be.s3.amazonaws.com (github-production-release-asset-2e65be.s3.amazonaws.com)... 52.216.81.8
+Connecting to github-production-release-asset-2e65be.s3.amazonaws.com (github-production-release-asset-2e65be.s3.amazonaws.com)|52.216.81.8|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 68903585 (66M) [application/octet-stream]
+Saving to: ‘trident-installer-19.10.0.tar.gz.1’
+
+trident-installer-19.10.0.tar 100%[=================================================>]  65.71M  53.8MB/s    in 1.2s
+
+2019-11-07 16:45:35 (53.8 MB/s) - ‘trident-installer-19.10.0.tar.gz.1’ saved [68903585/68903585]
+
+ubuntu@Anthos-Admin-Workstation:~$ tar -xf trident-installer-19.10.0.tar.gz
+----
+
+2. First set the location of the user cluster’s `kubeconfig` file as an environment variable so that you don’t have to reference it, because Trident has no option to pass this file.
++
+----
+ubuntu@Anthos-Admin-Workstation:~$ export KUBECONFIG=~/anthos-cluster01-kubeconfig
+----
+
+3. Navigate to the Trident directory and execute the tridentctl tool to install trident to your cluster. NetApp recommends installing Trident into its own namespace within the cluster. You can then verify that the install finished correctly.
++
+----
+ubuntu@Anthos-Admin-Workstation:~$ cd trident-installer --csi
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ ./tridentctl install -n trident
+INFO Starting Trident installation.                namespace=trident
+INFO Created namespace.                            namespace=trident
+INFO Created service account.
+INFO Created cluster role.
+INFO Created cluster role binding.
+INFO Created custom resource definitions.          namespace=trident
+INFO Added finalizers to custom resource definitions.
+INFO Created Trident deployment.
+INFO Waiting for Trident pod to start.
+INFO Trident pod started.                          namespace=trident pod=trident-79c76ff764-77sgl
+INFO Waiting for Trident REST interface.
+INFO Trident REST interface is up.                 version=19.10.0
+INFO Trident installation succeeded.
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ ./tridentctl version -n trident
++----------------+----------------+
+| SERVER VERSION | CLIENT VERSION |
++----------------+----------------+
+| 19.10.0        | 19.10.0        |
++----------------+----------------+
+----
+
+4. The next step in enabling Trident integration with the NetApp HCI solution and Anthos is to create a backend that enables communication with the storage system. There are sample backend files available in the downloaded installation archive in the `sample-input` folder. Copy the `backend-solidfire.json` to your working directory and edit it to provide information detailing the storage system environment.
++
+----
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ cp sample-input/backend-solidfire.json ./
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ vi backend-solidfire.json
+----
+
+5. Edit the user, password, and MVIP value on the EndPoint line.
+
+6. Edit the SVIP value.
++
+----
+ {
+    "version": 1,
+    "storageDriverName": "solidfire-san",
+    "Endpoint": "https://trident:password@172.21.224.150/json-rpc/8.0",
+    "SVIP": "10.63.172.100:3260",
+    "TenantName": "trident",
+    "Types": [{"Type": "Bronze", "Qos": {"minIOPS": 1000, "maxIOPS": 2000, "burstIOPS": 4000}},
+              {"Type": "Silver", "Qos": {"minIOPS": 4000, "maxIOPS": 6000, "burstIOPS": 8000}},
+              {"Type": "Gold", "Qos": {"minIOPS": 6000, "maxIOPS": 8000, "burstIOPS": 10000}}]
+}
+----
+
+7. With this back-end file in place, run the following command to create your first backend.
++
+----
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ ./tridentctl -n trident create backend -f backend.json
++-------------------+----------------+--------------------------------------+--------+---------+
+|    NAME           | STORAGE DRIVER |                 UUID                 | STATE  | VOLUMES |
++-------------------+----------------+--------------------------------------+--------+---------+
+| solidfire-backend | solidfire-san  | a5f9e159-c8f4-4340-a13a-c615fef0f433 | online |       0 |
++-------------------+----------------+--------------------------------------+--------+---------+
+----
+
+8. With the backend created, you must next create a storage class. Just as with the backend, there is a sample storage class file that can be edited for the environment available in the sample-inputs folder. Copy it to the working directory and make necessary edits to reflect the backend created.
++
+----
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ cp sample-input/storage-class-csi.yaml.templ ./storage-class-basic.yaml
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ vi storage-class-basic.yaml
+----
+
+9. The only edit that must be made to this file is to define the `backendType` value to the name of the storage driver from the newly created backend. Also note the name-field value, which must be referenced in a later step.
++
+----
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: basic-csi
+provisioner: csi.trident.netapp.io
+parameters:
+  backendType: "solidfire-san"
+----
+
+10. Run the `kubectl` command to create the storage class.
++
+----
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ kubectl create -f sample-input/storage-class-basic.yaml
+----
+
+11. With the storage class created, you must then create the first persistent volume claim (PVC). There is a sample `pvc-basic.yaml` file that can be used to perform this action located in sample-inputs as well. The only edit that must be made to this file is ensuring that the storageClassName field matches the one just created.
++
+----
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ vi sample-input/pvc-basic.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: basic
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: basic-csi
+----
+
+12. Create the PVC by issuing the `kubectl` command, Creation can take some time depending on the size of the backing volume being created, so you can watch the process as it completes.
++
+----
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ kubectl create -f sample-input/pvc-basic.yaml
+
+ubuntu@Anthos-Admin-Workstation:~/trident-installer$ kubectl get pvc --watch
+NAME      STATUS    VOLUME                                     CAPACITY   ACCESS MODES  STORAGECLASS   AGE
+basic     Pending                                                                       basic          1s
+basic     Pending   pvc-2azg0d2c-b13e-12e6-8d5f-5342040d22bf   0                        basic          5s
+basic     Bound     pvc-2azg0d2c-b13e-12e6-8d5f-5342040d22bf   1Gi        RWO           basic          7s
+----

@@ -1,0 +1,72 @@
+---
+sidebar: sidebar
+permalink: hcicaci_kvm_on_rhel.html
+keywords: KVM, Kernel-based, Virtual Machine, linux, workflow
+summary: TR-4857
+---
+
+= KVM on RHEL: NetApp HCI with Cisco ACI
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2020-08-31 14:10:37.380045
+//
+
+[.lead]
+KVM (for Kernel-based Virtual Machine) is an open-source full virtualization solution for Linux on x86 hardware such as Intel VT or AMD-V. In other words, KVM lets you turn a Linux machine into a hypervisor that allows the host to run multiple, isolated VMs.
+
+KVM converts any Linux machine into a type-1 (bare-metal) hypervisor. KVM can be implemented on any Linux distribution, but implementing KVM on a supported Linux distribution―like Red Hat Enterprise Linux―expands KVM's capabilities. You can swap resources among guests, share common libraries, and optimize system performance.
+
+== Workflow
+
+The following high-level workflow was used to set up the virtual environment. Each of these steps might involve several individual tasks.
+
+. Install and configure Nexus 9000 switches in ACI mode, and install and configure APIC software on a UCS C-series server. See the Install and Upgrade https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/tsd-products-support-series-home.html[documentation^] for detailed steps.
+. Configure and set up the ACI fabric by referring to the https://www.cisco.com/c/en/us/td/docs/switches/datacenter/aci/apic/sw/3-x/getting_started/b_APIC_Getting_Started_Guide_Rel_3_x.html[documentation^].
+. Configure the tenants, application profiles, bridge domains, and EPGs required for NetApp HCI nodes. NetApp recommends using a one-BD-to-one-EPG framework except for iSCSI. See the documentation https://www.cisco.com/c/en/us/td/docs/switches/datacenter/aci/apic/sw/2-x/L2_config/b_Cisco_APIC_Layer_2_Configuration_Guide.html[here^] for more details. The minimum set of EPGs required are in-band management, iSCSI, VM Motion, VM-data network,  and native.
+. Create the VLAN pool, physical domain, and AEP based on the requirements. Create the switch and interface profiles and policies for vPCs and individual ports. Then attach the physical domain and configure the static paths to the EPGs. See the https://www.cisco.com/c/en/us/td/docs/switches/datacenter/aci/apic/sw/2-x/L2_config/b_Cisco_APIC_Layer_2_Configuration_Guide.html[configuration guide^] for more details. Also see this table <link> for best practices for integrating ACI with Open vSwitch on the RHEL–KVM hypervisor.
++
+
+[NOTE]
+Use a vPC policy group for interfaces connecting to NetApp HCI storage and compute nodes.
+
+. Create and assign contracts for tightly-controlled access between workloads. For more details on configuring the contracts, see the guide https://www.cisco.com/c/en/us/td/docs/switches/datacenter/aci/apic/sw/1-x/Operating_ACI/guide/b_Cisco_Operating_ACI/b_Cisco_Operating_ACI_chapter_01000.html[here^].
+. Install and configure a NetApp HCI Element cluster. Do not use NDE for this installation; rather,  install a standalone Element cluster on HCI storage nodes. Then configure the required volumes for the installation of RHEL. Install RHEL, KVM, and Open vSwitch on the NetApp HCI compute nodes. Configure storage pools on the hypervisor using Element volumes for a shared storage service for hosts and VMs. For more details on installation and configuration of KVM on RHEL, see the https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html-single/virtualization_deployment_and_administration_guide/index[Red Hat documentation^]. See the https://docs.openvswitch.org/en/latest/[OVS documentation^] for details on configuring Open vSwitch.
+. RHEL KVM hypervisor’s Open vSwitch cannot be VMM integrated with Cisco ACI. Physical domain and static paths must be configured on all required EPGs to allow the required VLANs on the interfaces connecting the ACI leaf switches and RHEL hosts. Also configure the corresponding OVS bridges on RHEL hosts and configure VMs to use those bridges. The networking functionality for the RHEL KVM hosts in this solution is achieved using Open vSwitch virtual switch.
+
+== Open vSwitch
+
+Open vSwitch is an open-source, enterprise-grade virtual switch platform. It uses virtual network bridges and flow rules to forward packets between hosts. Programming flow rules work differently in OVS than in the standard Linux Bridge. The OVS plugin does not use VLANs to tag traffic. Instead, it programs flow rules on the virtual switches that dictate how traffic should be manipulated before forwarded to the exit interface. Flow rules determine how inbound and outbound traffic should be treated. The following figure depicts the internal networking of Open vSwitch on an RHEL-based KVM host.
+
+image:hcicaci_image21.jpeg[Error: Missing Graphic Image]
+
+The following table outlines the necessary parameters and best practices for configuring Cisco ACI and Open vSwitch on RHEL based KVM hosts.
+
+|===
+|Resource |Configuration Considerations |Best Practices
+
+|Endpoint groups
+a|* Separate EPG for native VLAN
+* Static binding of interfaces towards HCI storage and compute nodes in native VLAN EPG to be on 802.1P mode
+* Static binding of vPCs required on in-band management EPG and iSCSI EPG before KVM installation
+a|* Separate VLAN pool for physical domain with static allocation turned on
+* Contracts between EPGs to be well defined. Allow only required ports for communication.
+* Use unique native VLAN for discovery during Element cluster formation
+|Interface Policy
+|- One vPC policy group per RHEL host
+- One vPC policy group per NetApp HCI storage node
+- LLDP enabled, CDP disabled
+a|* NetApp recommends using vPC towards RHV-H hosts
+* Use LACP Active for the port-channel policy
+* Use only Graceful Convergence and Symmetric Hashing control bits for port-channel policy
+* Use Layer4 Src-Port load-balancing hashing method for port-channel policy
+* NetApp recommends using vPC with LACP Active port-channel policy for interfaces towards NetApp HCI storage nodes
+|===
+
+link:hcicaci_ontap_on_aff__netapp_hci_and_cisco_aci.html[Next: ONTAP on AFF: NetApp HCI and Cisco ACI]

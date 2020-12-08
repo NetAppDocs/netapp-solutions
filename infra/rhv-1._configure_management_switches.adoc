@@ -1,0 +1,173 @@
+---
+sidebar: sidebar
+permalink: rhv-1._configure_management_switches.html
+keywords: Cisco	switches, VLAN, LACP, vPCs, in-band, out-of-band
+summary:
+---
+
+= 1. Configure Management Switches: NetApp HCI with RHV
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 0.9 (June 4, 2020)
+//
+// 2020-06-25 14:26:00.154878
+//
+
+[.lead]
+
+Cisco Nexus 3048 switches are used in this deployment procedure to provide 1Gbps connectivity for in and out-of-band management of the compute and storage nodes. These steps begin after the switches have been racked, powered, and put through the initial setup process. To configure the switches to provide management connectivity to the infrastructure, complete the following steps:
+
+=== Enable Advanced Features for Cisco Nexus
+
+Run the following commands on each Cisco Nexus 3048 switch to configure advanced features:
+
+. Enter configuration mode.
++
+
+....
+Switch-01# configure terminal
+....
+
+. Enable VLAN functionality.
++
+
+....
+Switch-01(config)# feature interface-vlan
+....
+
+. Enable LACP.
++
+
+....
+Switch-01(config)# feature lacp
+....
+
+. Enable virtual port channels (vPCs).
++
+
+....
+Switch-01(config)# feature vpc
+....
+
+. Set the global port-channel load-balancing configuration.
++
+
+....
+Switch-01(config)# port-channel load-balance src-dst ip-l4port
+....
+
+. Perform global spanning-tree configuration.
+
+....
+Switch-01(config)# spanning-tree port type network default
+Switch-01(config)# spanning-tree port type edge bpduguard default
+....
+
+=== Configure Ports on the Switch for In-Band Management
+
+. Run the following commands to create VLANs for management purposes:
++
+
+....
+Switch-01(config)# vlan 2
+Switch-01(config-vlan)# Name Native_VLAN
+Switch-01(config-vlan)# vlan 16
+Switch-01(config-vlan)# Name OOB_Network
+Switch-01(config-vlan)# vlan 1172
+Switch-01(config-vlan)# Name MGMT_Network
+Switch-01(config-vlan)# exit
+....
+
+. Configure the ports ETH1/29-32 as VLAN trunk ports that connect to management interfaces on each HCI storage node.
+
+....
+Switch-01(config)# int eth 1/29
+Switch-01(config-if)# description HCI-STG-01 PortA
+Switch-01(config-if)# switchport mode trunk
+Switch-01(config-if)# switchport trunk native vlan 2
+Switch-01(config-if)# switchport trunk allowed vlan 1172
+Switch-01(config-if)# spanning tree port type edge trunk
+Switch-01(config-if)# int eth 1/30
+Switch-01(config-if)# description HCI-STG-02 PortA
+Switch-01(config-if)# switchport mode trunk
+Switch-01(config-if)# switchport trunk native vlan 2
+Switch-01(config-if)# switchport trunk allowed vlan 1172
+Switch-01(config-if)# spanning tree port type edge trunk
+Switch-01(config-if)# int eth 1/31
+Switch-01(config-if)# description HCI-STG-03 PortA
+Switch-01(config-if)# switchport mode trunk
+Switch-01(config-if)# switchport trunk native vlan 2
+Switch-01(config-if)# switchport trunk allowed vlan 1172
+Switch-01(config-if)# spanning tree port type edge trunk
+Switch-01(config-if)# int eth 1/32
+Switch-01(config-if)# description HCI-STG-04 PortA
+Switch-01(config-if)# switchport mode trunk
+Switch-01(config-if)# switchport trunk native vlan 2
+Switch-01(config-if)# switchport trunk allowed vlan 1172
+Switch-01(config-if)# spanning tree port type edge trunk
+Switch-01(config-if)# exit
+....
+
+=== Configure Ports on the Switch for Out-of-Band Management
+
+Run the following commands to configure the ports for cabling the IPMI interfaces on each HCI node.
+
+....
+Switch-01(config)# int eth 1/13
+Switch-01(config-if)# description HCI-CMP-01 IPMI
+Switch-01(config-if)# switchport mode access
+Switch-01(config-if)# switchport access vlan 16
+Switch-01(config-if)# spanning-tree port type edge
+Switch-01(config-if)# int eth 1/14
+Switch-01(config-if)# description HCI-STG-01 IPMI
+Switch-01(config-if)# switchport mode access
+Switch-01(config-if)# switchport access vlan 16
+Switch-01(config-if)# spanning-tree port type edge
+Switch-01(config-if)# int eth 1/15
+Switch-01(config-if)# description HCI-STG-03 IPMI
+Switch-01(config-if)# switchport mode access
+Switch-01(config-if)# switchport access vlan 16
+Switch-01(config-if)# spanning-tree port type edge
+Switch-01(config-if)# exit
+....
+
+[NOTE]
+In the validated configuration, we cabled odd-node IPMI interfaces to Switch-01 and even-node IPMI interfaces to Switch-02.
+
+=== Create a vPC Domain to Ensure Fault Tolerance
+
+. Activate the ports used for the vPC peer-link between the two switches.
++
+
+....
+Switch-01(config)# int eth 1/1
+Switch-01(config-if)# description vPC peer-link Switch-02 1/1
+Switch-01(config-if)# int eth 1/2
+Switch-01(config-if)# description vPC peer-link Switch-02 1/2
+Switch-01(config-if)# exit
+....
+
+. Perform the vPC global configuration.
+....
+Switch-01(config)# vpc domain 1
+Switch-01(config-vpc-domain)# role priority 10
+Switch-01(config-vpc-domain)# peer-keepalive destination <switch-02_mgmt_address> source <switch-01_mgmt_address> vrf managment
+Switch-01(config-vpc-domain)# peer-gateway
+Switch-01(config-vpc-domain)# auto recovery
+Switch-01(config-vpc-domain)# ip arp synchronize
+Switch-01(config-vpc-domain)# int eth 1/1-2
+Switch-01(config-vpc-domain)# channel-group 10 mode active
+Switch-01(config-vpc-domain)# int Po10
+Switch-01(config-if)# description vPC peer-link
+Switch-01(config-if)# switchport mode trunk
+Switch-01(config-if)# switchport trunk native vlan 2
+Switch-01(config-if)# switchport trunk allowed vlan 16, 1172
+Switch-01(config-if)# spanning-tree port type network
+Switch-01(config-if)# vpc peer-link
+Switch-01(config-if)# exit
+....
