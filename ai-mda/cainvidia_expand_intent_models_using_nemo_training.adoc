@@ -1,0 +1,178 @@
+---
+sidebar: sidebar
+permalink: cainvidia_expand_intent_models_using_nemo_training.html
+keywords: Intent Models, NeMo, toolkit, ASR, NLP, TTS, NARA, Data Preparation
+summary:
+---
+
+= Expand Intent Models Using NeMo Training
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2020-08-21 13:44:47.310529
+//
+
+NVIDIA NeMo is a toolkit built by NVIDIA for creating conversational AI applications. This toolkit includes collections of pre-trained modules for ASR, NLP, and TTS, enabling researchers and data scientists to easily compose complex neural network architectures and put more focus on designing their own applications.
+
+As shown in the previous example, NARA can only handle a limited type of question. This is because the pre-trained NLP model only trains on these types of questions. If we want to enable NARA to handle a broader range of questions, we need to retrain it with our own datasets. Thus, here, we demonstrate how we can use NeMo to extend the NLP model to satisfy the requirements. We start by converting the log collected from NARA into the format for NeMo, and then train with the dataset to enhance the NLP model.
+
+== Model
+
+Our goal is to enable NARA to sort the items based on user preferences. For instance, we might ask NARA to suggest the highest-rated sushi restaurant or might want NARA to look up the jeans with the lowest price. To this end, we use the intent detection and slot filling model provided in NeMo as our training model. This model allows NARA to understand the intent of searching preference.
+
+== Data Preparation
+
+To train the model, we collect the dataset for this type of question, and convert it to the NeMo format. Here, we listed the files we use to train the model.
+
+=== dict.intents.csv
+
+This file lists all the intents we want the NeMo to understand. Here, we have two primary intents and one intent only used to categorize the questions that do not fit into any of the primary intents.
+
+....
+price_check
+find_the_store
+unknown
+....
+
+=== dict.slots.csv
+
+This file lists all the slots we can label on our training questions.
+
+....
+B-store.type
+B-store.name
+B-store.status
+B-store.hour.start
+B-store.hour.end
+B-store.hour.day
+B-item.type
+B-item.name
+B-item.color
+B-item.size
+B-item.quantity
+B-location
+B-cost.high
+B-cost.average
+B-cost.low
+B-time.period_of_time
+B-rating.high
+B-rating.average
+B-rating.low
+B-interrogative.location
+B-interrogative.manner
+B-interrogative.time
+B-interrogative.personal
+B-interrogative
+B-verb
+B-article
+I-store.type
+I-store.name
+I-store.status
+I-store.hour.start
+I-store.hour.end
+I-store.hour.day
+I-item.type
+I-item.name
+I-item.color
+I-item.size
+I-item.quantity
+I-location
+I-cost.high
+I-cost.average
+I-cost.low
+I-time.period_of_time
+I-rating.high
+I-rating.average
+I-rating.low
+I-interrogative.location
+I-interrogative.manner
+I-interrogative.time
+I-interrogative.personal
+I-interrogative
+I-verb
+I-article
+O
+....
+
+=== train.tsv
+
+This is the main training dataset. Each line starts with the question following the intent category listing in the file dict.intent.csv. The label is enumerated starting from zero.
+
+=== train_slots.tsv
+
+....
+20 46 24 25 6 32 6
+52 52 24 6
+23 52 14 40 52 25 6 32 6
+…
+....
+
+== Train the Model
+
+....
+docker pull nvcr.io/nvidia/nemo:v0.10
+....
+
+We then use the following command to launch the container. In this command, we limit the container to use a single GPU (GPU ID = 1) since this is a lightweight training exercise. We also map our local workspace /workspace/nemo/ to the folder inside container /nemo.
+
+....
+NV_GPU='1' docker run --runtime=nvidia -it --shm-size=16g \
+                        --network=host --ulimit memlock=-1 --ulimit stack=67108864 \
+                        -v /workspace/nemo:/nemo\
+                        --rm nvcr.io/nvidia/nemo:v0.10
+....
+
+Inside the container, if we want to start from the original pre-trained BERT model, we can use the following command to start the training procedure. data_dir is the argument to set up the path of the training data. work_dir allows you to configure where you want to store the checkpoint files.
+
+....
+cd examples/nlp/intent_detection_slot_tagging/
+python joint_intent_slot_with_bert.py \
+    --data_dir /nemo/training_data\
+    --work_dir /nemo/log
+....
+
+If we have new training datasets and want to improve the previous model, we can use the following command to continue from the point we stopped. checkpoint_dir takes the path to the previous checkpoints folder.
+
+....
+cd examples/nlp/intent_detection_slot_tagging/
+python joint_intent_slot_infer.py \
+    --data_dir /nemo/training_data \
+    --checkpoint_dir /nemo/log/2020-05-04_18-34-20/checkpoints/ \
+    --eval_file_prefix test
+....
+
+== Inference the Model
+
+We need to validate the performance of the trained model after a certain number of epochs. The following command allows us to test the query one-by-one. For instance, in this command, we want to check if our model can properly identify the intention of the query `where can I get the best pasta`.
+
+....
+cd examples/nlp/intent_detection_slot_tagging/
+python joint_intent_slot_infer_b1.py \
+--checkpoint_dir /nemo/log/2020-05-29_23-50-58/checkpoints/ \
+--query "where can i get the best pasta" \
+--data_dir /nemo/training_data/ \
+--num_epochs=50
+....
+
+Then, the following is the output from the inference. In the output, we can see that our trained model can properly predict the intention find_the_store, and return the keywords we are interested in. With these keywords, we enable the NARA to search for what users want and do a more precise search.
+
+....
+[NeMo I 2020-05-30 00:06:54 actions:728] Evaluating batch 0 out of 1
+[NeMo I 2020-05-30 00:06:55 inference_utils:34] Query: where can i get the best pasta
+[NeMo I 2020-05-30 00:06:55 inference_utils:36] Predicted intent:       1       find_the_store
+[NeMo I 2020-05-30 00:06:55 inference_utils:50] where   B-interrogative.location
+[NeMo I 2020-05-30 00:06:55 inference_utils:50] can     O
+[NeMo I 2020-05-30 00:06:55 inference_utils:50] i       O
+[NeMo I 2020-05-30 00:06:55 inference_utils:50] get     B-verb
+[NeMo I 2020-05-30 00:06:55 inference_utils:50] the     B-article
+[NeMo I 2020-05-30 00:06:55 inference_utils:50] best    B-rating.high
+[NeMo I 2020-05-30 00:06:55 inference_utils:50] pasta   B-item.type
+....
+
+link:cainvidia_conclusion.html[Next: Conclusion]

@@ -1,0 +1,48 @@
+---
+sidebar: sidebar
+permalink: aicp_kubernetes_deployment.html
+keywords: NVIDIA, GPU, Kubernetes, Control Plane, Trident
+summary:
+---
+
+= Kubernetes Deployment
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2020-08-18 15:53:11.640756
+//
+
+[.lead]
+This section describes the tasks that you must complete to deploy a Kubernetes cluster in which to implement the NetApp AI Control Plane solution. If you already have a Kubernetes cluster, then you can skip this section as long as you are running a version of Kubernetes that is supported by Kubeflow and NetApp Trident. For a list of Kubernetes versions that are supported by Kubeflow, see the see the https://www.kubeflow.org/docs/started/getting-started/[official Kubeflow documentation^]. For a list of Kubernetes versions that are supported by Trident, see the https://netapp-trident.readthedocs.io/[Trident documentation^].
+
+For on-premises Kubernetes deployments that incorporate bare-metal nodes featuring NVIDIA GPU(s), NetApp recommends using NVIDIA’s DeepOps Kubernetes deployment tool. This section outlines the deployment of a Kubernetes cluster using DeepOps.
+
+For cloud- based Kubernetes deployments, NetApp recommends using the NetApp Kubernetes Service (NKS). This document does not cover the deployment of a Kubernetes cluster using NKS. If you wish to deploy a cloud-based Kubernetes cluster using NKS, visit the https://cloud.netapp.com/kubernetes-service[NKS homepage^].
+
+=== Prerequisites
+
+Before you perform the deployment exercise that is outlined in this section, we assume that you have already performed the following tasks:
+
+. You have already configured any bare-metal Kubernetes nodes (for example, an NVIDIA DGX system that is part of an ONTAP AI pod) according to standard configuration instructions.
+. You have installed a supported operating system on all Kubernetes master and worker nodes and on a deployment jump host. For a list of operating systems that are supported by DeepOps, see the https://github.com/NVIDIA/deepops[DeepOps GitHub site^].
+
+=== Use NVIDIA DeepOps to Install and Configure Kubernetes
+
+To deploy and configure your Kubernetes cluster with NVIDIA DeepOps, perform the following tasks from a deployment jump host:
+
+. Download NVIDIA DeepOps by following the instructions on the https://github.com/NVIDIA/deepops/blob/master/docs/getting-started.md[Getting Started page^] on the NVIDIA DeepOps GitHub site.
+. Deploy Kubernetes in your cluster by following the instructions on the https://github.com/NVIDIA/deepops/blob/master/docs/kubernetes-cluster.md[Kubernetes Deployment Guide page^] on the NVIDIA DeepOps GitHub site.
++
+For the DeepOps Kubernetes deployment to work, the same user must exist on all Kubernetes master and worker nodes.
++
+If the deployment fails, change the value of `kubectl_localhost` to `false` in `deepops/config/group_vars/k8s-cluster.yml` and repeat step 2. The `Copy kubectl binary to ansible host` task, which executes only when the value of `kubectl_localhost` is `true`, relies on the `fetch` Ansible module, which has known memory usage issues. These memory usage issues can sometimes cause the task to fail. If the task fails because of a memory issue, then the remainder of the deployment operation does not complete successfully.
++
+If the deployment completes successfully after you have changed the value of `kubectl_localhost` to `false`, then you must manually copy the kubectl binary from a Kubernetes master node to the deployment jump host. You can find the location of the kubectl binary on a specific master node by executing the command `which kubectl` directly on that node.
+
+link:aicp_netapp_trident_deployment_and_configuration_overview.html[Next: NetApp Trident Deployment and Configuration Overview]

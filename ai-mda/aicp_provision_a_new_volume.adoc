@@ -1,0 +1,49 @@
+---
+sidebar: sidebar
+permalink: aicp_provision_a_new_volume.html
+keywords: New Volume, FlexVol, StorageClass, PVC
+summary:
+---
+
+= Provision a New Volume
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2020-08-18 15:53:14.460115
+//
+
+[.lead]
+You can use Trident to provision a new volume on your NetApp storage system or platform. The following example commands show the provisioning of a new FlexVol volume. In this example, the volume is provisioned using the StorageClass that was created in the example in the section link:aicp_netapp_trident_deployment_and_configuration_overview.html[Trident Deployment and configuration Overview.html], step 2.
+
+An `accessModes` value of `ReadWriteMany` is specified in the following example PVC definition file. This value means that multiple containers can mount this PVC at the same time and that access is read-write. For more information about the `accessMode` field, see the https://kubernetes.io/docs/concepts/storage/persistent-volumes/[official Kubernetes documentation^].
+
+....
+$ cat << EOF > ./pvc-tensorflow-results.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: tensorflow-results
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ontap-ai-flexvols-retain
+EOF
+$ kubectl create -f ./pvc-tensorflow-results.yaml
+persistentvolumeclaim/tensorflow-results created
+$ kubectl get pvc
+NAME                              STATUS    VOLUME                             CAPACITY         ACCESS MODES   STORAGECLASS                        AGE
+pb-fg-all-iface1                  Bound     default-pb-fg-all-iface1-7d9f1     10995116277760   ROX            ontap-ai-flexgroups-retain-iface1   26h
+pb-fg-all-iface2                  Bound     default-pb-fg-all-iface2-85aee     10995116277760   ROX            ontap-ai-flexgroups-retain-iface2   26h
+tensorflow-results                Bound     default-tensorflow-results-2fd60   1073741824       RWX            ontap-ai-flexvols-retain            25h
+....
+
+link:aicp_example_high-aicp_example_kubeflow_operations_and_tasks_overview.html[Next: Example High-Performance Jobs for ONTAP AI Deployments Overview]

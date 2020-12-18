@@ -1,0 +1,46 @@
+---
+sidebar: sidebar
+permalink: aicp_set_default_kubernetes_storageclass.html
+keywords: Kubeflow, Kubernetes, StorageClass,
+summary:
+---
+
+= Set Default Kubernetes StorageClass
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2020-08-18 15:53:12.114936
+//
+
+[.lead]
+Before you deploy Kubeflow, you must designate a default StorageClass within your Kubernetes cluster. The Kubeflow deployment process attempts to provision new persistent volumes using the default StorageClass. If no StorageClass is designated as the default StorageClass, then the deployment fails. To designate a default StorageClass within your cluster, perform the following task from the deployment jump host. If you have already designated a default StorageClass within your cluster, then you can skip this step.
+
+. Designate one of your existing StorageClasses as the default StorageClass. The example commands that follow show the designation of a StorageClass named `ontap-ai- flexvols-retain` as the default StorageClass.
+
+[NOTE]
+The `ontap-nas-flexgroup` Trident Backend type has a minimum PVC size of 800GB. By default, Kubeflow attempts to provision PVCs that are smaller than 800GB. Therefore, you should not designate a StorageClass that utilizes the `ontap-nas-flexgroup` Backend type as the default StorageClass for the purposes of Kubeflow deployment.
+
+....
+$ kubectl get sc
+NAME                                PROVISIONER             AGE
+ontap-ai-flexgroups-retain          csi.trident.netapp.io   25h
+ontap-ai-flexgroups-retain-iface1   csi.trident.netapp.io   25h
+ontap-ai-flexgroups-retain-iface2   csi.trident.netapp.io   25h
+ontap-ai-flexvols-retain            csi.trident.netapp.io   3s
+$ kubectl patch storageclass ontap-ai-flexvols-retain -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+storageclass.storage.k8s.io/ontap-ai-flexvols-retain patched
+$ kubectl get sc
+NAME                                 PROVISIONER             AGE
+ontap-ai-flexgroups-retain           csi.trident.netapp.io   25h
+ontap-ai-flexgroups-retain-iface1    csi.trident.netapp.io   25h
+ontap-ai-flexgroups-retain-iface2    csi.trident.netapp.io   25h
+ontap-ai-flexvols-retain (default)   csi.trident.netapp.io   54s
+....
+
+link:aicp_use_nvidia_deepops_to_deploy_kubeflow.html[Next: Use Nvidia DeepOps to Deploy Kubeflow]

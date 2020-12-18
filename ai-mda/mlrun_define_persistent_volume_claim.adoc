@@ -1,0 +1,68 @@
+---
+sidebar: sidebar
+permalink: mlrun_define_persistent_volume_claim.html
+keywords: NetApp Trident Volume Jupyter Notebook
+summary:
+---
+
+= Define Persistent Volume Claim
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2020-08-19 15:22:25.719750
+//
+
+. Save the following YAML to a file to create a PVC of type Basic.
++
+....
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: basic
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: netapp-file
+....
+
+. Apply the YAML file to your Iguazio Kubernetes cluster.
+
+....
+Kubectl -n default-tenant apply -f <your yaml file>
+....
+
+== Attach NetApp Volume to the Jupyter Notebook
+
+Iguazio offers several managed services to provide data scientists with a full end-to-end stack for development and deployment of AI/ML applications. You can read more about these components at the https://www.iguazio.com/docs/intro/latest-release/ecosystem/app-services/[Iguazio Overview of Application Services and Tools^].
+
+One of the managed services is Jupyter Notebook. Each developer gets its own deployment of a notebook container with the resources they need for development. To give them access to the NetApp Cloud Volume, you can assign the volume to their container and resource allocation, running user, and environment variable settings for Persistent Volume Claims is presented in the following image.
+
+For an on-premises configuration, you can refer to https://www.netapp.com/us/media/tr-4798.pdf[TR-4798^] on the Trident setup to enable NetApp ONTAP data management capabilities, such as taking Snapshot copies of your data or model for versioning control. Add the following line in your Trident back- end config file to make Snapshot directories visible:
+
+....
+{
+    …
+    "defaults": {
+        "snapshotDir": "true"
+    }
+}
+....
+
+You must create a Trident back- end config file in JSON format, and then run the following https://netapp-trident.readthedocs.io/en/stable-v18.07/kubernetes/operations/tasks/backends.html[Trident command^] to reference it:
+
+....
+tridentctl create backend -f <backend-file>
+....
+
+image:mlrun_image11.png[Error: Missing Graphic Image]
+
+link:mlrun_deploying_the_application.html[Next: Deploying the Application]

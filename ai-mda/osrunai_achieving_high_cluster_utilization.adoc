@@ -1,0 +1,33 @@
+---
+sidebar: sidebar
+permalink: osrunai_achieving_high_cluster_utilization.html
+keywords:
+summary:
+---
+
+= Achieving High Cluster Utilization
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2020-09-11 12:14:20.578588
+//
+
+In this section, we emulate a realistic scenario in which four data science teams each submit their own workloads to demonstrate the Run:AI orchestration solution that achieves high cluster utilization while maintaining prioritization and balancing GPU resources. We start by using the ResNet-50 benchmark described in the section link:osrunai_resnet-50_with_imagenet_dataset_benchmark_summary.html[ResNet-50 with ImageNet Dataset Benchmark Summary]:
+
+....
+$ runai submit netapp1 -i netapp/tensorflow-tf1-py3:20.01.0 --local-image --large-shm  -v /mnt:/mnt -v /tmp:/tmp --command python --args "/netapp/scripts/run.py" --args "--dataset_dir=/mnt/mount_0/dataset/imagenet/imagenet_original/" --args "--num_mounts=2"  --args "--dgx_version=dgx1" --args "--num_devices=1" -g 1
+....
+
+We ran the same ResNet-50 benchmark as in https://www.netapp.com/us/media/nva-1121-design.pdf[NVA-1121^]. We used the flag `--local-image` for containers not residing in the public docker repository. We mounted the directories `/mnt` and `/tmp` on the host DGX-1 node to `/mnt` and `/tmp` to the container, respectively. The dataset is at NetApp AFFA800 with the `dataset_dir` argument pointing to the directory. Both `--num_devices=1` and `-g 1` mean that we allocate one GPU for this job. The former is an argument for the `run.py` script, while the latter is a flag for the `runai submit` command.
+
+The following figure shows a system overview dashboard with 97% GPU utilization and all sixteen available GPUs allocated. You can easily see how many GPUs are allocated for each team in the GPUs/Project bar chart. The Running Jobs pane shows the current running job names, project, user, type, node, GPUs consumed, run time, progress, and utilization details. A list of workloads in queue with their wait time is shown in Pending Jobs. Finally, the Nodes box offers GPU numbers and utilization for individual DGX-1 nodes in the cluster.
+
+image:osrunai_image6.png[Error: Missing Graphic Image]
+
+link:osrunai_fractional_gpu_allocation_for_less_demanding_or_interactive_workloads.html[Next: Fractional GPU Allocation for Less Demanding or Interactive Workloads]
