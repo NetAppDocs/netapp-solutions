@@ -1,0 +1,179 @@
+---
+sidebar: sidebar
+permalink: aicp_apache_airflow_deployment.html
+keywords: AI, control plane, apache, airflow
+summary:
+---
+
+= Apache Airflow Deployment
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2020-12-21 12:56:18.056962
+//
+
+[.lead]
+NetApp recommends running Apache Airflow on top of Kubernetes.  This section describes the tasks that you must complete to deploy Airflow in your Kubernetes cluster.
+
+[NOTE]
+It is possible to deploy Airflow on platforms other than Kubernetes. Deploying Airflow on platforms other than Kubernetes is outside of the scope of this document.
+
+=== Prerequisites
+
+Before you perform the deployment exercise that is outlined in this section, we assume that you have already performed the following tasks:
+
+. You already have a working Kubernetes cluster.
+. You have already installed and configured NetApp Trident in your Kubernetes cluster as outlined in the section “NetApp Trident Deployment and Configuration.”
+
+=== Install Helm
+
+Airflow is deployed using Helm, a popular package manager for Kubernetes. Before you deploy Airflow, you must install Helm on the deployment jump host. To install Helm on the deployment jump host, follow the https://helm.sh/docs/intro/install/[installation instructions^] in the official Helm documentation.
+
+=== Set Default Kubernetes StorageClass
+
+Before you deploy Airflow, you must designate a default StorageClass within your Kubernetes cluster. The Airflow deployment process attempts to provision new persistent volumes using the default StorageClass. If no StorageClass is designated as the default StorageClass, then the deployment fails. To designate a default StorageClass within your cluster, follow the instructions outlined in the section “Set Default Kubernetes StorageClass. ” If you have already designated a default StorageClass within your cluster, then you can skip this step.
+
+=== Use Helm to Deploy Airflow
+
+To deploy Airflow in your Kubernetes cluster using Helm, perform the following tasks from the deployment jump host:
+
+. Deploy Airflow using Helm by following the https://hub.helm.sh/charts/stable/airflow[deployment instructions^] for the official Airflow chart on the Helm Hub.  The example commands that follow show the deployment of Airflow using Helm. Modify, add, and/or remove values in the `custom- values.yaml` file as needed depending on your environment and desired configuration.
+
+....
+$ cat << EOF > custom-values.yaml
+###################################
+# Airflow - Common Configs
+###################################
+airflow:
+  ## the airflow executor type to use
+  ##
+  executor: "KubernetesExecutor"
+  ## environment variables for the web/scheduler/worker Pods (for airflow configs)
+  ##
+  config:
+    AIRFLOW__KUBERNETES__DELETE_WORKER_PODS: "False"
+    AIRFLOW__KUBERNETES__GIT_REPO: "git@github.com:mboglesby/airflow-dev.git"
+    AIRFLOW__KUBERNETES__GIT_BRANCH: master
+    AIRFLOW__KUBERNETES__GIT_DAGS_FOLDER_MOUNT_POINT: "/opt/airflow/dags"
+    AIRFLOW__KUBERNETES__DAGS_VOLUME_SUBPATH: "repo/"
+    AIRFLOW__KUBERNETES__GIT_SSH_KEY_SECRET_NAME: "airflow-git-key"
+    AIRFLOW__KUBERNETES__WORKER_CONTAINER_REPOSITORY: "apache/airflow"
+    AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG: "1.10.12"
+    AIRFLOW__KUBERNETES__RUN_AS_USER: "50000"
+    AIRFLOW__KUBERNETES__LOGS_VOLUME_CLAIM: "airflow-k8s-exec-logs"
+workers:
+  enabled: false # Celery workers
+###################################
+# Airflow - WebUI Configs
+###################################
+web:
+  ## configs for the Service of the web Pods
+  ##
+  service:
+    type: NodePort
+###################################
+# Airflow - Logs Configs
+###################################
+logs:
+  persistence:
+    enabled: true
+###################################
+# Airflow - DAGs Configs
+###################################
+dags:
+  ## configs for the DAG git repository & sync container
+  ##
+  git:
+    ## url of the git repository
+    ##
+    url: "git@github.com:mboglesby/airflow-dev.git"
+    ## the branch/tag/sha1 which we clone
+    ##
+    ref: master
+    ## the name of a pre-created secret containing files for ~/.ssh/
+    ##
+    ## NOTE:
+    ## - this is ONLY RELEVANT for SSH git repos
+    ## - the secret commonly includes files: id_rsa, id_rsa.pub, known_hosts
+    ## - known_hosts is NOT NEEDED if `git.sshKeyscan` is true
+    ##
+    secret: "airflow-git-key-files"
+    sshKeyscan: true
+    ## the name of the private key file in your `git.secret`
+    ##
+    ## NOTE:
+    ## - this is ONLY RELEVANT for PRIVATE SSH git repos
+    ##
+    privateKeyName: id_rsa
+    ## the host name of the git repo
+    ##
+    ## NOTE:
+    ## - this is ONLY REQUIRED for SSH git repos
+    ##
+    ## EXAMPLE:
+    ##   repoHost: "github.com"
+    ##
+    repoHost: "github.com"
+    ## the port of the git repo
+    ##
+    ## NOTE:
+    ## - this is ONLY REQUIRED for SSH git repos
+    ##
+    repoPort: 22
+    ## configs for the git-sync container
+    ##
+    gitSync:
+      ## enable the git-sync sidecar container
+      ##
+      enabled: true
+      ## the git sync interval in seconds
+      ##
+      refreshTime: 60
+EOF
+$ helm install "airflow" stable/airflow --version "7.10.1" --namespace "airflow" --values ./custom-values.yaml
+NAME: airflow
+LAST DEPLOYED: Mon Oct  5 18:32:11 2020
+NAMESPACE: airflow
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+Congratulations. You have just deployed Apache Airflow!
+1. Get the Airflow Service URL by running these commands:
+   export NODE_PORT=$(kubectl get --namespace airflow -o jsonpath="{.spec.ports[0].nodePort}" services airflow-web)
+   export NODE_IP=$(kubectl get nodes --namespace airflow -o jsonpath="{.items[0].status.addresses[0].address}")
+   echo http://$NODE_IP:$NODE_PORT/
+2. Open Airflow in your web browser
+....
+
+. Confirm that all Airflow pods are up and running.
+
+....
+$ kubectl -n airflow get pod
+NAME                                 READY   STATUS    RESTARTS   AGE
+airflow-postgresql-0                 1/1     Running   0          38m
+airflow-redis-master-0               1/1     Running   0          38m
+airflow-scheduler-7fb4bf56cc-g88z4   2/2     Running   2          38m
+airflow-web-8f4bdf5fb-hhxr7          2/2     Running   1          38m
+airflow-worker-0                     2/2     Running   0          38m
+....
+
+. Obtain the Airflow web service URL by following the instructions that were printed to the console when you deployed Airflow using Helm in step 1.
+
+....
+$ export NODE_PORT=$(kubectl get --namespace airflow -o jsonpath="{.spec.ports[0].nodePort}" services airflow-web)
+$ export NODE_IP=$(kubectl get nodes --namespace airflow -o jsonpath="{.items[0].status.addresses[0].address}")
+$ echo http://$NODE_IP:$NODE_PORT/
+
+. Confirm that you can access the Airflow web service.
+
+image:aicp_imageaa1.png[Error: Missing Graphic Image]
+....
+
+link:aicp_example_apache_airflow_workflows_overview.html[Next: Example Apache Airflow Workflows]
