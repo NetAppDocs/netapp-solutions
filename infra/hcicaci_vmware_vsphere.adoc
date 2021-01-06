@@ -19,7 +19,7 @@ summary: TR-4857
 //
 
 [.lead]
-VMware vSphere is an industry-leading virtualization platform that provides a way to build a resilient and reliable virtual infrastructure. vSphere contains virtualization, management, and interface layers. The two core components of VMware vSphere are ESXi server and the vCenter Server. VMware ESXi is hypervisor software installed on a physical machine that facilitates hosting of VMs and virtual appliances. vCenter Server is the service through which you manage multiple ESXi hosts connected in a network and pool host resources. For more information on VMware vSphere, see the documentation here.
+VMware vSphere is an industry-leading virtualization platform that provides a way to build a resilient and reliable virtual infrastructure. vSphere contains virtualization, management, and interface layers. The two core components of VMware vSphere are ESXi server and the vCenter Server. VMware ESXi is hypervisor software installed on a physical machine that facilitates hosting of VMs and virtual appliances. vCenter Server is the service through which you manage multiple ESXi hosts connected in a network and pool host resources. For more information on VMware vSphere, see the documentation https://docs.vmware.com/en/VMware-vSphere/index.html[here^].
 
 == Workflow
 
@@ -52,7 +52,7 @@ Use an access port policy group for interfaces connecting to NetApp HCI compute 
 . Create and assign contracts for tightly-controlled access between workloads. For more information on configuring the contracts, see the guide https://www.cisco.com/c/en/us/td/docs/switches/datacenter/aci/apic/sw/1-x/Operating_ACI/guide/b_Cisco_Operating_ACI/b_Cisco_Operating_ACI_chapter_01000.html[here^].
 . Install and configure NetApp HCI using NDE. NDE configures all the required parameters, including VDS port groups for networking, and also installs the mNode VM. See the https://docs.netapp.com/hci/index.jsp[deployment guide^] for more information.
 . Though VMM integration of Cisco ACI with VMware VDS is optional, using the VMM integration feature is a best practice. When not using VMM integration, an NDE-installed VDS can be used for networking with physical domain attachment on Cisco ACI.
-. If you are using VMM integration, NDE-installed VDS cannot be fully managed by ACI and can be added as read-only VMM domain. To avoid that scenario and make efficient use of Cisco ACI’s VMM networking feature, create a new VMware VMM domain in ACI with an explicit dynamic VLAN pool. The VMM domain created can integrate with any supported virtual switch.
+. If you are using VMM integration, NDE-installed VDS cannot be fully managed by ACI and can be added as read-only VMM domain. To avoid that scenario and make efficient use of Cisco ACI’s VMM networking feature, create a new VMware VMM domain in ACI with a new VMware vSphere Distributed Switch (vDS) and an explicit dynamic VLAN pool. The VMM domain created can integrate with any supported virtual switch.
 .. *Integrate with VDS.* If you wish to integrate ACI with VDS, select the virtual switch type to be VMware Distributed Switch. Consider the configuration best practices noted in the following table. See the https://www.cisco.com/c/en/us/td/docs/switches/datacenter/aci/apic/sw/3-x/virtualization/Cisco-ACI-Virtualization-Guide-3-2-x/Cisco-ACI-Virtualization-Guide-3-2-x_chapter_011.html[configuration guide^] for more details.
 +
 
@@ -112,8 +112,8 @@ a|* A common leaf access port policy group for all ESXi hosts
 * One vPC policy group per NetApp HCI storage node
 * LLDP enabled, CDP disabled
 a|* Separate VLAN pool for VMM domain with dynamic allocation turned on
-* Recommended to use vPC with LACP Active port-channel policy for interfaces towards NetApp HCI Storage Nodes
-* Recommended to use individual interfaces for Compute Nodes, No LACP.
+* Recommended to use vPC with LACP Active port-channel policy for interfaces towards NetApp HCI storage nodes
+* Recommended to use individual interfaces for compute nodes, no LACP.
 |VMM Integration
 a|* Local switching preference
 * Access mode is Read Write.
@@ -125,8 +125,16 @@ a|* Both uplinks active for iSCSI port-group
 * One uplink each for iSCSI-A and iSCSI-B
 a|* Load balancing method for all port-groups to be ‘Route based on physical NIC load’
 * iSCSI VMkernel port migration to be done one at a time from NDE deployed VDS to ACI integrated VDS
+|Easy Scale
+a|* Run NDE scale by attaching the same leaf access port policy group for ESXi hosts to be added
+* One vPC policy group per NetApp HCI storage node
+* Individual interfaces (for ESXi hosts) and vPCs (for storage nodes) should be attached to native, in-band management, iSCSI, VM motion EPGs for successful NDE scale
+* LLDP enabled, CDP disabled
+a|* Recommended to use vPC with LACP Active port-channel policy for interfaces towards NetApp HCI storage nodes
+* Recommended to use individual interfaces for compute nodes, no LACP.
 |===
 
+[NOTE]
 For traffic load-balancing, port channels with vPCs can be used on Cisco ACI along with LAGs on VDS with LACP in active mode. However, using LACP can affect storage performance when compared to iSCSI multipathing.
 
 === Cisco AVE
@@ -141,23 +149,29 @@ The following table lists the necessary parameters and best practices for config
 |Resource |Configuration Considerations |Best Practices
 
 |Endpoint Groups
-|Separate EPG for native VLANs
-Static binding of interfaces towards HCI storage and compute nodes in native VLAN EPG uses 802.1P mode. This is required for node discovery to run NDE.
-Separate EPGs for iSCSI, iSCSI-A and iSCSI-B with a common BD
-iSCSI-A and iSCSI-B are for iSCSI multipathing and are used for VMkernel ports on ESXi hosts
-Physical domain to be attached to iSCSI EPG before running NDE
-VMM domain is attached to iSCSI, iSCSI-A, and iSCSI-B EPGs
-|Separate VLAN pool for VMM domain with dynamic allocation turned on
-Contracts between EPGs to be well defined. Allow only required ports for communication.
-Use unique native VLAN for NDE node discovery
-Use native switching mode in VMM domain for EPGs that correspond to port groups being attached to host’s VMkernel adapters
-Use AVE switching mode in VMM domain for EPGs corresponding to port groups carrying user VM traffic
-For EPGs corresponding to port-groups being attached to VMkernel ports, VMM domain is attached with Pre-Provision for Resolution Immediacy
+a|* Separate EPG for native VLANs
+* Static binding of interfaces towards HCI storage and compute nodes in native VLAN EPG uses 802.1P mode. This is required for node discovery to run NDE.
+* Separate EPGs for iSCSI, iSCSI-A and iSCSI-B with a common BD
+* iSCSI-A and iSCSI-B are for iSCSI multipathing and are used for VMkernel ports on ESXi hosts
+* Physical domain to be attached to iSCSI EPG before running NDE
+* VMM domain is attached to iSCSI, iSCSI-A, and iSCSI-B EPGs
+a|* Separate VLAN pool for VMM domain with dynamic allocation turned on
+* Contracts between EPGs to be well defined. Allow only required ports for communication.
+* Use unique native VLAN for NDE node discovery
+* Use native switching mode in VMM domain for EPGs that correspond to port groups being attached to host’s VMkernel adapters
+* Use AVE switching mode in VMM domain for EPGs corresponding to port groups carrying user VM traffic
+* For EPGs corresponding to port-groups being attached to VMkernel ports, VMM domain is attached with Pre-Provision for Resolution Immediacy
 |Interface Policy
-a|* One vPC policy group per ESXi host
-* One vPC policy group per NetApp HCI storage node
+a|* One vPC policy group per NetApp HCI storage node
 * LLDP enabled, CDP disabled
-a|* NetApp recommends using vPCs to ESXi hosts
+
+* Before running NDE, for NDE discovery:
+- Leaf Access port policy group for all ESXi hosts
+
+* After running NDE, for Cisco AVE:
+- One vPC policy group per ESXi host
+
+a|* NetApp recommends using vPCs to ESXi hosts for Cisco AVE
 * Use static mode on port-channel policy for vPCs to ESXi
 * Use Layer-4 SRC port load balancing hashing method for port-channel policy
 * NetApp recommends using vPC with LACP active port-channel policy for interfaces to NetApp HCI storage nodes
@@ -173,10 +187,25 @@ a|* Static mode on for vSwitch policy
 * Enable Tag collection if using micro-segmentation
 * Recommended option for Default Encap mode is VXLAN
 |VDS
-a|* - Both uplinks active for iSCSI port-group
-* - One uplink each for iSCSI-A and iSCSI-B
+a|* Both uplinks active for iSCSI port-group
+* One uplink each for iSCSI-A and iSCSI-B
 a|* iSCSI VMkernel port migration is done one at a time from NDE deployed VDS to ACI integrated VDS
 * Load balancing method for all port-groups to be Route based on IP hash
+|Cisco AVE
+a|* Run NDE with access port interface policy groups towards ESXi hosts. Individual interfaces towards ESXi hosts should be attached to native, in-band management, iSCSI, VM motion EPGs for successful NDE run.
+* Once the environment is up, place the host in maintenance mode, migrate interface policy group to vPC with static mode on, assign vPC to all required EPGs and remove the host from maintenance mode. Repeat the same process for all hosts.
+* Run the AVE installation process to install AVE control VM on all hosts
+a|* Use local datastore on the hosts for installing AVE control VM. Each host should have one AVE control VM installed on it
+* Use network protocol profile on the in-band management VLAN if DHCP is not available on that network
+|Easy Scale
+a|* Run NDE scale with access port interface policy group for ESXi hosts to be added. Individual interfaces should be attached to native, in-band management, iSCSI, VM motion EPGs for successful NDE run.
+* *Once the ESXi host is added to the vSphere cluster, place the host in maintenance mode and migrate the interface policy group to vPC with static mode on. Then attach the vPC to required EPGs.*
+* Run AVE installation process on the new host for installing AVE control VM on that host
+* One vPC policy group per NetApp HCI storage node to be added to the cluster
+* LLDP enabled, CDP disabled
+a|* Use local datastore on the host for installing AVE control VM
+* Use network protocol profile on the in-band management VLAN if DHCP is not available on that network
+* Recommended to use vPC with LACP Active port-channel policy for interfaces towards NetApp HCI storage nodes
 |===
 
 [NOTE]
