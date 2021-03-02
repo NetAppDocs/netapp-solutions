@@ -1,0 +1,77 @@
+---
+sidebar: sidebar
+permalink: setup_awx.html
+summary: NetApp solutions automation enables the customer to automate the deployment, configuration and execution of many common infrastructure and application tasks.
+keywords: netapp, awx, tower, ansible tower, solutions, automation, ansible
+---
+
+= NetApp Solution Automation
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:table-stripes: odd
+:imagesdir: ./media/
+
+=== Procedure
+
+This section describes the steps to configure the parameters in AWX/Ansible Tower that will prepare the environment for consuming NetApp automated solutions.
+
+. Configure Inventory
+.. Go to 'Resources' → 'Inventories' → 'Add' and click on 'Add Inventory'.
+.. Provide name and organization details and click on 'Save'.
+.. In 'Inventories' page, click on the Inventory created.
+.. If there are any inventory variables, paste them in the variables field.
+.. Go to 'Groups' sub-menu and click on 'Add'
+.. Provide name of the group, paste the group variables (if any) and click on 'Save'
+.. Then click on the group created, go to 'Hosts' sub-menu and click on 'Add New Host'
+.. Provide hostname/IP address of the host, paste the host variables (if any) and click on 'Save'
+
+. Create Credential Types
+.. For solutions involving ONTAP, Element, VMware or any other https based transport connection, you will require to configure credential type to match username and password entries.
+.. Go to 'Administration' → 'Credential Types' and click on 'Add'
+.. Provide name and description
+.. Paste the following content in 'Input Configuration':
+[source, cli]
+fields:
+- id: username
+type: string
+label: Username
+- id: password
+type: string
+label: Password
+secret: true
+
+.. Paste the following content in 'Injector Configuration':
+[source, cli]
+extra_vars:
+password: '{{ password }}'
+username: '{{ username }}'
+
+. Configure Credentials
+.. Go to 'Resources' → 'Credentials' and click on 'Add'
+.. Enter the name and organization details
+.. Select the right credential type - if you intend to use the standard ssh login, select type Machine or select the custom credential type you might have created
+.. Enter the other corresponding details and click on 'Save'
+
+. Configure Project
+.. Go to 'Resources' → 'Projects' and click on 'Add'
+.. Enter the name and organization details
+.. Select 'Git' in 'Source Control Credential Type'
+.. Paste the Source Control URL (or git clone URL) corresponding to the specific solution
+.. Optionally, if the Git URL is access controlled, create and attach the corresponding credential in 'Source Control Credential'
+.. Click on 'Save'
+
+. Configure Job Template
+.. Go to 'Resources' → 'Templates' → 'Add' and click on 'Add Job Template'
+.. Enter the name and description
+.. Select the Job type - 'Run' configures the system based on playbook and 'Check' performs a dry run of playbook without actually configuring the system
+.. Select the corresponding inventory, project and credentials for the playbook
+.. Select the playbook that is desired to be run as part of the job template
+.. Usually the variables will be pasted during runtime. So to get the prompt to populate the variables during runtime, make sure to tick the checkbox 'Prompt on Launch' corresponding to the 'Variable' field.
+.. Provide any other details as required and click on Save
+
+. Launching the Job Template
+.. Go to 'Resources' → 'Templates'
+.. Click on the desired template and then click on 'Launch'
+.. Fill in any variables if prompted on launch and then click on 'Launch' again
