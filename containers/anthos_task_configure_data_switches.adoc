@@ -13,55 +13,51 @@ keywords: Mellanox, LACP, IPL, LLDP, MLAG, VLAN
 :linkattrs:
 :imagesdir: ./../media/
 
-[.lead]
-Mellanox SN2010 switches provide 25Gbps connectivity for the data plane of the compute and storage nodes.
+Mellanox SN2010 switches provide 25Gbps connectivity for the data plane of the compute and storage nodes. To configure the switches to provide data connectivity to the infrastructure, complete the following steps:
 
-To configure the switches to provide data connectivity to the infrastructure, complete the following steps:
+== Create MLAG cluster to provide fault tolerance
 
-
-== Create MLAG Cluster to Ensure Fault Tolerance
-
-1. Run the following commands on each Mellanox SN210 switch for general configuration:
-a. Enter configuration mode.
+. Run the following commands on each Mellanox SN210 switch for general configuration:
+.. Enter configuration mode.
 +
 ----
 Switch-01 enable
 Switch-01 configure terminal
 ----
-b. Enable the LACP required for the Inter-Peer Link (IPL).
+.. Enable the LACP required for the Inter-Peer Link (IPL).
 +
 ----
 Switch-01 (config) # lacp
 ----
-c. Enable the Link Layer Discovery Protocol (LLDP).
+.. Enable the Link Layer Discovery Protocol (LLDP).
 +
 ----
 Switch-01 (config) # lldp
 ----
-d. Enable IP routing.
+.. Enable IP routing.
 +
 ----
 Switch-01 (config) # ip routing
 ----
-e. Enable the MLAG protocol
+.. Enable the MLAG protocol.
 +
 ----
 Switch-01 (config) # protocol mlag
 ----
-f. Enable global QoS.
+.. Enable global QoS.
 +
 ----
 Switch-01 (config) # dcb priority-flow-control enable force
 ----
-2. For MLAG to function, the switches must be made peers to each other through an IPL. This should consist of two or more physical links for redundancy. The MTU for the IPL is set for jumbo frames (9216), and all VLANs are enabled by default. Run the following commands on each switch in the domain:
-a. Create port channel 10 for the IPL.
+. For MLAG to function, the switches must be made peers to each other through an IPL. This should consist of two or more physical links for redundancy. The MTU for the IPL is set for jumbo frames (9216), and all VLANs are enabled by default. Run the following commands on each switch in the domain:
+.. Create port channel 10 for the IPL.
 +
 ----
 Switch-01 (config) # interface port-channel 10
 Switch-01 (config interface port-channel 10) # description IPL
 Switch-01 (config interface port-channel 10) # exit
 ----
-b. Add interfaces ETH 1/20 and 1/22 to the port channel.
+.. Add interfaces ETH 1/20 and 1/22 to the port channel.
 +
 ----
 Switch-01 (config) # interface ethernet 1/20 channel-group 10 mode active
@@ -69,20 +65,20 @@ Switch-01 (config) # interface ethernet 1/20 description ISL-SWB_01
 Switch-01 (config) # interface ethernet 1/22 channel-group 10 mode active
 Switch-01 (config) # interface ethernet 1/22 description ISL-SWB_02
 ----
-c. Create a VLAN outside of the standard range dedicated to IPL traffic.
+.. Create a VLAN outside of the standard range dedicated to IPL traffic.
 +
 ----
 Switch-01 (config) # vlan 4000
 Switch-01 (config vlan 4000) # name IPL VLAN
 Switch-01 (config vlan 4000) # exit
 ----
-d. Define the port channel as the IPL.
+.. Define the port channel as the IPL.
 +
 ----
 Switch-01 (config) # interface port-channel 10 ipl 1
 Switch-01 (config) # interface port-channel 10 dcb priority-flow-control mode on force
 ----
-e. Set an IP for each IPL member (non-routable; it is not advertised outside of the switch).
+.. Set an IP for each IPL member (non-routable; it is not advertised outside of the switch).
 +
 ----
 Switch-01 (config) # interface vlan 4000
@@ -90,18 +86,18 @@ Switch-01 (config vlan 4000) # ip address 10.0.0.1 255.255.255.0
 Switch-01 (config vlan 4000) # ipl 1 peer-address 10.0.0.2
 Switch-01 (config vlan 4000) # exit
 ----
-3. Create a unique MLAG domain name for the two switches and assign a MLAG virtual IP (VIP). This IP is used for keep-alive heartbeat messages between the two switches. Run these commands on each switch in the domain:
-a. Create the MLAG domain and set the IP address and subnet.
+. Create a unique MLAG domain name for the two switches and assign an MLAG virtual IP (VIP). This IP is used for keep-alive heartbeat messages between the two switches. Run these commands on each switch in the domain:
+.. Create the MLAG domain and set the IP address and subnet.
 +
 ----
 Switch-01 (config) # mlag-vip MLAG-VIP-DOM ip a.b.c.d /24 force
 ----
-b. Create a virtual MAC address for the system MLAG.
+.. Create a virtual MAC address for the system MLAG.
 +
 ----
 Switch-01 (config) # mlag system-mac AA:BB:CC:DD:EE:FF
 ----
-c. Configure the MLAG domain so that it is active globally.
+.. Configure the MLAG domain so that it is active globally.
 +
 ----
 Switch-01 (config) # no mlag shutdown
@@ -111,10 +107,10 @@ NOTE: The IP used for the MLAG VIP must be in the same subnet as the switch mana
 
 NOTE: The MAC address used can be any unicast MAC address and must be set to the same value on both switches in the MLAG domain.
 
-== Configure Ports to Connect to Storage and Compute Hosts
+== Configure ports to connect to storage and compute hosts
 
-1. Create each of the VLANs needed to support the services for NetApp HCI. Run these commands on each switch in the domain:
-a. Create VLANs.
+. Create each of the VLANs needed to support the services for NetApp HCI. Run these commands on each switch in the domain:
+.. Create VLANs.
 +
 ----
 Switch-01 (config) # vlan 1172
@@ -122,7 +118,7 @@ Switch-01 (config vlan 1172) exit
 Switch-01 (config) # vlan 3480-3482
 Switch-01 (config vlan 3480-3482) exit
 ----
-b. Create names for each VLAN for easier accounting.
+.. Create names for each VLAN for easier accounting.
 +
 ----
 Switch-01 (config) # vlan 1172 name “VM_Network”
@@ -131,37 +127,37 @@ Switch-01 (config) # vlan 3481 name “Storage_Network”
 Switch-01 (config) # vlan 3482 name “vMotion_Network”
 +
 ----
-2. Create Hybrid VLAN ports on ports ETH1/9-10 so that you can tag the appropriate VLANs for the NetApp HCI compute nodes.
-a. Select the ports you want to work with.
+. Create hybrid VLAN ports on ports ETH1/9-10 so that you can tag the appropriate VLANs for the NetApp HCI compute nodes.
+.. Select the ports you want to work with.
 +
 ----
 Switch-01 (config) # interface ethernet 1/9-1/10
 ----
-b. Set the MTU for each port.
+.. Set the MTU for each port.
 +
 ----
 Switch-01 (config interface ethernet 1/9-1/10) # mtu 9216 force
 ----
-c. Modify spanning-tree settings for each port.
+.. Modify spanning-tree settings for each port.
 +
 ----
 Switch-01 (config interface ethernet 1/9-1/10) # spanning-tree bpdufilter enable
 Switch-01 (config interface ethernet 1/9-1/10) # spanning-tree port type edge
 Switch-01 (config interface ethernet 1/9-1/10) # spanning-tree bpduguard enable
 ----
-d. Set the switchport mode to hybrid.
+.. Set the switchport mode to hybrid.
 +
 ----
 Switch-01 (config interface ethernet 1/9-1/10 ) # switchport mode hybrid
 Switch-01 (config interface ethernet 1/9-1/10 ) # exit
 ----
-e. Create descriptions for each port being modified.
+.. Create descriptions for each port being modified.
 +
 ----
 Switch-01 (config) # interface ethernet 1/9 description HCI-CMP-01 PortD
 Switch-01 (config) # interface ethernet 1/10 description HCI-CMP-02 PortD
 ----
-f. Tag the appropriate VLANs for the NetApp HCI environment.
+.. Tag the appropriate VLANs for the NetApp HCI environment.
 +
 ----
 Switch-01 (config) # interface ethernet 1/9 switchport hybrid allowed-vlan add 1172
@@ -169,31 +165,31 @@ Switch-01 (config) # interface ethernet 1/9 switchport hybrid allowed-vlan add 3
 Switch-01 (config) # interface ethernet 1/10 switchport hybrid allowed-vlan add 1172
 Switch-01 (config) # interface ethernet 1/10 switchport hybrid allowed-vlan add 3480-3482
 ----
-3. Create MLAG interfaces and hybrid VLAN ports on ports ETH1/5-8 so that you can distribute connectivity between the switches and tag the appropriate VLANs for the NetApp HCI storage nodes.
-a. Select the ports that you want to work with.
+. Create MLAG interfaces and hybrid VLAN ports on ports ETH1/5-8 so that you can distribute connectivity between the switches and tag the appropriate VLANs for the NetApp HCI storage nodes.
+.. Select the ports that you want to work with.
 +
 ----
 Switch-01 (config) # interface ethernet 1/5-1/8
 ----
-b. Set the MTU for each port.
+.. Set the MTU for each port.
 +
 ----
 Switch-01 (config interface ethernet 1/5-1/8) # mtu 9216 force
 ----
-c. Modify spanning tree settings for each port.
+.. Modify spanning tree settings for each port.
 +
 ----
 Switch-01 (config interface ethernet 1/5-1/8) # spanning-tree bpdufilter enable
 Switch-01 (config interface ethernet 1/5-1/8) # spanning-tree port type edge
 Switch-01 (config interface ethernet 1/5-1/8) # spanning-tree bpduguard enable
 ----
-d. Set the switchport mode to hybrid.
+.. Set the switchport mode to hybrid.
 +
 ----
 Switch-01 (config interface ethernet 1/5-1/8 ) # switchport mode hybrid
 Switch-01 (config interface ethernet 1/5-1/8 ) # exit
 ----
-e. Create descriptions for each port being modified.
+.. Create descriptions for each port being modified.
 +
 ----
 Switch-01 (config) # interface ethernet 1/5 description HCI-STG-01 PortD
@@ -201,7 +197,7 @@ Switch-01 (config) # interface ethernet 1/6 description HCI-STG-02 PortD
 Switch-01 (config) # interface ethernet 1/7 description HCI-STG-03 PortD
 Switch-01 (config) # interface ethernet 1/8 description HCI-STG-04 PortD
 ----
-f.	Create and configure the MLAG port channels.
+..	Create and configure the MLAG port channels.
 +
 ----
 Switch-01 (config) # interface mlag-port-channel 115-118
@@ -216,7 +212,7 @@ Switch-01 (config) # interface ethernet 1/6 mlag-channel-group 116 mode active
 Switch-01 (config) # interface ethernet 1/7 mlag-channel-group 117 mode active
 Switch-01 (config) # interface ethernet 1/8 mlag-channel-group 118 mode active
 ----
-g.	Tag the appropriate VLANs for the storage environment.
+..	Tag the appropriate VLANs for the storage environment.
 +
 ----
 Switch-01 (config) # interface mlag-port-channel 115-118 switchport mode hybrid
@@ -229,18 +225,18 @@ Switch-01 (config) # interface mlag-port-channel 117 switchport hybrid allowed-v
 Switch-01 (config) # interface mlag-port-channel 118 switchport hybrid allowed-vlan add 3481
 ----
 
-NOTE:	The configurations in this section must also be run on the second switch in the MLAG domain. NetApp recommends that the descriptions for each port are updated to reflect the device ports that are being cabled and configured on the other switch.
+NOTE:	The configurations in this section must also be run on the second switch in the MLAG domain. NetApp recommends that the descriptions for each port are updated to reflect the device ports that are cabled and configured on the other switch.
 
-== Create Uplink Ports for the Switches
+== Create uplink ports for the switches
 
-1. Create an MLAG interface to provide uplinks to both Mellanox SN2010 switches from the core network.
+. Create an MLAG interface to provide uplinks to both Mellanox SN2010 switches from the core network.
 +
 ----
 Switch-01 (config) # interface mlag port-channel 101
 Switch-01 (config interface mlag port-channel) # description Uplink CORE-SWITCH port PORT
 Switch-01 (config interface mlag port-channel) # exit
 ----
-2. Configure the MLAG members.
+. Configure the MLAG members.
 +
 ----
 Switch-01 (config) # interface ethernet 1/18 description Uplink to CORE-SWITCH port PORT
@@ -248,13 +244,14 @@ Switch-01 (config) # interface ethernet 1/18 speed 10000 force
 Switch-01 (config) # interface mlag-port-channel 101 mtu 9216 force
 Switch-01 (config) # interface ethernet 1/18 mlag-channel-group 101 mode active
 ----
-3. Set the switchport mode to hybrid and allow all VLANs from the core uplink switches.
+. Set the switchport mode to hybrid and allow all VLANs from the core uplink switches.
 +
 ----
 Switch-01 (config) # interface mlag-port-channel switchport mode hybrid
 Switch-01 (config) # interface mlag-port-channel switchport hybrid allowed-vlan all
 ----
-4. Verify that the MLAG interface is up.
+. Verify that the MLAG interface is up.
++
 ----
 Switch-01 (config) # interface mlag-port-channel 101 no shutdown
 Switch-01 (config) # exit

@@ -5,7 +5,7 @@ summary: This section describes the design considerations necessary for the succ
 keywords: Port Identification, Network Design, VLAN requirements, Best Practices, DRS, SnapMirror
 ---
 
-= Design Considerations
+= Design considerations
 
 :hardbreaks:
 :nofooter:
@@ -13,33 +13,30 @@ keywords: Port Identification, Network Design, VLAN requirements, Best Practices
 :linkattrs:
 :imagesdir: ./../media/
 
-[.lead]
 
 This section describes the design considerations necessary for the successful deployment of the NetApp HCI Anthos solution.
 
-== Port Identification
+== Port identification
 
 NetApp HCI consists of NetApp H-Series nodes dedicated to either compute or storage. Both node configurations are available with two 1GbE ports (ports A and B) and two 10/25 GbE ports (ports C and D) on board. The compute nodes have additional 10/25GbE ports (ports E and F) available in the first mezzanine slot. Each node also has an additional out-of-band management port that supports Intelligent Platform Management Interface (IPMI) functionality. The following figure identifies each of these ports on the rear of an H410C node.
 
-.NetApp HCI network ports (compute node).
 image::netapp_hci_network_ports_compute_node.png[NetApp HCI network ports (compute node).]
 
-== Network Design
+== Network design
 
 The NetApp HCI with Anthos solution uses two data switches to provide primary data connectivity at 25Gbps. It also uses two additional management switches that provide connectivity at 1Gbps for in-band management for the storage nodes and out-of-band management for IPMI functionality.
 
-=== Cabling Storage Nodes
+=== Cabling storage nodes
 
 The management ports A and B must be active on each storage node to run NDE, configure the NetApp HCI cluster, and provide management accessibility to Element after the solution is deployed. The two 25Gbps ports (C and D) should be connected, one to each data switch, to provide physical fault tolerance. The switch ports should be configured for multi-chassis link aggregation (MLAG) and the data ports on the node should be configured for LACP with jumbo-frames support enabled. The IPMI ports on each node can be used to remotely manage the node after it is installed in a data center. With IPMI, the node can be accessed with a web-browser-based console to run the initial installation, run diagnostics, and reboot or shut down the node if necessary.
 
-=== Cabling Compute Nodes
+=== Cabling compute nodes
 
-The 25Gbps ports on the compute nodes are cabled with one onboard port (C) cabled to one data switch, and an additional port from the PCI slot (E) cabled to the second switch to provide physical fault tolerance. These ports should be configured to support jumbo frames. Connectivity for the node is managed by the vDS after VMware vSphere is deployed in the environment. The IPMI ports can also be used to remotely manage the node after it is installed in a data center. With IPMI, the node can be accessed via a web-browser-based console to run diagnostics and to be rebooted or shut down if necessary.
+The 25Gbps ports on the compute nodes are cabled with one onboard port (C) cabled to one data switch, and an additional port from the PCI slot (E) cabled to the second switch to provide physical fault tolerance. These ports should be configured to support jumbo frames. Connectivity for the node is managed by the vDS after VMware vSphere is deployed in the environment. The IPMI ports can also be used to remotely manage the node after it is installed in a data center. With IPMI, the node can be accessed via a web-browser-based console to run diagnostics and to be rebooted or shut down if necessary. The following figure provides a reference for network cabling.
 
-.Network cabling reference diagram.
 image::network_cabling_reference_diagram.png[Network cabling reference diagram.]
 
-== VLAN Requirements
+== VLAN requirements
 
 The solution is designed to logically separate network traffic for different purposes by using Virtual Local Area Networks (VLANs). NetApp HCI requires a minimum of three network segments. However, this configuration can be scaled to meet customer demands or to provide further isolation for specific network services. The following table lists the VLANs that are required to implement the solution, as well as the specific VLAN IDs that are used later in the validated architecture deployment.
 
@@ -47,15 +44,15 @@ The solution is designed to logically separate network traffic for different pur
 |===
 | VLANs
 | Purpose
-| VLAN Used
+| VLAN used
 | Out-of-band management | Management for HCI nodes | 16
 | In-band management | Management for HCI nodes and infrastructure virtual guests | 3480
-| Storage Network | Storage network for NetApp Element | 3481
+| Storage network | Storage network for NetApp Element | 3481
 | vMotion network | Network for VMware vMotion | 3482
 | VM network | Network for virtual guests | 1172
 |===
 
-== Network Infrastructure Support Resources
+== Network infrastructure support resources
 
 The following infrastructure should be in place prior to the deployment of the Anthos on NetApp HCI solution:
 
@@ -64,19 +61,25 @@ The following infrastructure should be in place prior to the deployment of the A
 * At least one NTP server that is accessible from the in-band management network and the VM network.
 * Outbound internet connectivity for both the in-band management network and the VM network.
 
-== Best Practices
+== Best practices
 
-=== Install a Second F5 Big-IP Virtual Edition Appliance
+The details in this document describe a deployment of Anthos on VMware that meets the minimum requirements for deployment. Prior to deploying the solution in a production environment, you should use the information presented in this Best Practice section.
 
-In a production environment, it is a best practice to avoid single points of failure in your environment. For this validation, a single F5 BIG-IP Virtual Edition Load Balancer appliance was used to validate connectivity to the control plane and the ingress VIP addresses for the Anthos on VMware clusters. While this works fine for a simple validation, loss of communication with the control plane VIP for a cluster can make a cluster inaccessible or unable to be managed from the admin workstation or the Google Cloud console. F5 BIG-IP Virtual Edition supports application-based HA to make sure disruptions do not happen. Although this issue is mentioned briefly, setup procedures for this functionality are not described in detail in this document. However, NetApp recommends investigating this feature further before deploying the NetApp HCI for Anthos solution into production.
+=== Install a second SeeSaw load balancer
 
-=== Enable VMware vSphere DRS and Configure Anti-Affinity Rules
+In a production environment, it is a best practice to avoid single points of failure in your environment. For this validation, a single Seesaw bundled load balancer was allocated to the admin and each user cluster deployed. While this works fine for a simple validation, loss of communication with the control plane VIP for a cluster can make a cluster inaccessible or unable to be managed from the admin workstation or the Google Cloud console. By deploying HA Seesaw load balancers, it is possible to make sure disruptions do not happen. The setup procedures and additional requirements to enable this function are not described in detail in this document, however full instructions can be found link:https://cloud.google.com/anthos/gke/docs/on-prem/1.6/how-to/bundled-load-balance[here^].
+
+=== Install a second F5 Big-IP Virtual Edition appliance
+
+In a production environment, it is a best practice to avoid single points of failure in your environment. For this validation, a single F5 BIG-IP Virtual Edition Load Balancer appliance was used to validate connectivity to the control plane and the ingress VIP addresses for the Anthos on VMware clusters. Although this works fine for a simple validation, loss of communication with the control plane VIP for a cluster can make a cluster inaccessible or unable to be managed from the admin workstation or the Google Cloud console. F5 BIG-IP Virtual Edition supports application-based HA to make sure disruptions do not happen. Although this issue is mentioned briefly, setup procedures for this functionality are not described in detail in this document. However, NetApp recommends investigating this feature further before deploying the NetApp HCI for Anthos solution into production.
+
+=== Enable VMware vSphere DRS and configure anti-affinity rules
 
 VMware vSphere provides a feature that makes sure that no single node in the cluster runs low on physical resources available to virtual guests. The Distributed Resource Scheduler (DRS) can be configured on vSphere clusters consisting of at least three ESXi nodes. The NetApp HCI minimum configuration described in this deployment guide consists of two compute nodes and is unable to make use of this feature. As a result of this limitation, we were also forced to disable anti-affinity rules for the Anthos on VMware clusters that we deployed.
 
-Anti-affinity rules ensure all masters or all workers for a specific user cluster run on different nodes, so that a single node failure cannot disable an entire user cluster or the pods that it is hosting. As the NetApp HCI system is both easily and rapidly scalable, and considering the minimum deployment described in this validation has two open chassis slots for immediate expansion of HCI 410C nodes, NetApp suggests adding additional compute nodes into the empty chassis slots prior to deploying the solution into production, and enabling DRS with Anti-Affinity rules.
+Anti-affinity rules ensure that all masters or all workers for a specific user cluster run on different nodes so that a single node failure cannot disable an entire user cluster or the pods that it is hosting. The NetApp HCI system is both easily and rapidly scalable and the minimum deployment described in this validation has two open chassis slots for immediate expansion of HCI 410C nodes. Therefore, NetApp suggests adding additional compute nodes into the empty chassis slots prior to deploying the solution into production and enabling DRS with anti-affinity rules.
 
-=== Leverage SnapMirror to Copy Data Remotely for Disaster Recovery
+=== Use SnapMirror to copy data remotely for disaster recovery
 
 NetApp Element storage systems can use NetApp SnapMirror technology to replicate storage volumes to systems running the NetApp ONTAP system, including AFF, FAS, and Cloud Volumes ONTAP. You can set up regularly scheduled SnapMirror operations to back up the VMware datastores and restore from a remote site in the event of a disaster. It is also possible to use SnapMirror to back up or migrate the persistent volumes provisioned by Trident and reattach them to Kubernetes clusters deployed in other environments and in the cloud.
 
