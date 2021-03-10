@@ -13,19 +13,22 @@ keywords: mnode, vCenter, F5 big-IP, VLAN
 :linkattrs:
 :imagesdir: ./../media/
 
-[.lead]
+
 NDE deploys the solution with vCenter server and integrates the solution with the Element cluster by provisioning the Mnode VM and installing the NetApp Element Plug-in for vCenter.
+
+NOTE: Note that NDE deploys vSphere 6.7U1. You can upgrade the Virtual Appliance and individual ESXi hosts by following the instructions from VMware link:https://docs.vmware.com/en/VMware-vSphere/6.7/com.vmware.vcenter.upgrade.doc/GUID-043EF6BD-78F7-412F-837F-CBDF844F850C.html[here^].
 
 After deployment, you must make a few modifications to the environment, including the creation of additional vDS portgroups, datastores, and resource groups for the deployment of the Anthos on VMware solution.
 
-Complete the following steps to configure your vCenter Server for use:
+Complete the following steps to configure your vCenter Server:
 
-1.	Log into the VMware vCenter server using the Administrator@vsphere.local account and the password chosen for the admin user during NDE configuration.
+.	Log into the VMware vCenter server using the Administrator@vsphere.local account and the password chosen for the admin user during NDE configuration.
 +
 
 image::vcenter_sign_on.PNG[vCenter Sign-On]
++
 
-2. Right-click `NetApp-HCI-Cluster-01` created by NDE and select the option to create a new resource pool. Name this pool `Infrastructure-Resource-Pool` and accept the defaults by clicking OK. This resource pool is used in a later configuration step.
+. Right-click `NetApp-HCI-Cluster-01` created by NDE and select the option to create a new resource pool. Name this pool `Infrastructure-Resource-Pool` and accept the defaults by clicking OK. This resource pool is used in a later configuration step.
 +
 
 image::vcenter_new_resource_pool.PNG[New Resource Pool]
@@ -33,39 +36,43 @@ image::vcenter_new_resource_pool.PNG[New Resource Pool]
 
 NOTE: The reservations in this resource pool can be modified based on the resources available in the environment. NetApp HCI is deployed as an all-in-one solution. Therefore, NetApp recommends reserving the resources necessary to provide availability for the infrastructure services by placing them into this resource pool and adjusting the resources appropriately. Infrastructure services include vCenter Server, NetApp Mnode, and F5 Big-IP Load Balancer.
 
-3. Repeat this step to create another resource pool for VMs deployed by Anthos. Name this pool Anthos-Resource-Pool and click the OK button to accept the default values. Adjust the resource availability based on the specific environment in which you are deploying the solution. This resource pool is used in a later deployment step.
-4. To configure Element volumes to be used as vSphere datastores, click the dropdown menu and select NetApp Element Management from the list.
-5. A Getting Started screen appears with details about your Element cluster.
+
+. Repeat this step to create another resource pool for VMs deployed by Anthos. Name this pool Anthos-Resource-Pool, and click the OK button to accept the default values. Adjust the resource availability based on the specific environment in which you are deploying the solution. This resource pool is used in a later deployment step.
+
+. To configure Element volumes to be used as vSphere datastores, click the dropdown menu and select NetApp Element Management from the list.
+
+. A Getting Started screen appears with details about your Element cluster.
 +
 
 image::vcenter_netapp_element_mgmt.PNG[NetApp Element Management]
 
-6.	Click Management, and the vSphere client presents a list of datastores. Click Create Datastore to create one datastore to host VMs and another to host ISOs for future guest installs.
+.	Click Management, and the vSphere client presents a list of datastores. Click Create Datastore to create one datastore to host VMs and another to host ISOs for future guest installs.
 +
 
 image::vcenter_netapp_element_mgmt_2.png[NetApp Element Management, Part 2]
 
-7. Next click the Network menu item in the left panel. This displays a screen with information about the vDS deployed by NDE.
+. Next click the Network menu item in the left panel. This displays a screen with information about the vDS deployed by NDE.
 +
 
 image::vcenter_netapp_element_mgmt_3.PNG[NetApp Element Management, Part 3]
 
-8. Several virtual port groups are defined by the initial configuration. NetApp recommends leaving these alone to support the infrastructure, and additional port groups should be created for user-deployed virtual guests. Right-click the NetApp HCI VDS 01 vDS in the left panel, and then select Distributed Port Group followed by the New Distributed Port Group option from the expanded menu.
+. Several virtual port groups are defined by the initial configuration. NetApp recommends leaving these alone to support the infrastructure, and additional port groups should be created for user-deployed virtual guests. Right-click the NetApp HCI VDS 01 vDS in the left panel, and then select Distributed Port Group followed by the New Distributed Port Group option from the expanded menu.
 +
 
 image::vcenter_netapp_element_mgmt_4.PNG[NetApp Element Management, Part 4]
 
-9. Create a new distributed port group called `Management_Network`. Then click Next.
+. Create a new distributed port group called `Management_Network`. Then click Next.
 +
 
 image::vcenter_netapp_element_mgmt_5.PNG[NetApp Element Management, Part 5]
 
-10. On the next screen, select the VLAN type as VLAN, and set the VLAN ID to 3480 for management purposes. Click Next, and, after reviewing the options on the summary page, click Next again to complete the creation of the distributed port group.
+. On the next screen, select the VLAN type as VLAN, and set the VLAN ID to 3480 for management purposes. Click Next, and, after reviewing the options on the summary page, click Next again to complete the creation of the distributed port group.
 +
 
 image::vcenter_netapp_element_mgmt_6.PNG[NetApp Element Management, Part 6]
++
 
-11. Repeat these steps to create distributed port groups for the `VM_Network` (VLAN 1172), as well as any other networks that might be used in the NetApp HCI environment.
+. Repeat these steps to create distributed port groups for the `VM_Network` (VLAN 1172) as well as any other networks that might be used in the NetApp HCI environment.
 
 NOTE:	Additional networks can be defined to segment any additional deployed VMs. Examples of this use could be for a dedicated HA network for additional F5 Big-IP appliances if provisioned. Such configurations are in addition to the environment deployed in this validated solution and are considered out of scope for this NVA document.
 

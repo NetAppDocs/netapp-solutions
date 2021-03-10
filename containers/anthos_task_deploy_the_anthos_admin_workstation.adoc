@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
 permalink: containers/anthos_task_deploy_the_anthos_admin_workstation.html
-summary: The admin workstation is a vSphere VM deployed within your NetApp HCI environment that is preinstalled with all the tools necessary to administer the Anthos on VMware solution. Follow the instructions in this section to download, deploy, and configure the Anthos admin workstation.
-keywords: virtual appliance, vCenter, vDS, Terraform, DHCP
+summary: The admin workstation is a vSphere VM deployed within your NetApp HCI environment that is preinstalled with all the tools necessary to administer the Anthos on VMware solution. Follow the instructions in this section to deploy the Anthos admin workstation.
+keywords: virtual appliance, vCenter, vDS, gkectl, DHCP
 ---
 
-= 7. Deploy the Anthos Admin Workstation
+= 7. Deploy the Anthos admin workstation
 
 :hardbreaks:
 :nofooter:
@@ -13,365 +13,107 @@ keywords: virtual appliance, vCenter, vDS, Terraform, DHCP
 :linkattrs:
 :imagesdir: ./../media/
 
-[.lead]
-The admin workstation is a vSphere VM deployed within your NetApp HCI environment that is preinstalled with all the tools necessary to administer the Anthos on VMware solution. Follow the instructions in this section to download, deploy, and configure the Anthos admin workstation.
-
-NOTE:	The admin workstation image is packaged as an OVA file and is only available for download to those users with whitelisted access service accounts. If you are unable to download the OVA from cloud storage, contact your project administrator or open a support ticket with Google Cloud support.
+The admin workstation is a vSphere VM deployed within your NetApp HCI environment that is preinstalled with all the tools necessary to administer the Anthos on VMware solution. Follow the instructions in this section to deploy the Anthos admin workstation.
 
 To deploy the Anthos admin workstation, complete the following steps:
 
-1. Download the latest version of the virtual appliance here. You must first set your account to the whitelisted access service account that has permission to download the OVA.
+. Download the gkeadm binary into your working directory
 +
 ----
-[user@rhel7 ~]$ gcloud config set account 'access-service-account@anthos-dev.iam.gserviceaccount.com'
-Updated property [core/account].
-[user@rhel7 ~]$ gsutil cp gs://gke-on-prem-release/admin-appliance/1.1.1-gke.2/gke-on-prem-admin-appliance-vsphere-1.1.1-gke.2.{ova,ova.sig} ~/
-Copying gs://gke-on-prem-release/admin-appliance/1.1.1-gke.2/gke-on-prem-admin-appliance-vsphere-1.1.1-gke.2.ova...
-==> NOTE: You are downloading one or more large file(s), which would
-run significantly faster if you enabled sliced object downloads. This
-feature is enabled by default but requires that compiled crcmod be
-installed (see "gsutil help crcmod").
-
-- [0 files][ 40.2 MiB/  5.1 GiB]
+[user@rhel7 anthos-install]$ gsutil cp gs://gke-on-prem-release/gkeadm/1.6.1-gke.1/linux/gkeadm ./
+[user@rhel7 anthos-install]$ chmod +x gkeadm
 ----
 
-2.	When the OVA file is downloaded, use govc to load it into your vCenter. You need to set several environment variables for your current user that provide specific information about your VMware vSphere environment deployed on NetApp HCI.
+. Use the gkeadm tool to create an admin workstation configuration file.
 +
 ----
-[user@rhel7 ~]$ export GOVC_URL=https://anthos-vc.cie.netapp.com/sdk
-[user@rhel7 ~]$ export GOVC_USERNAME=administrator@vsphere.local
-[user@rhel7 ~]$ export GOVC_PASSWORD=vcpassword
-[user@rhel7 ~]$ export GOVC_DATASTORE=VM_Datastore
-[user@rhel7 ~]$ export GOVC_DATACENTER=NetApp-HCI-Datacenter-01
-[user@rhel7 ~]$ export GOVC_RESOURCE_POOL= Anthos-Resource-Pool
-[user@rhel7 ~]$ export GOVC_INSECURE=true
+[user@rhel7 anthos-install]$ ./gkeadm create config
 ----
 
-3.	Because the NetApp HCI deployment uses a vDS, you need to create a custom options file that you pass as an additional argument to govc. Create a file called `options_specs`, and commit the following information to the file:
+. Two files are created: `credential.yaml` and `admin-ws-config.yaml`. Fill out each of these files.
 +
-----
-cat > options_spec <<EOF
-{
-  "DiskProvisioning": "thin",
-  "MarkAsTemplate": true,
-  "NetworkMapping": [
-      {
-          "Name": "VM Network",
-          "Network": “VM_Network”
-      }
-  ]
-}
-EOF
-----
-
-4.	To import the OVA file as template in VMware vSphere, enter the following command referencing the downloaded virtual appliance file, as well as the options file that you just created. The console reports upload progress, and you can also verify the upload by browsing to the Recent Tasks window in VMware vSphere.
-+
-----
-[user@rhel7 ~]$ govc import.ova -options options_spec .\gke-on-prem-admin-appliance-vsphere-1.1.1-gke.2.ova
-[06-11-19 10:56:39] Uploading gke-on-prem-admin-appliance-vsphere-1.1.1-gke.2.vmdk... (23%, 26.8MiB/s)
-----
-+
-
-image::deploy_ovf_template.PNG[Deploy OVF Template]
-
-5. With the template uploaded, we can now use Terraform to deploy the Anthos admin workstation VM. Google provides a Terraform template and variable files for environments using DHCP as well those using static IP addresses. Create a directory for these Terraform files, and copy and paste the text for both the TF and TFVARS files available here into files created with a text editor.
-+
-----
-[user@rhel7 ~]$ mkdir terraform
-[user@rhel7 ~]$ cd terraform
-[user@rhel7 ~]$ vi terraform.tfvars
-----
-
-6.	See the following `terraform.tfvars` file contents.
-+
-----
-# vCenter Server username
-vcenter_user = "administrator@vsphere.local"
-
-# vCenter Server password
-vcenter_password = "vcpassword"
-
-# vCenter Server IP or hostname
-vcenter_server = "https://anthos-vc.cie.netapp.com"
-
-# Path in which the admin workstation's VM's public key should be saved
-ssh_public_key_path = "~/.ssh/vsphere_workstation.pub"
-
-# Hostname for the VM
-vm_name = "admin-workstation"
-
-# vSphere datastore to use for storage
-datastore = "VM_Datastore"
-
-# vSphere datacenter in which to create the VM
-datacenter = "NetApp-HCI-Datacenter-01"
-
-# vSphere cluster in which to create the VM
-cluster = "NetApp-HCI-Cluster-01"
-
-# vSphere resource pool in which to create VM, if you are using a non-default resource pool
-# If you are using the default resource pool, provide a value like "CLUSTER-NAME/Resources"
-resource_pool = "Anthos-Resource-Pool"
-
-# vSphere network to use for the VM
-network = "VM_Network"
-
-# Number of CPUs for this VM. Recommended minimum 4.
-num_cpus = 4
-
-# Memory in MB for this VM. Recommended minimum 8192.
-memory = 8192
-
-# The VM template (OVA) to clone. Change the version if you imported a different version of the OVA.
-vm_template = "gke-on-prem-admin-appliance-vsphere-1.1.1-gke.2"
-
-
-[user@rhel7 ~]$ vi terraform.tf
-----
-
-7.	See the following `terraform.tf` file contents.
-+
-----
-#########################
-####### VARIABLES #######
-#########################
-
-# The following variables are declared in the accompanying TFVARS file
-
-# vCenter Server username
-variable "vcenter_user" { }
-
-# vCenter Server password
-variable "vcenter_password" { }
-
-# vCenter Server address
-variable "vcenter_server" { }
-
-# Path in which the VM's public key should be saved
-variable "ssh_public_key_path" { default = "~/.ssh/vsphere_workstation.pub" }
-
-# vSphere network to use for the VM
-variable "network" { default = "VM Network"}
-
-# Hostname for the VM
-variable "vm_name" { default = "vsphere-workstation" }
-
-# vSphere datacenter in which to create the admin workstation VM
-variable "datacenter" { }
-
-# vSphere datastore to use for storage
-variable "datastore" { }
-
-# vSphere cluster in which to create the VM
-variable "cluster" { }
-
-# vSphere resource pool in which to create the VM
-variable "resource_pool" { }
-
-# Number of CPUs for this VM. Recommended minimum 4.
-variable "num_cpus" { default = 4 }
-
-# Memory in MB for this VM. Recommended minimum 8192.
-variable "memory" { default = 8192 }
-
-# The VM template (OVA) to clone
-variable "vm_template" { }
-
-
-##########################
-##########################
-
-provider "vsphere" {
-  version        = "~> 1.5"
-  user           = "${var.vcenter_user}"
-  password       = "${var.vcenter_password}"
-  vcenter_server = "${var.vcenter_server}"
-
-  # if you have a self-signed cert
-  allow_unverified_ssl = true
-}
-
-### vSphere Data ###
-
-data "vsphere_datastore" "datastore" {
-  name          = "${var.datastore}"
-  datacenter_id = "${data.vsphere_datacenter.dc.id}"
-}
-
-data "vsphere_datacenter" "dc" {
-  name = "${var.datacenter}"
-}
-
-data "vsphere_compute_cluster" "cluster" {
-  name          = "${var.cluster}"
-  datacenter_id = "${data.vsphere_datacenter.dc.id}"
-}
-
-data "vsphere_resource_pool" "pool" {
-  name          = "${var.resource_pool}"
-  datacenter_id = "${data.vsphere_datacenter.dc.id}"
-}
-
-data "vsphere_network" "network" {
-  name          = "${var.network}"
-  datacenter_id = "${data.vsphere_datacenter.dc.id}"
-}
-
-data "vsphere_virtual_machine" "template_from_ovf" {
-  name          = "${var.vm_template}"
-  datacenter_id = "${data.vsphere_datacenter.dc.id}"
-}
-
-data "template_file" "dhcp_ip_config" {
-  template = <<EOF
-network:
-  version: 2
-  ethernets:
-    ens192:
-      dhcp4: true
-EOF
-}
-
-data "template_file" "user_data" {
-  template = <<EOF
-#cloud-config
-apt:
-  primary:
-    - arches: [default]
-      uri: http://us-west1.gce.archive.ubuntu.com/ubuntu/
-write_files:
-  - path: /etc/netplan/99-dhcp.yaml
-    permissions: '0644'
-    encoding: base64
-    content: |
-      $${dhcp_ip_config}
-runcmd:
-  - netplan apply
-  - /var/lib/gke/guest-startup.sh
-EOF
-  vars = {
-    dhcp_ip_config = "${base64encode(data.template_file.dhcp_ip_config.rendered)}"
-
-  }
-}
-
-### vSphere Resources ###
-
-resource "vsphere_virtual_machine" "vm" {
-  name             = "${var.vm_name}"
-  resource_pool_id = "${data.vsphere_resource_pool.pool.id}"
-  datastore_id     = "${data.vsphere_datastore.datastore.id}"
-  num_cpus         = "${var.num_cpus}"
-  memory           = "${var.memory}"
-  guest_id         = "${data.vsphere_virtual_machine.template_from_ovf.guest_id}"
-  enable_disk_uuid = "true"
-  scsi_type = "${data.vsphere_virtual_machine.template_from_ovf.scsi_type}"
-  network_interface {
-    network_id   = "${data.vsphere_network.network.id}"
-    adapter_type = "${data.vsphere_virtual_machine.template_from_ovf.network_interface_types[0]}"
-  }
-
-  wait_for_guest_net_timeout = 15
-
-  nested_hv_enabled = false
-  cpu_performance_counters_enabled = false
-
-  disk {
-    label            = "disk0"
-    size             = "${max(50, data.vsphere_virtual_machine.template_from_ovf.disks.0.size)}"
-    eagerly_scrub    = "${data.vsphere_virtual_machine.template_from_ovf.disks.0.eagerly_scrub}"
-    thin_provisioned = "${data.vsphere_virtual_machine.template_from_ovf.disks.0.thin_provisioned}"
-  }
-
-  cdrom {
-    client_device = true
-  }
-
-  vapp {
-    properties = {
-      hostname    = "${var.vm_name}"
-      public-keys = "${file(var.ssh_public_key_path)}"
-      user-data   = "${base64encode(data.template_file.user_data.rendered)}"
-    }
-  }
-
-  clone {
-    template_uuid = "${data.vsphere_virtual_machine.template_from_ovf.id}"
-  }
-}
-
-output "ip_address" {
-  value = "${vsphere_virtual_machine.vm.default_ip_address}"
-}
-----
-+
-
-NOTE:	Values specific to the deployed environment have been added to the terraform.tfvars file. However, you should not modify the terraform.tf file in any manner.
-
-8. Create an SSH public/private keypair used to log in to the admin workstation after it is deployed. Name the public key so that is matches the variable that was assigned in the `terraform.tfvars` file.
+.. credential.yaml contains your username and passwords for your VMware vCenter server.
 +
 
 ----
-[user@rhel7 ~]$ ssh-keygen -t rsa -f ~/.ssh/vsphere_workstation -N ""
-Generating public/private rsa key pair.
-Your identification has been saved in /home/user/.ssh/vsphere_workstation2.
-Your public key has been saved in /home/user/.ssh/vsphere_workstation2.pub.
-The key fingerprint is:
-SHA256:qEk8G13LhwiKqf85ekHHZkIZduX2MkZUxGNEHvFT2vw user@rhel7
-The key's randomart image is:
-+---[RSA 2048]----+
-|    oo.o+*B.  .  |
-|   .o. o .+o =   |
-|   ...  B.o.+ o  |
-| o ooo=B *   . . |
-|o ..==+ S .     E|
-|.  ..*   .       |
-|.   +.           |
-| .  o.           |
-|  o+o.           |
-+----[SHA256]-----+
+kind: CredentialFile
+items:
+- name: vCenter
+  username: "administrator@vsphere.local"
+  password: "vSphereAdminPassword"
 ----
 
-9. Navigate to the directory created to host the TF and TFVARS files. Within this directory, initialize Terraform and use it to launch the deployment of the admin workstation VM.
+.. admin-ws-config.yaml contains other information about your vSphere environment as well as the physical and networking options for the admin-workstation VM.
 +
+
 ----
-[user@rhel7 ~]$ cd terraform
-[user@rhel7 terraform]$ ls
-terraform.tf  terraform.tfvars
-[user@rhel7 terraform]$ terraform init && terraform apply -auto-approve -input=false
-Initializing the backend...
-Initializing provider plugins...
-The following providers do not have any version constraints in configuration,
-so the latest version was installed.
-To prevent automatic upgrades to new major versions that may contain breaking
-changes, it is recommended to add version = "..." constraints to the
-corresponding provider blocks in configuration, with the constraint strings
-suggested below.
-* provider.template: version = "~> 2.1"
-Terraform has been successfully initialized!
-
-data.template_file.dhcp_ip_config: Refreshing state...
-data.template_file.user_data: Refreshing state...
-data.vsphere_datacenter.dc: Refreshing state...
-data.vsphere_resource_pool.pool: Refreshing state...
-data.vsphere_datastore.datastore: Refreshing state...
-data.vsphere_virtual_machine.template_from_ovf: Refreshing state...
-data.vsphere_network.network: Refreshing state...
-data.vsphere_compute_cluster.cluster: Refreshing state...
-vsphere_virtual_machine.vm: Creating...
-vsphere_virtual_machine.vm: Still creating... [10s elapsed]
-vsphere_virtual_machine.vm: Still creating... [20s elapsed]
-vsphere_virtual_machine.vm: Still creating... [30s elapsed]
-vsphere_virtual_machine.vm: Still creating... [40s elapsed]
-vsphere_virtual_machine.vm: Creation complete after 49s [id=42118cfa-d464-b815-f7b1-37cd85b2943a]
-
-Warning: "vcenter_server": [DEPRECATED] This field has been renamed to vsphere_server.
-
-Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
-
-Outputs:
-
-ip_address = 10.63.172.21
+gcp:
+  # Path of the whitelisted service account's JSON key file
+  whitelistedServiceAccountKeyPath: "/home/anthos-install/service-keys/access-key.json"
+# Specify which vCenter resources to use
+vCenter:
+  # The credentials and address GKE On-Prem should use to connect to vCenter
+  credentials:
+    address: "anthos-vc.cie.netapp.com"
+    datacenter: "NetApp-HCI-Datacenter-01"
+    datastore: "VM_Datastore"
+    cluster: "NetApp-HCI-Cluster-01"
+    network: "VM_Network"
+    resourcePool: "Anthos-Resource-Pool"
+# Provide the path to vCenter CA certificate pub key for SSL verification
+    caCertPath: "/home/anthos-install/vcenter.pem"
+# The URL of the proxy for the jump host
+proxyUrl: ""
+adminWorkstation:
+  name: gke-admin-ws-200915-151421
+  cpus: 4
+  memoryMB: 8192
+#The boot disk size of the admin workstation in GB. It is recommended to use a disk with at least 50 GB to host images decompressed from the bundle.
+  diskGB: 50
+# Name for the persistent disk to be mounted to the home directory (ending in
+.vmdk).
+# Any directory in the supplied path must be created before deployment.
+  dataDiskName: gke-on-prem-admin-workstation-data-disk/gke-admin-ws-200915-151421-data-disk.vmdk
+# The size of the data disk in MB.
+  dataDiskMB: 512
+  network:
+# The IP allocation mode: 'dhcp' or 'static'
+    ipAllocationMode: "dhcp"
+# # The host config in static IP mode. Do not include if using DHCP
+  # hostConfig:
+    #   # The IPv4 static IP address for the admin workstation
+    #   ip: ""
+    #   # The IP address of the default gateway of the subnet in which the admin workstation
+    #   # is to be created
+    #   gateway: ""
+    #   # The subnet mask of the network where you want to create your admin workstation
+    #   netmask: ""
+    #   # The list of DNS nameservers to be used by the admin workstation
+    #   dns:
+    #   - ""
+  # The URL of the proxy for the admin workstation
+  proxyUrl: ""
+  ntpServer: ntp.ubuntu.com
 ----
 
-link:anthos_task_deploy_the_admin.html[Next: Deploy the Admin and the First User Cluster]
+. Create the admin workstation.
++
+
+----
+[user@rhel7 anthos-install]$ ./gkeadm create admin-workstation
+The output will be verbose as the workstation is created. In the end you will be prompted with the IP address to login to the workstation if you chose DHCP.
+...
+Getting ... service account...
+...
+********************************************************************
+Admin workstation is ready to use.
+
+Admin workstation information saved to /usr/local/google/home/me/my-admin-workstation
+This file is required for future upgrades
+SSH into the admin workstation with the following command:
+ssh -i /home/user/.ssh/gke-admin-workstation ubuntu@10.63.172.10
+********************************************************************
+----
+
+
+link:anthos_task_deploy_the_admin.html[Next: Deploy the admin and the first user cluster]
