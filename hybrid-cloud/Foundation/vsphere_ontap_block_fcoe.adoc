@@ -1,54 +1,108 @@
-= vSphere VMFS Datastore - Fiber Channel Storage backend with ONTAP
+---
+sidebar: sidebar
+permalink: hybrid-cloud/foundation/vsphere_ontap_block_fcoe.html
+keywords: vSphere, datastore, VMFS, FCoE, ONTAP tools, zone, network interface
+summary: This page provides steps to deploy a NetApp ONTAP storage FCoE VMFS datastore in a VMware vSphere environment.
+---
+= vSphere VMFS Datastore - Fibre Channel over Ethernet Storage protocol with ONTAP
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
 :imagesdir: ./../../media/
 :author: Suresh Thoppay, TME - Hybrid Cloud Solutions
+:ontap_version: ONTAP 9.8 or above
+:vsphere_version: vSphere 7.0 or above
+
+.About this task
+Creation of VMFS datastore with Fibre Channel over Ethernet (FCoE) transport protocol to ONTAP storage. 
+
+For Automated provision, check the following scripts
+|===
+|<<PowerShell>>|<<Ansible>>|<<Terraform>>
+|===
+
+
+.What you will need
+
+. Basic skill to manage vSphere environment and ONTAP.
+. ONTAP Storage System (FAS/AFF/CVO/ONTAP Select)
+.. Running with {ontap_version}
+. ONTAP Credentials (SVM Name, UserID, Password)
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanconf/GUID-CE5218C0-2572-4E12-9C72-BF04D5CE222A.html++[Supported FCoE Combination]
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-429C4DDD-5EC0-4DBD-8EA8-76082AB7ADEC.html++[Completed Configuration Worksheet]
+. vCenter Server Credentials
+. vSphere Host(s) Information
+.. {vsphere_version}
+. Fabric Switch(es)
+.. with either ONTAP FC data ports or vSphere hosts are connected.
+.. with N_port ID virtualization (NPIV) feature enabled.
+.. Create Single Initiator Single Target Zone.
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanconf/GUID-374F3D38-43B3-423E-A710-2E2ABAC90D1A.html++[FC/FCoE Zoning configured]
+. Network Switch(es)
+.. FCoE support
+.. DCB support
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-16DEF659-E9C8-42B0-9B94-E5C5E2FEFF9C.html++[Jumbo Frames for FCoE]
+. ONTAP Tool for VMware vSphere deployed, configured and ready to consume.
+
+.The steps to provision VMFS datastore involves
+. Check compatability with https://mysupport.netapp.com/matrix[Interoperability Matrix Tool (IMT)]
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-7D444A0D-02CE-4A21-8017-CB1DC99EFD9A.html++[Verify FCoE Configuration is supported]
 
 
 
-The steps to provision VMFS datastore involves
-* Check compatability with https://mysupport.netapp.com/matrix[Interoperability Matrix Tool (IMT)]
 
-** FC and NVMe/FC 
-*** requires FC Switch with N_port ID virtualization (NPIV) feature enabled.
-*** Use single-initiator zoning and use WWPNs to specify zone membership.
-** FCoE requires DCB capability on switch.
-* ONTAP tasks
-    . Verify ONTAP feature license for the SAN protocol of your choice.
-    . Ensure SAN protocol of your preference is enabled on SVM
-    . Ensure Logical Interfaces are available on SVM for the protocol of your choice.
-    . Create and Map LUN/Namespace - Skip if using ONTAP tools for VMware vSphere
+.ONTAP tasks
 
-* Tasks on VMware vSphere
-** FC
-    . Ensure at least 1 HBA available (2 HBAs preferred for better performance and fault tolerance)
-    . Ensure HBA drivers are installed
-    . Ensure Fabric Zones are configured
-    . ONTAP Tools for VMware vSphere is deployed and registered with vCenter.
-    . Provision VMFS datastore with ONTAP Tools.
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify ONTAP license for FCP]
+Use `system license show` command and check FCP is listed.
+Use `license add -license-code <license code>` to add license.
++
+////
+. Identify the physical fcp ports
+Use `Network fcp adapter show` to check adapters are listed.
+Use `Node run local sysconfig -v` to verify devices connected to current storage node.
+Check `System node hardware unified-connect show`. May need to change the type to initiator.
+////
++
 
-** FCoE
-    . Ensure at least 1 FCoE compatible NIC is available (2 is preferred for fault tolerance)
-    . Ensure correct drivers are installed
-    . Ensure Fabric zones are configured
-    . ONTAP Tools for VMware vSphere is deployed and registered with vCenter.
-    . Provision VMFS datastore with ONTAP Tools.
+. Ensure FCP protocol is enabled on SVM
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-1C31DF2B-8453-4ED0-952A-DF68C3D8B76F.html++[Verifying FCP on existing SVM]
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-D322649F-0334-4AD7-9700-2A4494544CB9.html++[Configuring FCP on existing SVM]
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-0FCB46AA-DA18-417B-A9EF-B6A665DB77FC.html++[Create new SVM with FCP]
+. Ensure FCP Logical Interfaces are available on SVM.
+.. Use `Network Interface show` to verify FCP adapter.
+.. When SVM is created with GUI, Logical Interfaces are as part of that process.
+.. To rename, use `Network Interface modify`
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-D4DAC7DB-A6B0-4696-B972-7327EE99FD72.html++[Create and Map LUN] - Skip if using ONTAP tools for VMware vSphere
 
-** iSCSI
-    . Ensure at least 1 NIC connected to iSCSI VLAN. (Two preferred for better performance and fault tolerance)
-    . Ensure iSCSI Software initiator is enabled
-    . Ensure TCPIP stack for iSCSI is available.
-    . Ensure iSCSI portgroups are available.
-    . Ensure iSCSI VMKernel adapters are enabled to match the number of NICs and IP are assigned.
-    . Bind iSCSI software adapter to iSCSI VMKernel adapter(s)
-    . Provision VMFS datastore with ONTAP Tools.
 
-** NVMe/FC
-    . Ensure at least 1 supported HBA available (2 HBAs preferred for better performance and fault tolerance)
-    . Ensure HBA drivers are installed
-    . Ensure Fabric Zones are configured
-    . Get host NQN info and update on NVMe subsystem on ONTAP SVM.
-    . ONTAP Tools for VMware vSphere is deployed and registered with vCenter.
-    . Provision VMFS datastore with ONTAP Tools.
+.VMware vSphere Tasks
+
+. Ensure HBA drivers are installed
+VMware supported HBAs have the drivers deployed out of the box and should be visible at link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-ED20B7BE-0D1C-4BF7-85C9-631D45D96FEC.html++[Storage Adapter Information]
+
+. link:++https://docs.netapp.com/vapp-98/topic/com.netapp.doc.vsc-iag/GUID-D7CAD8AF-E722-40C2-A4CB-5B4089A14B00.html++[Provision VMFS datastore with ONTAP Tools].
+
+
+
+.PowerShell Script
+[[PowerShell]]
+[source,powershell]
+----
+
+----
+
+.Ansible Playbook
+[[Ansible]]
+[source]
+----
+
+----
+
+.Terraform
+[[Terraform]]
+[source]
+----
+
+----
