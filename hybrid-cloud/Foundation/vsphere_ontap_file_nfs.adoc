@@ -1,12 +1,12 @@
 ---
 sidebar: sidebar
-permalink: hybrid-cloud/foundation/vsphere_ontap_block_iscsi.html
-keywords: vSphere, datastore, VMFS, iSCSI, ONTAP tools, vlan, network interface, service policy
-summary: This page provides steps to deploy a NetApp ONTAP storage iSCSI VMFS datastore in a VMware vSphere environment.
+permalink: hybrid-cloud/foundation/vsphere_ontap_file_nfs.html
+keywords: vSphere, datastore, nfs, ONTAP tools, vlan, network interface, service policy, export policy
+summary: This page provides steps to deploy a NetApp ONTAP NFS version 3 datastore in a VMware vSphere environment.
 ---
 
 
-= vSphere VMFS Datastore - iSCSI Storage backend with ONTAP
+= vSphere NFS Datastore - Version 3 with ONTAP
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -18,7 +18,7 @@ summary: This page provides steps to deploy a NetApp ONTAP storage iSCSI VMFS da
 
 
 .About this task
-Creation of VMFS datastore with ONTAP iSCSI storage. 
+Creation of NFS version 3 datastore with ONTAP NAS storage. 
 
 For Automated provision, check the following scripts
 |===
@@ -29,64 +29,43 @@ For Automated provision, check the following scripts
 .What you will need
 
 . Basic skill to manage vSphere environment and ONTAP.
-. ONTAP Storage System (FAS/AFF/CVO/ONTAP Select/ASA)
+. ONTAP Storage System (FAS/AFF/CVO/ONTAP Select/Cloud Volume Service/Azure NetApp Files)
 .. Running with {ontap_version}
 . ONTAP Credentials (SVM Name, UserID, Password)
-. ONTAP Network Port,SVM,LUN Information for iSCSI
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-iscsi-esx-cpg/GUID-429C4DDD-5EC0-4DBD-8EA8-76082AB7ADEC.html++[Have Completed iSCSI Configuration Worksheet]
+. ONTAP Network Port,SVM,LUN Information for NFS
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-nfs-vaai/GUID-BBD301EF-496A-4974-B205-5F878E44BF59.html++[Have Completed NFS Configuration Worksheet]
 . vCenter Server Credentials
 . vSphere Host(s) Information
 .. {vsphere_version}
-. iSCSI VMKernel Adapter IP Informattion
+. NFS VMKernel Adapter IP Informattion
 . Network Switch(es)
 .. with ONTAP System Network Data ports and vSphere hosts are connected
-..  VLAN(s) configured for iSCSI.
-.. (Optional) Link aggregation configured for ONTAP Nettwork Data ports.
+..  VLAN(s) configured for NFS.
+.. (Optional) Link aggregation configured for ONTAP Network Data ports.
 . ONTAP Tool for VMware vSphere deployed, configured and ready to consume.
 
 .Steps
 
 * Check compatability with https://mysupport.netapp.com/matrix[Interoperability Matrix Tool (IMT)]
-** link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-iscsi-esx-cpg/GUID-7D444A0D-02CE-4A21-8017-CB1DC99EFD9A.html++[Verify iSCSI configuration is supported]
+** link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-nfs-vaai/GUID-DA231492-F8D1-4E1B-A634-79BA906ECE76.html++[Verify NFS configuration is supported]
 
 * Complete ONTAP and vSphere Tasks provided below.
 
 .ONTAP Tasks 
 
-. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify ONTAP license for iSCSI] 
-Use `system license show` command and check iSCSI is listed.
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify ONTAP license for NFS] 
+Use `system license show` command and check nfs is listed.
 Use `license add -license-code <license code>` to add license.
 
-. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-iscsi-esx-cpg/GUID-ED75D939-C45A-4546-8B22-6B765FF6083F.html++[Ensure iSCSI protocol is enabled on SVM] 
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.pow-nfs-cg/GUID-6D7A1BB1-C672-46EF-B3DC-08EBFDCE1CD5.html++[Follow NFS Configuration Workflow] 
 
-. Ensure iSCSI Network Logical Interfaces are available on SVM.
-Note: When SVM is created using GUI, iSCSI Network Interfaces are also created. Use `Network interface` command to view or make changes to Network interace.
-TIP: Two iSCSI Network Interface per node is recommended.
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-nmg/GUID-CEE760DF-A059-4018-BE6C-6B3A034CB377.html++[Create iSCSI Network Interface]
-Can use default-data-blocks service policy.
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-nmg/GUID-BBC2D94B-DD3A-4029-9FCE-F71F9C157B53.html++[Ensure data-iscsi service included in service Policy]
-Can use `network interface service-policy show` to verify.
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-nmg/GUID-DE59CF49-3A5F-4F38-9F17-E2C16B567DC0.html++[Check Jumbo Frames are enabled]
-
-. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-D4DAC7DB-A6B0-4696-B972-7327EE99FD72.html++[Create and Map LUN] - Skip if using ONTAP tools for VMware vSphere #Repeat for number of LUNs#
 
 .VMware vSphere Tasks
 
-    . Ensure at least 1 NIC available for iSCSI VLAN. (Two preferred for better performance and fault tolerance)
-    link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.networking.doc/GUID-B2AA3EEE-2334-45FE-9A0F-1172FDDCC6A8.html++[Identify number of physical NIC available on the vSphere host]
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-C476065E-C02F-47FA-A5F7-3B3F2FD40EA8.html++[Configure iSCSI Initiator]
-    Typical use case is Software iSCSI Initiator.
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.networking.doc/GUID-660423B1-3D35-4F85-ADE5-FE1D6BF015CF.html++[Ensure TCPIP stack for iSCSI is available].
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-0D31125F-DC9D-475B-BC3D-A3E131251642.html++[Ensure iSCSI portgroups are available].
-    We typically use single virtual switch with multiple uplink ports. 
-    Use 1:1 adapter mapping.
-    Ensure iSCSI VMKernel adapters are enabled to match the number of NICs and IP are assigned.
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-D9B862DF-476A-4BCB-8CA5-DE6DB2A1A981.html++[Bind iSCSI software adapter to iSCSI VMKernel adapter(s)]
-    . link:++https://docs.netapp.com/vapp-98/topic/com.netapp.doc.vsc-iag/GUID-D7CAD8AF-E722-40C2-A4CB-5B4089A14B00.html++[Provision VMFS datastore with ONTAP Tools].#Repeat for number of Datastores#
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-0520FD37-D7AD-4FBA-9A2E-E5F8211FCBBB.html++[Verify Hardware Acceleration Support]
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-nfs-vaai/GUID-D78DD9CF-12F2-4C3C-AD3A-002E5D727411.html++[Follow NFS Client Configuration for vSphere Workflow]
 
 .What's next?
-Once the tasks are completed, VMFS datastore is ready to consume for provisioning virtual machines.
+Once the tasks are completed, NFS datastore is ready to consume for provisioning virtual machines.
 
 .PowerShell Script
 [[PowerShell]]
