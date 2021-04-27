@@ -1,7 +1,7 @@
 ---
 sidebar: sidebar
 permalink: ent-db/automated_ontap_oracle19c.html
-keywords: Linux, RHEL Oracle19c, NFS
+keywords: Linux, RHEL Oracle19c, NFS, ONTAP
 summary: This page describes the Automated method for deploying Oracle19c on NetApp ONTAP storage.
 ---
 
@@ -257,5 +257,126 @@ function addnfsvolumes() {
 	document.getElementById("select_more_nfs_volumes").style.display = "none";
 	document.getElementById("more_nfs_volumes_button").style.display = "none";
 }
+
+</script>
+++++
+=== Host VARS Config
+++++
+<style>
+div {
+position: relative;
+}
+div button {
+position: absolute;
+top: 0;
+right: 0;
+}
+button {
+  transition-duration: 0.4s;
+  background-color: white;
+  color: #1563a3;
+  border: 2px solid #1563a3;
+}
+button:hover {
+  background-color: #1563a3;
+  color: white;
+}
+#more_datastores_nfs {
+  display: block;
+}
+#more_datastores_nfs_button {
+  display: none;
+}
+</style>
+<div class="listingblock"><div class="content"><div><button id="copy-button1" onclick="CopyClassText1()">Copy</button></div><pre><code><div class="CopyMeClass1" id="CopyMeID1">
+######################################################################
+##############      Host Variables Configuration        ##############
+######################################################################
+
+# Oracle db log mode: true or false
+log_archive_mode: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>true</i></span>
+
+# Number of pluggable database per container instance identified by sid
+oracle_sid: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>cdb2</i></span>
+pdb_num: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>3</i></span>
+pdb_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>"{{ oracle_sid }}_pdb"</i></span>
+
+# CDB listener port, use different listener port for additional CDB on same host
+listener_port: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>1523</i></span>
+
+# CDB is created with SGA at 75% of memory_limit, MB. Consider how many databases to be hosted on the node and how much ram to be allocated to each DB. The grand total SGA should not exceed 75% available RAM on node.
+memory_limit: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>5464</i></span>
+
+# Set "em_configuration: DBEXPRESS" to install enterprise manager express and choose a unique port from 5500 to 5599 for each sid on the host.
+# Leave them black if em express is not installed.
+em_configuration: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>DBEXPRESS</i></span>
+em_express_port: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>5501</i></span>
+
+host_datastores_nfs:
+  - {vol_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>"{{groups.oracle[0]}}_u01"</i></span>, aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr01_node01</i></span>, lif: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.200</i></span>, size: <span <div contenteditable="true"/><i>25</i></span>}
+<a id="more_datastores_nfs" href="javascript:datastoredropdown();">More NFS volumes</a><div id="select_more_datastores_nfs"></div><a id="more_datastores_nfs_button" href="javascript:adddatastorevolumes();">Enter NFS volumes' details</a><div id="extra_datastores_nfs"></div>
+</div></code></pre></div></div>
+<script>
+function CopyClassText1(){
+  	var textToCopy = document.getElementById("CopyMeID1");
+  	var currentRange;
+  	if(document.getSelection().rangeCount > 0)
+  	{
+  		currentRange = document.getSelection().getRangeAt(0);
+  		window.getSelection().removeRange(currentRange);
+  	}
+  	else
+  	{
+  		currentRange = false;
+  	}
+  	var CopyRange = document.createRange();
+  	CopyRange.selectNode(textToCopy);
+  	window.getSelection().addRange(CopyRange);
+    document.getElementById("more_datastores_nfs").style.display = "none";
+    var command = document.execCommand("copy");
+      if (command)
+      {
+          document.getElementById("copy-button1").innerHTML = "Copied!";
+          setTimeout(revert_copy, 3000);
+      }
+  	window.getSelection().removeRange(CopyRange);
+  	if(currentRange)
+  	{
+  		window.getSelection().addRange(currentRange);
+  	}
+}
+function revert_copy() {
+      document.getElementById("copy-button1").innerHTML = "Copy";
+      document.getElementById("more_datastores_nfs").style.display = "block";
+}
+
+function datastoredropdown() {
+    document.getElementById("more_datastores_nfs").style.display = "none";
+	document.getElementById("more_datastores_nfs_button").style.display = "block";
+    var x=1;
+    var myHTML = '';
+    var buildup = '';
+    var wrapper = document.getElementById("select_more_datastores_nfs");
+    while (x < 100) {
+      buildup += '<option value="' + x + '">' + x + '</option>';
+  	  x++;
+    }
+    myHTML += '<a id="more_datastores_nfs">How many extra NFS volumes do you wish to add?</a><select name="number_of_extra_datastores_nfs" id="number_of_extra_datastores_nfs">' + buildup + '</select>';
+    wrapper.innerHTML = myHTML;
+}
+function adddatastorevolumes() {
+    var y = document.getElementById("number_of_extra_datastores_nfs").value;
+    var j=0;
+    var myHTML = '';
+    var wrapper = document.getElementById("extra_datastores_nfs");
+    while (j < y) {
+    	j++;
+        myHTML += '  - {vol_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>"{{groups.oracle[0]}}_u01"</i></span>, aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr01_node02</i></span>, lif: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.201</i></span>, size: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>25</i></span>}<br>';
+    }
+	wrapper.innerHTML = myHTML;
+	document.getElementById("select_more_datastores_nfs").style.display = "none";
+	document.getElementById("more_datastores_nfs_button").style.display = "none";
+}
+
 </script>
 ++++
