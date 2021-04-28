@@ -25,7 +25,7 @@ summary: This page describes the Automated method for deploying Oracle19c on Net
 [width=100%,cols="6, 5, 6",grid="all"]
 |===
 | *Ansible Environment* | *Oracle Server(s)* | *ONTAP*
-| AWX/Tower or Linux host to be the Ansible control host | RHEL 7/9 | ONTAP version 9.3 - 9.8
+| AWX/Tower or Linux host to be the Ansible control host | RHEL 7/8 | ONTAP version 9.3 - 9.8
 | Ansible v.2.10 and higher | Oracle Linux 7/8 | Two data aggregates
 | Python 3 | NFS vlan configured interface | NFS vlan and ifgrp created
 | Python libraries
@@ -34,27 +34,29 @@ summary: This page describes the Automated method for deploying Oracle19c on Net
   - jmespath | Oracle installation files on Oracle servers |
 |===
 
-== Ansible Environment
-* AWX/Tower or Linux host to be the Ansible control host
-* Ansible version 2.10 and above
-* ONTAP Ansible collections
-* Python 3
-* Python libraries:
-** netapp-lib
-** xmltodict
-** jmespath
+= Automation Details
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
 
-== ONTAP
-* ONTAP version 9.3 - 9.8
-* Two data aggregates
-* NFS vlan and ifgrp created
+The automated deployment is designed with a single Ansible playbook, that consists of three separate roles. The roles are for ONTAP, Linux, and Oracle configurations.
+The table below describes what tasks are being automated.
 
-== Linux
-* RHEL 7/8
-* Oracle Linux 7/8
-* NFS vlan configured interface
-* Oracle installation files need to be copied to the DB servers
-
+[width=100%,cols="6, 5, 6",grid="all"]
+|===
+| *ontap_config* | *linux_config* | *oracle_config*
+| Pre-check of the ONTAP environment | Create mount points and mount NFS volumes | Oracle software installation
+| Creation of NFS based SVM for Oracle | Verify NFS mounts | Create Oracle listener
+| Creation of export policy | OS specific configuration | Create Oracle databases
+| Creation of volumes for Oracle | Create Oracle directories | Oracle environment configuration
+| Creation of NFS LIFs | Configure hugepages | Save PDB state
+| | Disable SELinux and Firewall Daemon | Enable instance archive mode
+| | Enable and start chronyd service | Enable dnfs client
+| | Increase file descriptor hard limit | Enable database auto startup and shutdown between OS reboots
+| | Create pam.d session file |
+|===
 = Automation Details
 The automation has been built for the end user to execute in three separate plays.
 
