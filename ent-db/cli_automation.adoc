@@ -62,25 +62,113 @@ Each Oracle host has its host variable file identified by its host name that con
 
 ==== 5. Run the playbook:
 ++++
+<div>
+<strong>5.1</strong> Run the ONTAP playbook by passing the correct tags and ONTAP cluster username. Fill the password for ONTAP cluster, and vsadmin when prompted.
+<div><span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>playbook -i hosts ontap_playbook.yml -u username -k -t ontap_cofig<i></i></span>
 <p>
 <div>
-5.1. Run the ONTAP playbook by passing the correct tags and ONTAP cluster username. Fill the password for ONTAP cluster, and vsadmin when prompted.
-</div><span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>#playbook -i hosts ontap_playbook.yml -u username -k -t ontap_cofig<i></i></span>
-<p>
-<div>
-5.2. Run the Linux playbook to execute Linux portion of deployment. Input for admin ssh password as well as sudo password.
+<strong>5.2</strong> Run the Linux playbook to execute Linux portion of deployment. Input for admin ssh password as well as sudo password.
 <div><span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>
-#ansible-playbook -i hosts linux_playbook.yml -u username -k -K -t linux_config<i></i></span>
+ansible-playbook -i hosts linux_playbook.yml -u username -k -K -t linux_config<i></i></span>
 <p>
 </div>
-5.3. Run the Oracle playbook to execute Oracle portion of deployment. Input for admin ssh password as well as sudo password.
+<strong>5.3</strong> Run the Oracle playbook to execute Oracle portion of deployment. Input for admin ssh password as well as sudo password.
 <div>
 <p>
-<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>#ansible-playbook -i hosts oracle_playbook.yml -u username -k -K -t oracle_config<i></i></span>
+<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>ansible-playbook -i hosts oracle_playbook.yml -u username -k -K -t oracle_config<i></i></span>
 </div>
-5.4. Run the All playbook to execute ONTAP, Linux, and Oracle deployment for an end to end deployment in a single run. Input for admin ssh password as well as sudo password.
- <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>#ansible-playbook -i hosts all_playbook.yml -u username -k -K<i></i></span>
+<strong>5.4</strong> Run the All playbook to execute ONTAP, Linux, and Oracle deployment for an end to end deployment in a single run. Input for admin ssh password as well as sudo password.
+ <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>ansible-playbook -i hosts all_playbook.yml -u username -k -K<i></i></span>
 </div>
 <p>
 ++++
 NOTE: To deploy second database instance on same host, Make changes in sid, memory_limit, listener_ports and/or em_express_port if em express is to be configured, then execute Oracle playbook again.
+
+==== 6. Validate Oracle installation:
+++++
+<strong>1</strong>. Login to Oracle server as root and the following command:
+<div>
+<div><span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>
+ps -ef | grep ora<i></i></span>
+<p>
+</div>
+<strong>2.</strong> Login database to check db setting and PDBs created with following command sets.
+<div>
+<p>
+<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>su - oracle<i></i></span>
+</div>
+<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>sqlplus / as sysdba <i></i></span>
+<p>
+</div>
+<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>SQL> select name, log_mode from v$database; <i></i></span>
+</div>
+<p>
+</div>
+++++
+++++
+<pre>
+<strong>
+NAME LOG_MODE
+--------- ------------
+CDB2 ARCHIVELOG
+</strong>>
+++++
+++++
+</div>
+<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>show pdbs; <i></i></span>
+</div>
+<p>
+++++
+++++
+<pre>
+<strong>
+CON_ID CON_NAME OPEN MODE RESTRICTED
+---------- ------------------------------ ---------- ----------
+2 PDB$SEED READ ONLY NO
+3 CDB2_PDB1 READ WRITE NO
+4 CDB2_PDB2 READ WRITE NO
+5 CDB2_PDB3 READ WRITE NO
+</strong>>
+++++
+++++
+</div>
+<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>check dnfs; <i></i></span>
+</div>
+<p>
+++++
+++++
+<div>
+<pre>
+<strong>
+col svrname form a30
+
+col dirname form a30
+</strong>>
+</div>
+++++
+++++
+<strong>select svrname, dirname, nfsversion from v$dnfs_servers</strong>
+<div>
+++++
+++++
+</div>
+<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>SQL>/<i></i></span>
+</div>
+<p>
+++++
+++++
+<div>
+<pre>
+<strong>
+SVRNAME DIRNAME NFSVERSION
+------------------------------ ------
+172.21.126.200 /rhelora02_u02 NFSv3.0
+172.21.126.200 /rhelora02_u03 NFSv3.0
+172.21.126.200 /rhelora02_u01 NFSv3.0
+</strong>>
+</div>
+++++
+++++
+<strong>This confirms that dnfs is working properly.
+</strong>
+++++
