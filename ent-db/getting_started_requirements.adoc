@@ -1,0 +1,74 @@
+---
+sidebar: sidebar
+permalink: ent-db/getting_started_requirements.html
+keywords: Linux, RHEL Oracle19c, NFS, ONTAP
+summary: This page describes the Automated method for deploying Oracle19c on NetApp ONTAP storage.
+---
+
+= Getting Started
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+This solution has been designed to be ran in an AWX/Tower environment or by CLI on an Ansible control host.
+
+=== AWX/Tower
+
+. For AWX/Tower environments you will be guided through creating an inventory of your ONTAP cluster management and Oracle server (IPs and hostnames), creating credentials, configuring a Project that pulls the Ansible code from NetApp Automation Github, and the Job Template that will launch the automation.
+. Next fill out the variables specific to your environment, and copy and paste those into the Extra Vars into your Job Template.
+. After the Extra vars have been added to your Job Template you will be able to launch the automation.
+. The Job Template will be ran in three phases by specifying tags, for ontap_config, linux_config, and finally oracle_config.
+
+=== CLI via Ansible Control host
+
+. Linux host configured to be used for an Ansible control host, click the link for details on getting those configurations installed.
+. After the Ansible control host configured you can git clone the Ansible Automation repository.
+. Edit the hosts file with the IPs and/or hostnames of your ONTAP cluster management, and Oracle server's management IPs.
+. Next fill out the variables specific to your environment, and copy and paste those into the vars.yml file.
+. Each Oracle host will have a variable file identified by its hostname that contains host specific variables.
+. After all variable files have been completed, you can run the playbook in three phases specifying tags, for ontap_config, linux_config, and finally oracle_config.
+
+= Requirements
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[width=100%]
+|===
+|Environment +4| Requirements |
+
+| *Ansible Environment* | AWX/Tower or Linux host to be the Ansible control host | Ansible v.2.10 and higher | Python 3 | Python libraries
+- netapp-lib
+- xmltodict
+- jmespath
+| *ONTAP* | ONTAP version 9.3 - 9.8 | Two data aggregates | NFS vlan and ifgrp created |
+| *Oracle Server(s)* | RHEL 7/8 | Oracle Linux 7/8 | NFS vlan configured interface | Oracle installation files on Oracle servers
+|===
+
+= Automation Details
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+The automated deployment is designed with a single Ansible playbook, that consists of three separate roles. The roles are for ONTAP, Linux, and Oracle configurations.
+The table below describes what tasks are being automated.
+
+[width=100%,cols="6, 5, 6",grid="all"]
+|===
+| *ontap_config* | *linux_config* | *oracle_config*
+| Pre-check of the ONTAP environment | Create mount points and mount NFS volumes | Oracle software installation
+| Creation of NFS based SVM for Oracle | Verify NFS mounts | Create Oracle listener
+| Creation of export policy | OS specific configuration | Create Oracle databases
+| Creation of volumes for Oracle | Create Oracle directories | Oracle environment configuration
+| Creation of NFS LIFs | Configure hugepages | Save PDB state
+| | Disable SELinux and Firewall Daemon | Enable instance archive mode
+| | Enable and start chronyd service | Enable dnfs client
+| | Increase file descriptor hard limit | Enable database auto startup and shutdown between OS reboots
+| | Create pam.d session file |
+|===
