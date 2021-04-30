@@ -14,4 +14,61 @@ summary: This page describes the Automated method for deploying Oracle19c on Net
 
 
 
-== Automated Deployment of Oracle19c with AWX/Tower
+== AWX/Tower Deployment Oracle 19c Database
+
+==== 1. Create the Inventory, Group, Hosts, and Credentials for your Environment:
+
+=== Procedure
+
+This section describes the steps to configure the parameters in AWX/Ansible Tower that will prepare the environment for consuming NetApp automated solutions.
+
+. Configure Inventory
+.. Go to 'Resources' → 'Inventories' → 'Add' and click on 'Add Inventory'.
+.. Provide name and organization details and click on 'Save'.
+.. In 'Inventories' page, click on the Inventory created.
+.. If there are any inventory variables, paste them in the variables field.
+.. Go to 'Groups' sub-menu and click on 'Add'
+.. Provide name of the group, paste the group variables (if any) and click on 'Save'
+.. Then click on the group created, go to 'Hosts' sub-menu and click on 'Add New Host'
+.. Provide hostname/IP address of the host, paste the host variables (if any) and click on 'Save'
+.. This process will need to be done for the ONTAP Cluster Management IP/Hostname, and Oracle servers management IP/Hostname
+
+. Create Credential Types
+.. For solutions involving ONTAP you will need to configure credential type to match username and password entries.
+.. Go to 'Administration' → 'Credential Types' and click on 'Add'
+.. Provide name and description
+.. Paste the following content in 'Input Configuration':
+[source, cli]
+fields:
+- id: username
+type: string
+label: Username
+- id: password
+type: string
+label: Password
+secret: true
+- id: vsadmin_password
+type: string
+label: vsadmin_password
+secret: true
+
+.. Paste the following content in 'Injector Configuration':
+[source, cli]
+extra_vars:
+password: '{{ password }}'
+username: '{{ username }}'
+vsadmin_password: '{{ vsadmin_password }}'
+
+. Configure Credentials
+.. Go to 'Resources' → 'Credentials' and click on 'Add'
+.. Enter the name and organization details
+.. Select the custom 'Credential Type' you created for ONTAP
+.. Under 'Type Details' Enter the Username, Password, and vsadmin_password
+
+. Configure host_vars
+.. Go to 'Resources' → 'Hosts' and select your Oracle server
+.. Under 'Variables' click edit and add copy the variables from below that are specific to the server
+NOTE: The Items in blue must be changed to match your Oracle server and ONTAP environment.
+include::ent-db/host_vars.adoc[]
+.. Click Save
+.. Repeat process for additional Oracle servers
