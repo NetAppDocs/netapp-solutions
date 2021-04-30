@@ -4,7 +4,6 @@ permalink: ent-db/cli_automation.html
 keywords: Linux, RHEL Oracle19c, NFS, ONTAP
 summary: This page describes the Automated method for deploying Oracle19c on NetApp ONTAP storage.
 ---
-
 = Deployment
 :hardbreaks:
 :nofooter:
@@ -20,8 +19,14 @@ summary: This page describes the Automated method for deploying Oracle19c on Net
 == CLI Deployment Oracle 19c Database
 
 ==== 1. Download Oracle19c Repo:
-From your ansible controller, run the command git clone "Place holder url for GitHub" (login with your SSO when prompted)
-Then change directories to na_oracle19c_deploy <cd na_oracle19c_deploy>
+- From your ansible controller, run the command:
+++++
+<p < contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>git clone "Place holder url for GitHub" <i></i></div>
+++++
+- login with your SSO when prompted
+
+- Change directories to na_oracle19c_deploy <cd na_oracle19c_deploy>
 
 ==== 2. Edit the hosts file:
 - vim hosts
@@ -35,55 +40,160 @@ Following is an example of host file
 #ONTAP Host<div>
 [ontap]
 <div>
-<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>10.61.184.183<i></i></span>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>10.61.184.183<i></i></span>
 </div>
 #Oracle hosts<div>
 <div>
 [oracle]<div>
-<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>rtpora01<i></i></span>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>rtpora01<i></i></span>
 <div>
-<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>rtpora02<i></i></span>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>rtpora02<i></i></span>
 </div>
 
 ++++
-This will execute playbook and deploy oracle 19c on two oracle DB servers concurrent. You can also test with just one DB server. In that case, you only need to configure one host variable file.
+This will execute the playbook and deploy oracle 19c on two oracle DB servers concurrently. You can also test with just one DB server. In that case, you only need to configure one host variable file.
 
-NOTE: The playbook will execute the same regardless number of Oracle hosts and number of databases to be deployed.
+NOTE: The playbook will execute the same way regardless of how many Oracle Hosts and Databases are to be deployed.
 
 ==== 3. Edit the vars.yml file:
 The vars.yml file consolidates all environment specific variables (ONTAP, Linux, Oracle) for Oracle deployment.
-3.1 Edit and copy the variables from VARS section,
+
+- Edit and copy the variables from VARS section,
 
 include::ent-db/automated_ontap_oracle19c.adoc[]
 
 NOTE: The Items in blue must be changed to match your ONTAP environment.
 
+include::ent-db/vars.adoc[]
+
 
 ==== 4. Edit the host_name.yml file under host_vars:
 Each Oracle host has its host variable file identified by its host name that contains host specific variables. Edit and copy the host_vars from VARS section.
 
+include::ent-db/host_vars.adoc[]
+
+
 ==== 5. Run the playbook:
 ++++
 <div>
-<p>
-5.1. Run the ONTAP playbook by passing the correct tags and ONTAP cluster username. Fill the password for ONTAP cluster, and vsadmin when prompted.
-<div><span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>#playbook -i hosts ontap_playbook.yml -u username -k -t ontap_cofig<i></i></span>
-</div>
+<strong>5.1</strong> Run the ONTAP playbook by passing the correct tags and ONTAP cluster username. Fill the password for ONTAP cluster, and vsadmin when prompted.
+<div><span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>playbook -i hosts all_playbook.yml -u username -k -t ontap_cofig<i></i></span>
 <p>
 <div>
-5.2. Run the Linux playbook to execute Linux portion of deployment. Input for admin ssh password as well as sudo password.
-<div><span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>
-#ansible-playbook -i hosts linux_playbook.yml -u username -k -K -t linux_config<i></i></span>
+<strong>5.2</strong> Run the Linux playbook to execute Linux portion of deployment. Input for admin ssh password as well as sudo password.
+<div><span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>
+ansible-playbook -i hosts all_playbook.yml -u username -k -K -t linux_config<i></i></span>
 <p>
 </div>
-5.3. Run the Oracle playbook to execute Oracle portion of deployment. Input for admin ssh password as well as sudo password.
+<strong>5.3</strong> Run the Oracle playbook to execute Oracle portion of deployment. Input for admin ssh password as well as sudo password.
 <div>
 <p>
-<span <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>#ansible-playbook -i hosts oracle_playbook.yml -u username -k -K -t oracle_config<i></i></span>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>ansible-playbook -i hosts all_playbook.yml -u username -k -K -t oracle_config<i></i></span>
 </div>
-5.4. Run the All playbook to execute ONTAP, Linux, and Oracle deployment for an end to end deployment in a single run. Input for admin ssh password as well as sudo password.
- <div contenteditable="false" style="color:#008000; font-weight:bold; font-style:italic; text-decoration:;"/>#ansible-playbook -i hosts all_playbook.yml -u username -k -K<i></i></span>
+<strong>5.4</strong> Run the All playbook to execute ONTAP, Linux, and Oracle deployment for an end to end deployment in a single run. Input for admin ssh password as well as sudo password.
+ <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>ansible-playbook -i hosts all_playbook.yml -u username -k -K<i></i></span>
 </div>
 <p>
 ++++
 NOTE: To deploy second database instance on same host, Make changes in sid, memory_limit, listener_ports and/or em_express_port if em express is to be configured, then execute Oracle playbook again.
+
+==== 6. Validate Oracle installation:
+++++
+<strong>1</strong>. Login to Oracle server as root and the following command:
+<div>
+<div><span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>
+ps -ef | grep ora<i></i></span> -- this will list oracle processes if installation completed as expected and oracle DB started
+<p>
+</div>
+<strong>2.</strong> Login database to check db setting and PDBs created with following command sets.
+<div>
+<p>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>su - oracle<i></i></span>
+</div>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>sqlplus / as sysdba <i></i></span>
+<p>
+</div>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>SQL> select name, log_mode from v$database; <i></i></span>
+</div>
+++++
+++++
+<pre>
+<strong>
+<div style = "border-width:1px; border-style:solid; height: 100px; width: 170px">
+NAME LOG_MODE
+--------- -----
+CDB2 ARCHIVELOG
+</strong>
+++++
+++++
+</div>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>show pdbs; <i></i></span>
+</div>
+++++
+++++
+<pre>
+<strong>
+<div style = "border-width:1px; border-style:solid; height: 170px; width: 400px">
+CON_ID CON_NAME OPEN MODE RESTRICTED
+---------- ------------------------------
+2 PDB$SEED READ ONLY NO
+3 CDB2_PDB1 READ WRITE NO
+4 CDB2_PDB2 READ WRITE NO
+5 CDB2_PDB3 READ WRITE NO
+</strong>
+++++
+++++
+</div>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>check dnfs; <i></i></span>
+</div>
+++++
+++++
+<div>
+<pre>
+<strong>
+<div style = "border-width:1px; border-style:solid; height: 100px; width: 200px">
+col svrname form a30
+
+col dirname form a30
+</strong>
+</div>
+++++
+++++
+<strong>Select svrname, dirname, nfsversion from v$dnfs_servers</strong>
+++++
+++++
+</div>
+<span <div contenteditable="false" style="color:#7EAF97
+; font-weight:bold; font-style:italic; text-decoration:;"/>SQL>/<i></i></span>
+</div>
+++++
+++++
+<div>
+<pre>
+<strong>
+<div style = "border-width:1px; border-style:solid; height: 150px; width: 400px">
+SVRNAME DIRNAME NFSVERSION
+------------------------------ ------
+172.21.126.200 /rhelora02_u02 NFSv3.0
+172.21.126.200 /rhelora02_u03 NFSv3.0
+172.21.126.200 /rhelora02_u01 NFSv3.0
+</strong>
+</div>
+++++
+++++
+<strong>This confirms that dnfs is working properly.
+</strong>
+++++
