@@ -4,7 +4,7 @@ permalink: ent-db/cli_automation.html
 keywords: Linux, RHEL Oracle19c, NFS, ONTAP
 summary: This page describes the Automated method for deploying Oracle19c on NetApp ONTAP storage.
 ---
-= Deployment
+= Solution Overview
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -17,25 +17,25 @@ summary: This page describes the Automated method for deploying Oracle19c on Net
 // 2021-02-16 10:32:05.121542
 //
 == CLI Deployment Oracle 19c Database
+=== Procedure
+This section covers the steps required to prepare and deploy Oracle19c Database via CLI. Make sure that you have reviewed the    link:getting_started_requirements.html[Getting Started and Requirements Section] and prepared your environment accordingly.
 
 ==== 1. Download Oracle19c Repo:
-- From your ansible controller, run the command:
+- From your ansible controller, run the following command:
 ++++
 <p < contenteditable="false" style="color:#7EAF97
 ; font-weight:bold; font-style:italic; text-decoration:;"/>git clone "Place holder url for GitHub" <i></i></div>
 ++++
-- login with your SSO when prompted
-
-- Change directories to na_oracle19c_deploy <cd na_oracle19c_deploy>
+- After downloading the repository, change directories to na_oracle19c_deploy <cd na_oracle19c_deploy>
 
 ==== 2. Edit the hosts file:
-- vim hosts
-- Under ontap, change the IP address to your cluster management IP.
-- Under oracle group, add oracle hosts names. The host name needs to be resolved to its IP address either through DNS, hosts file or specified in host
-- variable files in host_vars directory.
-- Save changes
+The Following steps should be completed before deployment.
+- Edit your "hosts" file na_oracle19c_deploy directory.
+- Under "[ontap]", change the IP address to your cluster management IP.
+- Under "[oracle]" group, add oracle hosts names. The host name needs to be resolved to its IP address either through DNS, hosts file or specified in host
+- Once you have completed the steps above, save changes.
 
-Following is an example of host file
+===== Following is an example of "host" file
 ++++
 #ONTAP Host<div>
 [ontap]
@@ -59,27 +59,28 @@ This will execute the playbook and deploy oracle 19c on two oracle DB servers co
 NOTE: The playbook will execute the same way regardless of how many Oracle Hosts and Databases are to be deployed.
 
 ==== 3. Edit the vars.yml file:
-The vars.yml file consolidates all environment specific variables (ONTAP, Linux, Oracle) for Oracle deployment.
+The "vars.yml" file consolidates all environment specific variables (ONTAP, Linux, Oracle) for Oracle deployment.
 
-- Edit and copy the variables from VARS section,
+- Edit and copy the variables from VARS section and paste these variables into your "vars.yml" file.
 
 NOTE: The Items in blue must be changed to match your ONTAP environment.
 
 include::ent-db/vars.adoc[]
 
 
-==== 4. Edit the host_name.yml file under host_vars:
-Each Oracle host has its host variable file identified by its host name that contains host specific variables. Edit and copy the host_vars from VARS section.
+==== 4. Edit the "your_host.yml" file under host_vars:
+Each Oracle host has its host variable file identified by its host name that contains host specific variables. You can specify any name for your host. Edit and copy the host_vars from VARS section and paste it into your desired "your_host.yml" file.
 
 include::ent-db/host_vars.adoc[]
 
 
 ==== 5. Run the playbook:
+After completing the required environment prerequisites and copying the variables into "vars.yml" and "your_host.yml", we are now ready to deploy the playbooks.
 ++++
 <div>
 <strong>5.1</strong> Run the ONTAP playbook by passing the correct tags and ONTAP cluster username. Fill the password for ONTAP cluster, and vsadmin when prompted.
 <div><span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>playbook -i hosts all_playbook.yml -u username -k -t ontap_cofig<i></i></span>
+; font-weight:bold; font-style:italic; text-decoration:;"/>ansible-playbook -i hosts all_playbook.yml -u username -k -t ontap_cofig<i></i></span>
 <p>
 <div>
 <strong>5.2</strong> Run the Linux playbook to execute Linux portion of deployment. Input for admin ssh password as well as sudo password.
@@ -191,7 +192,4 @@ SVRNAME DIRNAME NFSVERSION
 </strong>
 </div>
 ++++
-++++
-<strong>This confirms that dnfs is working properly.
-</strong>
-++++
+This confirms that dnfs is working properly.
