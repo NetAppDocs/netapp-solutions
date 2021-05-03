@@ -1,17 +1,22 @@
 ---
 sidebar: sidebar
-permalink: automation/setup_awx.html
-summary: NetApp solutions automation enables the customer to automate the deployment, configuration and execution of many common infrastructure and application tasks.
-keywords: netapp, awx, tower, ansible tower, solutions, automation, ansible
+permalink: ent-db/awx_automation.html
+keywords: Linux, RHEL Oracle19c, NFS, ONTAP
+summary: This page describes the Automated method for deploying Oracle19c on NetApp ONTAP storage.
 ---
 
-= NetApp Solution Automation
+= Solution Overview
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
-:table-stripes: odd
-:imagesdir: ./media/
+:imagesdir: ./../media/
+
+
+
+== AWX/Tower Deployment Oracle 19c Database
+
+==== 1. Create the Inventory, Group, Hosts, and Credentials for your Environment:
 
 === Procedure
 
@@ -26,9 +31,10 @@ This section describes the steps to configure the parameters in AWX/Ansible Towe
 .. Provide name of the group, paste the group variables (if any) and click on 'Save'
 .. Then click on the group created, go to 'Hosts' sub-menu and click on 'Add New Host'
 .. Provide hostname/IP address of the host, paste the host variables (if any) and click on 'Save'
+.. This process will need to be done for the ONTAP Cluster Management IP/Hostname, and Oracle servers management IP/Hostname
 
 . Create Credential Types
-.. For solutions involving ONTAP, Element, VMware or any other https based transport connection, you will require to configure credential type to match username and password entries.
+.. For solutions involving ONTAP you will need to configure credential type to match username and password entries.
 .. Go to 'Administration' → 'Credential Types' and click on 'Add'
 .. Provide name and description
 .. Paste the following content in 'Input Configuration':
@@ -56,15 +62,25 @@ vsadmin_password: '{{ vsadmin_password }}'
 . Configure Credentials
 .. Go to 'Resources' → 'Credentials' and click on 'Add'
 .. Enter the name and organization details
-.. Select the right credential type - if you intend to use the standard ssh login, select type Machine or select the custom credential type you might have created
-.. Enter the other corresponding details and click on 'Save'
+.. Select the custom 'Credential Type' you created for ONTAP
+.. Under 'Type Details' Enter the Username, Password, and vsadmin_password
 
-. Configure Project
+. Configure host_vars
+.. Go to 'Resources' → 'Hosts' and select your Oracle server
+.. Under 'Variables' click edit and add copy the variables from below that are specific to the server
+
+NOTE: The Items in blue must be changed to match your Oracle server and ONTAP environment.
+
+include::ent-db/host_vars.adoc[]
+
+.. Click Save
+.. Repeat process for additional Oracle servers
+
+. Create Project
 .. Go to 'Resources' → 'Projects' and click on 'Add'
 .. Enter the name and organization details
 .. Select 'Git' in 'Source Control Credential Type'
-.. Paste the Source Control URL (or git clone URL) corresponding to the specific solution
-.. Optionally, if the Git URL is access controlled, create and attach the corresponding credential in 'Source Control Credential'
+.. <GITHUB URL>
 .. Click on 'Save'
 
 . Configure Job Template
@@ -75,6 +91,12 @@ vsadmin_password: '{{ vsadmin_password }}'
 .. Select the playbook that is desired to be run as part of the job template
 .. Usually the variables will be pasted during runtime. So to get the prompt to populate the variables during runtime, make sure to tick the checkbox 'Prompt on Launch' corresponding to the 'Variable' field.
 .. Provide any other details as required and click on Save
+
+- Edit and copy the variables from VARS section
+
+NOTE: The Items in blue must be changed to match your ONTAP environment.
+
+include::ent-db/vars.adoc[]
 
 . Launching the Job Template
 .. Go to 'Resources' → 'Templates'
