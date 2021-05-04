@@ -30,7 +30,6 @@ This section covers the steps required to prepare and deploy Oracle19c Database 
 
 ==== 2. Edit the hosts file:
 The Following steps should be completed before deployment.
-
 - Edit your "hosts" file na_oracle19c_deploy directory.
 - Under "[ontap]", change the IP address to your cluster management IP.
 - Under "[oracle]" group, add oracle hosts names. The host name needs to be resolved to its IP address either through DNS, hosts file or specified in host
@@ -77,75 +76,98 @@ include::ent-db/host_vars.adoc[]
 
 ==== 5. Run the playbook:
 After completing the required environment prerequisites and copying the variables into "vars.yml" and "your_host.yml", we are now ready to deploy the playbooks.
+
 ++++
+<style>
+div {
+position: relative;
+}
+div button {
+position: absolute;
+top: 0;
+right: 0;
+}
+button {
+  transition-duration: 0.4s;
+  background-color: white;
+  color: #1563a3;
+  border: 2px solid #1563a3;
+}
+button:hover {
+  background-color: #1563a3;
+  color: white;
+}
+</style>
 <div>
-<strong>5.1</strong> Run the ONTAP playbook by passing the correct tags and ONTAP cluster username. Fill the password for ONTAP cluster, and vsadmin when prompted.
-<div><span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>ansible-playbook -i hosts all_playbook.yml -u username -k -t ontap_cofig<i></i></span>
-<p>
-<div>
+<strong>5.1</strong>
+Run the ONTAP playbook by passing the correct tags and ONTAP cluster username. Fill the password for ONTAP cluster, and vsadmin when prompted.
+<section>
+<div class="listingblock"><div class="content"><div><button id="copy-button1" onclick="CopyClassText1()">Copy</button></div><pre><code><div class="CopyMeClass1" id="CopyMeID1">
+ansible-playbook -i hosts all_playbook.yml -u <span <div contenteditable="true" style="color:#0000FF
+; font-weight:bold; font-style:italic; text-decoration:underline;;"/>username<i></i></span> -k -K -t ontap_config
+</section>
 <strong>5.2</strong> Run the Linux playbook to execute Linux portion of deployment. Input for admin ssh password as well as sudo password.
-<div><span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>
-ansible-playbook -i hosts all_playbook.yml -u username -k -K -t linux_config<i></i></span>
-<p>
 </div>
+<section>
+<div class="listingblock"><div class="content"><div><button id="copy-button1" onclick="CopyClassText1()">Copy</button></div><pre><code><div class="CopyMeClass1" id="CopyMeID1">
+ansible-playbook -i hosts all_playbook.yml -u <span <div contenteditable="true" style="color:#0000FF
+; font-weight:bold; font-style:italic; text-decoration:underline;;"/>username<i></i></span> -k -K -t linux_config
+</section>
 <strong>5.3</strong> Run the Oracle playbook to execute Oracle portion of deployment. Input for admin ssh password as well as sudo password.
-<div>
-<p>
-<span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>ansible-playbook -i hosts all_playbook.yml -u username -k -K -t oracle_config<i></i></span>
-</div>
+<section>
+<div class="listingblock"><div class="content"><div><button id="copy-button1" onclick="CopyClassText1()">Copy</button></div><pre><code><div class="CopyMeClass1" id="CopyMeID1">
+ansible-playbook -i hosts all_playbook.yml -u <span <div contenteditable="true" style="color:#0000FF
+; font-weight:bold; font-style:italic; text-decoration:underline;;"/>username<i></i></span> -k -K -t oracle_config
+</section>
 <strong>5.4</strong> Run the All playbook to execute ONTAP, Linux, and Oracle deployment for an end to end deployment in a single run. Input for admin ssh password as well as sudo password.
- <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>ansible-playbook -i hosts all_playbook.yml -u username -k -K<i></i></span>
-</div>
-<p>
+<section>
+<div class="listingblock"><div class="content"><div><button id="copy-button1" onclick="CopyClassText1()">Copy</button></div><pre><code><div class="CopyMeClass1" id="CopyMeID1">
+ansible-playbook -i hosts all_playbook.yml -u <span <div contenteditable="true" style="color:#0000FF
+; font-weight:bold; font-style:italic; text-decoration:underline;;"/>username<i></i></span> -k -K
+</section>
 ++++
-NOTE: To deploy second database instance on same host, Make changes in sid, memory_limit, listener_ports and/or em_express_port if em express is to be configured, then execute Oracle playbook again.
 
 ==== 6. Validate Oracle installation:
 ++++
 <strong>1</strong>. Login to Oracle server as root and the following command:
-<div>
-<div><span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>
-ps -ef | grep ora<i></i></span> -- this will list oracle processes if installation completed as expected and oracle DB started
-<p>
-</div>
-<strong>2.</strong> Login database to check db setting and PDBs created with following command sets.
-<div>
-<p>
-<span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>su - oracle<i></i></span>
-</div>
-<span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>sqlplus / as sysdba <i></i></span>
-<p>
-</div>
-<span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>SQL> select name, log_mode from v$database; <i></i></span>
-</div>
 ++++
+[source, cli]
+ps -ef | grep ora
+
+NOTE:  This will list oracle processes if installation completed as expected and oracle DB started
+
+++++
+<strong>2.</strong> Login database to check db setting and PDBs created with following command sets.
+++++
+
+[source, cli]
+su - oracle
+
+[source, cli]
+sqlplus / as sysdba
+
+[source, cli]
+select name, log_mode from v$database;
+
 ++++
 <pre>
 <strong>
-<div style = "border-width:1px; border-style:solid; height: 100px; width: 170px">
+<div style = "padding: 0; margin-bottom: auto; border-width:1px; border-style:solid; height: 100px; width: 170px">
 NAME LOG_MODE
 --------- -----
 CDB2 ARCHIVELOG
 </strong>
+</div><code></pre></div></div>
+
 ++++
-++++
-</div>
-<span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>show pdbs; <i></i></span>
-</div>
-++++
+
+[source, cli]
+show pdbs;
+
 ++++
 <pre>
 <strong>
-<div style = "border-width:1px; border-style:solid; height: 170px; width: 400px">
+<div style = "border-width:1px; border-style:solid; height: 170px; width: 400px"; >
 CON_ID CON_NAME OPEN MODE RESTRICTED
 ---------- ------------------------------
 2 PDB$SEED READ ONLY NO
@@ -153,13 +175,12 @@ CON_ID CON_NAME OPEN MODE RESTRICTED
 4 CDB2_PDB2 READ WRITE NO
 5 CDB2_PDB3 READ WRITE NO
 </strong>
+</div><code></pre></div></div>
+
 ++++
-++++
-</div>
-<span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>check dnfs; <i></i></span>
-</div>
-++++
+[source, cli]
+check dnfs;
+
 ++++
 <div>
 <pre>
@@ -170,16 +191,13 @@ col svrname form a30
 col dirname form a30
 </strong>
 </div>
+</div><code></pre></div></div>
+
 ++++
-++++
-<strong>Select svrname, dirname, nfsversion from v$dnfs_servers</strong>
-++++
-++++
-</div>
-<span <div contenteditable="false" style="color:#7EAF97
-; font-weight:bold; font-style:italic; text-decoration:;"/>SQL>/<i></i></span>
-</div>
-++++
+
+[source, cli]
+Select svrname, dirname, nfsversion from v$dnfs_servers
+
 ++++
 <div>
 <pre>
