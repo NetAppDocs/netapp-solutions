@@ -16,11 +16,11 @@ summary: This page describes the Automated method for deploying Oracle19c on Net
 
 == AWX/Tower Deployment Oracle 19c Database
 
-==== 1. Create the Inventory, Group, Hosts, and Credentials for your Environment:
+=== 1. Create the Inventory, Group, Hosts, and Credentials for your Environment
 
-=== Procedure
+==== Procedure
 
-This section describes the steps to configure the parameters in AWX/Ansible Tower that will prepare the environment for consuming NetApp automated solutions.
+This section describes the steps to setup the inventory, groups, hosts and access credentials in AWX/Ansible Tower that will prepare the environment for consuming NetApp automated solutions.
 
 . Configure Inventory
 .. Go to 'Resources' → 'Inventories' → 'Add' and click on 'Add Inventory'.
@@ -65,40 +65,85 @@ vsadmin_password: '{{ vsadmin_password }}'
 .. Select the custom 'Credential Type' you created for ONTAP
 .. Under 'Type Details' Enter the Username, Password, and vsadmin_password
 
-. Configure host_vars
-.. Go to 'Resources' → 'Hosts' and select your Oracle server
-.. Under 'Variables' click edit and add copy the variables from below that are specific to the server
+=== 2. Configure Oracle host_vars
 
-NOTE: The Items in blue must be changed to match your Oracle server and ONTAP environment.
+==== Procedure
 
-include::ent-db/host_vars.adoc[]
+Variables defined in this section applied to each individual Oracle server and database
 
+. Input your environment specific parameters in following embedded Oracle hosts variables or host_vars form.
+
+  NOTE: The Items in blue must be changed to match your Oracle server and ONTAP environment.
+
+  include::ent-db/host_vars.adoc[]
+
+.. Fill in all variables in blue fields
+.. After completing variables input, click on Copy button on the form to copy all variables to be transferred to AWX or Tower
+. Back to AWX or Tower and go to 'Resources' → 'Hosts' and select and open your Oracle server configuration page
+.. Under 'Details' tab and click edit and paste the copied variables from above step 1 to the Variables field under YAML tab
 .. Click Save
 .. Repeat process for additional Oracle servers
 
-. Create Project
-.. Go to 'Resources' → 'Projects' and click on 'Add'
+=== 3. Create Project
+
+==== Procedure
+. Go to 'Resources' → 'Projects' and click on 'Add'
 .. Enter the name and organization details
 .. Select 'Git' in 'Source Control Credential Type'
-.. <GITHUB URL>
+.. enter <GITHUB URL> in Source Control URL
 .. Click on 'Save'
+.. The project may need occasionally Sync when source code changed
 
-. Configure Job Template
+=== 4. Configure Global Variables
+
+==== Procedure
+
+Variables defined in this section applies to all Oracle hosts, databases and ONTAP cluster.
+
+. Input your environment specific parameters in following embedded global variables or vars form.
+
+  NOTE: The Items in blue must be changed to match your ONTAP environment.
+
+  include::ent-db/vars.adoc[]
+
+.. Fill in all variables in blue fields
+.. After completing variables input, click on Copy button on the form to copy all variables to be transferred to AWX or Tower to enter into following Job Template
+
+=== 5. Configure and Launch Job Template
+
+==== Procedure
+
+. Create job template
 .. Go to 'Resources' → 'Templates' → 'Add' and click on 'Add Job Template'
 .. Enter the name and description
 .. Select the Job type - 'Run' configures the system based on playbook and 'Check' performs a dry run of playbook without actually configuring the system
-.. Select the corresponding inventory, project and credentials for the playbook
-.. Select the playbook that is desired to be run as part of the job template
-.. Usually the variables will be pasted during runtime. So to get the prompt to populate the variables during runtime, make sure to tick the checkbox 'Prompt on Launch' corresponding to the 'Variable' field.
+.. Select the corresponding inventory, project, playbook, and credentials for the playbook
+.. Select the all_playbook.yml as the default playbook to be executed
+.. Paste global variables copied from above step 4 into template Variables field under YAML tab
+.. The variables can also be pasted during runtime. So to get the prompt to populate the variables during runtime, make sure to tick the checkbox 'Prompt on Launch' corresponding to the 'Variable' field.
+.. Enter ontap_config in 'Job Tags' field to execute ONTAP portion of deployment playbook
+.. Enter linux_config in 'Job Tags' field to execute Linux portion of
+deployment playbook
+.. Enter oracle_config in 'Job Tags' field to execute Oracle portion of deployment playbook
+.. You may need to click on Create "job tag" line right below entered job tag to get job tag entered
+.. If no job tag is entered in 'Job Tags' field, all deployment tasks all be executed in sequence starting from ONTAP tasks, then Linux tasks, and finally Oracle tasks
 .. Provide any other details as required and click on Save
-
-- Edit and copy the variables from VARS section
-
-NOTE: The Items in blue must be changed to match your ONTAP environment.
-
-include::ent-db/vars.adoc[]
-
-. Launching the Job Template
+. Launch job template
 .. Go to 'Resources' → 'Templates'
 .. Click on the desired template and then click on 'Launch'
 .. Fill in any variables if prompted on launch and then click on 'Launch' again
+.. Click on 'View' → 'Jobs' to monitor the job output and progress
+
+=== 7. Deploy Additional Database on Same Oracle Host
+
+==== Procedure
+
+The Oracle portion of playbook will create single Oracle container database on an Oracle server per execution. To create additional container database on the same server, follow below procedure.
+
+. Revise host_vars variables
+.. Go back to step 2 - Configure Oracle host_vars
+.. Change Oracle sid to a different naming string
+.. Change listener port to different number
+.. Change EM Express port to a different number if EM Express is to be installed
+.. Copy and paste the revised host variables to Oracle host variables field in host configuration detail tab
+. Launch the deployment job template with oracle_config tag only  
