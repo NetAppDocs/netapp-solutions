@@ -8,7 +8,7 @@
 ==== Validate Oracle installation:
 ++++
 <div>
-<strong>1</strong>. Login to Oracle server as root and the following command:
+<strong>1</strong>. Login to Oracle server as oracle user and execute the following commands:
 ++++
 [source, cli]
 ps -ef | grep ora
@@ -17,44 +17,92 @@ NOTE:  This will list oracle processes if installation completed as expected and
 
 ++++
 <div>
-<strong>2.</strong> Login database to check db setting and PDBs created with following command sets.
+<strong>2.</strong> Login database to check db configuration settings and PDBs created with following command sets.
 ++++
 
 [source, cli]
-su - oracle
-
-[source, cli]
 sqlplus / as sysdba
+
+[oracle@localhost ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Thu May 6 12:52:51 2021
+Version 19.8.0.0.0
+
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.8.0.0.0
+
+SQL>
 
 [source, cli]
 select name, log_mode from v$database;
 
 SQL> select name, log_mode from v$database;
-
 NAME      LOG_MODE
 --------- ------------
 CDB2      ARCHIVELOG
 
-
-
 [source, cli]
 show pdbs;
 
-image:2.png[2]
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 CDB2_PDB1                      READ WRITE NO
+         4 CDB2_PDB2                      READ WRITE NO
+         5 CDB2_PDB3                      READ WRITE NO
 
 [source, cli]
-check dnfs;
+col svrname form a30
+col dirname form a30
+select svrname, dirname, nfsversion from v$dnfs_servers;
 
-image:1.png[3]
+SQL> col svrname form a30
+SQL> col dirname form a30
+SQL> select svrname, dirname, nfsversion from v$dnfs_servers;
 
+SVRNAME                        DIRNAME                        NFSVERSION
+------------------------------ ------------------------------ ----------------
+172.21.126.200                 /rhelora03_u02                 NFSv3.0
+172.21.126.200                 /rhelora03_u03                 NFSv3.0
+172.21.126.200                 /rhelora03_u01                 NFSv3.0
+
+This confirms that dNFS is working properly.
+
+++++
+<div>
+<strong>3.</strong> Connect to database via listener to check Oracle listener configuration with following command. Change to appropriate listener port and database service name.
+++++
 
 [source, cli]
-Select svrname, dirname, nfsversion from v$dnfs_servers
+sqlplus system@//localhost:1523/cdb2_pdb1.cie.netapp.com
 
-image:4.png[4]
+[oracle@localhost ~]$ sqlplus system@//localhost:1523/cdb2_pdb1.cie.netapp.com
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Thu May 6 13:19:57 2021
+Version 19.8.0.0.0
+
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
+
+Enter password:
+Last Successful login time: Wed May 05 2021 17:11:11 -04:00
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.8.0.0.0
+
+SQL> show user
+USER is "SYSTEM"
+SQL> show con_name
+CON_NAME
+CDB2_PDB1
 
 ++++
 <p><div>
-This confirms that dnfs is working properly.
+This confirms that Oracle listener is working properly.
 </p>
 ++++
