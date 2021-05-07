@@ -1,0 +1,285 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-n_overview_trident.html
+keywords: Trident, Operator, iSCSI, NFS
+summary:
+---
+
+= NetApp Trident Overview: Red Hat OpenShift with NetApp
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 0.9 (June 4, 2020)
+//
+// 2020-06-25 14:31:33.563897
+//
+
+[.lead]
+
+NetApp Trident is an open-source and fully-supported storage orchestrator for containers and Kubernetes distributions, including Red Hat OpenShift.
+It works with the entire NetApp storage portfolio, including the NetApp ONTAP and Element storage systems, and supports NFS and iSCSI connections.
+Trident provides the ability to accelerate the DevOps workflow by allowing end users to provision and manage storage from their NetApp storage systems, without requiring intervention from a storage administrator.
+An administrator can configure a number of storage backends based on project needs, and storage system models that allow for any number of advanced storage features, such as: compression, specific disk types, or QoS levels that guarantee a certain performance. After they are defined, these backends can be leveraged by developers as part of their projects to create persistent volume claims (PVCs) and attach persistent storage to their containers on demand.
+
+image:redhat_openshift_image2.png[Error: Missing Graphic Image]
+
+NetApp Trident has a rapid development cycle, and just like Kubernetes, is released four times a year.
+
+The latest version of NetApp Trident is 21.04 released in April 2021. A support matrix for what version of Trident has been tested with which Kubernetes distribution can be found https://netapp-trident.readthedocs.io/en/stable-v21.04/support/requirements.html#supported-frontends-orchestrators[here].
+
+Starting with the 20.04 release, the setup of Trident is performed by the Trident operator. The operator makes large scale deployments easier, and provides additional support including self-healing for the pods that are deployed as a part of the Trident install.
+
+With the 21.01 release, a Helm chart was made available to ease the installation of the Trident Operator.
+
+= Download NetApp Trident
+
+To install Trident on the deployed user cluster and provision a persistent volume, complete the following steps:
+
+.	Download the installation archive to the admin workstation and extract the contents. The current version of Trident is 21.01, which can be downloaded https://github.com/NetApp/trident/releases/download/v21.04.0/trident-installer-21.04.0.tar.gz[here].
++
+----
+[netapp-user@rhel7 ~]$ wget https://github.com/NetApp/trident/releases/download/v21.04.0/trident-installer-21.04.0.tar.gz
+--2021-05-06 15:17:30--  https://github.com/NetApp/trident/releases/download/v21.04.0/trident-installer-21.04.0.tar.gz
+Resolving github.com (github.com)... 140.82.114.3
+Connecting to github.com (github.com)|140.82.114.3|:443... connected.
+HTTP request sent, awaiting response... 302 Found
+Location: https://github-releases.githubusercontent.com/77179634/a4fa9f00-a9f2-11eb-9053-98e8e573d4ae?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20210506%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20210506T191643Z&X-Amz-Expires=300&X-Amz-Signature=8a49a2a1e08c147d1ddd8149ce45a5714f9853fee19bb1c507989b9543eb3630&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=77179634&response-content-disposition=attachment%3B%20filename%3Dtrident-installer-21.04.0.tar.gz&response-content-type=application%2Foctet-stream [following]
+--2021-05-06 15:17:30--  https://github-releases.githubusercontent.com/77179634/a4fa9f00-a9f2-11eb-9053-98e8e573d4ae?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20210506%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20210506T191643Z&X-Amz-Expires=300&X-Amz-Signature=8a49a2a1e08c147d1ddd8149ce45a5714f9853fee19bb1c507989b9543eb3630&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=77179634&response-content-disposition=attachment%3B%20filename%3Dtrident-installer-21.04.0.tar.gz&response-content-type=application%2Foctet-stream
+Resolving github-releases.githubusercontent.com (github-releases.githubusercontent.com)... 185.199.108.154, 185.199.109.154, 185.199.110.154, ...
+Connecting to github-releases.githubusercontent.com (github-releases.githubusercontent.com)|185.199.108.154|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 38349341 (37M) [application/octet-stream]
+Saving to: ‘trident-installer-21.04.0.tar.gz’
+
+100%[==================================================================================================================>] 38,349,341  88.5MB/s   in 0.4s
+
+2021-05-06 15:17:30 (88.5 MB/s) - ‘trident-installer-21.04.0.tar.gz’ saved [38349341/38349341]
+----
+
+. Extract the Trident install from the downloaded bundle.
++
+----
+[netapp-user@rhel7 ~]$ tar -xzf trident-installer-21.01.0.tar.gz
+[netapp-user@rhel7 ~]$ cd trident-installer/
+[netapp-user@rhel7 trident-installer]$
+----
+
+= Install the Trident Operator with Helm
+
+. First set the location of the user cluster’s `kubeconfig` file as an environment variable so that you don’t have to reference it, because Trident has no option to pass this file.
++
+----
+[netapp-user@rhel7 trident-installer]$ export KUBECONFIG=~/ocp-install/auth/kubeconfig
+----
+
+. Run the Helm command to install the Trident operator from the tarball in the helm directory while creating the trident namespace in your user cluster.
++
+----
+[netapp-user@rhel7 trident-installer]$ helm install trident helm/trident-operator-21.04.0.tgz --create-namespace --namespace trident
+NAME: trident
+LAST DEPLOYED: Wed May  5 14:53:32 2021
+NAMESPACE: trident
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+Thank you for installing trident-operator, which will deploy and manage NetApp's Trident CSI
+storage provisioner for Kubernetes.
+
+Your release is named 'trident' and is installed into the 'trident' namespace.
+Please note that there must be only one instance of Trident (and trident-operator) in a Kubernetes cluster.
+
+To configure Trident to manage storage resources, you will need a copy of tridentctl, which is
+available in pre-packaged Trident releases.  You may find all Trident releases and source code
+online at https://github.com/NetApp/trident.
+
+To learn more about the release, try:
+
+  $ helm status trident
+  $ helm get all trident
+----
+
+. You can verify that Trident is successfully installed by checking the pods that are running in the namespace or by using the tridentctl binary to check the installed version.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl get pods -n trident
+NAME                               READY   STATUS    RESTARTS   AGE
+trident-csi-4n6vr                  2/2     Running   0          2m4s
+trident-csi-696b685cf8-tvtq5       6/6     Running   0          2m4s
+trident-csi-n7pxf                  2/2     Running   0          2m4s
+trident-csi-v898r                  2/2     Running   0          2m4s
+trident-operator-7c748d957-67dlp   1/1     Running   0          2m14s
+
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ ./tridentctl -n trident version
++----------------+----------------+
+| SERVER VERSION | CLIENT VERSION |
++----------------+----------------+
+| 21.04.0       | 21.04.0        |
++----------------+----------------+
+----
+
+NOTE: In some cases customer environments may require the customization of the Trident deployment. In these cases it is also possible to manually install the Trident operator and update the included manifests to customize the deployment.
+
+= Manually Install the Trident Operator
+
+. First set the location of the user cluster’s `kubeconfig` file as an environment variable so that you don’t have to reference it, because Trident has no option to pass this file.
++
+----
+[netapp-user@rhel7 trident-installer]$ export KUBECONFIG=~/ocp-install/auth/kubeconfig
+----
+
+. The `trident-installer` directory contains manifests for defining all the required resources. Using the appropriate manifests, create the `TridentOrchestrator` custom resource definition.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl create -f deploy/crds/trident.netapp.io_tridentorchestrators_crd_post1.16.yaml
+customresourcedefinition.apiextensions.k8s.io/tridentorchestrators.trident.netapp.io created
+----
+
+. If one does not exist, create a Trident namespace in your cluster using the provided manifest.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl apply -f deploy/namespace.yaml
+namespace/trident created
+----
+
+. Create the resources required for the Trident operator deployment, such as a `ServiceAccount` for the operator, a `ClusterRole` and `ClusterRoleBinding` to the `ServiceAccount`, a dedicated `PodSecurityPolicy`, or the operator itself.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl create -f deploy/bundle.yaml
+serviceaccount/trident-operator created
+clusterrole.rbac.authorization.k8s.io/trident-operator created
+clusterrolebinding.rbac.authorization.k8s.io/trident-operator created
+deployment.apps/trident-operator created
+podsecuritypolicy.policy/tridentoperatorpods created
+----
+
+. You can check the status of the operator after it’s deployed with the following commands:
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl get deployment -n trident
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+trident-operator   1/1     1            1           54s
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl get pods -n trident
+NAME                                READY   STATUS    RESTARTS   AGE
+trident-operator-5c8bbf6754-h957z   1/1     Running   0          68s
+----
+
+. With the operator deployed, we can now use it to install Trident. This requires creating a `TridentOrchestrator`.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl create -f deploy/crds/tridentorchestrator_cr.yaml
+tridentorchestrator.trident.netapp.io/trident created
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl describe torc trident
+Name:         trident
+Namespace:
+Labels:       <none>
+Annotations:  <none>
+API Version:  trident.netapp.io/v1
+Kind:         TridentOrchestrator
+Metadata:
+  Creation Timestamp:  2021-02-17T18:25:43Z
+  Generation:          1
+  Managed Fields:
+    API Version:  trident.netapp.io/v1
+    Fields Type:  FieldsV1
+    fieldsV1:
+      f:spec:
+        .:
+        f:debug:
+        f:namespace:
+    Manager:      kubectl
+    Operation:    Update
+    Time:         2021-02-17T18:25:43Z
+    API Version:  trident.netapp.io/v1
+    Fields Type:  FieldsV1
+    fieldsV1:
+      f:status:
+        .:
+        f:currentInstallationParams:
+          .:
+          f:IPv6:
+          f:autosupportHostname:
+          f:autosupportImage:
+          f:autosupportProxy:
+          f:autosupportSerialNumber:
+          f:debug:
+          f:enableNodePrep:
+          f:imagePullSecrets:
+          f:imageRegistry:
+          f:k8sTimeout:
+          f:kubeletDir:
+          f:logFormat:
+          f:silenceAutosupport:
+          f:tridentImage:
+        f:message:
+        f:namespace:
+        f:status:
+        f:version:
+    Manager:         trident-operator
+    Operation:       Update
+    Time:            2021-02-17T18:25:43Z
+  Resource Version:  14836643
+  Self Link:         /apis/trident.netapp.io/v1/tridentorchestrators/trident
+  UID:               0e5f2c3b-6ca2-4b85-8453-0382e1426160
+Spec:
+  Debug:      true
+  Namespace:  trident
+Status:
+  Current Installation Params:
+    IPv6:
+    Autosupport Hostname:
+    Autosupport Image:
+    Autosupport Proxy:
+    Autosupport Serial Number:
+    Debug:
+    Enable Node Prep:
+    Image Pull Secrets:         <nil>
+    Image Registry:
+    k8sTimeout:
+    Kubelet Dir:
+    Log Format:
+    Silence Autosupport:
+    Trident Image:
+  Message:                      Installing Trident
+  Namespace:                    trident
+  Status:                       Installing
+  Version:
+Events:
+  Type    Reason      Age   From                        Message
+  ----    ------      ----  ----                        -------
+  Normal  Installing  23s   trident-operator.netapp.io  Installing Trident
+  Normal  Installed   15s   trident-operator.netapp.io  Trident installed
+----
+
+. You can verify that Trident is successfully installed by checking the pods that are running in the namespace or by using the tridentctl binary to check the installed version.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl get pod -n trident
+NAME                                READY   STATUS    RESTARTS   AGE
+trident-csi-2cp7x                   2/2     Running   0          4m16s
+trident-csi-2xr5h                   2/2     Running   0          4m16s
+trident-csi-bnwvh                   2/2     Running   0          4m16s
+trident-csi-d6cfc6bb-lxm2p          6/6     Running   0          4m16s
+trident-operator-5c8bbf6754-h957z   1/1     Running   0          8m55s
+
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ ./tridentctl -n trident version
++----------------+----------------+
+| SERVER VERSION | CLIENT VERSION |
++----------------+----------------+
+| 21.01.1        | 21.01.1        |
++----------------+----------------+
+----
+
+
+. link:./rh-os-n_ontap-trident-nfs.html[NetApp ONTAP NFS]
+
+. link:./rh-os-n_ontap-trident-iscsi.html[NetApp ONTAP iSCSI]
+
+. link:./rh-os-n_element-trident-iscsi.html[NetApp Element iSCSI]
+
+
+link:rh-os-n_use_cases.html[Next: Solution Validation / Use Cases: Red Hat OpenShift with NetApp]

@@ -1,0 +1,105 @@
+---
+sidebar: sidebar
+permalink: containers/anthos_task_install_and_configure_trident.html
+summary:
+keywords: Trident, ONTAP, AFF, FAS, iSCSI
+---
+
+= NetApp ONTAP iSCSI Configuration
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+To enable Trident integration with the NetApp ONTAP storage system you must create a backend that enables communication with the storage system.
+
+. There are sample backend files available in the downloaded installation archive in the `sample-input` folder hierarchy. For NetApp ONTAP systems serving iSCSI, copy the `backend-ontap-san.json` to your working directory and edit it.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ cp sample-input/backend-ontap-san.json ./
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ $ vi backend-ontap-san.json
+----
+
+.. Edit the managementLIF, dataLIF, svm, username, and password values in this file.
++
+----
+{
+  "version": 1,
+  "storageDriverName": "ontap-san",
+  "managementLIF": "172.21.224.201",
+  "dataLIF": "10.61.181.240",
+  "svm": "trident_svm",
+  "username": "admin",
+  "password": "password"
+}
+----
++
+. With this backend file in place, run the following command to create your first backend.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ ./tridentctl -n trident create backend -f backend-ontap-san.json
++------------------------+----------------+--------------------------------------+--------+---------+
+|          NAME          | STORAGE DRIVER |                 UUID                 | STATE  | VOLUMES |
++------------------------+----------------+--------------------------------------+--------+---------+
+| ontapsan_10.61.181.241 | ontap-san      | bc7aea93-53ec-414f-ba17-9bdf66c8fdaf | online |       0 |
++------------------------+----------------+--------------------------------------+--------+---------+
+----
+
+. With the backend created, you must next create a storage class. Just as with the backend, there is a sample storage class file that can be edited for the environment available in the sample-inputs folder. Copy it to the working directory and make necessary edits to reflect the backend created.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ cp sample-input/storage-class-csi.yaml.templ ./storage-class-basic.yaml
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ vi storage-class-basic.yaml
+----
+
+. The only edit that must be made to this file is to define the `backendType` value to the name of the storage driver from the newly created backend. Also note the name-field value, which must be referenced in a later step.
++
+
+----
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: basic-csi
+provisioner: csi.trident.netapp.io
+parameters:
+  backendType: "ontap-san"
+----
+
+. Run the `kubectl` command to create the storage class.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl create -f sample-input/storage-class-basic.yaml
+----
+
+. With the storage class created, you must then create the first persistent volume claim (PVC). There is a sample `pvc-basic.yaml` file that can be used to perform this action located in sample-inputs as well. The only edit that must be made to this file is ensuring that the storageClassName field matches the one just created.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ vi sample-input/pvc-basic.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: basic
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: basic
+----
+
+. Create the PVC by issuing the `kubectl` command. Creation can take some time depending on the size of the backing volume being created, so you can watch the process as it completes.
++
+----
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl create -f sample-input/pvc-basic.yaml
+
+ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl get pvc --watch
+NAME    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+basic   Bound    pvc-e2697d0f-a040-4428-b0f1-1ea6fc1719bb   1Gi        RWO            basic          9s
+----
++
+
+
+link:rh-os-n_use_cases.html[Next: Solution Validation / Use Cases: Red Hat OpenShift with NetApp]

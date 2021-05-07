@@ -1,0 +1,81 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-rhv_design_considerations.html
+keywords: OpenShift, VMware vSphere, ESXi
+summary:
+---
+
+= OpenShift on VMware vSphere
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 0.9 (June 4, 2020)
+//
+// 2020-06-25 14:31:33.555482
+//
+
+[.lead]
+
+VMware vSphere is a virtualization platform for centrally managing a large number of virtualized servers and networks running on the ESXi hypervisor.
+
+For more information about RHV, see the https://www.vmware.com/products/vsphere.html[VMware vSphere Website^].
+
+VMware vSphere provides the following features:
+
+* *VMware vCenter Server* VMware vCenter Server provides unified management of all hosts and VMs from a single console and aggregates performance monitoring of clusters, hosts, and VMs.
+
+* *VMware vSphere vMotion* VMware vCenter provides for the ability to hot migrate virtual machines between nodes in the cluster, upon user request in non-disruptive manner.
+
+* *vSphere High Availability.* In event of host failures, to avoid disruption, VMware vSphere allows hosts to be clustered and configured for High Availability. VMs that are disrupted by host failure are rebooted shortly on other hosts in the cluster, restoring services.
+
+* *Distributed Resource Scheduler (DRS)* A VMware vSphere cluster can be configured to load balance the resource needs of the VM's it is hosting. Virtual machines with resource contentions can be hot migrated to other nodes in the cluster to ensure that there are enough resources available.
+
+
+image:redhat_openshift_image3.png[Error: Missing Graphic Image]
+
+
+=== Network Design
+
+The Red Hat OpenShift on NetApp solution uses two data switches to provide primary data connectivity at 25Gbps. It also uses two additional management switches that provide connectivity at 1Gbps for in-band management for the storage nodes and out-of-band management for IPMI functionality.  OCP uses the Virtual Machine logical network on VMware vSphere for it's cluster management.  This section describes the arrangement and purpose of each virtual network segment used in the solution and outlines the pre-requisites for deployment of the solution.
+
+==== VLAN Requirements
+
+The NetApp HCI for Red Hat OpenShift on RHV solution is designed to logically separate network traffic for different purposes by using virtual local area networks (VLANs). NetApp HCI requires a minimum of three network segments. However, this configuration can be scaled to meet customer demands or to provide further isolation for specific network services. The following table lists the VLANs that are required to implement the solution, as well as the specific VLAN IDs that are used later in the verified architecture deployment.
+
+|===
+|VLANs |Purpose |VLAN ID
+
+|Out-of-band management network
+|Management for physical nodes and IPMI
+|16
+|VM Network
+|Virtual Guest Network Access
+|181
+|In-band management network
+|Management for RHV-H Nodes, RHV-Manager, ovirtmgmt network
+|3343
+|Storage network
+|Storage network for NetApp Element iSCSI
+|3344
+|Migration network
+|Network for virtual guest migration
+|3345
+|===
+
+==== Network Infrastructure Support Resources
+
+The following infrastructure should be in place prior to the deployment of the OpenShift Container Platform (OCP) on Red Hat Virtualization on NetApp HCI solution:
+
+* At least one DNS server which provides a full host-name resolution that is accessible from the in-band management network and the VM network.
+
+* At least one NTP server that is accessible from the in-band management network and the VM network.
+
+* (Optional) Outbound internet connectivity for both the in-band management network and the VM network.
+
+* RHV cluster should have at least 28x vCPUs, 112GB RAM, and 840GB of available storage (depending on the production workload requirements).
+
+link:rh-os-rhv_deployment_summary.html[Next: Deploying NetApp HCI for Red Hat OpenShift on RHV]
