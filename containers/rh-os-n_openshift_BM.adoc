@@ -1,7 +1,7 @@
 ---
 sidebar: sidebar
 permalink: containers/rh-os-n_openshift_BM.html
-keywords: OpenShift, bare metal
+keywords: OpenShift, bare metal, IPI
 summary:
 ---
 
@@ -18,37 +18,58 @@ summary:
 // 2020-06-25 14:31:33.555482
 //
 
+Virtual deployments of OpenShift are quite popular because they allow for ease of deployment, and rapid provisioning and scaling of OpenShift clusters, while also supplying the need to support virtualized workloads for applications that are not ready to be containerized.
+This does require extra overhead however in regard to managing the host environment, as well as the OpenShift environment, and introduces addtional limitations as the physical resources have to be shared between both environments.
 
+OpenShift deployed on bare metal provides the following features:
+
+* *IPI or Assisted Installer Deployment* With an OpenShift cluster deployed by Installer Provisioned Infrastructure (IPI) on bare metal servers, customers can deploy an highly versatile, easily scalable OpenShift environment directly on commodity servers, without the need to manage a hypervisor layer.
+
+* *Compact Cluster Design* To minimize the hardware requirements, OpenShift on bare metal allows for users to deploy clusters of just 3 nodes, by enabling the OpenShift control plane nodes to also act as worker nodes and host containers.
+
+* *OpenShift Virtualization* OpenShift can run virtual machines within containers by using OpenShift Virtualization. This container-native virtualization runs the KVM hypervisor inside of a container, and attaches persistent volumes for VM storage.
+
+* *AI/ML-Optimized Infrastructure* Deploy applications like Kubeflow for Machine Learning applications by incorporating GPU-based worker nodes to your OpenShift environment and leveragine OpenShift Advanced Scheduling.
 
 
 === Network Design
 
-The Red Hat OpenShift on NetApp solution uses two data switches to provide primary data connectivity at 25Gbps. It also uses two additional management switches that provide connectivity at 1Gbps for in-band management for the storage nodes and out-of-band management for IPMI functionality.  OCP uses the logical network on the RHV for the cluster management.  This section describes the arrangement and purpose of each virtual network segment used in the solution and outlines the pre-requisites for deployment of the solution.
+The Red Hat OpenShift on NetApp solution uses two data switches to provide primary data connectivity at 25Gbps. It also uses two additional management switches that provide connectivity at 1Gbps for in-band management for the storage nodes and out-of-band management for IPMI functionality.
+
+The OpenShift bare metal IPI deployment requires the customer to create a Provisioner node, a Red Hat Enterprise Linux 8 machine which will need to have network interfaces attached to separate networks.
+
+* *Provisioning Network:* This network is used to boot the bare metal nodes and install the necessary images and packages to deploy the OpenShift cluster.
+
+* *Baremetal Network:* This network is used for public facing communication of the cluster once it is deployed.
+
+The setup of the provisioner node will create bridge interfaces that allow the traffic to route properly both on the node itself and for the Bootstrap VM which will be provisioned for the deployment purposes.
+
+Once the cluster is deployed the API and Ingress VIP addresses will be migrated from the bootstrap node to the newly deployed cluster.
+
+image:redhat_openshift_image36.png[Error: Missing Graphic Image]
+
+image:redhat_openshift_image37.png[Error: Missing Graphic Image]
 
 ==== VLAN Requirements
 
-The NetApp HCI for Red Hat OpenShift on RHV solution is designed to logically separate network traffic for different purposes by using virtual local area networks (VLANs). NetApp HCI requires a minimum of three network segments. However, this configuration can be scaled to meet customer demands or to provide further isolation for specific network services. The following table lists the VLANs that are required to implement the solution, as well as the specific VLAN IDs that are used later in the verified architecture deployment.
+The Red Hat OpenShift with NetApp solution is designed to logically separate network traffic for different purposes by using virtual local area networks (VLANs).
 
 |===
 |VLANs |Purpose |VLAN ID
-
-|Out-of-band management network
-|Management for HCI nodes and IPMI
+|Out-of-band Management Network
+|Management for bare metal nodes and IPMI
 |16
-|In-band management network
-|Management for HCI nodes, ovirtmgmt, and VMs
-|1172
-|Storage network
-|Storage network for NetApp Element
-|3343
-|Migration network
-|Network for virtual guest migration
-|3345
+|Bare Metal Network
+|181
+|Provisioning Network
+|3485
 |===
+
+NOTE: While each of these networks were virtually separated by VLANs, each physical port needed to be set up in "access mode" with the primary VLAN assigned, as there is no way to pass a VLAN tag during a PXE boot sequence.
 
 ==== Network Infrastructure Support Resources
 
-The following infrastructure should be in place prior to the deployment of the OpenShift Container Platform (OCP) on Red Hat Virtualization on NetApp HCI solution:
+The following infrastructure should be in place prior to the deployment of the OpenShift Container Platform:
 
 * At least one DNS server which provides a full host-name resolution that is accessible from the in-band management network and the VM network.
 
@@ -56,6 +77,5 @@ The following infrastructure should be in place prior to the deployment of the O
 
 * (Optional) Outbound internet connectivity for both the in-band management network and the VM network.
 
-* RHV cluster should have at least 28x vCPUs, 112GB RAM, and 840GB of available storage (depending on the production workload requirements).
 
-link:rh-os-rhv_deployment_summary.html[Next: Deploying NetApp HCI for Red Hat OpenShift on RHV]
+link:rh-os-n_overview_netapp.html[Next: NetApp Storage Overview]
