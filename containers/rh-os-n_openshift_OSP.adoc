@@ -18,17 +18,90 @@ summary:
 // 2020-06-25 14:31:33.555482
 //
 
+Red Hat OpenStack Platform delivers an integrated foundation to create, deploy, and scale a secure and reliable private OpenStack cloud. OSP is an infrastructure-as-a-service (IaaS) cloud implemented by a collection of control services that manage compute, storage, and networking resources. The environment is managed using a web-based interface that allows administrators and
+users to control, provision, and automate OpenStack resources. Additionally, the OpenStack infrastructure is facilitated through an extensive command line interface and API enabling full automation capabilities for administrators and end-users.
 
+The OpenStack project is a rapidly developed community project, and provides updated releases every six months. Initially Red Hat OpenStack Platform kept pace with this release cycle by publishing a new release along with every upstream release, and providing long term support for every third release. Recently with the OSP 16.0 release (based on OpenStack Train) Red Hat has chosen
+not to keep pace with release numbers, but instead backport new features into sub-releases. The most recent release is Red Hat OpenStack Platform 16.1, which includes backported advanced features from the Ussuri and Victoria releases upstream.
 
+== OpenStack Services
+
+OpenStack Platform services are deployed as containers, which isolates services from one another and enables easy upgrades. The OpenStack Platform uses a set of containers built and managed with Kolla. The deployment of services is performed by pulling container images from the Red Hat Custom Portal. These service containers are managed using the Podman command, and are deployed, configured, and maintained with Red Hat OpenStack Director.
+
+image:redhat_openshift_image34.png[Error: Missing Graphic Image]
+
+|===
+|Service |Project Name |Description
+|Dashboard
+|Horizon
+|Web browser-based dashboard that you use to manage OpenStack services.
+|Identity
+|Keystone
+|Centralized service for authentication and authorization of OpenStack services and for managing users, projects, and roles.
+|OpenStack Networking
+|Neutron
+|Provides connectivity between the interfaces of OpenStack services.
+|Block Storage
+|Cinder
+|Manages persistent block storage volumes for virtual machines (VMs).
+|Compute
+|Nova
+|Manages and provisions VMs running on compute nodes.
+|Image
+|Glance
+|Registry service used to store resources such as VM images and volume snapshots.
+|Object Storage
+|Swift
+|Allows users to storage and retrieve files and arbitrary data.
+|Telemetry
+|Ceilometer
+|Provides measurements of use of cloud resources.
+|Orchestration
+|Heat
+|Template-based orchestration engine that supports automatic creation of resource stacks.
+|===
 
 === Network Design
 
 The Red Hat OpenShift with NetApp solution uses two data switches to provide primary data connectivity at 25Gbps. It also uses two additional management switches that provide connectivity at 1Gbps for in-band management for the storage nodes and out-of-band management for IPMI functionality.
 
+IPMI functionality is required by Red Hat OpenStack Director to deploy Red Hat OpenStack Platform using the Ironic baremetal provision service.
+
 ==== VLAN Requirements
 
-The Red Hat OpenShift with NetApp solution is designed to logically separate network traffic for different purposes by using virtual local area networks (VLANs). Depending on the type of OpenShift deployment (Baremetal, Private Cloud, Virtual) there are several networking options available.
-Please consult the guide for your physical infrastructure deployment to determine which networking configuration applies.
+Red Hat OpenShift on RHV is designed to logically separate network traffic for different purposes by using virtual local area networks (VLANs). This configuration can be scaled to meet customer demands or to provide further isolation for specific network services. The following table lists the VLANs that are required to implement the solution while validating the solution at NetApp.
+
+|===
+|VLANs |Purpose |VLAN ID
+
+|Out-of-band management network
+|Network used for management of physical nodes and IPMI service for Ironic.
+|16
+|Storage Infrastructure
+|Network used for controller nodes to map volumes directly to support infrastructure services like Swift.
+|201
+|Storage Cinder
+|Network used to map and attach block volumes directly to virtual instances deployed in the environment.
+|202
+|Internal API
+|Network used for communication between the OpenStack services using API communication, RPC messages, and database communication.
+|301
+|Tenant
+|Neutron provides each tenant with their own networks via tunneling through VXLAN. Network traffic is isolated within each tenant network. Each tenant network has an IP subnet associated with it, and network namespaces mean that multiple tenant networks can use the same address range without causing conflicts
+|302
+|Storage Management
+|OpenStack Object Storage (Swift) uses this network to synchronize data objects between participating replica nodes. The proxy service acts as the intermediary interface between user requests and the underlying storage layer. The proxy receives incoming requests and locates the necessary replica to retrieve the requested data.
+|303
+|PXE
+|The OpenStack Director provides PXE boot as a part of the Ironic bare metal provisioning service to orchestrate the installation of the OSP Overcloud.
+|3484
+|External
+|Publicly available network which hosts the OpenStack Dashboard (Horizon) for graphical management, and allows for public API calls to manage OpenStack services.
+|3485
+|In-band management network
+|Provides access for system administration functions such as SSH access, DNS traffic, and Network Time Protocol (NTP) traffic. This network also acts as a gateway for non-controller nodes.
+|3486
+|===
 
 ==== Network Infrastructure Support Resources
 
@@ -40,5 +113,30 @@ The following infrastructure should be in place prior to the deployment of the O
 
 * (Optional) Outbound internet connectivity for the OpenShift environment.
 
+=== Best Practices for Production Deployments
+
+This section lists several best practices that an organization should take into consideration before deploying this solution into production.
+
+==== Deploy OpenShift to an RHV Cluster of at Least Three Nodes
+
+The verified architecture described in this document presents the minimum hardware deployment suitable for HA operations by deploying two RHV-H hypervisor nodes and ensuring a fault tolerant configuration where both hosts can manage the hosted-engine and deployed VMs can migrate between the two hypervisors.
+
+Because Red Hat OpenShift initially deploys with three master nodes, it is ensured in a two-node configuration that at least two masters will occupy the same node, which can lead to a possible outage for OpenShift if that specific node becomes unavailable. Therefore, it is a Red Hat best practice that at least three RHV-H hypervisor nodes be deployed as part of the solution so that the OpenShift masters can be distributed evenly, and the solution receives an added degree of fault tolerance.
+
+==== Configure Virtual Machine/Host Affinity
+
+Ensuring the distribution of the OpenShift masters across multiple hypervisor nodes can be achieved by enabling VM/host affinity.
+
+Affinity is a way to define rules for a set of VMs and/or hosts that determine whether the VMs run together on the same host or hosts in the group or on different hosts. It is applied to VMs by creating affinity groups that consist of VMs and/or hosts with a set of identical parameters and conditions. Depending on whether the VMs in an affinity group run on the same host or hosts in the group or separately on different hosts, the parameters of the affinity group can define either positive affinity or negative affinity.
+
+The conditions defined for the parameters can be either hard enforcement or soft enforcement. Hard enforcement ensures that the VMs in an affinity group always follows the positive/negative affinity strictly without any regards to external conditions. Soft enforcement, on the other hand, ensures that a higher preference is set out for the VMs in an affinity group to follow the positive/negative affinity whenever feasible. In a two or three hypervisor configuration as described in this document soft affinity is the recommended setting, in larger clusters hard affinity can be relied on to ensure OpenShift nodes are distributed.
+
+To configure affinity groups, see the https://access.redhat.com/documentation/en-us/red_hat_virtualization/4.4/html/virtual_machine_management_guide/sect-affinity_groups[Red Hat 6.11. Affinity Groups documentation^].
+
+==== Use a Custom Install File for OpenShift Deployment
+
+IPI makes the deployment of OpenShift clusters extremely easy through the interactive wizard discussed earlier in this document. However, it is possible that there are some default values that might need to be changed as a part of a cluster deployment.
+
+In these instances, the wizard can be run and tasked without immediately deploying a cluster, but instead outputting a configuration file from which the cluster can be deployed later. This is very useful if any IPI defaults need to be changed, or if a user wants to deploy multiple identical clusters in their environment for other uses such as multitenancy. For more information about creating a customized install configuration for OpenShift, see https://docs.openshift.com/container-platform/4.4/installing/installing_rhv/installing-rhv-customizations.html[Red Hat OpenShift Installing a Cluster on RHV with Customizations^].
 
 link:rh-os-n_deployment_summary.html[Next: Deploying Red Hat OpenShift with NetApp]
