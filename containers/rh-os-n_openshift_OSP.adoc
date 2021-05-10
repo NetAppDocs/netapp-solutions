@@ -1,6 +1,6 @@
 ---
 sidebar: sidebar
-permalink: containers/rh-os-n_openshift_OCP.html
+permalink: containers/rh-os-n_openshift_OSP.html
 keywords: OpenShift, OpenStack, private cloud
 summary:
 ---
@@ -117,26 +117,28 @@ The following infrastructure should be in place prior to the deployment of the O
 
 This section lists several best practices that an organization should take into consideration before deploying this solution into production.
 
-==== Deploy OpenShift to an RHV Cluster of at Least Three Nodes
+==== Deploy OpenShift to an OSP private cloud with at least three compute nodes.
 
-The verified architecture described in this document presents the minimum hardware deployment suitable for HA operations by deploying two RHV-H hypervisor nodes and ensuring a fault tolerant configuration where both hosts can manage the hosted-engine and deployed VMs can migrate between the two hypervisors.
+The verified architecture described in this document presents the minimum hardware deployment suitable for HA operations by deploying three OSP controller nodes and two OSP compute nodes, and ensuring a fault tolerant configuration where both compute nodes can launch the virtual instances and deployed VMs can migrate between the two hypervisors.
 
-Because Red Hat OpenShift initially deploys with three master nodes, it is ensured in a two-node configuration that at least two masters will occupy the same node, which can lead to a possible outage for OpenShift if that specific node becomes unavailable. Therefore, it is a Red Hat best practice that at least three RHV-H hypervisor nodes be deployed as part of the solution so that the OpenShift masters can be distributed evenly, and the solution receives an added degree of fault tolerance.
+Because Red Hat OpenShift initially deploys with three master nodes, it is ensured in a two-node configuration that at least two masters will occupy the same node, which can lead to a possible outage for OpenShift if that specific node becomes unavailable. Therefore, it is a Red Hat best practice that at least three OSP compute nodes be deployed as part of the solution so that the OpenShift masters can be distributed evenly, and the solution receives an added degree of fault tolerance.
 
 ==== Configure Virtual Machine/Host Affinity
 
 Ensuring the distribution of the OpenShift masters across multiple hypervisor nodes can be achieved by enabling VM/host affinity.
 
-Affinity is a way to define rules for a set of VMs and/or hosts that determine whether the VMs run together on the same host or hosts in the group or on different hosts. It is applied to VMs by creating affinity groups that consist of VMs and/or hosts with a set of identical parameters and conditions. Depending on whether the VMs in an affinity group run on the same host or hosts in the group or separately on different hosts, the parameters of the affinity group can define either positive affinity or negative affinity.
+Affinity is a way to define rules for a set of VMs and/or hosts that determine whether the VMs run together on the same host or hosts in the group or on different hosts. It is applied to VMs by creating affinity groups that consist of VMs and/or hosts with a set of identical parameters and conditions. Depending on whether the VMs in an affinity group run on the same host or hosts in the group or separately on different hosts, the parameters of the affinity group can define either positive affinity or negative affinity. In Red Hat OpenStack Platform, host affinity and anti-affinity rules can be created and enforced by creating Server Groups and configuring filters so that instances deployed by Nova in a server group deploy on different compute nodes.
 
-The conditions defined for the parameters can be either hard enforcement or soft enforcement. Hard enforcement ensures that the VMs in an affinity group always follows the positive/negative affinity strictly without any regards to external conditions. Soft enforcement, on the other hand, ensures that a higher preference is set out for the VMs in an affinity group to follow the positive/negative affinity whenever feasible. In a two or three hypervisor configuration as described in this document soft affinity is the recommended setting, in larger clusters hard affinity can be relied on to ensure OpenShift nodes are distributed.
+A server group has a default maximum of 10 virtual instances that it can manage placement for. This can be modified by updating the default quotas for Nova.
 
-To configure affinity groups, see the https://access.redhat.com/documentation/en-us/red_hat_virtualization/4.4/html/virtual_machine_management_guide/sect-affinity_groups[Red Hat 6.11. Affinity Groups documentation^].
+NOTE: There is a specific hard affinity/anti-affinity limit for OSP Server Groups, where if there not enough resources to deploy on separate nodes, or not enough resources to allow sharing of nodes, the VM will fail to boot.
+
+To configure affinity groups, see the https://access.redhat.com/solutions/1977943[How do I configure Affinity and Anti-Affinity for OpenStack instances?^].
 
 ==== Use a Custom Install File for OpenShift Deployment
 
 IPI makes the deployment of OpenShift clusters extremely easy through the interactive wizard discussed earlier in this document. However, it is possible that there are some default values that might need to be changed as a part of a cluster deployment.
 
-In these instances, the wizard can be run and tasked without immediately deploying a cluster, but instead outputting a configuration file from which the cluster can be deployed later. This is very useful if any IPI defaults need to be changed, or if a user wants to deploy multiple identical clusters in their environment for other uses such as multitenancy. For more information about creating a customized install configuration for OpenShift, see https://docs.openshift.com/container-platform/4.4/installing/installing_rhv/installing-rhv-customizations.html[Red Hat OpenShift Installing a Cluster on RHV with Customizations^].
+In these instances, the wizard can be run and tasked without immediately deploying a cluster, but instead outputting a configuration file from which the cluster can be deployed later. This is very useful if any IPI defaults need to be changed, or if a user wants to deploy multiple identical clusters in their environment for other uses such as multitenancy. For more information about creating a customized install configuration for OpenShift, see https://docs.openshift.com/container-platform/4.7/installing/installing_openstack/installing-openstack-installer-custom.html[Red Hat OpenShift Installing a Cluster on OpenStack with Customizations^].
 
 link:rh-os-n_deployment_summary.html[Next: Deploying Red Hat OpenShift with NetApp]
