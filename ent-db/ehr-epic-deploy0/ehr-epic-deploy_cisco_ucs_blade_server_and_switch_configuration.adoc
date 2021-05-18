@@ -1,0 +1,62 @@
+---
+sidebar: sidebar
+permalink: ehr-epic-deploy/ehr-epic-deploy_cisco_ucs_blade_server_and_switch_configuration.html
+keywords: cisco, ucs, blade, server, switch, configuration
+summary: The FlexPod for Epic software is designed with fault tolerance at every level. There is no single point of failure in the system. This document is intended to provide high-level guidance on the basic configuration of a FlexPod environment for Epic software.
+---
+
+= Cisco UCS blade server and switch configuration
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-05-07 11:34:58.170179
+//
+
+The FlexPod for Epic software is designed with fault tolerance at every level. There is no single point of failure in the system. We recommend the use of hot spare blade servers for optimal performance.
+
+This document is intended to provide high-level guidance on the basic configuration of a FlexPod environment for Epic software. In this section, we present high-level steps with some examples to prepare the Cisco UCS compute platform element of the FlexPod configuration. A prerequisite for this guidance is that the FlexPod configuration is racked, powered, and cabled per the instructions in the FlexPod Datacenter with FC Storage.
+
+== Cisco Nexus switch configuration
+
+A fault-tolerant pair of Cisco Nexus 9300 Series Ethernet switches is deployed for the solution. These switches should be cabled as described in the section link:ehr-epic-deploy_deployment_and_configuration_overview.html#cabling-diagram[“Cabling Diagram.”] The Cisco Nexus configuration makes sure that Ethernet traffic flows are optimized for the Epic application.
+
+. After the initial setup and licensing are completed, run the following commands to set global configuration parameters on both switches:
++
+....
+spanning-tree port type network default
+spanning-tree port type edge bpduguard default
+spanning-tree port type edge bpdufilter default
+port-channel load-balance src-dst l4port
+ntp server <global-ntp-server-ip> use-vrf management
+ntp master 3
+ip route 0.0.0.0/0 <ib-mgmt-vlan-gateway>
+copy run start
+....
+
+. Create the VLANs for the solution on each switch, using global configuration mode:
++
+....
+vlan <ib-mgmt-vlan-id>
+name IB-MGMT-VLAN
+vlan <native-vlan-id>
+name Native-VLAN
+vlan <vmotion-vlan-id>
+name vMotion-VLAN
+vlan <vm-traffic-vlan-id>
+name VM-Traffic-VLAN
+vlan <infra-nfs-vlan-id>
+name Infra-NFS-VLAN
+exit
+copy run start
+....
+
+. Create the NTP distribution interface, port channels, port channel parameters, and port descriptions for troubleshooting per https://www.cisco.com/c/en/us/td/docs/unified_computing/ucs/UCS_CVDs/flexpod_esxi65u1_n9fc.html[FlexPod Datacenter with FC Cisco Validated Design^].
+
+
+link:ehr-epic-deploy_esxi_configuration_best_practices.html[Next: ESXi Configuration Best Practices]
