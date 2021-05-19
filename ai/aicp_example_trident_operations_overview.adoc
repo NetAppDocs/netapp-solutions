@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
 permalink: ai/aicp_example_trident_operations_overview.html
-keywords:
-summary:
+keywords: Trident
+summary: Example Trident Operations
 ---
 
-= Overview
+= Example Trident Operations
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -19,7 +19,95 @@ summary:
 //
 
 [.lead]
-This section includes examples of various operations that you may want to perform on your Kubernetes cluster.
+This section includes examples of various operations that you may want to perform with Trident.
 
-link:ai/aicp_import_an_existing_volume.html[Next: Import an Existing Volume]
+=== Import an Existing Volume
+
+If there are existing volumes on your NetApp storage system/platform that you want to mount on containers within your Kubernetes cluster, but that are not tied to PVCs in the cluster, then you must import these volumes. You can use the Trident volume import functionality to import these volumes.
+
+The example commands that follow show the importing of the same volume, named `pb_fg_all,` twice, once for each Trident Backend that was created in the example in the section link:aicp_example_trident_backends_for_ontap_ai_deployments.html[Example Trident Backends for ONTAP AI Deployments], step 1. Importing the same volume twice in this manner enables you to mount the volume (an existing FlexGroup volume) multiple times across different LIFs, as described in the section link:aicp_example_trident_backends_for_ontap_ai_deployments.html[Example Trident Backends for ONTAP AI Deployments], step 1. For more information about PVCs, see the https://kubernetes.io/docs/concepts/storage/persistent-volumes/[official Kubernetes documentation^]. For more information about the volume import functionality, see the https://netapp-trident.readthedocs.io/[Trident documentation^].
+
+An `accessModes` value of `ReadOnlyMany` is specified in the example PVC spec files. For more information about the `accessMode` field, see the https://kubernetes.io/docs/concepts/storage/persistent-volumes/[official Kubernetes documentation^].
+
+[NOTE]
+The Backend names that are specified in the following example import commands correspond to the Backends that were created in the example in the section link:aicp_example_trident_backends_for_ontap_ai_deployments.html[Example Trident Backends for ONTAP AI Deployments], step 1. The StorageClass names that are specified in the following example PVC definition files correspond to the StorageClasses that were created in the example in the section link:aicp_example_kubernetes_storageclasses_for_ontap_ai_deployments.html[Example Kubernetes StorageClasses for ONTAP AI Deployments], step 1.
+
+....
+$ cat << EOF > ./pvc-import-pb_fg_all-iface1.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pb-fg-all-iface1
+  namespace: default
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: ontap-ai-flexgroups-retain-iface1
+EOF
+$ tridentctl import volume ontap-ai-flexgroups-iface1 pb_fg_all -f ./pvc-import-pb_fg_all-iface1.yaml -n trident
++--------------------------------+--------+-----------------------------------+----------+--------------------------------------------+--------+---------+
+|          NAME                  |  SIZE  |       STORAGE CLASS               | PROTOCOL |             BACKEND UUID                         | STATE  | MANAGED |
++--------------------------------+--------+-----------------------------------+----------+------------------------------------------+--------+---------+
+| default-pb-fg-all-iface1-7d9f1 | 10 TiB | ontap-ai-flexgroups-retain-iface1 | file     | b74cbddb-e0b8-40b7-b263-b6da6dec0bdd | online | true    |
++--------------------------------+--------+-----------------------------------+----------+--------------------------------------------+--------+---------+
+$ cat << EOF > ./pvc-import-pb_fg_all-iface2.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pb-fg-all-iface2
+  namespace: default
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: ontap-ai-flexgroups-retain-iface2
+EOF
+$ tridentctl import volume ontap-ai-flexgroups-iface2 pb_fg_all -f ./pvc-import-pb_fg_all-iface2.yaml -n trident
++--------------------------------+--------+-----------------------------------+----------+--------------------------------------------+--------+---------+
+|          NAME                  |  SIZE  |       STORAGE CLASS               | PROTOCOL |             BACKEND UUID                         | STATE  | MANAGED |
++--------------------------------+--------+-----------------------------------+----------+------------------------------------------+--------+---------+
+| default-pb-fg-all-iface2-85aee | 10 TiB | ontap-ai-flexgroups-retain-iface2 | file     | 61814d48-c770-436b-9cb4-cf7ee661274d | online | true    |
++--------------------------------+--------+-----------------------------------+----------+--------------------------------------------+--------+---------+
+$ tridentctl get volume -n trident
++----------------------------------+---------+-----------------------------------+----------+--------------------------------------+--------+---------+
+|               NAME               |  SIZE   |           STORAGE CLASS           | PROTOCOL |             BACKEND UUID             | STATE  | MANAGED |
++----------------------------------+---------+-----------------------------------+----------+--------------------------------------+--------+---------+
+| default-pb-fg-all-iface1-7d9f1   | 10 TiB  | ontap-ai-flexgroups-retain-iface1 | file     | b74cbddb-e0b8-40b7-b263-b6da6dec0bdd | online | true    |
+| default-pb-fg-all-iface2-85aee   | 10 TiB  | ontap-ai-flexgroups-retain-iface2 | file     | 61814d48-c770-436b-9cb4-cf7ee661274d | online | true    |
++----------------------------------+---------+-----------------------------------+----------+--------------------------------------+--------+---------+
+$ kubectl get pvc
+NAME                 STATUS   VOLUME                             CAPACITY         ACCESS MODES   STORAGECLASS                        AGE
+pb-fg-all-iface1     Bound    default-pb-fg-all-iface1-7d9f1     10995116277760   ROX            ontap-ai-flexgroups-retain-iface1   25h
+pb-fg-all-iface2     Bound    default-pb-fg-all-iface2-85aee     10995116277760   ROX            ontap-ai-flexgroups-retain-iface2   25h
+....
+
+=== Provision a New Volume
+
+You can use Trident to provision a new volume on your NetApp storage system or platform. The following example commands show the provisioning of a new FlexVol volume. In this example, the volume is provisioned using the StorageClass that was created in the example in the section link:aicp_example_kubernetes_storageclasses_for_ontap_ai_deployments.html[Example Kubernetes StorageClasses for ONTAP AI Deployments], step 2.
+
+An `accessModes` value of `ReadWriteMany` is specified in the following example PVC definition file. For more information about the `accessMode` field, see the https://kubernetes.io/docs/concepts/storage/persistent-volumes/[official Kubernetes documentation^].
+
+....
+$ cat << EOF > ./pvc-tensorflow-results.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: tensorflow-results
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ontap-ai-flexvols-retain
+EOF
+$ kubectl create -f ./pvc-tensorflow-results.yaml
+persistentvolumeclaim/tensorflow-results created
+$ kubectl get pvc
+NAME                              STATUS    VOLUME                             CAPACITY         ACCESS MODES   STORAGECLASS                        AGE
+pb-fg-all-iface1                  Bound     default-pb-fg-all-iface1-7d9f1     10995116277760   ROX            ontap-ai-flexgroups-retain-iface1   26h
+pb-fg-all-iface2                  Bound     default-pb-fg-all-iface2-85aee     10995116277760   ROX            ontap-ai-flexgroups-retain-iface2   26h
+tensorflow-results                Bound     default-tensorflow-results-2fd60   1073741824       RWX            ontap-ai-flexvols-retain            25h
+....
+
+link:aicp_example_high-performance_jobs_for_ontap_ai_deployments_overview.html[Next: Example High-Performance Jobs for ONTAP AI Deployments Overview]
 
