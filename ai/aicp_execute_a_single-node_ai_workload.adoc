@@ -19,7 +19,7 @@ summary: To execute a single-node AI and ML job in your Kubernetes cluster, perf
 //
 
 [.lead]
-To execute a single-node AI and ML job in your Kubernetes cluster, perform the following tasks from the deployment jump host. With Trident, you can quickly and easily make a data volume, potentially containing petabytes of data, accessible to a Kubernetes workload. To make such a data volume accessible from within a Kubernetes pod, simply specify a PVC, such as one of the PVCs that was created in the example in the section link:aicp_import_an_existing_volume.html[Import an Existing Volume], in the pod definition. This step is a Kubernetes-native operation; no NetApp expertise is required.
+To execute a single-node AI and ML job in your Kubernetes cluster, perform the following tasks from the deployment jump host. With Trident, you can quickly and easily make a data volume, potentially containing petabytes of data, accessible to a Kubernetes workload. To make such a data volume accessible from within a Kubernetes pod, simply specify a PVC in the pod definition. This step is a Kubernetes-native operation; no NetApp expertise is required.
 
 [NOTE]
 This section assumes that you have already containerized (in the Docker container format) the specific AI and ML workload that you are attempting to execute in your Kubernetes cluster.
@@ -28,9 +28,7 @@ This section assumes that you have already containerized (in the Docker containe
 +
 This example job requests eight GPUs and therefore can run on a single GPU worker node that features eight or more GPUs. This example job could be submitted in a cluster for which a worker node featuring eight or more GPUs is not present or is currently occupied with another workload. If so, then the job remains in a pending state until such a worker node becomes available.
 +
-Additionally, to provide the required amount of storage bandwidth, the volume that contains the needed training data (the volume that was imported in the example in the section link:aicp_import_an_existing_volume.html[Import an Existing Volume]) is mounted twice within the pod that this job creates. See the highlighted lines in the following job definition. See the section link:aicp_netapp_trident_deployment_and_configuration_overview.html[Trident Deployment and Configuration Overview], step 1, for details about why you might want to mount the same data volume multiple times. The number of mounts that you need depends on the amount of bandwidth that the specific job requires.
-+
-The volume that was created in the example in the section link:aicp_provision_a_new_volume.html[Provision a New Volume] is also mounted in the pod. These volumes are referenced in the job definition by using the names of the PVCs. For more information about Kubernetes jobs, see the https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/[official Kubernetes documentation^].
+Additionally, in order to maximize storage bandwidth, the volume that contains the needed training data is mounted twice within the pod that this job creates. Another volume is also mounted in the pod. This second volume will be used to store results and metrics. These volumes are referenced in the job definition by using the names of the PVCs. For more information about Kubernetes jobs, see the https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/[official Kubernetes documentation^].
 +
 An `emptyDir` volume with a `medium` value of `Memory` is mounted to `/dev/shm` in the pod that this example job creates. The default size of the `/dev/shm` virtual volume that is automatically created by the Docker container runtime can sometimes be insufficient for TensorFlow’s needs. Mounting an `emptyDir` volume as in the following example provides a sufficiently large `/dev/shm` virtual volume. For more information about `emptyDir` volumes, see the https://kubernetes.io/docs/concepts/storage/volumes/[official Kubernetes documentation^].
 +
@@ -117,7 +115,7 @@ mpirun -allow-run-as-root -np 8 -H localhost:8 -bind-to none -map-by slot -x NCC
 . *Optional:* Clean up job artifacts. The following example commands show the deletion of the job object that was created in step 1.
 +
 When you delete the job object, Kubernetes automatically deletes any associated pods.
-
++
 ....
 $ kubectl get jobs
 NAME                                             COMPLETIONS   DURATION   AGE

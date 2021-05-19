@@ -18,38 +18,7 @@ summary: Kubeflow is capable of rapidly provisioning new Jupyter Notebook server
 // 2020-08-18 15:53:12.652015
 //
 
-Kubeflow is capable of rapidly provisioning new Jupyter Notebook servers to act as data scientist workspaces. To provision a new Jupyter Notebook server with Kubeflow, perform the following tasks. For more information about Jupyter Notebooks within the Kubeflow context, see the https://www.kubeflow.org/docs/components/jupyter/[official Kubeflow documentation^].
-
-. *Optional:* If there are existing volumes on your NetApp storage system that you want to mount on the new Jupyter Notebook server, but that are not tied to PersistentVolumeClaims (PVCs) in the namespace that the new server is going to be created in (see step 4 below), then you must import these volumes into that namespace. Use the Trident volume import functionality to import these volumes.
-+
-The example commands that follow show the importing of an existing volume named `pb_fg_all` into the `kubeflow-anonymous` namespace. These commands create a PVC in the `kubeflow-anonymous` namespace that is tied to the volume on the NetApp storage system. For more information about PVCs, see the https://kubernetes.io/docs/concepts/storage/persistent-volumes/[official Kubernetes documentation^]. For more information about the volume import functionality, see the https://netapp-trident.readthedocs.io/[Trident documentation^]. For a detailed example showing the importing of a volume using Trident, see the section link:aicp_import_an_existing_volume.html[Import an Existing Volume].
-+
-[NOTE]
-The volume is imported in the `kubeflow-anonymous` namespace because that is the namespace that the new Jupyter Notebook server is created in in step 4. To mount this existing volume on the new Jupyter Notebook server using Kubeflow, a PVC must exist for the volume in the same namespace.
-+
-
-....
-$ cat << EOF > ./pvc-import-pb_fg_all-kubeflow-anonymous.yaml
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: pb-fg-all
-  namespace: kubeflow-anonymous
-spec:
-  accessModes:
-    - ReadOnlyMany
-  storageClassName: ontap-ai-flexgroups-retain
-EOF
-$ tridentctl import volume ontap-ai-flexgroups-iface1 pb_fg_all -f ./pvc-import-pb_fg_all-kubeflow-anonymous.yaml -n trident
-+------------------------------------------+--------+----------------------------+----------+--------------------------------------+--------+---------+
-|                   NAME                   |  SIZE  |       STORAGE CLASS        | PROTOCOL |             BACKEND UUID             | STATE  | MANAGED |
-+------------------------------------------+--------+----------------------------+----------+--------------------------------------+--------+---------+
-| pvc-1ed071be-d5a6-11e9-8278-00505681feb6 | 10 TiB | ontap-ai-flexgroups-retain | file     | 12f4f8fa-0500-4710-a023-d9b47e86a2ec | online | true    |
-+------------------------------------------+--------+----------------------------+----------+--------------------------------------+--------+---------+
-$ kubectl get pvc -n kubeflow-anonymous
-NAME        STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS                 AGE
-pb-fg-all   Bound    pvc-1ed071be-d5a6-11e9-8278-00505681feb6   10Ti       ROX            ontap-ai-flexgroups-retain   14s
-....
+Kubeflow is capable of rapidly provisioning new Jupyter Notebook servers to act as data scientist workspaces. To provision a new Jupyter Notebook server with Kubeflow, perform the following tasks. For more information about Jupyter Notebooks within the Kubeflow context, see the https://www.kubeflow.org/docs/components/notebooks/[official Kubeflow documentation^].
 
 . From the Kubeflow central dashboard, click Notebook Servers in the main menu to navigate to the Jupyter Notebook server administration page.
 +
@@ -65,11 +34,11 @@ In the following example, the `kubeflow-anonymous` namespace is chosen. In addit
 +
 image:aicp_image11.png[Error: Missing Graphic Image]
 
-. Specify the workspace volume details. If you choose to create a new volume, then that volume or PVC is provisioned using the default StorageClass. Because a StorageClass utilizing Trident was designated as the default StorageClass in link:aicp_set_default_kubernetes_storageclass.html[Set Default Kubernetes StorageClass], the volume or PVC is provisioned with Trident. This volume is automatically mounted as the default workspace within the Jupyter Notebook Server container. Any notebooks that a user creates on the server that are not saved to a separate data volume are automatically saved to this workspace volume. Therefore, the notebooks are persistent across reboots.
+. Specify the workspace volume details. If you choose to create a new volume, then that volume or PVC is provisioned using the default StorageClass. Because a StorageClass utilizing Trident was designated as the default StorageClass in the section link:aicp_kubeflow_deployment_overview.html[Kubeflow Deployment], the volume or PVC is provisioned with Trident. This volume is automatically mounted as the default workspace within the Jupyter Notebook Server container. Any notebooks that a user creates on the server that are not saved to a separate data volume are automatically saved to this workspace volume. Therefore, the notebooks are persistent across reboots.
 +
 image:aicp_image12.png[Error: Missing Graphic Image]
 
-. Add data volumes. The following example specifies the existing volume that was imported by the example commands in step 1 and accepts the default mount point.
+. Add data volumes. The following example specifies an existing PVC named 'pb-fg-all' and accepts the default mount point.
 +
 image:aicp_image13.png[Error: Missing Graphic Image]
 
@@ -78,7 +47,7 @@ image:aicp_image13.png[Error: Missing Graphic Image]
 image:aicp_image14.png[Error: Missing Graphic Image]
 
 . Click Launch to provision your new notebook server.
-. Wait for your notebook server to be fully provisioned. This can take several minutes if you have never provisioned a server using the Docker image that you specified in step 4 because the image needs to be downloaded. When your server has been fully provisioned, you see a green check mark in the Status column on the Jupyter Notebook server administration page.
+. Wait for your notebook server to be fully provisioned. This can take several minutes if you have never provisioned a server using the Docker image that you specified because the image needs to be downloaded. When your server has been fully provisioned, you see a green check mark in the Status column on the Jupyter Notebook server administration page.
 +
 image:aicp_image15.png[Error: Missing Graphic Image]
 
@@ -101,4 +70,4 @@ image:aicp_image19.png[Error: Missing Graphic Image]
 
 image:aicp_image20.png[Error: Missing Graphic Image]
 
-link:aicp_create_a_snapshot_of_an_ontap_volume_from_within_a_jupyter_notebook.html[Next: Create a Snapshot of an ONTAP Volume from Within a Jupyter Notebook]
+link:aicp_example_notebooks_and_pipelines.html[Next: Example Notebooks and Pipelines]
