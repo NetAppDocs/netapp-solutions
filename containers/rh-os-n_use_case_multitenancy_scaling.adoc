@@ -1,0 +1,161 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-n_use_case_multitenancy_scaling.html
+keywords: OpenShift, OCP, NetApp Trident, NetApp ONTAP, Red Hat OpenShift, Multitenancy, Multi-tenancy
+summary: Configuring Multitenancy on Red Hat OpenShift with NetApp
+---
+
+= Scaling: Adding more projects
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+
+In a multi-tenant configuration, adding new projects with storage resources require additional configuration to ensure multi-tenancy is not violated. For adding more projects in a multi-tenant cluster, follow the below steps:
+
+.	Login to NetApp ONTAP cluster as a storage admin.
+. Navigate to `Storage -> Storage VMs` and click on `Add`. Create a new SVM dedicated to project-3. Also create vsadmin account to manage the SVM and its resources.
+
+image::redhat_openshift_image42.jpg[Create SVM for scaling]
+
+[start=3]
+.	Login to the Red Hat OpenShift cluster as cluster admin
+.	Create a new project.
+[source, console]
+oc create ns project-3
+
+.	Ensure that the user group for project-3 is created on IdP and sync’d with OpenShift cluster
+[source, console]
+oc get groups
+
+.	Create developer role for project-3
+[source, console]
+cat << EOF | oc create -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: project-3
+  name: developer-project-3
+rules:
+  - verbs:
+      - '*'
+    apiGroups:
+      - apps
+      - batch
+      - autoscaling
+      - extensions
+      - networking.k8s.io
+      - policy
+      - apps.openshift.io
+      - build.openshift.io
+      - image.openshift.io
+      - ingress.operator.openshift.io
+      - route.openshift.io
+      - snapshot.storage.k8s.io
+      - template.openshift.io
+    resources:
+      - '*'
+  - verbs:
+      - '*'
+    apiGroups:
+      - ''
+    resources:
+      - bindings
+      - configmaps
+      - endpoints
+      - events
+      - persistentvolumeclaims
+      - pods
+      - pods/log
+      - pods/attach
+      - podtemplates
+      - replicationcontrollers
+      - services
+      - limitranges
+      - namespaces
+      - componentstatuses
+      - nodes
+  - verbs:
+      - '*'
+    apiGroups:
+      - trident.netapp.io
+    resources:
+      - tridentsnapshots
+EOF
+
+NOTE: The role definition provided in this section is just an example. Developer role must be defined based on the end-user requirements.
+
+[start=7]
+.	Create RoleBinding for developers in project-3 binding the developer-project-3 role to the corresponding group (ocp-project-3) in project-3.
+[source, console]
+cat << EOF | oc create -f -
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: project-3-developer
+  namespace: project-3
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ocp-project-3
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: developer-project-3
+EOF
+
+.	Login to the Red Hat OpenShift cluster as storage admin
+.	Create a Trident backend and map to the SVM dedicated to project-3 to it. It is recommended to use the SVM's vsadmin account for connecting the backend to SVM instead of ONTAP cluster administrator.
+[source, console]
+cat << EOF | tridentctl -n trident create backend -f
+{
+    "version": 1,
+    "storageDriverName": "ontap-nas",
+    "backendName": "nfs_project_3",
+    "managementLIF": "172.21.224.210",
+    "dataLIF": "10.61.181.228",
+    "svm": "project-3-svm",
+    "username": "vsadmin",
+    "password": "NetApp!23"
+}
+EOF
+
+NOTE: We are using ontap-nas driver for this example. Use the appropriate driver for while creating the backend based on the use-case.
+
+NOTE: It is assumed that Trident is installed in trident project.
+
+[start=10]
+.	Create the storage class for project-3 and configure it to use the storage pools from backend dedicated to project-3.
+[source, console]
+cat << EOF | oc create -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: project-3-sc
+provisioner: csi.trident.netapp.io
+parameters:
+  backendType: ontap-nas
+  storagePools: "nfs_project_3:.*"
+EOF
+
+.	Create a ResourceQuota to restrict resources in project-3 requesting storage from storageclasses dedicated to other projects.
+[source, console]
+cat << EOF | oc create -f -
+kind: ResourceQuota
+apiVersion: v1
+metadata:
+  name: project-3-sc-rq
+  namespace: project-3
+spec:
+  hard:
+    project-1-sc.storageclass.storage.k8s.io/persistentvolumeclaims: 0
+    project-2-sc.storageclass.storage.k8s.io/persistentvolumeclaims: 0
+EOF
+
+.	Patch the ResourceQuotas in other projects to restrict resources in those projects access storage from storageclass dedicated to project-3.
+[source, console]
+oc patch resourcequotas project-1-sc-rq -n project-1 --patch '{"spec":{"hard":{ "project-3-sc.storageclass.storage.k8s.io/persistentvolumeclaims": 0}}}'
+oc patch resourcequotas project-2-sc-rq -n project-2 --patch '{"spec":{"hard":{ "project-3-sc.storageclass.storage.k8s.io/persistentvolumeclaims": 0}}}'
