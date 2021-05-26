@@ -5,55 +5,51 @@ keywords: vSphere, datastore, VMFS, FC, ONTAP tools, zone, network interface, se
 summary: This page provides steps to deploy a NetApp ONTAP storage iSCSI VMFS datastore in a VMware vSphere environment.
 ---
 
-= vSphere VMFS Datastore - Fibre Channel Storage backend with ONTAP
+= vSphere VMFS datastore - Fibre Channel storage backend with ONTAP
+
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
 :imagesdir: ./../../media/
 :author: Suresh Thoppay, TME - Hybrid Cloud Solutions
-:ontap_version: ONTAP 9.8 or above
-:vsphere_version: vSphere 7.0 or above
+:ontap_version: ONTAP 9.8 or later
+:vsphere_version: vSphere 7.0 or later
 
-.About this task
-Creation of VMFS datastore with ONTAP Fibre Channel (FC) storage. 
+== About this task
+This section covers the creation of a VMFS datastore with ONTAP Fibre Channel (FC) storage.
 
-For Automated provision, check the following scripts
-|===
-|<<PowerShell>>|<<Ansible>>|<<Terraform>>
-|===
+For automated provisioning, use one of these scripts: <<PowerShell>>, <<Ansible>>, or <<Terraform>>.
 
+== What you need
 
-.What you will need
+* The basic skills necessary to manage a vSphere environment and ONTAP
+* An ONTAP storage system (FAS/AFF/CVO/ONTAP Select/ASA) running {ontap_version}
+* ONTAP credentials (SVM name, userID, and password)
+* ONTAP WWPN of host, target, and SVM, and LUN information
+* link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-429C4DDD-5EC0-4DBD-8EA8-76082AB7ADEC.html++[The completed FC configuration worksheet]
+* vCenter Server credentials
+* vSphere host(s) information
+** {vsphere_version}
+* Fabric switch(es)
+** with connected ONTAP FC data ports and vSphere hosts
+** with the N_port ID virtualization (NPIV) feature enabled
+** Create a single initiator single target zone.
+*** Create one zone for each initiator (single initiator zone).
+*** For each zone, include a target that is the ONTAP FC logical interface (WWPN) for the SVMs. There should be at least two logical interfaces per node per SVM. Do not use the WWPN of the physical ports.
+* The ONTAP Tool for VMware vSphere is deployed, configured, and ready to consume.
 
-. Basic skill to manage vSphere environment and ONTAP.
-. ONTAP Storage System (FAS/AFF/CVO/ONTAP Select/ASA)
-.. Running with {ontap_version}
-. ONTAP Credentials (SVM Name, UserID, Password)
-. ONTAP WWPN of host,target,SVM,LUN Information
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-429C4DDD-5EC0-4DBD-8EA8-76082AB7ADEC.html++[Completed FC Configuration Worksheet]
-. vCenter Server Credentials
-. vSphere Host(s) Information
-.. {vsphere_version}
-. Fabric Switch(es)
-.. with ONTAP FC data ports and vSphere hosts are connected.
-.. with N_port ID virtualization (NPIV) feature enabled.
-.. Create Single Initiator Single Target Zone.
-... Create one zone for each initiator (Single Initiator zone) 
-... For each zone, include target which is ONTAP FC Logical Interfaces (WWPN) of SVMs. There should be at least two logical interfaces per node per SVM. Should not be using WWPN of physical ports.
-. ONTAP Tool for VMware vSphere deployed, configured and ready to consume.
+== Provisioning a VMFS datastore
+To provision a VMFS datastore, complete the following steps:
 
-.The steps to provision VMFS datastore involves
 . Check compatability with https://mysupport.netapp.com/matrix[Interoperability Matrix Tool (IMT)]
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-7D444A0D-02CE-4A21-8017-CB1DC99EFD9A.html++[Verify FCP Configuration is supported]
+. Verify that the link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-7D444A0D-02CE-4A21-8017-CB1DC99EFD9A.html++[FCP Configuration is supported].
 
-[sidebar]
+=== ONTAP tasks
 
-.ONTAP tasks
-****
-. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify ONTAP license for FCP]
-Use `system license show` command and check FCP is listed.
-Use `license add -license-code <license code>` to add license.
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify that the ONTAP license for FCP]
+.. Use the `system license show` command to check that FCP is listed.
+.. Use `license add -license-code <license code>` to add the license.
 +
 ////
 . Identify the physical fcp ports
@@ -63,23 +59,23 @@ Check `System node hardware unified-connect show`. May need to change the type t
 ////
 +
 
-. Ensure FCP protocol is enabled on SVM
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-1C31DF2B-8453-4ED0-952A-DF68C3D8B76F.html++[Verifying FCP on existing SVM]
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-D322649F-0334-4AD7-9700-2A4494544CB9.html++[Configuring FCP on existing SVM]
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-0FCB46AA-DA18-417B-A9EF-B6A665DB77FC.html++[Create new SVM with FCP]
-. Ensure FCP Logical Interfaces are available on SVM.
-.. Use `Network Interface show` to verify FCP adapter.
-.. When SVM is created with GUI, Logical Interfaces are as part of that process.
-.. To rename, use `Network Interface modify`
-. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-D4DAC7DB-A6B0-4696-B972-7327EE99FD72.html++[Create and Map LUN] - Skip if using ONTAP tools for VMware vSphere
-****
+. Make sure that the FCP protocol is enabled on the SVM.
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-1C31DF2B-8453-4ED0-952A-DF68C3D8B76F.html++[Verify the FCP on an existing SVM.]
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-D322649F-0334-4AD7-9700-2A4494544CB9.html++[Configure the FCP on an existing SVM.]
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-0FCB46AA-DA18-417B-A9EF-B6A665DB77FC.html++[Create s new SVM with the FCP.]
+. Make sure that FCP logical interfaces are available on an SVM.
+.. Use `Network Interface show` to verify the FCP adapter.
+.. When an SVM is created with the GUI, logical interfaces are a part of that process.
+.. To rename network interfaces, use `Network Interface modify`.
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-D4DAC7DB-A6B0-4696-B972-7327EE99FD72.html++[Create and Map a LUN.] Skip this step if you are using ONTAP tools for VMware vSphere.
 
-.VMware vSphere Tasks
-****
-. Ensure HBA drivers are installed
-VMware supported HBAs have the drivers deployed out of the box and should be visible at link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-ED20B7BE-0D1C-4BF7-85C9-631D45D96FEC.html++[Storage Adapter Information]
 
-. link:++https://docs.netapp.com/vapp-98/topic/com.netapp.doc.vsc-iag/GUID-D7CAD8AF-E722-40C2-A4CB-5B4089A14B00.html++[Provision VMFS datastore with ONTAP Tools].
+=== VMware vSphere tasks
+
+. Verfiy that HBA drivers are installed.
+VMware supported HBAs have drivers deployed out of the box and should be visible in the link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-ED20B7BE-0D1C-4BF7-85C9-631D45D96FEC.html++[Storage Adapter Information].
+
+. link:++https://docs.netapp.com/vapp-98/topic/com.netapp.doc.vsc-iag/GUID-D7CAD8AF-E722-40C2-A4CB-5B4089A14B00.html++[Provision a VMFS datastore with ONTAP Tools].
 ****
 
 

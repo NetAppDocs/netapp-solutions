@@ -7,86 +7,117 @@ summary: This page provides steps to deploy a NetApp ONTAP storage iSCSI VMFS da
 
 
 = vSphere VMFS Datastore - iSCSI Storage backend with ONTAP
+
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
 :imagesdir: ./../../media/
 :author: Suresh Thoppay, TME - Hybrid Cloud Solutions
-:ontap_version: ONTAP 9.8 or above
-:vsphere_version: vSphere 7.0 or above
+:ontap_version: ONTAP 9.8 or later
+:vsphere_version: vSphere 7.0 or later
 
 
-.About this task
-Creation of VMFS datastore with ONTAP iSCSI storage. 
+== About this task
 
-For Automated provision, check the following scripts
-|===
-|<<PowerShell>>|<<Ansible>>|<<Terraform>>
-|===
+This section covers the creation of a VMFS datastore with ONTAP iSCSI storage.
+
+For automated provisioning, use one of these scripts: <<PowerShell>>, <<Ansible>>, or <<Terraform>>.
 
 
-.What you will need
+== What you need
 
-. Basic skill to manage vSphere environment and ONTAP.
-. ONTAP Storage System (FAS/AFF/CVO/ONTAP Select/ASA)
-.. Running with {ontap_version}
-. ONTAP Credentials (SVM Name, UserID, Password)
-. ONTAP Network Port,SVM,LUN Information for iSCSI
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-iscsi-esx-cpg/GUID-429C4DDD-5EC0-4DBD-8EA8-76082AB7ADEC.html++[Have Completed iSCSI Configuration Worksheet]
-. vCenter Server Credentials
-. vSphere Host(s) Information
-.. {vsphere_version}
-. iSCSI VMKernel Adapter IP Informattion
-. Network Switch(es)
-.. with ONTAP System Network Data ports and vSphere hosts are connected
-..  VLAN(s) configured for iSCSI.
-.. (Optional) Link aggregation configured for ONTAP Nettwork Data ports.
-. ONTAP Tool for VMware vSphere deployed, configured and ready to consume.
+* The basic skills necessary to manage a vSphere environment and ONTAP.
 
-.Steps
+* ONTAP storage system (FAS/AFF/CVO/ONTAP Select/ASA) running {ontap_version}
 
-* Check compatability with https://mysupport.netapp.com/matrix[Interoperability Matrix Tool (IMT)]
-** link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-iscsi-esx-cpg/GUID-7D444A0D-02CE-4A21-8017-CB1DC99EFD9A.html++[Verify iSCSI configuration is supported]
+* ONTAP credentials (SVM name, userID, and password)
 
-* Complete ONTAP and vSphere Tasks provided below.
+* ONTAP network port, SVM, and LUN information for iSCSI
 
-.ONTAP Tasks 
+* link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-iscsi-esx-cpg/GUID-429C4DDD-5EC0-4DBD-8EA8-76082AB7ADEC.html++[A completed iSCSI configuration worksheet]
 
-. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify ONTAP license for iSCSI] 
-Use `system license show` command and check iSCSI is listed.
-Use `license add -license-code <license code>` to add license.
+* vCenter Server credentials
 
-. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-iscsi-esx-cpg/GUID-ED75D939-C45A-4546-8B22-6B765FF6083F.html++[Ensure iSCSI protocol is enabled on SVM] 
+* vSphere host(s) information
 
-. Ensure iSCSI Network Logical Interfaces are available on SVM.
-Note: When SVM is created using GUI, iSCSI Network Interfaces are also created. Use `Network interface` command to view or make changes to Network interace.
-TIP: Two iSCSI Network Interface per node is recommended.
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-nmg/GUID-CEE760DF-A059-4018-BE6C-6B3A034CB377.html++[Create iSCSI Network Interface]
-Can use default-data-blocks service policy.
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-nmg/GUID-BBC2D94B-DD3A-4029-9FCE-F71F9C157B53.html++[Ensure data-iscsi service included in service Policy]
-Can use `network interface service-policy show` to verify.
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-nmg/GUID-DE59CF49-3A5F-4F38-9F17-E2C16B567DC0.html++[Check Jumbo Frames are enabled]
+** {vsphere_version}
 
-. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-D4DAC7DB-A6B0-4696-B972-7327EE99FD72.html++[Create and Map LUN] - Skip if using ONTAP tools for VMware vSphere #Repeat for number of LUNs#
+* iSCSI VMKernel adapter IP informattion
 
-.VMware vSphere Tasks
+* Network switch(es)
 
-    . Ensure at least 1 NIC available for iSCSI VLAN. (Two preferred for better performance and fault tolerance)
-    link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.networking.doc/GUID-B2AA3EEE-2334-45FE-9A0F-1172FDDCC6A8.html++[Identify number of physical NIC available on the vSphere host]
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-C476065E-C02F-47FA-A5F7-3B3F2FD40EA8.html++[Configure iSCSI Initiator]
-    Typical use case is Software iSCSI Initiator.
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.networking.doc/GUID-660423B1-3D35-4F85-ADE5-FE1D6BF015CF.html++[Ensure TCPIP stack for iSCSI is available].
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-0D31125F-DC9D-475B-BC3D-A3E131251642.html++[Ensure iSCSI portgroups are available].
-    We typically use single virtual switch with multiple uplink ports. 
-    Use 1:1 adapter mapping.
-    Ensure iSCSI VMKernel adapters are enabled to match the number of NICs and IP are assigned.
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-D9B862DF-476A-4BCB-8CA5-DE6DB2A1A981.html++[Bind iSCSI software adapter to iSCSI VMKernel adapter(s)]
-    . link:++https://docs.netapp.com/vapp-98/topic/com.netapp.doc.vsc-iag/GUID-D7CAD8AF-E722-40C2-A4CB-5B4089A14B00.html++[Provision VMFS datastore with ONTAP Tools].#Repeat for number of Datastores#
-    . link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-0520FD37-D7AD-4FBA-9A2E-E5F8211FCBBB.html++[Verify Hardware Acceleration Support]
+** with ONTAP system network data ports and connected vSphere hosts
 
-.What's next?
-Once the tasks are completed, VMFS datastore is ready to consume for provisioning virtual machines.
+**  VLAN(s) configured for iSCSI
+
+** (Optional) link aggregation configured for ONTAP network data ports
+
+* ONTAP Tool for VMware vSphere deployed, configured, and ready to consume
+
+== Steps
+
+. Check compatibility with the https://mysupport.netapp.com/matrix[Interoperability Matrix Tool (IMT)].
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-iscsi-esx-cpg/GUID-7D444A0D-02CE-4A21-8017-CB1DC99EFD9A.html++[Verify that the iSCSI configuration is supported.]
+
+. Complete the following ONTAP and vSphere tasks.
+
+== ONTAP tasks
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify the ONTAP license for iSCSI].
+
+.. Use the `system license show` command to check if iSCSI is listed.
+
+.. Use `license add -license-code <license code>` to add the license.
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-iscsi-esx-cpg/GUID-ED75D939-C45A-4546-8B22-6B765FF6083F.html++[Verify that the iSCSI protocol is enabled on the SVM.]
+
+. Verify that iSCSI network logical interfaces are available on the SVM.
++
+NOTE: When an SVM is created using the GUI, iSCSI network interfaces are also created.
+
+. Use the `Network interface` command to view or make changes to the network interface.
++
+TIP: Two iSCSI network interfaces per node are recommended.
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-nmg/GUID-CEE760DF-A059-4018-BE6C-6B3A034CB377.html++[Create an iSCSI network interface.]
+You can use the default-data-blocks service policy.
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-nmg/GUID-BBC2D94B-DD3A-4029-9FCE-F71F9C157B53.html++[Verify that the data-iscsi service is included in the service policy.]
+You can use `network interface service-policy show` to verify.
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-nmg/GUID-DE59CF49-3A5F-4F38-9F17-E2C16B567DC0.html++[Verify that jumbo frames are enabled.]
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-D4DAC7DB-A6B0-4696-B972-7327EE99FD72.html++[Create and map the LUN.]
+Skip this step if you are using ONTAP tools for VMware vSphere. Repeat this step for each LUN.
+
+== VMware vSphere tasks
+
+. Verify that at least one NIC is available for the iSCSI VLAN. Two NICs are preferred for better performance and fault tolerance.
+
+. link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.networking.doc/GUID-B2AA3EEE-2334-45FE-9A0F-1172FDDCC6A8.html++[Identify the number of physical NICs available on the vSphere host.]
+
+. link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-C476065E-C02F-47FA-A5F7-3B3F2FD40EA8.html++[Configure the iSCSI initiator.]
+A typical use case is a software iSCSI initiator.
+
+. link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.networking.doc/GUID-660423B1-3D35-4F85-ADE5-FE1D6BF015CF.html++[Verify that the TCPIP stack for iSCSI is available].
+
+. link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-0D31125F-DC9D-475B-BC3D-A3E131251642.html++[Verify that iSCSI portgroups are available].
+** We typically use a single virtual switch with multiple uplink ports.
+** Use 1:1 adapter mapping.
+
+. Verify that iSCSI VMKernel adapters are enabled to match the number of NICs and that IPs are assigned.
+
+. link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-D9B862DF-476A-4BCB-8CA5-DE6DB2A1A981.html++[Bind the iSCSI software adapter to the iSCSI VMKernel adapter(s).]
+
+. link:++https://docs.netapp.com/vapp-98/topic/com.netapp.doc.vsc-iag/GUID-D7CAD8AF-E722-40C2-A4CB-5B4089A14B00.html++[Provision the VMFS datastore with ONTAP Tools]. Repeat this step for all datastores.
+
+. link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-0520FD37-D7AD-4FBA-9A2E-E5F8211FCBBB.html++[Verify hardware acceleration support.]
+
+== What's next?
+
+After these the tasks are completed, the VMFS datastore is ready to consume for provisioning virtual machines.
 
 .PowerShell Script
 [[PowerShell]]
