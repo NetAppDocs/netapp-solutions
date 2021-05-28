@@ -1,0 +1,67 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-n_use_case_openshift_virtualization_workflow_clone_vm.html
+keywords: OpenShift, OCP, NetApp Trident, NetApp ONTAP, Red Hat OpenShift, OpenShift Virtualization, CNV, Container Native Virtualization, Red Hat OpenShift Virtualization
+summary: Red Hat OpenShift Virtualization with NetApp ONTAP
+---
+
+= Workflows: Red Hat OpenShift Virtualization with NetApp ONTAP
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+== VM cloning
+
+Cloning an existing VM in OpenShift is achieved with the support of NetApp Trident’s Volume CSI cloning feature. CSI volume cloning allows for creation of a new PVC using an existing PVC as the data source by duplicating its PV. After the new PVC is created, it functions as a separate entity and without any link to or dependency on the source PVC.
+
+image::redhat_openshift_image57.jpg[VM Cloning architecture]
+
+There are certain restrictions with CSI volume cloning to consider:
+
+.	Source PVC and destination PVC must be in the same project.
+.	Cloning is supported within the same storage class.
+.	Cloning can be performed only when source and destination volumes use the same VolumeMode setting; for example, a block volume can only be cloned to another block volume.
+
+VMs in an OpenShift cluster can be cloned in two ways:
+
+.	By shutting down the source VM
+.	By keeping the source VM live
+
+=== By Shutting down the source VM
+
+Cloning an existing VM by shutting down the VM is a native OpenShift feature that is implemented with support from NetApp Trident. Complete the following steps to clone a VM.
+
+.	Navigate to `Workloads > Virtualization > Virtual Machines` and click the ellipsis next to the virtual machine you wish to clone.
+.	Click Clone Virtual Machine and provide the details for the new VM.
++
+
+image::redhat_openshift_image58.JPG[clone vm]
+
+.	Click Clone Virtual Machine; this shuts down the source VM and initiates the creation of the clone VM.
+.	After this step is completed, you can access and verify the content of the cloned VM.
+
+=== By keeping the source VM live
+
+An existing VM can also be cloned by cloning the existing PVC of the source VM and then creating a new VM using the cloned PVC. This method does not require you to shut down the source VM. Complete the following steps to clone a VM without shutting it down.
+
+.	Navigate to Storage -> PersistentVolumeClaims` and click the ellipsis next to the PVC that is attached to the source VM.
+.	Click Clone PVC and furnish the details for the new PVC.
++
+
+image::redhat_openshift_image59.JPG[clone pvc]
+
+.	Then click Clone. This creates a PVC for the new VM.
+.	Navigate to `Workloads > Virtualization > Virtual Machines` and click `Create > With YAML`.
+.	In the `spec > template > spec > volumes` section, attach the cloned PVC instead of the container disk. Provide all other details for the new VM according to your requirements.
+[source, cli]
+- name: rootdisk
+  persistentVolumeClaim:
+    claimName: rhel8-short-frog-rootdisk-28dvb-clone
+
+.	Click Create to create the new VM.
+.	After the VM is created successfully, access and verify that the new VM is a clone of the source VM.
+
+link:rh-os-n_use_case_openshift_virtualization_workflow_vm_from_snapshot.html[Next: Workflows: Create VM from a Snapshot.]
