@@ -12,18 +12,16 @@ summary: Configuring Multitenancy on Red Hat OpenShift with NetApp
 :linkattrs:
 :imagesdir: ./../media/
 
-[.lead]
+The following resources must be configured by a storage administrator:
 
-The following resources have to be configured by a storage administrator:
-
-. Login to NetApp ONTAP cluster as admin.
-. Navigate to `Storage -> Storage VMs` and click on `Add`. Create 2 SVMs, one for project-1 and another for project-2, providing the required details. Also create vsadmin account to manage the SVM and its resources.
+. Log into the NetApp ONTAP cluster as admin.
+. Navigate to `Storage -> Storage VMs` and click `Add`. Create two SVMs, one for project-1 and the other for project-2, providing the required details. Also create an vsadmin account to manage the SVM and its resources.
 
 image::redhat_openshift_image41.jpg[SVM creation on ONTAP]
 
 [start=3]
-. Login to Red Hat OpenShift cluster as storage administrator.
-.	Create the backend for project-1 mapping it to SVM dedicated to the project. It is recommended to use the SVM's vsadmin account for connecting the backend to SVM instead of ONTAP cluster administrator.
+. Login to the Red Hat OpenShift cluster as the storage administrator.
+.	Create the backend for project-1 and map it to the SVM dedicated to the project. NetApp recommends using the SVM's vsadmin account to connect the backend to SVM instead of using the ONTAP cluster administrator.
 [source, console]
 cat << EOF | tridentctl -n trident create backend -f
 {
@@ -38,13 +36,13 @@ cat << EOF | tridentctl -n trident create backend -f
 }
 EOF
 
-NOTE: We are using ontap-nas driver for this example. Use the appropriate driver for while creating the backend based on the use-case.
+NOTE: We are using the ontap-nas driver for this example. Use the appropriate driver when creating the backend based on the use-case.
 
-NOTE: It is assumed that Trident is installed in trident project.
+NOTE: We assume that Trident is installed in trident project.
 
 [start=5]
-.	Similarly create Trident backend for project-2 mapping it to the SVM dedicated for project-2.
-.	Next step is to create storage classes. Create the storage class for project-1 and configure it to use the storage pools from backend dedicated to project-1 by setting the storagePools parameter.
+.	Similarly create the Trident backend for project-2 and map it to the SVM dedicated to project-2.
+.	Next, create the storage classes. Create the storage class for project-1 and configure it to use the storage pools from backend dedicated to project-1 by setting the storagePools parameter.
 [source, console]
 cat << EOF | oc create -f -
 apiVersion: storage.k8s.io/v1
@@ -74,4 +72,4 @@ EOF
 .	Similarly, create a ResourceQuota to restrict resources in project-2 requesting storage from storageclasses dedicated to other projects.
 
 
-link:rh-os-n_use_case_multitenancy_validation.html[Next: Validation]
+link:rh-os-n_use_case_multitenancy_validation.html[Next: Validation.]

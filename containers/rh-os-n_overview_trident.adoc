@@ -2,7 +2,7 @@
 sidebar: sidebar
 permalink: containers/rh-os-n_overview_trident.html
 keywords: Trident, Helm, Operator, iSCSI, NFS
-summary:
+summary: NetApp Trident is an open-source and fully-supported storage orchestrator for containers and Kubernetes distributions, including Red Hat OpenShift.
 ---
 
 = NetApp Trident Overview: Red Hat OpenShift with NetApp
@@ -18,7 +18,6 @@ summary:
 // 2020-06-25 14:31:33.563897
 //
 
-[.lead]
 NetApp Trident is an open-source and fully-supported storage orchestrator for containers and Kubernetes distributions, including Red Hat OpenShift.
 
 Trident works with the entire NetApp storage portfolio, including the NetApp ONTAP and Element storage systems, and supports NFS and iSCSI connections.
@@ -126,7 +125,7 @@ trident-operator-7c748d957-gr2gw   1/1     Running   0          36s
 
 NOTE: In some cases customer environments may require the customization of the Trident deployment. In these cases it is also possible to manually install the Trident operator and update the included manifests to customize the deployment.
 
-== Manually Install the Trident Operator
+== Manually install the Trident Operator
 
 . First set the location of the user cluster’s `kubeconfig` file as an environment variable so that you don’t have to reference it, because Trident has no option to pass this file.
 +
@@ -276,7 +275,50 @@ trident-operator-66f48895cc-lzczk   1/1     Running   0          2m39s
 +----------------+----------------+
 ----
 
-== Create Storage System Backends
+== Prepare worker nodes for storage
+
+Most Kubernetes distributions come with the packages and utilities to mount NFS backends installed by default, including Red Hat OpenShift.
+
+In order to prepare worker nodes to allow for the mapping of block storage volumes through the iSCSI protocol you need to install the necessary packages to support that functionality.
+
+In Red Hat OpenShift, this is handled by applying a MCO (Machine Config Operator) to your cluster once it is deployed.
+
+To configure the worker nodes to run storage services, complete the following steps:
+
+. Log in to the OCP web console and navigate to Compute > Machine Configs and click Create Machine Config. Copy/Paste the YAML file and click Create.
++
+
+image:redhat_openshift_image14.png[Error: Missing Graphic Image]
+
+. After the configuration is created, it will take approximately 20–30 minutes to apply the configuration to the worker nodes and reload them.  Verify whether the machine config is applied by using `oc get mcp` and make sure that the machine config pool for workers is updated. You can also log in to the worker nodes to confirm that the iscsid service is running.
++
+
+....
+[netapp-user@rhel7 openshift-deploy]$ oc get mcp
+NAME     CONFIG                                    UPDATED   UPDATING   DEGRADED
+master   rendered-master-a520ae930e1d135e0dee7168   True      False      False
+worker   rendered-worker-de321b36eeba62df41feb7bc   True      False      False
+
+[netapp-user@rhel7 openshift-deploy]$ ssh core@10.61.181.22 sudo systemctl status iscsid
+● iscsid.service - Open-iSCSI
+   Loaded: loaded (/usr/lib/systemd/system/iscsid.service; enabled; vendor preset: disabled)
+   Active: active (running) since Tue 2021-05-26 13:36:22 UTC; 3 min ago
+     Docs: man:iscsid(8)
+           man:iscsiadm(8)
+ Main PID: 1242 (iscsid)
+   Status: "Ready to process requests"
+    Tasks: 1
+   Memory: 4.9M
+      CPU: 9ms
+   CGroup: /system.slice/iscsid.service
+           └─1242 /usr/sbin/iscsid -f
+....
+
+
+NOTE: It is also possible to confirm that the MachineConfig has been successfully applied and services have been started as expected by running the `oc debug` command with the appropriate flags.
+
+
+== Create storage-system backends
 
 After completing the NetApp Trident Operator install, you must configure the backend for the specific NetApp storage platform you are using. Follow the links below in order to continue the setup and configuration of NetApp Trident.
 
@@ -288,4 +330,4 @@ After completing the NetApp Trident Operator install, you must configure the bac
 * link:./rh-os-n_trident_element_iscsi.html[NetApp Element iSCSI]
 
 
-link:rh-os-n_use_cases.html[Next: Solution Validation / Use Cases: Red Hat OpenShift with NetApp]
+link:rh-os-n_use_cases.html[Next: Solution Validation/Use Cases: Red Hat OpenShift with NetApp.]

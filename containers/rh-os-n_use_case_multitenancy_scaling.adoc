@@ -12,26 +12,24 @@ summary: Configuring Multitenancy on Red Hat OpenShift with NetApp
 :linkattrs:
 :imagesdir: ./../media/
 
-[.lead]
+In a multitenant configuration, adding new projects with storage resources requires additional configuration to make sure that multitenancy is not violated. For adding more projects in a multitenant cluster, complete the following steps:
 
-In a multi-tenant configuration, adding new projects with storage resources require additional configuration to ensure multi-tenancy is not violated. For adding more projects in a multi-tenant cluster, follow the below steps:
-
-.	Login to NetApp ONTAP cluster as a storage admin.
-. Navigate to `Storage -> Storage VMs` and click on `Add`. Create a new SVM dedicated to project-3. Also create vsadmin account to manage the SVM and its resources.
+.	Log into the NetApp ONTAP cluster as a storage admin.
+. Navigate to `Storage -> Storage VMs` and click `Add`. Create a new SVM dedicated to project-3. Also create a vsadmin account to manage the SVM and its resources.
 
 image::redhat_openshift_image42.jpg[Create SVM for scaling]
 
 [start=3]
-.	Login to the Red Hat OpenShift cluster as cluster admin
+.	Log into the Red Hat OpenShift cluster as cluster admin.
 .	Create a new project.
 [source, console]
 oc create ns project-3
 
-.	Ensure that the user group for project-3 is created on IdP and sync’d with OpenShift cluster
+.	Make sure that the user group for project-3 is created on IdP and sync’d with the OpenShift cluster.
 [source, console]
 oc get groups
 
-.	Create developer role for project-3
+.	Create the developer role for project-3.
 [source, console]
 cat << EOF | oc create -f -
 apiVersion: rbac.authorization.k8s.io/v1
@@ -86,7 +84,7 @@ rules:
       - tridentsnapshots
 EOF
 
-NOTE: The role definition provided in this section is just an example. Developer role must be defined based on the end-user requirements.
+NOTE: The role definition provided in this section is just an example. The developer role must be defined based on the end-user requirements.
 
 [start=7]
 .	Create RoleBinding for developers in project-3 binding the developer-project-3 role to the corresponding group (ocp-project-3) in project-3.
@@ -108,7 +106,7 @@ roleRef:
 EOF
 
 .	Login to the Red Hat OpenShift cluster as storage admin
-.	Create a Trident backend and map to the SVM dedicated to project-3 to it. It is recommended to use the SVM's vsadmin account for connecting the backend to SVM instead of ONTAP cluster administrator.
+.	Create a Trident backend and map it to the SVM dedicated to project-3. NetApp recommends using the SVM's vsadmin account to connect the backend to the SVM instead of using the ONTAP cluster administrator.
 [source, console]
 cat << EOF | tridentctl -n trident create backend -f
 {
@@ -123,9 +121,9 @@ cat << EOF | tridentctl -n trident create backend -f
 }
 EOF
 
-NOTE: We are using ontap-nas driver for this example. Use the appropriate driver for while creating the backend based on the use-case.
+NOTE: We are using the ontap-nas driver for this example. Use the appropriate driver for creating the backend based on the use-case.
 
-NOTE: It is assumed that Trident is installed in trident project.
+NOTE: We assume that Trident is installed in the trident project.
 
 [start=10]
 .	Create the storage class for project-3 and configure it to use the storage pools from backend dedicated to project-3.
@@ -155,7 +153,7 @@ spec:
     project-2-sc.storageclass.storage.k8s.io/persistentvolumeclaims: 0
 EOF
 
-.	Patch the ResourceQuotas in other projects to restrict resources in those projects access storage from storageclass dedicated to project-3.
+.	Patch the ResourceQuotas in other projects to restrict resources in those projects from accessing storage from the storageclass dedicated to project-3.
 [source, console]
 oc patch resourcequotas project-1-sc-rq -n project-1 --patch '{"spec":{"hard":{ "project-3-sc.storageclass.storage.k8s.io/persistentvolumeclaims": 0}}}'
 oc patch resourcequotas project-2-sc-rq -n project-2 --patch '{"spec":{"hard":{ "project-3-sc.storageclass.storage.k8s.io/persistentvolumeclaims": 0}}}'
