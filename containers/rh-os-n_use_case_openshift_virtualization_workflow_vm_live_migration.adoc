@@ -1,0 +1,43 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-n_use_case_openshift_virtualization_workflow_vm_live_migration.html
+keywords: OpenShift, OCP, NetApp Trident, NetApp ONTAP, Red Hat OpenShift, OpenShift Virtualization, CNV, Container Native Virtualization, Red Hat OpenShift Virtualization
+summary: Red Hat OpenShift Virtualization with NetApp ONTAP
+---
+
+= Workflows: Red Hat OpenShift Virtualization with NetApp ONTAP
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+== VM Live Migration
+
+Live Migration is a process of migrating a VM instance from one node to another in an OpenShift cluster with no downtime. For live migration to work in an OpenShift cluster, VMs must be bound to PVCs with shared ReadWriteMany access mode. A NetApp Trident backend configured with an SVM on a NetApp ONTAP cluster that is enabled for NFS protocol supports shared ReadWriteMany access for PVCs. Therefore, the VMs with PVCs that are requested from StorageClasses provisioned by Trident from NFS-enabled SVM can be migrated with no downtime.
+
+image::redhat_openshift_image55.jpg[VM Live Migration architecture]
+
+To create a VM bound to PVCs with shared ReadWriteMany access:
+
+.	Navigate to `Workloads > Virtualization > Virtual Machines` and click `Create > With Wizard`.
+.	Select the desired the operating system and click Next. Let us assume the selected OS already had a boot source configured with it.
+.	In the Review and Create pane, select the project you want to create the VM in and furnish the VM details. Make sure that the boot source is selected to be Clone and boot from CD-ROM with the appropriate PVC assigned for the selected OS.
+.	Click Customize Virtual Machine and then click Storage.
+.	Click on the ellipsis next to rootdisk, make sure that the storageclass provisioned using Trident is selected. Expand Advanced and select Shared Access (RWX) for Access Mode. Then click Save.
++
+
+image::redhat_openshift_image56.JPG[Make the disk RWX accessible]
+
+.	Click Review and confirm and then click Create Virtual Machine.
+
+To manually migrate a VM to another node in the OpenShift cluster, complete the following steps.
+
+.	Navigate to `Workloads > Virtualization > Virtual Machines`.
+.	For the VM you wish to migrate, click the ellipsis, and then click Migrate the Virtual Machine.
+.	Click Migrate when the message pops up to confirm.
+
+NOTE: A VM instance in an OpenShift cluster automatically migrates to another node when the original node is placed into maintenance mode if the evictionStrategy is set to LiveMigrate.
+
+link:rh-os-n_use_case_openshift_virtualization_workflow_clone_vm.html[Next: Workflows: VM Cloning.]

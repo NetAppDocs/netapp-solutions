@@ -1,0 +1,122 @@
+---
+sidebar: sidebar
+permalink: hybrid-cloud/vsphere_ontap_auto_block_nvmeof.html
+keywords: vSphere, datastore, VMFS, NVMeoF, ONTAP tools, zone, network interface, namespace, storage subsystem
+summary: This page provides steps to deploy a NetApp ONTAP NVMe/FC storage for VMFS datastore in a VMware vSphere environment.
+---
+
+= vSphere VMFS Datastore - NVMe/FC with ONTAP
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+:scriptsdir: ./../scripts/
+:author: Suresh Thoppay, TME - Hybrid Cloud Solutions
+:ontap_version: ONTAP 9.8 or later
+:vsphere_version: vSphere 7.0 or later
+
+== About this task
+This section covers the creation of a VMFS datastore with ONTAP storage using NVMe/FC.
+
+For automated provisioning, use one of these scripts: <<PowerShell>>, <<Ansible>>, or <<Terraform>>.
+
+
+== What you will need
+
+* Basic skill to manage vSphere environment and ONTAP.
+
+* link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-059DDF49-2A0C-49F5-BB3B-907A21EC94D6.html++[Basic understanding of NVMe/FC].
+
+* ONTAP Storage System (FAS/AFF/CVO/ONTAP Select/ASA) running {ontap_version}
+
+* ONTAP credentials (SVM name, userID, and password)
+
+* ONTAP WWPN of host, target, SVM, and LUN information
+
+* link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-429C4DDD-5EC0-4DBD-8EA8-76082AB7ADEC.html++[A completed FC configuration worksheet]
+
+* vCenter Server
+
+* vSphere host(s) information ({vsphere_version})
+
+* Fabric switch(es)
+
+** with ONTAP FC data ports and vSphere hosts are connected.
+
+** with N_port ID virtualization (NPIV) feature enabled.
+
+** Create Single Initiator Single Target Zone.
+
+** Create one zone for each initiator (Single Initiator zone)
+
+*** For each zone, include target which is ONTAP FC Logical Interfaces (WWPN) of SVMs. There should be at least two logical interfaces per node per SVM. Should not be using WWPN of physical ports.
+
+== Provision VMFS datastore
+
+. Check compatibility with the https://mysupport.netapp.com/matrix[Interoperability Matrix Tool (IMT)]
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-7D444A0D-02CE-4A21-8017-CB1DC99EFD9A.html++[Verify that the NVMe/FC configuration is supported.]
+
+[sidebar]
+
+== ONTAP tasks
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify ONTAP license for FCP]
+Use `system license show` command and check NVMe_oF is listed.
+Use `license add -license-code <license code>` to add license.
++
+////
+. Identify the physical fcp ports
+Use `Network fcp adapter show` to check adapters are listed.
+Use `Node run local sysconfig -v` to verify devices connected to current storage node.
+Check `System node hardware unified-connect show`. May need to change the type to initiator.
+////
++
+
+. Ensure NVMe protocol is enabled on SVM
+
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-CDDBD7F4-2089-4466-892F-F2DFF5798B1C.html[Configure SVM for NVMe]
+
+. Ensure NVMe/FC Logical Interfaces are available on SVM.
+
+.. Use `Network Interface show` to verify FCP adapter.
+
+.. When SVM is created with GUI, Logical Interfaces are as part of that process.
+
+.. To rename, use `Network Interface modify`
+
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-BBBAB2E4-E106-4355-B95C-C3626DCD5088.html++[Create NVMe namespace and subsystem]
+
+== VMware vSphere Tasks
+
+. Ensure HBA drivers are installed
+VMware supported HBAs have the drivers deployed out of the box and should be visible at link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-ED20B7BE-0D1C-4BF7-85C9-631D45D96FEC.html++[Storage Adapter Information]
+
+. link:++https://docs.netapp.com/us-en/ontap-sanhost/nvme_esxi_7.html++[Perform vSphere Host NVMe driver installatioln and validation tasks]
+
+. link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-5AC611E0-7CEB-4604-A03C-F600B1BA2D23.html++[Create VMFS Datastore]
+
+
+
+.PowerShell Script
+[[PowerShell]]
+[source,powershell]
+----
+
+----
+
+.Ansible Playbook
+[[Ansible]]
+[source]
+----
+
+----
+
+.Terraform
+[[Terraform]]
+[source]
+----
+
+----
