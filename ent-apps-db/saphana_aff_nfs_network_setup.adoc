@@ -1,0 +1,43 @@
+---
+sidebar: sidebar
+permalink: saphana_aff_nfs_network_setup.html
+keywords:
+summary:
+---
+
+= Network setup
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-05-20 16:44:23.315971
+//
+
+[.lead]
+Use the following guidelines when configuring the network:
+
+* A dedicated storage network must be used to connect the SAP HANA hosts to the storage controllers with a 10GbE or faster network.
+* Use the same connection speed for storage controllers and SAP HANA hosts. If this is not possible, ensure that the network components between the storage controllers and the SAP HANA hosts are able to handle different speeds. For example, you must provide enough buffer space to allow speed negotiation at the NFS level between storage and hosts. Network components are usually switches, but other components within blade chassis, such as the back plane, must be considered as well.
+* Disable flow control on all physical ports used for storage traffic on the storage network switch and host layer.
+* Each SAP HANA host must have a redundant network connection with a minimum of 10Gb of bandwidth.
+* Jumbo frames with a maximum transmission unit (MTU) size of 9,000 must be enabled on all network components between the SAP HANA hosts and the storage controllers.
+* In a VMware setup, dedicated VMXNET3 network adapters must be assigned to each running virtual machine.  Check the relevant papers mentioned in “Introduction” for further requirements.
+* To avoid interference between each other, use separate network/IO paths for the log and data area. shows an example with four SAP HANA hosts attached to a storage controller HA pair using a 10GbE network. Each SAP HANA host has an active-passive connection to the redundant fabric.
+
+At the storage layer, four active connections are configured to provide 10Gb throughput for each SAP HANA host.  In addition,  one spare interface is configured on each storage controller.
+
+At the storage layer,  a broadcast domain with an MTU size of 9000 is configured, and all required physical interfaces are added to this broadcast domain. This approach automatically assigns these physical interfaces to the same failover group. All logical interfaces (LIFs) that are assigned to these physical interfaces are added to this failover group.
+
+image:saphana_aff_nfs_image10.png[Error: Missing Graphic Image]
+
+In general, it is also possible to use HA interface groups on the servers (bonds) and the storage systems (for example,  Link Aggregation Control Protocol [LACP] and ifgroups). With HA interface groups, verify that the load is equally distributed between all interfaces within the group. The load distribution depends on the functionality of the network switch infrastructure.
+
+[NOTE]
+Depending on the number of SAP HANA hosts and the connection speed used, different numbers of active physical ports are needed. For details, see “” === 
+
+
