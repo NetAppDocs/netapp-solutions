@@ -1,8 +1,8 @@
 ---
 sidebar: sidebar
-permalink: saphana_aff_nfs_storage_sizing.html
-keywords:
-summary:
+permalink: ent-apps-db/saphana_aff_nfs_storage_sizing.html
+keywords: storage, sizing, performance, sas disk shelf, ns224 nvme, test tool,
+summary: The following section provides an overview of the required performance and capacity considerations needed for sizing a storage system for SAP HANA.
 ---
 
 = Storage sizing
@@ -10,7 +10,7 @@ summary:
 :nofooter:
 :icons: font
 :linkattrs:
-:imagesdir: ./media/
+:imagesdir: ./../media/
 
 //
 // This file was created with NDAC Version 2.0 (August 17, 2020)
@@ -18,15 +18,14 @@ summary:
 // 2021-05-20 16:44:23.296190
 //
 
-[.lead]
 The following section provides an overview of the required performance and capacity considerations needed for sizing a storage system for SAP HANA.
 
 [NOTE]
 Contact NetApp or your NetApp partner sales representative to assist you in creating a properly sized storage environment.
 
-=== Performance considerations
+== Performance considerations
 
-SAP has defined a static set of storage KPIs. These KPIs are valid for all production SAP HANA environments independent of the memory size of the database hosts and the applications that use the SAP HANA database. These KPIs are valid for single- host, multiple-host, Business Suite on HANA, Business Warehouse on HANA, S/4HANA,  and BW/4HANA environments. Therefore, the current performance sizing approach depends on only the number of active SAP HANA hosts that are attached to the storage system.
+SAP has defined a static set of storage KPIs. These KPIs are valid for all production SAP HANA environments independent of the memory size of the database hosts and the applications that use the SAP HANA database. These KPIs are valid for single-host, multiple-host, Business Suite on HANA, Business Warehouse on HANA, S/4HANA,  and BW/4HANA environments. Therefore, the current performance sizing approach depends on only the number of active SAP HANA hosts that are attached to the storage system.
 
 [NOTE]
 Storage performance KPIs are only mandated for production SAP HANA systems, but you can implement them in for all HANA system.
@@ -37,19 +36,19 @@ NetApp tested and predefined the maximum number of SAP HANA hosts that can be at
 
 The maximum number of SAP HANA hosts that can be run on a disk shelf and the minimum number of SSDs required per SAP HANA host were determined by running the SAP performance test tool. This test does not consider the actual storage capacity requirements of the hosts. You must also calculate the capacity requirements to determine the actual storage configuration needed.
 
-==== SAS disk shelf
+=== SAS disk shelf
 
-With the 12Gb serial-attached SCSI (SAS) disk shelf (DS224C),  performance sizing is performed by using the following fixed disk- shelf configurations:
+With the 12Gb serial-attached SCSI (SAS) disk shelf (DS224C), performance sizing is performed by using the following fixed disk-shelf configurations:
 
-* Half- loaded disk shelves with 12 SSDs
+* Half-loaded disk shelves with 12 SSDs
 * Fully loaded disk shelves with 24 SSDs
 
 [NOTE]
-Both configurations use Advanced Disk Partitioning (ADPv2).  A half- loaded disk shelf supports up to nine SAP HANA hosts,  whereas a fully loaded shelf supports up to 14 hosts in a single disk shelf.  The SAP HANA hosts must be equally distributed between both storage controllers.  The same applies to the internal disks of an AFF A700s system.  The DS224C disk shelf must be connected using 12Gb SAS to support the number of SAP HANA hosts.
+Both configurations use Advanced Disk Partitioning (ADPv2). A half-loaded disk shelf supports up to nine SAP HANA hosts, whereas a fully loaded shelf supports up to 14 hosts in a single disk shelf. The SAP HANA hosts must be equally distributed between both storage controllers. The same applies to the internal disks of an AFF A700s system. The DS224C disk shelf must be connected using 12Gb SAS to support the number of SAP HANA hosts.
 
 The 6Gb SAS disk shelf (DS2246) supports a maximum of four SAP HANA hosts. The SSDs and the SAP HANA hosts must be equally distributed between both storage controllers.
 
- summarizes the supported number of SAP HANA hosts per disk shelf.
+The following table summarizes the supported number of SAP HANA hosts per disk shelf.
 
 |===
 | |6Gb SAS shelves (DS2246)Fully loaded with 24 SSDs |12Gb SAS shelves (DS224C)Half loaded with 12 SSDs and ADPv2 |12Gb SAS shelves (DS224C)Fully loaded with 24 SSDs and ADPv2
@@ -61,16 +60,16 @@ The 6Gb SAS disk shelf (DS2246) supports a maximum of four SAP HANA hosts. The S
 |===
 
 [NOTE]
-This calculation is independent of the storage controller used.  Adding more disk shelfs do not increase the maximum amount of SAP HANA hosts a storage controller can support.
+This calculation is independent of the storage controller used. Adding more disk shelfs do not increase the maximum amount of SAP HANA hosts a storage controller can support.
 
-==== NS224 NVMe shelf
+=== NS224 NVMe shelf
 
-The minimum number of 12 NVMe SSDs for the first shelf supports up to 16 SAP HANA hosts. A fully populated shelf (24 SSDs) supports up to 34 SAP HANA hosts.  The same applies to the internal disks of an AFF A800 system.
+The minimum number of 12 NVMe SSDs for the first shelf supports up to 16 SAP HANA hosts. A fully populated shelf (24 SSDs) supports up to 34 SAP HANA hosts. The same applies to the internal disks of an AFF A800 system.
 
 [NOTE]
 Adding more disk shelfs does not increase the maximum amount of SAP HANA hosts a storage controller can support.
 
-=== Mixed workloads
+== Mixed workloads
 
 SAP HANA and other application workloads running on the same storage controller or in the same storage aggregate are supported. However, it is a NetApp best practice to separate SAP HANA workloads from all other application workloads.
 
@@ -78,18 +77,18 @@ You might decide to deploy SAP HANA workloads and other application workloads on
 
 The SAP performance test tool must be used to check if additional SAP HANA hosts can be run on an existing storage controller that is already in use for other workloads. SAP application servers can be safely placed on the same storage controller and/or aggregate as the SAP HANA databases.
 
-==== Capacity considerations
+=== Capacity considerations
 
 A detailed description of the capacity requirements for SAP HANA is in the http://go.sap.com/documents/2015/03/74cdb554-5a7c-0010-82c7-eda71af511fa.html[SAP HANA Storage Requirements^] white paper.
 
 [NOTE]
 The capacity sizing of the overall SAP landscape with multiple SAP HANA systems must be determined by using SAP HANA storage sizing tools from NetApp. Contact NetApp or your NetApp partner sales representative to validate the storage sizing process for a properly sized storage environment.
 
-=== Configuration of performance test tool
+== Configuring the performance test tool
 
 Starting with SAP HANA 1.0 SPS10, SAP introduced parameters to adjust the I/O behavior and optimize the database for the file and storage system used. These parameters must also be set for the performance test tool from SAP when storage performance is being tested with the SAP performance test tool.
 
-NetApp conducted performance tests to define the optimal values.  lists the parameters that must be set within the configuration file of the SAP performance test tool.
+NetApp conducted performance tests to define the optimal values. The following table lists the parameters that must be set within the configuration file of the SAP performance test tool.
 
 |===
 |Parameter |Value
@@ -196,10 +195,10 @@ These variables must be used for the test configuration. This is usually the cas
             }, …
 ....
 
-=== Storage sizing process overview
+== Storage sizing process overview
 
 The number of disks per HANA host and the SAP HANA host density for each storage model were determined with performance test tool.
 
- summarizes the sizing process.
+The following figure summarizes the sizing process.
 
 image:saphana_aff_nfs_image9.jpg[Error: Missing Graphic Image]
