@@ -1,8 +1,8 @@
 ---
 sidebar: sidebar
-permalink: saphana_aff_nfs_architecture.html
-keywords:
-summary:
+permalink: ent-apps-db/saphana_aff_nfs_architecture.html
+keywords: host, storage controller, nfs, 10gbe, architecture, back up, disaster recovery, dr, replication, snapmirror, metrocluster
+summary: SAP HANA hosts are connected to storage controllers by using a redundant 10GbE or faster network infrastructure. Data communication between SAP HANA hosts and storage controllers is based on the NFS protocol. A redundant switching infrastructure is required to provide fault-tolerant SAP HANA host-to-storage connectivity in case of switch or network interface card (NIC) failure.
 ---
 
 = Architecture
@@ -10,7 +10,7 @@ summary:
 :nofooter:
 :icons: font
 :linkattrs:
-:imagesdir: ./media/
+:imagesdir: ./../media/
 
 //
 // This file was created with NDAC Version 2.0 (August 17, 2020)
@@ -18,37 +18,42 @@ summary:
 // 2021-05-20 16:44:23.291080
 //
 
-[.lead]
-SAP HANA hosts are connected to storage controllers by using a redundant 10GbE, or faster,  network infrastructure. Data communication between SAP HANA hosts and storage controllers is based on the NFS protocol. A redundant switching infrastructure is required to provide fault-tolerant SAP HANA host- to- storage connectivity in case of switch or network interface card (NIC) failure.
+SAP HANA hosts are connected to storage controllers by using a redundant 10GbE or faster network infrastructure. Data communication between SAP HANA hosts and storage controllers is based on the NFS protocol. A redundant switching infrastructure is required to provide fault-tolerant SAP HANA host-to-storage connectivity in case of switch or network interface card (NIC) failure.
 
 The switches might aggregate individual port performance with port channels in order to appear as a single logical entity at the host level.
 
 Different models of the AFF system product family can be mixed and matched at the storage layer to allow for growth and differing performance and capacity needs. The maximum number of SAP HANA hosts that can be attached to the storage system is defined by the SAP HANA performance requirements and the model of NetApp controller used. The number of required disk shelves is only determined by the capacity and performance requirements of the SAP HANA systems.
 
- shows an example configuration with eight SAP HANA hosts attached to a storage high availability (HA) pair.
+The following figure shows an example configuration with eight SAP HANA hosts attached to a storage high availability (HA) pair.
 
 image:saphana_aff_nfs_image2.png[Error: Missing Graphic Image]
 
+The following figure shows an example of using VMware vSphere as a virtualization layer.
+
+image:saphana_aff_nfs_image3.jpg[Error: Missing Graphic Image]
+
 The architecture can be scaled in two dimensions:
 
-* By attaching additional SAP HANA hosts and storage capacity to the existing storage, if the storage controllers provide enough performance to meet the current SAP HANA key performance indicators (KPIs)
-* By adding more storage systems with additional storage capacity for the additional SAP HANA hosts shows an example configuration in which more SAP HANA hosts are attached to the storage controllers. In this example, more disk shelves are necessary to fulfill the capacity and performance requirements of 16 SAP HANA hosts. Depending on the total throughput requirements, additional 10GbE or faster connections to the storage controllers must be added.
+* By attaching additional SAP HANA hosts and storage capacity to the existing storage, if the storage controllers provide enough performance to meet the current SAP HANA key performance indicators (KPIs).
+* By adding more storage systems with additional storage capacity for the additional SAP HANA hosts
+
+The following figure shows an example configuration in which more SAP HANA hosts are attached to the storage controllers. In this example, more disk shelves are necessary to fulfill the capacity and performance requirements of the 16 SAP HANA hosts. Depending on the total throughput requirements, you must add additional 10GbE or faster connections to the storage controllers.
 
 image:saphana_aff_nfs_image4.png[Error: Missing Graphic Image]
 
-Independent of the deployed AFF system, the SAP HANA landscape can also be scaled by adding any of the certified storage controllers to meet the desired node density, as shown in .
+Independent of the deployed AFF system, the SAP HANA landscape can also be scaled by adding any of the certified storage controllers to meet the desired node density, as shown in the following figure.
 
 image:saphana_aff_nfs_image5.png[Error: Missing Graphic Image]
 
 === SAP HANA backup
 
-The ONTAP software present on all NetApp storage controllers provides a built-in mechanism to back up SAP HANA databases while in operation with no effect on performance. Storage-based NetApp Snapshot™ backups are a fully supported and integrated backup solution available for SAP HANA single containers and for SAP HANA Multitenant Database Containers (MDC) systems with a single tenant or multiple tenants.
+The ONTAP software present on all NetApp storage controllers provides a built-in mechanism to back up SAP HANA databases while in operation with no effect on performance. Storage-based NetApp Snapshot backups are a fully supported and integrated backup solution available for SAP HANA single containers and for SAP HANA Multitenant Database Containers (MDC) systems with a single tenant or multiple tenants.
 
-Storage-based Snapshot backups are implemented by using the NetApp SnapCenter plug-in for SAP HANA. This allows users to create consistent storage-based Snapshot backups by using the interfaces provided natively by SAP HANA databases. SnapCenter registers each of the Snapshot backups into the SAP HANA backup catalog. Therefore,  the backups taken by SnapCenter are visible within SAP HANA Studio and Cockpit where they can be selected directly for restore and recovery operations.
+Storage-based Snapshot backups are implemented by using the NetApp SnapCenter plug-in for SAP HANA. This allows users to create consistent storage-based Snapshot backups by using the interfaces provided natively by SAP HANA databases. SnapCenter registers each of the Snapshot backups into the SAP HANA backup catalog. Therefore, the backups taken by SnapCenter are visible within SAP HANA Studio and Cockpit where they can be selected directly for restore and recovery operations.
 
-NetApp SnapMirror® technology enables Snapshot copies that were created on one storage system to be replicated to a secondary backup storage system that is controlled by SnapCenter. Different backup retention policies can then be defined for each of the backup sets on the primary storage and for the backup sets on the secondary storage systems. The SnapCenter Plug-in for SAP HANA automatically manages the retention of Snapshot copy-based data backups and log backups, including the housekeeping of the backup catalog. The SnapCenter Plug-in for SAP HANA also allows the execution of a block integrity check of the SAP HANA database by executing a file-based backup.
+NetApp SnapMirror technology enables Snapshot copies that were created on one storage system to be replicated to a secondary backup storage system that is controlled by SnapCenter. Different backup retention policies can then be defined for each of the backup sets on the primary storage and for the backup sets on the secondary storage systems. The SnapCenter Plug-in for SAP HANA automatically manages the retention of Snapshot copy-based data backups and log backups, including the housekeeping of the backup catalog. The SnapCenter Plug-in for SAP HANA also allows the execution of a block integrity check of the SAP HANA database by executing a file-based backup.
 
-The database logs can be backed up directly to the secondary storage by using an NFS mount, as shown in .
+The database logs can be backed up directly to the secondary storage by using an NFS mount, as shown in the following figure.
 
 image:saphana_aff_nfs_image6.jpg[Error: Missing Graphic Image]
 
@@ -66,11 +71,11 @@ For detailed information about the SAP HANA backup and recovery solution see htt
 
 SAP HANA disaster recovery (DR) can be done either on the database layer by using SAP HANA system replication or on the storage layer by using storage replication technologies. The following section provides an overview of disaster recovery solutions based on storage replication.
 
-For detailed information about SAP HANA disaster recovery solutions, see https://www.netapp.com/pdf.html?item=/media/8584-tr4646pdf.pdf[TR-4646: SAP HANA Disaster Recovery with Storage Replication^]. 
+For detailed information about SAP HANA disaster recovery solutions, see https://www.netapp.com/pdf.html?item=/media/8584-tr4646pdf.pdf[TR-4646: SAP HANA Disaster Recovery with Storage Replication^].
 
 ==== Storage replication based on SnapMirror
 
- shows a three-site disaster recovery solution using synchronous SnapMirror replication to the local DR datacenter and asynchronous SnapMirror to replicate the data to the remote DR datacenter.
+The following figure shows a three-site disaster recovery solution using synchronous SnapMirror replication to the local DR datacenter and asynchronous SnapMirror to replicate the data to the remote DR datacenter.
 
 Data replication using synchronous SnapMirror provides an RPO of zero. The distance between the primary and the local DR datacenter is limited to around 100km.
 
@@ -78,16 +83,16 @@ Protection against failures of both the primary and the local DR site is perform
 
 The RTO for both replication methods primarily depends on the time needed to start the HANA database at the DR site and load the data into memory. With the assumption that the data is read with a throughput of 1000MBps, loading 1TB of data would take approximately 18 minutes.
 
-The servers at the DR sites can be used as dev/test systems during normal operation. In the case of a disaster. the dev/test systems would need to be shut down and started as DR production servers.
+The servers at the DR sites can be used as dev/test systems during normal operation. In the case of a disaster, the dev/test systems would need to be shut down and started as DR production servers.
 
 Both replication methods allow to you execute DR workflow testing without influencing the RPO and RTO. FlexClone volumes are created on the storage and are attached to the DR testing servers.
 
 image:saphana_aff_nfs_image7.png[Error: Missing Graphic Image]
 
-Synchronous replication offers StrictSync mode. If the write to secondary storage is not completed for any reason, the application I/O fails, thereby ensuring that the primary and secondary storage systems are identical. Application I/O to the primary resumes only after the SnapMirror relationship returns to the InSync status. If the primary storage fails, application I/O can be resumed on the secondary storage after failover with no loss of data. In StrictSync mode,  the RPO is always zero.
+Synchronous replication offers StrictSync mode. If the write to secondary storage is not completed for any reason, the application I/O fails, thereby ensuring that the primary and secondary storage systems are identical. Application I/O to the primary resumes only after the SnapMirror relationship returns to the InSync status. If the primary storage fails, application I/O can be resumed on the secondary storage after failover with no loss of data. In StrictSync mode, the RPO is always zero.
 
 ==== Storage replication based on MetroCluster
 
- shows a high-level overview of the solution. The storage cluster at each site provides local high availability and is used for the production workload. The data of each site is synchronously replicated to the other location and is available in case of disaster failover.
+The following figure shows a high-level overview of the solution. The storage cluster at each site provides local high availability and is used for the production workload. The data of each site is synchronously replicated to the other location and is available in case of disaster failover.
 
 image:saphana_aff_nfs_image8.png[Error: Missing Graphic Image]
