@@ -1,0 +1,208 @@
+---
+sidebar: sidebar
+permalink: ent-apps-db/saphana_aff_fc_storage_sizing.html
+keywords:
+summary:
+---
+
+= Storage sizing
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-05-20 16:47:33.693524
+//
+
+The following section provides an overview of performance and capacity considerations required for sizing a storage system for SAP HANA.
+
+[NOTE]
+Contact your NetApp or NetApp partner sales representative to support the storage sizing process and to assist you with creating a properly sized storage environment.
+
+== Performance considerations
+
+SAP has defined a static set of storage key performance indicators (KPIs). These KPIs are valid for all production SAP HANA environments independent of the memory size of the database hosts and the applications that use the SAP HANA database. These KPIs are valid for single-host, multiple-host, Business Suite on HANA, Business Warehouse on HANA, S/4HANA, and BW/4HANA environments. Therefore, the current performance sizing approach depends on only the number of active SAP HANA hosts that are attached to the storage system.
+
+[NOTE]
+Storage performance KPIs are only mandated for production SAP HANA systems, but you can implement them in for all HANA system.
+
+SAP delivers a performance test tool which must be used to validate the storage systems performance for active SAP HANA hosts attached to the storage.
+
+NetApp tested and predefined the maximum number of SAP HANA hosts that can be attached to a specific storage model, while still fulfilling the required storage KPIs from SAP for production-based SAP HANA systems.
+
+The maximum number of SAP HANA hosts that can be run on a disk shelf and the minimum number of SSDs required per SAP HANA host were determined by running the SAP performance test tool. This test does not consider the actual storage capacity requirements of the hosts. You must also calculate the capacity requirements to determine the actual storage configuration needed.
+
+=== SAS disk shelf
+
+With the 12Gb SAS disk shelf (DS224C), the performance sizing is performed by using fixed disk- shelf configurations:
+
+* Half-loaded disk shelves with 12 SSDs
+* Fully loaded disk shelves with 24 SSDs
+
+Both configurations use advanced drive partitioning (ADPv2). A half-loaded disk shelf supports up to 9 SAP HANA hosts; a fully loaded shelf supports up to 14 hosts in a single disk shelf. The SAP HANA hosts must be equally distributed between both storage controllers.
+
+[NOTE]
+The DS224C disk shelf must be connected by using 12Gb SAS to support the number of SAP HANA hosts.
+
+The 6Gb SAS disk shelf (DS2246) supports a maximum of 4 SAP HANA hosts. The SSDs and the SAP HANA hosts must be equally distributed between both storage controllers. The following figure summarizes the supported number of SAP HANA hosts per disk shelf.
+
+|===
+| |6Gb SAS shelves (DS2246)Fully loaded with 24 SSDs |12Gb SAS shelves (DS224C)Half-loaded with 12 SSDs and ADPv2 |12Gb SAS shelves (DS224C)Fully loaded with 24 SSDs and ADPv2
+
+|Maximum number of SAP HANA hosts per disk shelf
+|4
+|9
+|14
+|===
+
+[NOTE]
+This calculation is independent of the storage controller used. Adding more disk shelves does not increase the maximum number of SAP HANA hosts that a storage controller can support.
+
+=== NS224 NVMe shelf
+
+The minimum number of 12 NVMe SSDs for the first shelf supports up to 16 SAP HANA hosts. A fully populated shelf supports up to 34 SAP HANA hosts.
+
+[NOTE]
+Adding more disk shelves does not increase the maximum number of SAP HANA hosts that a storage controller can support.
+
+== Mixed workloads
+
+SAP HANA and other application workloads running on the same storage controller or in the same storage aggregate are supported. However, it is a NetApp best practice to separate SAP HANA workloads from all other application workloads.
+
+You might decide to deploy SAP HANA workloads and other application workloads on either the same storage controller or the same aggregate. If so, you must make sure that adequate performance is available for SAP HANA within the mixed workload environment. NetApp also recommends that you use quality of service (QoS) parameters to regulate the effect these other applications could have on SAP HANA applications and to guarantee throughput for SAP HANA applications.
+
+The SAP HCMT test tool must be used to check if additional SAP HANA hosts can be run on an existing storage controller that is already in use for other workloads. SAP application servers can be safely placed on the same storage controller and/or aggregate as the SAP HANA databases.
+
+== Capacity considerations
+
+A detailed description of the capacity requirements for SAP HANA is in the http://go.sap.com/documents/2015/03/74cdb554-5a7c-0010-82c7-eda71af511fa.html[SAP HANA Storage Requirements^] white paper.
+
+[NOTE]
+The capacity sizing of the overall SAP landscape with multiple SAP HANA systems must be determined by using SAP HANA storage sizing tools from NetApp. Contact NetApp or your NetApp partner sales representative to validate the storage sizing process for a properly sized storage environment.
+
+== Configuration of performance test tool
+
+Starting with SAP HANA 1.0 SPS10, SAP introduced parameters to adjust the I/O behavior and optimize the database for the file and storage system used. These parameters must also be set for the performance test tool from SAP when the storage performance is being tested with the SAP test tool.
+
+NetApp conducted performance tests to define the optimal values. The following table lists the parameters that must be set within the configuration file of the SAP test tool.
+
+|===
+|Parameter |Value
+
+|max_parallel_io_requests
+|128
+|async_read_submit
+|on
+|async_write_submit_active
+|on
+|async_write_submit_blocks
+|all
+|===
+
+For more information about the configuration of SAP test tool, see https://service.sap.com/sap/support/notes/1943937[SAP note 1943937^] for HWCCT (SAP HANA 1.0) and https://launchpad.support.sap.com/[SAP note 2493172^] for HCMT/HCOT (SAP HANA 2.0).
+
+The following example shows how variables can be set for the HCMT/HCOT execution plan.
+
+....
+…{
+         "Comment": "Log Volume: Controls whether read requests are submitted asynchronously, default is 'on'",
+         "Name": "LogAsyncReadSubmit",
+         "Value": "on",
+         "Request": "false"
+      },
+      {
+         "Comment": "Data Volume: Controls whether read requests are submitted asynchronously, default is 'on'",
+         "Name": "DataAsyncReadSubmit",
+         "Value": "on",
+         "Request": "false"
+      },
+      {
+         "Comment": "Log Volume: Controls whether write requests can be submitted asynchronously",
+         "Name": "LogAsyncWriteSubmitActive",
+         "Value": "on",
+         "Request": "false"
+      },
+      {
+         "Comment": "Data Volume: Controls whether write requests can be submitted asynchronously",
+         "Name": "DataAsyncWriteSubmitActive",
+         "Value": "on",
+         "Request": "false"
+      },
+      {
+         "Comment": "Log Volume: Controls which blocks are written asynchronously. Only relevant if AsyncWriteSubmitActive is 'on' or 'auto' and file system is flagged as requiring asynchronous write submits",
+         "Name": "LogAsyncWriteSubmitBlocks",
+         "Value": "all",
+         "Request": "false"
+      },
+      {
+         "Comment": "Data Volume: Controls which blocks are written asynchronously. Only relevant if AsyncWriteSubmitActive is 'on' or 'auto' and file system is flagged as requiring asynchronous write submits",
+         "Name": "DataAsyncWriteSubmitBlocks",
+         "Value": "all",
+         "Request": "false"
+      },
+      {
+         "Comment": "Log Volume: Maximum number of parallel I/O requests per completion queue",
+         "Name": "LogExtMaxParallelIoRequests",
+         "Value": "128",
+         "Request": "false"
+      },
+      {
+         "Comment": "Data Volume: Maximum number of parallel I/O requests per completion queue",
+         "Name": "DataExtMaxParallelIoRequests",
+         "Value": "128",
+         "Request": "false"
+      }, …
+....
+
+These variables must be used for the test configuration. This is usually the case with the predefined execution plans SAP delivers with the HCMT/HCOT tool. The following example for a 4k log write test is from an execution plan.
+
+....
+…
+      {
+         "ID": "D664D001-933D-41DE-A904F304AEB67906",
+         "Note": "File System Write Test",
+         "ExecutionVariants": [
+            {
+               "ScaleOut": {
+                  "Port": "${RemotePort}",
+                  "Hosts": "${Hosts}",
+                  "ConcurrentExecution": "${FSConcurrentExecution}"
+               },
+               "RepeatCount": "${TestRepeatCount}",
+               "Description": "4K Block, Log Volume 5GB, Overwrite",
+               "Hint": "Log",
+               "InputVector": {
+                  "BlockSize": 4096,
+                  "DirectoryName": "${LogVolume}",
+                  "FileOverwrite": true,
+                  "FileSize": 5368709120,
+                  "RandomAccess": false,
+                  "RandomData": true,
+                  "AsyncReadSubmit": "${LogAsyncReadSubmit}",
+                  "AsyncWriteSubmitActive": "${LogAsyncWriteSubmitActive}",
+                  "AsyncWriteSubmitBlocks": "${LogAsyncWriteSubmitBlocks}",
+                  "ExtMaxParallelIoRequests": "${LogExtMaxParallelIoRequests}",
+                  "ExtMaxSubmitBatchSize": "${LogExtMaxSubmitBatchSize}",
+                  "ExtMinSubmitBatchSize": "${LogExtMinSubmitBatchSize}",
+                  "ExtNumCompletionQueues": "${LogExtNumCompletionQueues}",
+                  "ExtNumSubmitQueues": "${LogExtNumSubmitQueues}",
+                  "ExtSizeKernelIoQueue": "${ExtSizeKernelIoQueue}"
+               }
+            }, …
+....
+
+== Storage sizing process overview
+
+The number of disks per HANA host and the SAP HANA host density for each storage model were determined using the SAP HANA test tool.
+
+The sizing process requires details such as the number of production and nonproduction SAP HANA hosts, the RAM size of each host, and the backup retention of the storage-based Snapshot copies. The number of SAP HANA hosts determines the storage controller and the number of disks required.
+
+The size of the RAM, net data size on the disk of each SAP HANA host, and the Snapshot copy backup retention period are used as inputs during capacity sizing.
+
+The following figure summarizes the sizing process.
+
+image:saphana_aff_fc_image8.jpg[Error: Missing Graphic Image]
