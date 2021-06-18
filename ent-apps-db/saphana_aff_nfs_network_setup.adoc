@@ -1,0 +1,55 @@
+---
+sidebar: sidebar
+permalink: ent-apps-db/saphana_aff_nfs_network_setup.html
+keywords: network, setup, nic, nfs, lacp, ifgroup, jumbo frames, vmxnet3, mtu
+summary: This section describes the dedicated storage network setup for SAP HANA hosts.
+---
+
+= Network setup
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-05-20 16:44:23.315971
+//
+
+Use the following guidelines when configuring the network:
+
+* A dedicated storage network must be used to connect the SAP HANA hosts to the storage controllers with a 10GbE or faster network.
+* Use the same connection speed for storage controllers and SAP HANA hosts. If this is not possible, ensure that the network components between the storage controllers and the SAP HANA hosts are able to handle different speeds. For example, you must provide enough buffer space to allow speed negotiation at the NFS level between storage and hosts. Network components are usually switches, but other components within blade chassis, such as the back plane, must be considered as well.
+* Disable flow control on all physical ports used for storage traffic on the storage network switch and host layer.
+* Each SAP HANA host must have a redundant network connection with a minimum of 10Gb of bandwidth.
+* Jumbo frames with a maximum transmission unit (MTU) size of 9,000 must be enabled on all network components between the SAP HANA hosts and the storage controllers.
+* In a VMware setup, dedicated VMXNET3 network adapters must be assigned to each running virtual machine.  Check the relevant papers mentioned in “Introduction” for further requirements.
+* To avoid interference between each other, use separate network/IO paths for the log and data area.
+
+The following figure shows an example with four SAP HANA hosts attached to a storage controller HA pair using a 10GbE network. Each SAP HANA host has an active-passive connection to the redundant fabric.
+
+At the storage layer, four active connections are configured to provide 10Gb throughput for each SAP HANA host.  In addition,  one spare interface is configured on each storage controller.
+
+At the storage layer, a broadcast domain with an MTU size of 9000 is configured, and all required physical interfaces are added to this broadcast domain. This approach automatically assigns these physical interfaces to the same failover group. All logical interfaces (LIFs) that are assigned to these physical interfaces are added to this failover group.
+
+image:saphana_aff_nfs_image10.png[Error: Missing Graphic Image]
+
+In general, it is also possible to use HA interface groups on the servers (bonds) and the storage systems (for example,  Link Aggregation Control Protocol [LACP] and ifgroups). With HA interface groups, verify that the load is equally distributed between all interfaces within the group. The load distribution depends on the functionality of the network switch infrastructure.
+
+[NOTE]
+Depending on the number of SAP HANA hosts and the connection speed used, different numbers of active physical ports are needed. For details, see the section link:saphana_aff_nfs_storage_controller_setup.html#lif-configuration["LIF configuration"].
+
+== VMware-specific network setup
+
+Proper network design and configuration are crucial because all data for SAP HANA instances, including performance-critical data and log volumes for the database, is provided through NFS in this solution. A dedicated storage network is used to separate the NFS traffic from communication and user access traffic between SAP HANA nodes. Each SAP HANA node requires a redundant dedicated network connection with a minimum of 10Gb of bandwidth. Higher bandwidth is also supported. This network must extend end to end from the storage layer through network switching and computing up to the guest operating system hosted on VMware vSphere. In addition to the physical switching infrastructure, a VMware distributed switch (vDS) is used to provide adequate performance and manageability of network traffic at the hypervisor layer.
+
+image:saphana_aff_nfs_image11.png[Error: Missing Graphic Image]
+
+As shown in the preceding figure, each SAP HANA node uses a dedicated port group on the VMware distributed switch. This port group allows for enhanced quality of service (QoS) and dedicated assignment of physical network interface cards (NICs) on the ESX hosts. To use dedicated physical NICs while preserving HA capabilities in the event of NIC failure, the dedicated physical NIC is configured as an active uplink. Additional NICs are configured as standby uplinks in the teaming and failover settings of the SAP HANA port group. In addition, jumbo frames (MTU 9,000) must be enabled end to end on physical and virtual switches. In addition, turn off flow control on all ethernet ports used for storage traffic on servers, switches, and storage systems. The following figure shows an example of such a configuration.
+
+[NOTE]
+LRO (large receive offload) must be turned off for interfaces used for NFS traffic. For all other network configuration guidelines, see the respective VMware best practices guides for SAP HANA.
+
+image:saphana_aff_nfs_image12.png[Error: Missing Graphic Image]
