@@ -1,0 +1,126 @@
+---
+sidebar: sidebar
+permalink: ent-apps-db/saphana-dr-anf_hana_database_recovery_01.html
+keywords: recovery, forward, log, backups, system, tenant, database, log, backups, check, consistency, hana, azure
+summary: The following are steps for HANA database recovery.
+---
+
+= HANA database recovery
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-05-24 12:07:40.431085
+//
+
+[.lead]
+Start the required SAP services.
+
+....
+vm-pr1:~ # systemctl start sapinit
+....
+
+The following output shows the required processes.
+
+....
+vm-pr1:/ # ps -ef | grep sap
+root     23101     1  0 11:29 ?        00:00:00 /usr/sap/hostctrl/exe/saphostexec pf=/usr/sap/hostctrl/exe/host_profile
+pr1adm   23191     1  3 11:29 ?        00:00:00 /usr/sap/PR1/HDB01/exe/sapstartsrv pf=/usr/sap/PR1/SYS/profile/PR1_HDB01_vm-pr1 -D -u pr1adm
+sapadm   23202     1  5 11:29 ?        00:00:00 /usr/sap/hostctrl/exe/sapstartsrv pf=/usr/sap/hostctrl/exe/host_profile -D
+root     23292     1  0 11:29 ?        00:00:00 /usr/sap/hostctrl/exe/saposcol -l -w60 pf=/usr/sap/hostctrl/exe/host_profile
+root     23359  2597  0 11:29 pts/1    00:00:00 grep --color=auto sap
+....
+
+The following subsections describe the recovery process with forward recovery using the replicated log backups. The recovery is executed using the HANA recovery script for the system database and hdbsql commands for the tenant database.
+
+The commands to execute a recovery to the latest data savepoint is described in chapter link:saphana-dr-anf_hana_database_recovery_01.html#recovery-to-latest-hana-data-volume-backup-savepoint[Recovery to latest HANA Data Volume Backup Savepoint].
+
+== Recovery with forward recovery using log backups
+
+The recovery using all available log backups is executed with the following commands as user pr1adm:
+
+* System database
+
+....
+recoverSys.py --command "RECOVER DATABASE UNTIL TIMESTAMP '2021-02-20 00:00:00' CLEAR LOG USING SNAPSHOT"
+....
+
+* Tenant database
+
+....
+Within hdbsql: RECOVER DATABASE FOR PR1 UNTIL TIMESTAMP '2021-02-20 00:00:00' CLEAR LOG USING SNAPSHOT
+....
+
+[NOTE]
+To recover using all available logs, you can use any time in the future as the timestamp in the recovery statement.
+
+You can also use HANA Studio or Cockpit to execute the recovery of the system and the tenant database.
+
+The following command output show the recovery execution.
+
+=== System database recovery
+
+....
+pr1adm@vm-pr1:/usr/sap/PR1/HDB01> HDBSettings.sh recoverSys.py --command "RECOVER DATABASE UNTIL TIMESTAMP '2021-02-24 00:00:00' CLEAR LOG USING SNAPSHOT"
+[139792805873472, 0.008] >> starting recoverSys (at Tue Feb 23 12:05:16 2021)
+[139792805873472, 0.008] args: ()
+[139792805873472, 0.008] keys: {'command': "RECOVER DATABASE UNTIL TIMESTAMP '2021-02-24 00:00:00' CLEAR LOG USING SNAPSHOT"}
+using logfile /usr/sap/PR1/HDB01/vm-pr1/trace/backup.log
+recoverSys started: ============2021-02-23 12:05:16 ============
+testing master: vm-pr1
+vm-pr1 is master
+shutdown database, timeout is 120
+stop system
+stop system on: vm-pr1
+stopping system: 2021-02-23 12:05:17
+stopped system: 2021-02-23 12:05:18
+creating file recoverInstance.sql
+restart database
+restart master nameserver: 2021-02-23 12:05:23
+start system: vm-pr1
+sapcontrol parameter: ['-function', 'Start']
+sapcontrol returned successfully:
+2021-02-23T12:07:53+00:00  P0012969      177cec93d51 INFO    RECOVERY RECOVER DATA finished successfully, reached timestamp 2021-02-23T09:03:11+00:00, reached log position 43123520
+recoverSys finished successfully: 2021-02-23 12:07:54
+[139792805873472, 157.466] 0
+[139792805873472, 157.466] << ending recoverSys, rc = 0 (RC_TEST_OK), after 157.458 secs
+pr1adm@vm-pr1:/usr/sap/PR1/HDB01>
+....
+
+=== Tenant database recovery
+
+If a user store key has not been created for the pr1adm user at the source system, a key must be created at the target system. The database user configured in the key must have privileges to execute tenant recovery operations.
+
+....
+pr1adm@vm-pr1:/usr/sap/PR1/HDB01> hdbuserstore set PR1KEY vm-pr1:30113 <backup-user> <password>
+....
+
+....
+pr1adm@vm-pr1:/usr/sap/PR1/HDB01> hdbsql -U PR1KEY
+Welcome to the SAP HANA Database interactive terminal.
+Type:  \h for help with commands
+       \q to quit
+hdbsql SYSTEMDB=> RECOVER DATABASE FOR PR1 UNTIL TIMESTAMP '2021-02-24 00:00:00' CLEAR LOG USING SNAPSHOT
+0 rows affected (overall time 98.740038 sec; server time 98.737788 sec)
+hdbsql SYSTEMDB=>
+....
+
+== Check consistency of latest log backups
+
+Because log backup volume replication is performed independently of the log backup process executed by the SAP HANA database, there might be open, inconsistent log backup files at the disaster recovery site. Only the latest log backup files might be inconsistent, and those files should be checked before a forward recovery is performed at the disaster recovery site using the `hdbbackupcheck` tool.
+
+....
+pr1adm@hana-10: > hdbbackupcheck /hanabackup/PR1/log/SYSTEMDB/log_backup_0_0_0_0.1589289811148
+Loaded library 'libhdbcsaccessor'
+Loaded library 'libhdblivecache'
+Backup '/mnt/log-backup/SYSTEMDB/log_backup_0_0_0_0.1589289811148' successfully checked.
+....
+
+The check must be executed for the latest log backup files of the System and the tenant database.
+
+If the `hdbbackupcheck` tool reports an error for the latest log backups, the latest set of log backups must be removed or deleted.
