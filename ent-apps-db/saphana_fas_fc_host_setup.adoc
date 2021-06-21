@@ -18,10 +18,9 @@ summary: The documentation also contains information about multipath configurati
 // 2021-05-20 16:40:51.362045
 //
 
-[.lead]
 Before setting up the host, NetApp SAN Host Utilities must be downloaded from the http://mysupport.netapp.com/[NetApp Support^] site and installed on the HANA servers. The Host Utility documentation includes information about additional software that must be installed depending on the FCP HBA used.
 
-The documentation also contains information about multipath configurations that are specific to the Linux version used. This document covers the required configuration steps for SLES 15 and Red Hat Enterprise Linux 7. 6 or higher, as described in the https://library.netapp.com/ecm/ecm_download_file/ECMLP2547958[Linux Host Utilities 7.1 Installation and Setup Guide^].
+The documentation also contains information about multipath configurations that are specific to the Linux version used. This document covers the required configuration steps for SLES 15 and Red Hat Enterprise Linux 7.6 or higher, as described in the https://library.netapp.com/ecm/ecm_download_file/ECMLP2547958[Linux Host Utilities 7.1 Installation and Setup Guide^].
 
 == Configure multipathing
 
@@ -30,8 +29,8 @@ Steps 1 to 6 must be performed on all worker and standby hosts in the SAP HANA m
 
 To configure multipathing, complete the following steps:
 
-. Run the Linux `rescan-scsi-bus.sh` `-a` command on each server to discover new LUNs.
-. Run the `sanlun lun show` command and verify that all required LUNs are visible. The following example shows the `sanlun lun show` command output for a 2+1 multiple-host HANA system with two data LUNs and two log LUNs. The output shows the LUNs and the corresponding device files, such as LUN `SS3`_`data`_`mnt00001` and the device file `/dev/sdag`. Each LUN has eight FC paths from the host to the storage controllers.
+. Run the Linux `rescan-scsi-bus.sh -a` command on each server to discover new LUNs.
+. Run the `sanlun lun show` command and verify that all required LUNs are visible. The following example shows the `sanlun lun show` command output for a 2+1 multiple-host HANA system with two data LUNs and two log LUNs. The output shows the LUNs and the corresponding device files, such as LUN `SS3_data_mnt00001` and the device file `/dev/sdag`. Each LUN has eight FC paths from the host to the storage controllers.
 +
 ....
 stlrx300s8-6:~ # sanlun lun show
@@ -72,11 +71,12 @@ hana                          /vol/SS3_log_mnt00001/SS3_log_mnt00001   /dev/sdd 
 hana                          /vol/SS3_log_mnt00001/SS3_log_mnt00001   /dev/sdc        host10     FCP        512.0g  cDOT
 ....
 
-. Run the `multipath - r` command to get the worldwide identifiers (WWIDs) for the device file names:
+. Run the `multipath -r` command to get the worldwide identifiers (WWIDs) for the device file names:
 +
 [NOTE]
 In this example, there are four LUNs.
 +
+
 ....
 stlrx300s8-6:~ # multipath -r
 create: 3600a098038304436375d4d442d753878 undef NETAPP,LUN C-Mode
@@ -134,6 +134,7 @@ size=512G features='3 pg_init_retries 50 queue_if_no_path' hwhandler='0' wp=unde
 [NOTE]
 The example output shows the content of the `/etc/multipath.conf` file, which includes alias names for the four LUNs of a 2+1 multiple-host system. If there is no `multipath.conf` file available, you can create one by running the following command: `multipath -T > /etc/multipath.conf`.
 +
+
 ....
 stlrx300s8-6:/ # cat /etc/multipath.conf
 multipaths {
@@ -157,11 +158,12 @@ multipaths {
 ....
 
 . Run the `multipath -r` command to reload the device map.
-. Verify the configuration by running the `multipath - ll` command to list all the LUNs, alias names, and active and standby paths.
+. Verify the configuration by running the `multipath -ll` command to list all the LUNs, alias names, and active and standby paths.
 +
 [NOTE]
 The following example output shows the output of a 2+1 multiple-host HANA system with two data and two log LUNs.
 +
+
 ....
 stlrx300s8-6:~ # multipath -ll
 hana- SS3_data_mnt00002 (3600a098038304436375d4d442d753879) dm-1 NETAPP,LUN C-Mode
@@ -343,6 +345,7 @@ To mount file systems during system boot using the `/etc/fstab` configuration fi
 [NOTE]
 The XFS file systems for the data and log LUN must be mounted with the `relatime` and `inode64` mount options.
 +
+
 ....
 stlrx300s8-6:/ # cat /etc/fstab
 /dev/mapper/FAS8200-hana- SS3_shared /hana/shared xfs defaults 0 0
@@ -359,11 +362,14 @@ If LVM is used, use the logical volume names for data and log.
 /dev/mapper/FC5_data_mnt00001-vol /hana/data/FC5/mnt00001 xfs relatime,inode64 0 0
 ....
 +
+
 ** For a multiple-host system, add the `/hana/shared` file system to the `/etc/fstab` configuration file of each host.
 +
+
 [NOTE]
 All the data and log file systems are mounted through the SAP HANA storage connector.
 +
+
 ....
 stlrx300s8-6:/ # cat /etc/fstab
 <storage-ip>:/hana_shared /hana/shared nfs rw,vers=3,hard,timeo=600,intr,noatime,nolock 0 0
