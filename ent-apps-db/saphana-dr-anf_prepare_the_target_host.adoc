@@ -1,0 +1,110 @@
+---
+sidebar: sidebar
+permalink: ent-apps-db/saphana-dr-anf_prepare_the_target_host.html
+keywords: prepare, target, host, target, host, server, hana, log, volume, configure, install
+summary: This section describes the preparation steps required at the server, which is used for disaster recovery failover testing.
+---
+
+= Prepare the target host
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-05-24 12:07:40.363850
+//
+
+This section describes the preparation steps required at the server, which is used for disaster recovery failover testing.
+
+During normal operation, the target host is typically used for other purposes, for example as a HANA QA or test system. Therefore, most of these steps must be run when disaster failover testing is performed. On the other hand, the relevant configuration files, like `/etc/fstab` and `/usr/sap/sapservices`, can be prepared and then put into production by simply copying the configuration file. The disaster recovery testing procedure ensures that the relevant prepared configuration files are configured correctly.
+
+The target host preparation also includes shutting down the HANA QA or test system, as well as stopping all services using `systemctl stop sapinit`.
+
+== Target server host name and IP address
+
+The host name of the target server must be identical to the host name of the source system. The IP address can be different.
+
+[NOTE]
+Proper fencing of the target server must be established so that it cannot communicate with other systems. If proper fencing is not in place, then the cloned production system might exchange data with other production systems, resulting in logically corrupted data.
+
+== Install required software
+
+The SAP host agent software must be installed at the target server. For more information, see the https://help.sap.com/viewer/9f03f1852ce94582af41bb49e0a667a7/103/en-US[SAP Host Agent^] at the SAP help portal.
+
+[NOTE]
+If the host is used as a HANA QA or test system, the SAP host agent software is already installed.
+
+== Configure users, ports, and SAP services
+
+The required users and groups for the SAP HANA database must be available at the target server. Typically, central user management is used; therefore, no configuration steps are necessary at the target server. The required ports for the HANA database must be configured at the target hosts. The configuration can be copied from the source system by copying the `/etc/services` file to the target server.
+
+The required SAP services entries must be available at the target host. The configuration can be copied from the source system by copying the `/usr/sap/sapservices` file to the target server. The following output shows the required entries for the SAP HANA database used in the lab setup.
+
+....
+vm-pr1:~ # cat /usr/sap/sapservices
+#!/bin/sh
+LD_LIBRARY_PATH=/usr/sap/PR1/HDB01/exe:$LD_LIBRARY_PATH;export LD_LIBRARY_PATH;/usr/sap/PR1/HDB01/exe/sapstartsrv pf=/usr/sap/PR1/SYS/profile/PR1_HDB01_vm-pr1 -D -u pr1adm
+limit.descriptors=1048576
+....
+
+== Prepare HANA log volume
+
+Because the HANA log volume is not part of the replication, an empty log volume must exist at the target host. The log volume must include the same subdirectories as the source HANA system.
+
+....
+vm-pr1:~ # ls -al /hana/log/PR1/mnt00001/
+total 16
+drwxrwxrwx 5 root   root   4096 Feb 19 16:20 .
+drwxr-xr-x 3 root   root     22 Feb 18 13:38 ..
+drwxr-xr-- 2 pr1adm sapsys 4096 Feb 22 10:25 hdb00001
+drwxr-xr-- 2 pr1adm sapsys 4096 Feb 22 10:25 hdb00002.00003
+drwxr-xr-- 2 pr1adm sapsys 4096 Feb 22 10:25 hdb00003.00003
+vm-pr1:~ #
+....
+
+== Prepare log backup volume
+
+Because the source system is configured with a separate volume for the HANA log backups, a log backup volume must also be available at the target host. A volume for the log backups must be configured and mounted at the target host.
+
+If log backup volume replication is part of the disaster recovery setup, a new volume based on a snapshot is mounted at the target host and it is not necessary to prepare an additional log backup volume.
+
+== Prepare file system mounts
+
+The following table shows the naming conventions used in the lab setup. The volume names of the new volumes at the disaster recovery site are included in `/etc/fstab`. These volume names are used in the volume creation step in the next section.
+
+|===
+|HANA PR1 volumes |New volume and subdirectories at disaster recovery site |Mount point at target host
+
+|Data volume
+|PR1-data-mnt00001-sm-dest-clone
+|/hana/data/PR1/mnt00001
+|Shared volume
+|PR1-shared-sm-dest-clone/shared
+PR1-shared-sm-dest-clone/usr-sap-PR1
+|/hana/shared
+/usr/sap/PR1
+|Log backup volume
+|hanabackup-sm-dest-clone
+|/hanabackup
+|===
+
+[NOTE]
+The mount points listed in this table must be created at the target host.
+
+Here are the required `/etc/fstab` entries.
+
+....
+vm-pr1:~ # cat /etc/fstab
+# HANA ANF DB Mounts
+10.0.2.4:/PR1-data-mnt00001-sm-dest-clone /hana/data/PR1/mnt00001 nfs   rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys  0  0
+10.0.2.4:/PR1-log-mnt00001-dr /hana/log/PR1/mnt00001 nfs   rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys  0  0
+# HANA ANF Shared Mounts
+10.0.2.4:/PR1-shared-sm-dest-clone/hana-shared /hana/shared nfs rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys  0  0
+10.0.2.4:/PR1-shared-sm-dest-clone/usr-sap-PR1 /usr/sap/PR1 nfs rw,vers=4,minorversion=1,hard,timeo=600,rsize=262144,wsize=262144,intr,noatime,lock,_netdev,sec=sys  0  0
+# HANA file and log backup destination
+10.0.2.4:/hanabackup-sm-dest-clone    /hanabackup nfs   rw,vers=3,hard,timeo=600,rsize=262144,wsize=262144,nconnect=8,bg,noatime,nolock 0 0
+....

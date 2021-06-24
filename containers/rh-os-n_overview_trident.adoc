@@ -20,19 +20,19 @@ summary: NetApp Trident is an open-source and fully-supported storage orchestrat
 
 NetApp Trident is an open-source and fully-supported storage orchestrator for containers and Kubernetes distributions, including Red Hat OpenShift.
 
-Trident works with the entire NetApp storage portfolio, including the NetApp ONTAP and Element storage systems, and supports NFS and iSCSI connections.
+Trident works with the entire NetApp storage portfolio, including the NetApp ONTAP and Element storage systems, and it also supports NFS and iSCSI connections.
 
-Trident provides the ability to accelerate the DevOps workflow by allowing end users to provision and manage storage from their NetApp storage systems, without requiring intervention from a storage administrator.
+Trident  accelerates the DevOps workflow by allowing end users to provision and manage storage from their NetApp storage systems without requiring intervention from a storage administrator.
 
-An administrator can configure a number of storage backends based on project needs, and storage system models that allow for any number of advanced storage features, such as: compression, specific disk types, or QoS levels that guarantee a certain performance. After they are defined, these backends can be leveraged by developers as part of their projects to create persistent volume claims (PVCs) and attach persistent storage to their containers on demand.
+An administrator can configure a number of storage backends based on project needs and storage system models that enable advanced storage features, including compression, specific disk types, or QoS levels that guarantee a certain level of performance. After they are defined, these backends can be used by developers in their projects to create persistent volume claims (PVCs) and to attach persistent storage to their containers on demand.
 
 image:redhat_openshift_image2.png[Error: Missing Graphic Image]
 
-NetApp Trident has a rapid development cycle, and just like Kubernetes, is released four times a year.
+NetApp Trident has a rapid development cycle, and, just like Kubernetes, is released four times per year.
 
-The latest version of NetApp Trident is 21.04 released in April 2021. A support matrix for what version of Trident has been tested with which Kubernetes distribution can be found https://netapp-trident.readthedocs.io/en/stable-v21.04/support/requirements.html#supported-frontends-orchestrators[here].
+The latest version of NetApp Trident, 21.04, was released in April 2021. A support matrix for what version of Trident has been tested with which Kubernetes distribution can be found https://netapp-trident.readthedocs.io/en/stable-v21.04/support/requirements.html#supported-frontends-orchestrators[here].
 
-Starting with the 20.04 release, the setup of Trident is performed by the Trident operator. The operator makes large scale deployments easier, and provides additional support including self-healing for the pods that are deployed as a part of the Trident install.
+Starting with the 20.04 release, Trident setup is performed by the Trident operator. The operator makes large scale deployments easier and provides additional support including self healing for pods that are deployed as a part of the Trident install.
 
 With the 21.01 release, a Helm chart was made available to ease the installation of the Trident Operator.
 
@@ -123,11 +123,11 @@ trident-operator-7c748d957-gr2gw   1/1     Running   0          36s
 +----------------+----------------+
 ----
 
-NOTE: In some cases customer environments may require the customization of the Trident deployment. In these cases it is also possible to manually install the Trident operator and update the included manifests to customize the deployment.
+NOTE: In some cases, customer environments might require the customization of the Trident deployment. In these cases, it is also possible to manually install the Trident operator and update the included manifests to customize the deployment.
 
 == Manually install the Trident Operator
 
-. First set the location of the user cluster’s `kubeconfig` file as an environment variable so that you don’t have to reference it, because Trident has no option to pass this file.
+. First, set the location of the user cluster’s `kubeconfig` file as an environment variable so that you don’t have to reference it, because Trident has no option to pass this file.
 +
 ----
 [netapp-user@rhel7 trident-installer]$ export KUBECONFIG=~/ocp-install/auth/kubeconfig
@@ -279,21 +279,69 @@ trident-operator-66f48895cc-lzczk   1/1     Running   0          2m39s
 
 Most Kubernetes distributions come with the packages and utilities to mount NFS backends installed by default, including Red Hat OpenShift.
 
-In order to prepare worker nodes to allow for the mapping of block storage volumes through the iSCSI protocol you need to install the necessary packages to support that functionality.
+To prepare worker nodes to allow for the mapping of block storage volumes through the iSCSI protocol, you must install the necessary packages to support that functionality.
 
-In Red Hat OpenShift, this is handled by applying a MCO (Machine Config Operator) to your cluster once it is deployed.
+In Red Hat OpenShift, this is handled by applying an MCO (Machine Config Operator) to your cluster after it is deployed.
 
 To configure the worker nodes to run storage services, complete the following steps:
 
-. Log in to the OCP web console and navigate to Compute > Machine Configs and click Create Machine Config. Copy/Paste the YAML file and click Create.
+. Log into the OCP web console and navigate to Compute > Machine Configs. Click Create Machine Config. Copy and paste the YAML file and click Create.
+
+When not using multipathing:
+[source, cli]
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-worker-element-iscsi
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    systemd:
+      units:
+        - name: iscsid.service
+          enabled: true
+          state: started
+  osImageURL: ""
+
+
+When using multipathing:
+[source, cli]
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 99-worker-ontap-iscsi
+  labels:
+    machineconfiguration.openshift.io/role: worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,ZGVmYXVsdHMgewogICAgICAgIHVzZXJfZnJpZW5kbHlfbmFtZXMgeWVzCiAgICAgICAgZmluZF9tdWx0aXBhdGhzIHllcwp9CgpibGFja2xpc3RfZXhjZXB0aW9ucyB7CiAgICAgICAgcHJvcGVydHkgIihTQ1NJX0lERU5UX3xJRF9XV04pIgp9CgpibGFja2xpc3Qgewp9Cgo=
+          verification: {}
+        filesystem: root
+        mode: 400
+        path: /etc/multipath.conf
+    systemd:
+      units:
+        - name: iscsid.service
+          enabled: true
+          state: started
+        - name: multipathd.service
+          enabled: true
+          state: started
+  osImageURL: ""
+
+[start=2]
+. After the configuration is created, it takes approximately 20 to 30 minutes to apply the configuration to the worker nodes and reload them. Verify whether the machine config is applied by using `oc get mcp` and make sure that the machine config pool for workers is updated. You can also log into the worker nodes to confirm that the iscsid service is running (and the multipathd service is running if using multipathing).
 +
 
-image:redhat_openshift_image14.png[Error: Missing Graphic Image]
-
-. After the configuration is created, it will take approximately 20–30 minutes to apply the configuration to the worker nodes and reload them.  Verify whether the machine config is applied by using `oc get mcp` and make sure that the machine config pool for workers is updated. You can also log in to the worker nodes to confirm that the iscsid service is running.
-+
-
-....
+----
 [netapp-user@rhel7 openshift-deploy]$ oc get mcp
 NAME     CONFIG                                    UPDATED   UPDATING   DEGRADED
 master   rendered-master-a520ae930e1d135e0dee7168   True      False      False
@@ -312,7 +360,19 @@ worker   rendered-worker-de321b36eeba62df41feb7bc   True      False      False
       CPU: 9ms
    CGroup: /system.slice/iscsid.service
            └─1242 /usr/sbin/iscsid -f
-....
+
+[netapp-user@rhel7 openshift-deploy]$ ssh core@10.61.181.22 sudo systemctl status multipathd
+ ● multipathd.service - Device-Mapper Multipath Device Controller
+   Loaded: loaded (/usr/lib/systemd/system/multipathd.service; enabled; vendor preset: enabled)
+   Active: active (running) since Tue 2021-05-26 13:36:22 UTC; 3 min ago
+  Main PID: 918 (multipathd)
+    Status: "up"
+    Tasks: 7
+    Memory: 13.7M
+    CPU: 57ms
+    CGroup: /system.slice/multipathd.service
+            └─918 /sbin/multipathd -d -s
+----
 
 
 NOTE: It is also possible to confirm that the MachineConfig has been successfully applied and services have been started as expected by running the `oc debug` command with the appropriate flags.
@@ -323,11 +383,11 @@ NOTE: It is also possible to confirm that the MachineConfig has been successfull
 After completing the NetApp Trident Operator install, you must configure the backend for the specific NetApp storage platform you are using. Follow the links below in order to continue the setup and configuration of NetApp Trident.
 
 
-* link:./rh-os-n_trident_ontap_nfs.html[NetApp ONTAP NFS]
+* link:rh-os-n_trident_ontap_nfs.html[NetApp ONTAP NFS]
 
-* link:./rh-os-n_trident_ontap_iscsi.html[NetApp ONTAP iSCSI]
+* link:rh-os-n_trident_ontap_iscsi.html[NetApp ONTAP iSCSI]
 
-* link:./rh-os-n_trident_element_iscsi.html[NetApp Element iSCSI]
+* link:rh-os-n_trident_element_iscsi.html[NetApp Element iSCSI]
 
 
 link:rh-os-n_use_cases.html[Next: Solution Validation/Use Cases: Red Hat OpenShift with NetApp.]

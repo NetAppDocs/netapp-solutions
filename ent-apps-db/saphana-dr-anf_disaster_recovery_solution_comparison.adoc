@@ -1,0 +1,130 @@
+---
+sidebar: sidebar
+permalink: ent-apps-db/saphana-dr-anf_disaster_recovery_solution_comparison.html
+keywords: sap, hana, system, replication, data, memory, disaster, recovery, solutions, azure
+summary: A comprehensive disaster recovery solution must enable customers to recover from a complete failure of the primary site.
+---
+
+= Disaster recovery solution comparison
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-05-24 12:07:40.310060
+//
+
+A comprehensive disaster recovery solution must enable customers to recover from a complete failure of the primary site. Therefore, data must be transferred to a secondary site, and a complete infrastructure is necessary to run the required production SAP HANA systems in case of a site failure. Depending on the availability requirements of the application and the kind of disaster you want to be protected from, a two-site or three-site disaster recovery solution must be considered.
+
+The following figure shows a typical configuration in which the data is replicated synchronously within the same Azure region into a second availability zone. The short distance allows you to replicate the data synchronously to achieve an RPO of zero (typically used to provide HA).
+
+In addition, data is also replicated asynchronously to a secondary region to be protected from disasters, when the primary region is affected. The minimum achievable RPO depends on the data replication frequency, which is limited by the available bandwidth between the primary and the secondary region. A typical minimal RPO is in the range of 20 minutes to multiple hours.
+
+This document discusses different implementation options of a two- region disaster recovery solution.
+
+image:saphana-dr-anf_image3.png[Error: Missing Graphic Image]
+
+== SAP HANA System Replication
+
+SAP HANA System Replication works at the database layer. The solution is based on an additional SAP HANA system at the disaster recovery site that receives the changes from the primary system. This secondary system must be identical to the primary system.
+
+SAP HANA System Replication can be operated in one of two modes:
+
+* With data preloaded into memory and a dedicated server at the disaster recovery site:
+** The server is used exclusively as an SAP HANA System Replication secondary host.
+** Very low RTO values can be achieved because the data is already loaded into memory and no database start is required in case of a failover.
+* Without data preloaded into memory and a shared server at the disaster recovery site:
+** The server is shared as an SAP HANA System Replication secondary and as a dev/test system.
+** RTO depends mainly on the time required to start the database and load the data into memory.
+
+For a full description of all configuration options and replication scenarios, see the https://help.sap.com/saphelp_hanaplatform/helpdata/en/67/6844172c2442f0bf6c8b080db05ae7/content.htm?frameset=/en/52/08b5071e3f45d5aa3bcbb7fde10cec/frameset.htm&current_toc=/en/00/0ca1e3486640ef8b884cdf1a050fbb/plain.htm&node_id=527&show_children=f[SAP HANA Administration Guide^].
+
+The following figure shows the setup of a two-region disaster recovery solution with SAP HANA System Replication. Synchronous replication with data preloaded into memory is used for local HA in the same Azure region, but in different availability zones. Asynchronous replication without data preloaded is configured for the remote disaster recovery region.
+
+The following figure depicts SAP HANA System Replication.
+
+image:saphana-dr-anf_image4.png[Error: Missing Graphic Image]
+
+=== SAP HANA System Replication with data preloaded into memory
+
+Very low RTO values with SAP HANA can be achieved only with SAP HANA System Replication with data preloaded into memory. Operating SAP HANA System Replication with a dedicated secondary server at the disaster recovery site allows an RTO value of approximately 1 minute or less. The replicated data is received and preloaded into memory at the secondary system. Because of this low failover time, SAP HANA System Replication is also often used for near-zero-downtime maintenance operations, such as HANA software upgrades.
+
+Typically, SAP HANA System Replication is configured to replicate synchronously when data preload is chosen. The maximum supported distance for synchronous replication is in the range of 100km.
+
+=== SAP System Replication without data preloaded into memory
+
+For less stringent RTO requirements, you can use SAP HANA System Replication without data preloaded. In this operational mode, the data at the disaster recovery region is not loaded into memory. The server at the DR region is still used to process SAP HANA System Replication running all the required SAP HANA processes. However, most of the server’s memory is available to run other services, such as SAP HANA dev/test systems.
+
+In the event of a disaster, the dev/test system must be shut down, failover must be initiated, and the data must be loaded into memory. The RTO of this cold standby approach depends on the size of the database and the read throughput during the load of the row and column store. With the assumption that the data is read with a throughput of 1000MBps, loading 1TB of data should take approximately 18 minutes.
+
+== SAP HANA disaster recovery with ANF Cross-Region Replication
+
+ANF Cross-Region Replication is built into ANF as a disaster recovery solution using asynchronous data replication. ANF Cross-Region Replication is configured through a data protection relationship between two ANF volumes on a primary and a secondary Azure region. ANF Cross-Region Replication updates the secondary volume by using efficient block delta replications. Update schedules can be defined during the replication configuration.
+
+The following figure shows a two- region disaster recovery solution example, using ANF Cross- Region Replication. In this example the HANA system is protected with HANA System Replication within the primary region as discussed in the previous chapter. The replication to a secondary region is performed using ANF cross region replication. The RPO is defined by the replication schedule and replication options.
+
+The RTO depends mainly on the time needed to start the HANA database at the disaster recovery site and to load the data into memory. With the assumption that the data is read with a throughput of 1000MB/s, loading 1TB of data would take approximately 18 minutes. Depending on the replication configuration, forward recovery is required as well and will add to the total RTO value.
+
+More details on the different configuration options are provided in chapter link:ent-apps-db/saphana-dr-anf_anf_cross-region_replication_with_sap_hana_overview.html[Configuration options for cross region replication with SAP HANA].
+
+The servers at the disaster recovery sites can be used as dev/test systems during normal operation. In case of a disaster, the dev/test systems must be shut down and started as DR production servers.
+
+ANF Cross-Region Replication allows you to test the DR workflow without impacting the RPO and RTO. This is accomplished by creating volume clones and attaching them to the DR testing server.
+
+image:saphana-dr-anf_image5.png[Error: Missing Graphic Image]
+
+== Summary of disaster recovery solutions
+
+The following table compares the disaster recovery solutions discussed in this section and highlights the most important indicators.
+
+The key findings are as follows:
+
+* If a very low RTO is required, SAP HANA System Replication with preload into memory is the only option.
+** A dedicated server is required at the DR site to receive the replicated data and load the data into memory.
+* In addition, storage replication is needed for the data that resides outside of the database (for example shared files, interfaces, and so on).
+* If RTO/RPO requirements are less strict, ANF Cross-Region Replication can also be used to:
+** Combine database and nondatabase data replication.
+** Cover additional use cases such as disaster recovery testing and dev/test refresh.
+** With storage replication the server at the DR site can be used as a QA or test system during normal operation.
+* A combination of SAP HANA System Replication as an HA solution with RPO=0 with storage replication for long distance makes sense to address the different requirements.
+
+The following table provides a comparison of disaster recovery solutions.
+
+|===
+| |Storage replication 2+|SAP HANA system replication
+
+|
+|*Cross-region replication*
+|*With data preload*
+|*Without data preload*
+|RTO
+|Low to medium, depending on database startup time and forward recovery
+|Very low
+|Low to medium, depending on database startup time
+|RPO
+|RPO > 20min asynchronous replication
+|RPO > 20min asynchronous replication
+RPO=0 synchronous replication
+|RPO > 20min asynchronous replication
+RPO=0 synchronous replication
+|Servers at DR site can be used for dev/test
+|Yes
+|No
+|Yes
+|Replication of nondatabase data
+|Yes
+|No
+|No
+|DR data can be used for refresh of dev/test systems
+|Yes
+|No
+|No
+|DR testing without affecting RTO and RPO
+|Yes
+|No
+|No
+|===
