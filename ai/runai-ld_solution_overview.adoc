@@ -1,0 +1,94 @@
+---
+sidebar: sidebar
+permalink: ai/runai-ld_solution_overview.html
+keywords: azure, lane, detection, architecture, ai, run, machine learning
+summary: In this architecture, the focus is on the most computationally intensive part of the AI or machine learning (ML) distributed training process of lane detection.
+---
+
+= Solution overview
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-07-01 08:47:40.944608
+//
+
+In this architecture, the focus is on the most computationally intensive part of the AI or machine learning (ML) distributed training process of lane detection. Lane detection is one of the most important tasks in autonomous driving, which helps to guide vehicles by localization of the lane markings. Static components like lane markings guide the vehicle to drive on the highway interactively and safely.
+
+Convolutional Neural Network (CNN)-based approaches have pushed scene understanding and segmentation to a new level. Although it doesn't perform well for objects with long structures and regions that could be occluded (for example, poles, shade on the lane, and so on). Spatial Convolutional Neural Network (SCNN) generalizes the CNN to a rich spatial level. It allows information propagation between neurons in the same layer, which makes it best suited for structured objects such as lanes, poles, or truck with occlusions. This compatibility is because the spatial information can be reinforced, and it preserves smoothness and continuity.
+
+Thousands of scene images need to be injected in the system to allow the model learn and distinguish the various components in the dataset. These images include weather, daytime or nighttime, multilane highway roads, and other traffic conditions.
+
+For training, there is a need for good quality and quantity of data. Single GPU or multiple GPUs can take days to weeks to complete the training. Data-distributed training can speed up the process by using multiple and multinode GPUs. Horovod is one such framework that grants distributed training but reading data across clusters of GPUs could act as a hindrance. Azure NetApp Files provides ultrafast, high throughput and sustained low latency to provide scale-out/scale-up capabilities so that GPUs are leveraged to the best of their computational capacity. Our experiments verified that all the GPUs across the cluster are used more than 96% on average for training the lane detection using SCNN.
+
+== Target audience
+
+Data science incorporates multiple disciplines in IT and business, therefore multiple personas are part of our targeted audience:
+
+* Data scientists need the flexibility to use the tools and libraries of their choice.
+* Data engineers need to know how the data flows and where it resides.
+* Autonomous driving use-case experts.
+* Cloud administrators and architects to set up and manage cloud (Azure) resources.
+* A DevOps engineer needs the tools to integrate new AI/ML applications into their continuous integration and continuous deployment (CI/CD) pipelines.
+* Business users want to have access to AI/ML applications.
+
+In this document, we describe how Azure NetApp Files, RUN: AI, and Microsoft Azure help each of these roles bring value to business.
+
+== Solution technology
+
+This section covers the technology requirements for the lane detection use case by implementing a distributed training solution at scale that fully runs in the Azure cloud. The figure below provides an overview of the solution architecture.
+
+The elements used in this solution are:
+
+* Azure Kubernetes Service (AKS)
+* Azure Compute SKUs with NVIDIA GPUs
+* Azure NetApp Files
+* RUN: AI
+* NetApp Trident
+
+Links to all the elements mentioned here are listed in the link:runai-ld_additional_information.html[Additional information] section.
+
+image:runai-ld_image2.png[Error: Missing Graphic Image]
+
+== Cloud resources and services requirements
+
+The following table lists the hardware components that are required to implement the solution. The cloud components that are used in any implementation of the solution might vary based on customer requirements.
+
+|===
+|Cloud |Quantity
+
+|AKS
+|Minimum of three system nodes and three GPU worker nodes
+|Virtual machine (VM) SKU system nodes
+|Three Standard_DS2_v2
+|VM SKU GPU worker nodes
+|Three Standard_NC6s_v3
+|Azure NetApp Files
+|4TB standard tier
+|===
+
+== Software requirements
+
+The following table lists the software components that are required to implement the solution. The software components that are used in any implementation of the solution might vary based on customer requirements.
+
+|===
+|Software |Version or other information
+
+|AKS - Kubernetes version
+|1.18.14
+|RUN:AI CLI
+|v2.2.25
+|RUN:AI Orchestration Kubernetes Operator version
+|1.0.109
+|Horovod
+|0.21.2
+|NetApp Trident
+|20.01.1
+|Helm
+|3.0.0
+|===
