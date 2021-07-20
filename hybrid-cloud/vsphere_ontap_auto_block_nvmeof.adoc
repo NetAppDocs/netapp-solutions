@@ -23,17 +23,17 @@ This section covers the creation of a VMFS datastore with ONTAP storage using NV
 For automated provisioning, use one of these scripts: <<PowerShell>>, <<Ansible>>, or <<Terraform>>.
 
 
-== What you will need
+== What you need
 
-* Basic skill to manage vSphere environment and ONTAP.
+* Basic skills needed to manage a vSphere environment and ONTAP.
 
 * link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-059DDF49-2A0C-49F5-BB3B-907A21EC94D6.html++[Basic understanding of NVMe/FC].
 
-* ONTAP Storage System (FAS/AFF/CVO/ONTAP Select/ASA) running {ontap_version}
+* An ONTAP Storage System (FAS/AFF/CVO/ONTAP Select/ASA) running {ontap_version}
 
 * ONTAP credentials (SVM name, userID, and password)
 
-* ONTAP WWPN of host, target, SVM, and LUN information
+* ONTAP WWPN for host, target, and SVMs and LUN information
 
 * link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-429C4DDD-5EC0-4DBD-8EA8-76082AB7ADEC.html++[A completed FC configuration worksheet]
 
@@ -43,19 +43,19 @@ For automated provisioning, use one of these scripts: <<PowerShell>>, <<Ansible>
 
 * Fabric switch(es)
 
-** with ONTAP FC data ports and vSphere hosts are connected.
+** With ONTAP FC data ports and vSphere hosts connected.
 
-** with N_port ID virtualization (NPIV) feature enabled.
+** With the N_port ID virtualization (NPIV) feature enabled.
 
-** Create Single Initiator Single Target Zone.
+** Create a single initiator target zone.
 
-** Create one zone for each initiator (Single Initiator zone)
+** Create one zone for each initiator (single initiator zone).
 
-*** For each zone, include target which is ONTAP FC Logical Interfaces (WWPN) of SVMs. There should be at least two logical interfaces per node per SVM. Should not be using WWPN of physical ports.
+** For each zone, include a target that is the ONTAP FC logical interface (WWPN) for the SVMs. There should be at least two logical interfaces per node per SVM. DO not use the WWPN of physical ports.
 
 == Provision VMFS datastore
 
-. Check compatibility with the https://mysupport.netapp.com/matrix[Interoperability Matrix Tool (IMT)]
+. Check compatibility with the https://mysupport.netapp.com/matrix[Interoperability Matrix Tool (IMT)].
 
 . link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.exp-fc-esx-cpg/GUID-7D444A0D-02CE-4A21-8017-CB1DC99EFD9A.html++[Verify that the NVMe/FC configuration is supported.]
 
@@ -63,9 +63,9 @@ For automated provisioning, use one of these scripts: <<PowerShell>>, <<Ansible>
 
 == ONTAP tasks
 
-. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify ONTAP license for FCP]
-Use `system license show` command and check NVMe_oF is listed.
-Use `license add -license-code <license code>` to add license.
+. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-cmpr-980/system__license__show.html++[Verify the ONTAP license for FCP.]
+Use the `system license show` command and check if NVMe_oF is listed.
+Use `license add -license-code <license code>` to add a license.
 +
 ////
 . Identify the physical fcp ports
@@ -75,24 +75,23 @@ Check `System node hardware unified-connect show`. May need to change the type t
 ////
 +
 
-. Ensure NVMe protocol is enabled on SVM
+. Verify that NVMe protocol is enabled on the SVM.
 
-.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-CDDBD7F4-2089-4466-892F-F2DFF5798B1C.html[Configure SVM for NVMe]
+.. link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-CDDBD7F4-2089-4466-892F-F2DFF5798B1C.html[Configure SVMs for NVMe.]
 
-. Ensure NVMe/FC Logical Interfaces are available on SVM.
+. Verify that NVMe/FC Logical Interfaces are available on the SVMs.
 
-.. Use `Network Interface show` to verify FCP adapter.
+.. Use `Network Interface show` to verify the FCP adapter.
 
-.. When SVM is created with GUI, Logical Interfaces are as part of that process.
+.. When an SVM is created with the GUI, logical interfaces are as part of that process.
 
-.. To rename, use `Network Interface modify`
+.. To rename the network interface, use the command `Network Interface modify`.
 
 . link:++https://docs.netapp.com/ontap-9/topic/com.netapp.doc.dot-cm-sanag/GUID-BBBAB2E4-E106-4355-B95C-C3626DCD5088.html++[Create NVMe namespace and subsystem]
 
 == VMware vSphere Tasks
 
-. Ensure HBA drivers are installed
-VMware supported HBAs have the drivers deployed out of the box and should be visible at link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-ED20B7BE-0D1C-4BF7-85C9-631D45D96FEC.html++[Storage Adapter Information]
+. Verify that HBA drivers are installed. VMware supported HBAs have the drivers deployed out of the box and should be visible at link:++https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-ED20B7BE-0D1C-4BF7-85C9-631D45D96FEC.html++[Storage Adapter Information]
 
 . link:++https://docs.netapp.com/us-en/ontap-sanhost/nvme_esxi_7.html++[Perform vSphere Host NVMe driver installatioln and validation tasks]
 
