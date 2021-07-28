@@ -222,7 +222,7 @@ size=512G features='4 queue_if_no_path pg_init_retries 50 retain_attached_hw_han
 This step is only needed if LVM will be used. The following example is for a 2+1 host setup using SID FC5.
 
 [NOTE]
-For an LVM- based setup, the multipath configuration described in the previous section must be completed as well. In this example, eight LUNs must be configured for multipathing.
+For an LVM-based setup, the multipath configuration described in the previous section must be completed as well. In this example, eight LUNs must be configured for multipathing.
 
 . Initialize all LUNs as a physical volume.
 +
@@ -256,7 +256,10 @@ lvcreate --extents 100%FREE -i 2 -I 64k --name vol FC5_log_mnt00001
 . Scan the physical volumes, volume groups, and vol groups at all other hosts.
 +
 ....
-modprobe dm_modpvscanvgscanlvscan
+modprobe dm_mod
+pvscan
+vgscan
+lvscan
 ....
 +
 [NOTE]
@@ -275,18 +278,18 @@ To create the XFS file system on each LUN belonging to the HANA system, take one
 * For a single-host system, create the XFS file system on the data, log, and `/hana/shared` LUNs.
 
 ....
-stlrx300s8-6:/ # mkfs.xfs /dev/mapper/hana- SS3_data_mnt00001
-stlrx300s8-6:/ # mkfs.xfs /dev/mapper/hana- SS3_log_mnt00001
-stlrx300s8-6:/ # mkfs.xfs /dev/mapper/hana- SS3_shared
+stlrx300s8-6:/ # mkfs.xfs /dev/mapper/hana-SS3_data_mnt00001
+stlrx300s8-6:/ # mkfs.xfs /dev/mapper/hana-SS3_log_mnt00001
+stlrx300s8-6:/ # mkfs.xfs /dev/mapper/hana-SS3_shared
 ....
 
 * For a multiple-host system, create the XFS file system on all data and log LUNs.
 
 ....
-stlrx300s8-6:~ # mkfs.xfs /dev/mapper/hana- SS3_log_mnt00001
-stlrx300s8-6:~ # mkfs.xfs /dev/mapper/hana- SS3_log_mnt00002
-stlrx300s8-6:~ # mkfs.xfs /dev/mapper/hana- SS3_data_mnt00001
-stlrx300s8-6:~ # mkfs.xfs /dev/mapper/hana- SS3_data_mnt00002
+stlrx300s8-6:~ # mkfs.xfs /dev/mapper/hana-SS3_log_mnt00001
+stlrx300s8-6:~ # mkfs.xfs /dev/mapper/hana-SS3_log_mnt00002
+stlrx300s8-6:~ # mkfs.xfs /dev/mapper/hana-SS3_data_mnt00001
+stlrx300s8-6:~ # mkfs.xfs /dev/mapper/hana-SS3_data_mnt00002
 ....
 
 * If LVM is used, create the XFS file system on all data and log logical volumes.
@@ -311,6 +314,7 @@ To create the required mount point directories, take one of the following action
 stlrx300s8-6:/ # mkdir -p /hana/data/SS3/mnt00001
 stlrx300s8-6:/ # mkdir -p /hana/log/SS3/mnt00001
 stlrx300s8-6:/ # mkdir -p /hana/shared
+
 stlrx300s8-6:/ # chmod –R 777 /hana/log/SS3
 stlrx300s8-6:/ # chmod –R 777 /hana/data/SS3
 stlrx300s8-6:/ # chmod 777 /hana/shared
@@ -349,9 +353,9 @@ The XFS file systems for the data and log LUN must be mounted with the `relatime
 
 ....
 stlrx300s8-6:/ # cat /etc/fstab
-/dev/mapper/FAS8200-hana- SS3_shared /hana/shared xfs defaults 0 0
-/dev/mapper/FAS8200-hana- SS3_log_mnt00001 /hana/log/SS3/mnt00001 xfs relatime,inode64,nobarrier 0 0
-/dev/mapper/FAS8200-hana- SS3_data_mnt00001 /hana/data/SS3/mnt00001 xfs relatime,inode64 0 0
+/dev/mapper/FAS8200-hana-SS3_shared /hana/shared xfs defaults 0 0
+/dev/mapper/FAS8200-hana-SS3_log_mnt00001 /hana/log/SS3/mnt00001 xfs relatime,inode64,nobarrier 0 0
+/dev/mapper/FAS8200-hana-SS3_data_mnt00001 /hana/data/SS3/mnt00001 xfs relatime,inode64 0 0
 ....
 +
 If LVM is used, use the logical volume names for data and log.
