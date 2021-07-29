@@ -1,7 +1,7 @@
 ---
 sidebar: sidebar
 permalink: containers/rh-os-n_overview_astra.html
-keywords: Astra, Application, Trident, Helm, Operator
+keywords: NetApp Astra, Astra Control Center, Application, Trident, Helm, Operator, ONTAP, OpenShift, Kubernetes, Red Hat OpenShift
 summary: NetApp Astra Control Center offers a rich set of storage and application-aware data management services for stateful Kubernetes workloads, deployed in an on-prem environment, powered by NetApp’s trusted data protection technology.
 ---
 
@@ -11,13 +11,6 @@ summary: NetApp Astra Control Center offers a rich set of storage and applicatio
 :icons: font
 :linkattrs:
 :imagesdir: ./../media/
-
-//
-// This file was created with NDAC Version 0.9 (June 4, 2020)
-//
-// 2020-06-25 14:31:33.563897
-//
-
 
 NetApp Astra Control Center offers a rich set of storage and application-aware data management services for stateful Kubernetes workloads, deployed in an on-premises environment, powered by NetApp’s trusted data protection technology.
 
@@ -80,7 +73,7 @@ NOTE: Refer the link link:rh-os-n_private_registry.html[here] to install and con
 [netapp-user@rhel7 ~]$ cd astra-control-center-21.06.353
 ----
 
-.	Before we start the installation, we need to push the Astra Control Center images to an image registry. Push the images to the registry using docker cli or podman cli by selecting the appropriate platform.
+.	Before we start the installation, we need to push the Astra Control Center images to an image registry.
 +
 NOTE: You can choose to do this with either Docker or Podman, instructions for both are provided in this step.
 
@@ -112,7 +105,7 @@ for astraImageFile in $(ls images/*.tar); do
 done
 ----
 +
-NOTE: If you are using untrusted certificates for your registry, edit the shell script and use --tls-verify=false for the podman push command - podman push $registry/$(echo $astraImage | sed 's/^[^\/]\+\///') --tls-verify=false
+NOTE: If you are using untrusted certificates for your registry, edit the shell script and use --tls-verify=false for the podman push command - `podman push $registry/$(echo $astraImage | sed 's/^[^\/]\+\///') --tls-verify=false`
 
 ..	Make the file executable
 +
@@ -146,7 +139,7 @@ for astraImageFile in $(ls images/*.tar); do
 done
 ----
 +
-NOTE: If you are using untrusted certificates for your registry, edit the shell script and use --tls-verify=false for the docker push command - docker push $registry/$(echo $astraImage | sed 's/^[^\/]\+\///') --tls-verify=false
+NOTE: If you are using untrusted certificates for your registry, edit the shell script and use --tls-verify=false for the docker push command - `docker push $registry/$(echo $astraImage | sed 's/^[^\/]\+\///') --tls-verify=false`
 
 ..	Make the file executable
 +
@@ -159,34 +152,35 @@ NOTE: If you are using untrusted certificates for your registry, edit the shell 
 ----
 [netapp-user@rhel7 ~]$ ./push-images-to-registry.sh
 ----
+--
+====
 
-..	Next step is to upload the image registry TLS certificates to the OpenShift nodes. For that, create a configmap in openshift-config namespace using the TLS certificates and patch it to the cluster image config to make the certificate trusted.
+[start=4]
+.	Next step is to upload the image registry TLS certificates to the OpenShift nodes. For that, create a configmap in openshift-config namespace using the TLS certificates and patch it to the cluster image config to make the certificate trusted.
 +
 ----
 [netapp-user@rhel7 ~]$ oc create configmap default-ingress-ca -n openshift-config --from-file=astra-registry.apps.ocp-vmw.cie.netapp.com=tls.crt
 
 [netapp-user@rhel7 ~]$ oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"default-ingress-ca"}}}' --type=merge
 ----
++
+NOTE: If you are using OpenShift internal registry with default TLS certificates from the ingress operator with a route, you will still need to follow the above step to patch the certificates to the route hostname. To extract the certificates from ingress operator, you can use the command - `oc extract secret/router-ca --keys=tls.crt -n openshift-ingress-operator`
 
-NOTE: If you are using OpenShift internal registry with default TLS certificates from the ingress operator with a route, you will still need to follow the above step to patch the certificates to the route hostname. To extract the certificates from ingress operator, you can use the command - oc extract secret/router-ca --keys=tls.crt -n openshift-ingress-operator
---
-====
 
-[start=4]
-.	Create a namespace ‘acc-operator-system’ for installing the Astra Control Center Operator.
+.	Create a namespace `acc-operator-system` for installing the Astra Control Center Operator.
 +
 ----
 [netapp-user@rhel7 ~]$ oc create ns acc-operator-system
 ----
 
-.	Create a secret with credentials to log into the image registry in ‘acc-operator-system’ namespace.
+.	Create a secret with credentials to log into the image registry in `acc-operator-system` namespace.
 +
 ----
 [netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-cred --docker-server=astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password -n acc-operator-system
 secret/astra-registry-cred created
 ----
 
-.	Edit the Astra Control Center Operator CR ‘astra_control_center_operator_deploy.yaml’ which is a set of all resources Astra Control Center deploys. In the operator CR, find the deployment definition for ‘acc-operator-controller-manager’ and enter the FQDN for your registry along with the organization name as it was given while pushing the images to registry (in this example, astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra) by replacing the text ‘[your.registry.goes.here]’ and provide the name of the secret we just created. Verify other details of the operator, save and close.
+.	Edit the Astra Control Center Operator CR `astra_control_center_operator_deploy.yaml` which is a set of all resources Astra Control Center deploys. In the operator CR, find the deployment definition for `acc-operator-controller-manager` and enter the FQDN for your registry along with the organization name as it was given while pushing the images to registry (in this example, astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra) by replacing the text `[your.registry.goes.here]` and provide the name of the secret we just created. Verify other details of the operator, save and close.
 +
 ----
 [netapp-user@rhel7 ~]$ vim astra_control_center_operator_deploy.yaml
@@ -267,18 +261,19 @@ spec:
 .	Create a dedicated namespace for installing all the Astra Control Center resources.
 +
 ----
-[netapp-user@rhel7 ~]$ oc create ns netapp-astra-cc
-namespace/netapp-astra-cc created
+[netapp-user@rhel7 ~]$ oc create ns pcloud
+namespace/pcloud created
 ----
 
 .	Create the secret for accessing image registry in that namespace.
 +
 ----
-[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-cred --docker-server= astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password -n netapp-astra-cc
+[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-cred --docker-server= astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password -n pcloud
+
 secret/astra-registry-cred created
 ----
 
-.	Next step is to edit the Astra Control Center CRD file ‘astra_control_center_min.yaml’ and fill the FQDN, image registry details, administrator email address and other details.
+.	Next step is to edit the Astra Control Center CRD file `astra_control_center_min.yaml` and fill the FQDN, image registry details, administrator email address and other details.
 +
 ----
 [netapp-user@rhel7 ~]$ vim astra_control_center_min.yaml
@@ -301,21 +296,21 @@ spec:
 .	Create the Astra Control Center CRD in the namespace created for it.
 +
 ----
-[netapp-user@rhel7 ~]$ oc apply -f astra_control_center_min.yaml -n netapp-astra-cc
+[netapp-user@rhel7 ~]$ oc apply -f astra_control_center_min.yaml -n pcloud
 astracontrolcenter.astra.netapp.io/astra created
 ----
 
-NOTE: The above file ‘astra_control_center_min.yaml’ is the minimum version of the Astra Control Center CRD. If you want to create the CRD with more control like defining storageclass other than default for creating PVCs or providing SMTP details for mail notifications, you can edit the file ‘astra_control_center.yaml’, fill those details and use it to create the CRD.
+NOTE: The above file `astra_control_center_min.yaml` is the minimum version of the Astra Control Center CRD. If you want to create the CRD with more control like defining storageclass other than default for creating PVCs or providing SMTP details for mail notifications, you can edit the file `astra_control_center.yaml`, fill those details and use it to create the CRD.
 
 === Installation Verificaton
 
-.	It might take several minutes for the installation to complete. Verify that all the pods and services in netapp-astra-cc namespace are up and running.
+.	It might take several minutes for the installation to complete. Verify that all the pods and services in pcloud namespace are up and running.
 +
 ----
-[netapp-user@rhel7 ~]$ oc get all -n netapp-astra-cc
+[netapp-user@rhel7 ~]$ oc get all -n pcloud
 ----
 
-. Check the acc-operator-controller-manager logs to ensure that the installation is completed.
+. Check the `acc-operator-controller-manager` logs to ensure that the installation is completed.
 +
 ----
 [netapp-user@rhel7 ~]$ oc logs deploy/acc-operator-controller-manager -n acc-operator-system -c manager -f
@@ -326,38 +321,38 @@ NOTE: The following message should be displayed to indicate the successful insta
 
 +
 ----
-{"level":"info","ts":1624054318.029971,"logger":"controllers.AstraControlCenter","msg":"Successfully Reconciled AstraControlCenter in [seconds]s","AstraControlCenter":"netapp-astra-cc/astra","ae.Version":"[21.06.353]"}
+{"level":"info","ts":1624054318.029971,"logger":"controllers.AstraControlCenter","msg":"Successfully Reconciled AstraControlCenter in [seconds]s","AstraControlCenter":"pcloud/astra","ae.Version":"[21.06.353]"}
 ----
 +
 .	The username for logging into Astra Control Center is the email address of the administrator provided in the CRD file and the password is a string ‘ACC-’ appended to the Astra Control Center UUID. Run the following command –
 +
 ----
-[netapp-user@rhel7 ~]$ oc get astracontrolcenters -n netapp-astra-cc
+[netapp-user@rhel7 ~]$ oc get astracontrolcenters -n pcloud
 NAME    UUID
 astra   345c55a5-bf2e-21f0-84b8-b6f2bce5e95f
 ----
 +
 
-NOTE: In this case, the password is – ‘ACC-<astra-control-center-UUID>
+NOTE: In this example, the password is – `ACC-345c55a5-bf2e-21f0-84b8-b6f2bce5e95f`
 
 +
 .	 Now log into the Astra Control Center GUI by browsing to the FQDN you provided in the CRD file.
 +
-<<initial logging screenshot>>
+image:redhat_openshift_image87.jpg[Astra Control Center login]
 
-.	When you log into Astra Control Center GUI for the first time, you will need to change the password.
+.	When you log into Astra Control Center GUI for the first time using the admin email address provided in CRD, you will need to change the password.
 +
-<<Mandatory password change screenshot>>
+image:redhat_openshift_image88.jpg[Astra Control Center mandatory password change]
 
-.	If you wish to add a user to Astra Control Center, go to Account -> Users and click on ‘Add’ and enter the details of the user and click ‘Add’.
+.	If you wish to add a user to Astra Control Center, go to `Account` -> `Users` and click on `Add` and enter the details of the user and click `Add`.
 +
-<<adding an user screenshot>>
+image:redhat_openshift_image89.jpg[Astra Control Center create user]
 
-.	Astra Control Center requires a license for all of it’s functionalities to work. To add a license, go to ‘Account’ -> ‘License’, click on ‘Add License’ and upload the license file.
+.	Astra Control Center requires a license for all of it’s functionalities to work. To add a license, go to `Account` -> `License`, click on `Add License` and upload the license file.
 +
-<<add license screenshot>>
+image:redhat_openshift_image90.jpg[Astra Control Center add license]
 
 
 
 
-link:rh-os-n_astra_register.html[Next: Register Your Red Hat OpenShift Clusters: Red Hat OpenShift with NetApp.]
+link:rh-os-n_astra_register.html[Next: Register your Red Hat OpenShift Clusters: Red Hat OpenShift with NetApp.]

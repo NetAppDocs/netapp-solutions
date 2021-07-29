@@ -1,7 +1,7 @@
 ---
 sidebar: sidebar
 permalink: containers/rh-os-n_private_registry.html
-keywords: Advanced Configuration, Private Registry, NetApp Trident
+keywords: Advanced Configuration, Private Registry, NetApp Trident, OpenShift Registry, NetApp Astra Registry
 summary: This section is dedicated to creating and configuring a private image registry backed by persistent storage provided by NetApp Trident.
 ---
 
@@ -12,11 +12,6 @@ summary: This section is dedicated to creating and configuring a private image r
 :linkattrs:
 :imagesdir: ./../media/
 
-//
-// This file was created with NDAC Version 0.9 (June 4, 2020)
-//
-// 2020-06-25 14:31:33.563897
-//
 
 For most deployments of Red Hat OpenShift, using a public registry like https://quay.io[Quay.io] or https://hub.docker.com[DockerHub] meets most customer's needs. However there are times when a customer may want to host their own private or customized images.
 
@@ -26,7 +21,7 @@ NOTE: Astra Control Center requires a registry to host the images the Astra cont
 
 == Creating A Private Image Registry
 
-.	Edit the imageregistry operator, enter the below storage parameters to ‘spec’ section–
+.	Edit the imageregistry operator, enter the below storage parameters to `spec` section
 +
 ----
 [netapp-user@rhel7 ~]$ oc edit configs.imageregistry.operator.openshift.io
@@ -36,7 +31,7 @@ storage:
     claim:
 ----
 
-.	Then enter the following parameters to ‘spec’ section for creating a OpenShift route with a custom hostname, save and exit –
+.	Then enter the following parameters to `spec` section for creating a OpenShift route with a custom hostname, save and exit
 +
 ----
 routes:
@@ -44,19 +39,21 @@ routes:
     name: netapp-astra-route
 ----
 +
-NOTE: The above route config is used when you want a custom hostname for your route. If you want OpenShift to create a route with default hostname, you can just add the following parameters to ‘spec’ section – defaultRoute: true
+NOTE: The above route config is used when you want a custom hostname for your route. If you want OpenShift to create a route with default hostname, you can just add the following parameters to `spec` section – `defaultRoute: true`
 
 +
 
-NOTE: When you are using custom hostname for the route, by default, it uses the default TLS configuration of OpenShift Ingress operator. However, you can add a custom TLS configuration to the route. To do so, following the below steps –
+.Custom TLS Certificates
+****
+When you are using custom hostname for the route, by default, it uses the default TLS configuration of OpenShift Ingress operator. However, you can add a custom TLS configuration to the route. To do so, following the below steps –
 
-.	Create a secret with the route’s TLS certificates and key –
+..	Create a secret with the route’s TLS certificates and key –
 +
 ----
 [netapp-user@rhel7 ~]$ oc create secret tls astra-route-tls -n openshift-image-registry –cert/home/admin/netapp-astra/tls.crt --key=/home/admin/netapp-astra/tls.key
 ----
 
-.	Edit the imageregistry operator and add the following parameters to the ‘spec’ section –
+..	Edit the imageregistry operator and add the following parameters to the `spec` section –
 +
 ----
 [netapp-user@rhel7 ~]$ oc edit configs.imageregistry.operator.openshift.io
@@ -66,8 +63,9 @@ routes:
     name: netapp-astra-route
     secretName: astra-route-tls
 ----
+****
 
-.	Next step is to edit the imageregistry operator again and change the management state of the operator to ‘Managed’ state, save and exit –
+.	Next step is to edit the imageregistry operator again and change the management state of the operator to `Managed` state, save and exit –
 +
 ----
 oc edit configs.imageregistry/cluster
@@ -124,13 +122,13 @@ NAME                                     HOST/PORT                              
 route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.com          image-registry   <all>   reencrypt     None
 ----
 
-.	If you are using the default TLS certificates of Ingress operator OpenShift registry route, you fetch the TLS certificates using the following command –
+.	If you are using the default TLS certificates of Ingress operator OpenShift registry route, you can fetch the TLS certificates using the below command.
 +
 ----
 [netapp-user@rhel7 ~]$ oc extract secret/router-ca --keys=tls.crt -n openshift-ingress-operator
 ----
 
-.	To allow OpenShift nodes to access and pull the images from the registry, you need to add the certificates to the docker client on the OpenShift nodes. Create a configmap in openshift-config namespace using the TLS certificates and patch it to the cluster image config to make the certificate trusted.
+.	To allow OpenShift nodes to access and pull the images from the registry, you need to add the certificates to the docker client on the OpenShift nodes. Create a configmap in  `openshift-config` namespace using the TLS certificates and patch it to the cluster image config to make the certificate trusted.
 +
 ----
 [netapp-user@rhel7 ~]$ oc create configmap astra-ca -n openshift-config --from-file=astra-registry.apps.ocp-vmw.cie.netapp.com=tls.crt
