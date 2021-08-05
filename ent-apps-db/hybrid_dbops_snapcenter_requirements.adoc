@@ -20,7 +20,7 @@ The solutions support all databases that are currently supported by NetApp SnapC
 
 It is assumed that production database servers are hosted on-prem with DB volumes presented to DB hosts from ONTAP storage cluster. SnapCenter software is installed on-prem for database backup and data replication to cloud. An Ansible controller is setup for database deployment automation or OS kernel and DB configuration syncing up with standby DR instance or DEV and TEST instances in public cloud.
 
-The following are details of solution requirements:
+The following are the details of the solution requirements:
 
 == Requirements
 
@@ -34,13 +34,55 @@ Any supported databases and versions by SnapCenter
 | Ansible v2.10 or higher
 | ONTAP cluster 9.x
 | Intercluster lifs configured
-| VPN connection from ON-prem to cloud VPC
+| Connectivity from ON-prem to cloud VPC (VPN, Interconnect etc.)
 | Networking ports open
 - ssh 22
 - tcp 8145, 8146
-.4+| *Cloud* |
-AWS, Azure, GCP
-| Cloud manager / connector
-| CVO
-| Matching DB OS instances to On-prem in the cloud of choice
+.3+| *Cloud - AWS* |
+https://docs.netapp.com/us-en/occm/task_creating_connectors_aws.html[Cloud Manager Connector^]
+| https://docs.netapp.com/us-en/occm/task_getting_started_aws.html[Cloud Volumes ONTAP^]
+| Matching DB OS EC2 instances to On-prem
+.3+| *Cloud - Azure* |
+https://docs.netapp.com/us-en/occm/task_creating_connectors_azure.html[Cloud Manager Connector^]
+| https://docs.netapp.com/us-en/occm/task_getting_started_azure.html[Cloud Volumes ONTAP^]
+| Matching DB OS Azure Virtual Machines to On-prem
+.3+| *Cloud - GCP* |
+https://docs.netapp.com/us-en/occm/task_creating_connectors_gcp.html[Cloud Manager Connector^]
+| https://docs.netapp.com/us-en/occm/task_getting_started_gcp.html[Cloud Volumes ONTAP^]
+| Matching DB OS Google Compute Engine instances to On-prem
 |===
+
+
+== Pre-Requisites
+
+=== What is a Cloud Manager Connector?
+
+include::https://docs.netapp.com/us-en/occm/concept_connectors.html[]
+
+=== Cloud Volumes ONTAP Getting started Checklist
+
+include::https://docs.netapp.com/us-en/occm/reference_checklist_cm.html[]
+
+=== Cloud Volumes ONTAP sizing and architecture
+
+When deploying Cloud Volumes ONTAP, you will be given the option to choose either a pre-defined package or create your own configuration. Although many of these values can be changed later on non-disruptively, there are some key considerations that need to be made before deployment based on the workloads that will be deployed in the cloud.
+
+Each cloud provider has different options for deplyment and almost every workload has its own unique properties. NetApp has a https://cloud.netapp.com/cvo-sizer[CVO sizing tool^] that can help size deployments correctly based on capacity and performance, but it has been built around some basic concepts which are worth considering:
+
+- Capacity required
+- Network capability of cloud virtual machine
+- Performance characteristics of cloud storage
+
+The key is to plan for a configuration that not only satisfies the current capacity and performance requirements, but also looks at future growth. This is generally known as capacity headroom and performance headroom.
+
+If you would like some further information, please read the documentation about planning correctly for https://docs.netapp.com/us-en/occm/task_planning_your_config.html[AWS^], https://docs.netapp.com/us-en/occm/task_planning_your_config_azure.html[Azure^] and https://docs.netapp.com/us-en/occm/task_planning_your_config_gcp.html[GCP^].
+
+==== Single Node or High Availability?
+
+In all clouds, there is the option to deploy CVO in either a single node or clustered high availability pair with 2 nodes. Depending on the use case, you may wish to deploy a single node to save costs or an HA pair to provide further availability and redundancy.
+
+For a DR use case or spinning up temporary storage for development and testing, single nodes are common since the impact of a sudden zonal or infrastructure outage is lower. However, for any production use case, or where the data is only in a single location, or the dataset must have more redundancy and availability, high availability is recommended.
+
+For further information about the architecture of each cloud's version of high availability, please visit the documentation for https://docs.netapp.com/us-en/occm/concept_ha.html[AWS^], https://docs.netapp.com/us-en/occm/concept_ha_azure.html[Azure^] and https://docs.netapp.com/us-en/occm/concept_ha_google_cloud.html[GCP^].
+
+==== Licensing Considerations
