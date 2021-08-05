@@ -1,0 +1,71 @@
+---
+sidebar: sidebar
+permalink: ent-apps-db/saphana-dr-anf_configuration_options_for_cross-region_replication_with_sap_hana.html
+keywords: configuration, options, cross, region, replication, sap, hana, azure
+summary: The following figure shows the volume replication relationships for an SAP HANA system using ANF Cross-Region Replication.
+---
+
+= Configuration options for Cross-Region Replication with SAP HANA
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-05-24 12:07:40.328531
+//
+
+link:saphana-dr-anf_anf_cross-region_replication_with_sap_hana_overview.html[Previous: ANF Cross-Region Replication with SAP HANA.]
+
+The following figure shows the volume replication relationships for an SAP HANA system using ANF Cross-Region Replication. With ANF Cross-Region Replication, the HANA data and the HANA shared volume must be replicated. If only the HANA data volume is replicated, typical RPO values are in the range of one day. If lower RPO values are required, the HANA log backups must be also replicated for forward recovery.
+
+[NOTE]
+The term “log backup” used in this document includes the log backup and the HANA backup catalog backup. The HANA backup catalog is required to execute forward recovery operations.
+
+[NOTE]
+The following description and the lab setup focus on the HANA database. Other shared files, for example the SAP transport directory would be protected and replicated in the same way as the HANA shared volume.
+
+To enable HANA save-point recovery or forward recovery using the log backups, application-consistent data Snapshot backups must be created at the primary site for the HANA data volume. This can be done for example with the ANF backup tool AzAcSnap (see also https://docs.microsoft.com/en-us/azure/azure-netapp-files/azacsnap-introduction[What is Azure Application Consistent Snapshot tool for Azure NetApp Files | Microsoft Docs^]). The Snapshot backups created at the primary site are then replicated to the DR site.
+
+In the case of a disaster failover, the replication relationship must be broken, the volumes must be mounted to the DR production server, and the HANA database must be recovered, either to the last HANA save point or with forward recovery using the replicated log backups. The chapter link:saphana-dr-anf_disaster_recovery_failover_overview.html[Disaster recovery failover], describes the required steps.
+
+The following figure depicts the HANA configuration options for cross-region replication.
+
+image:saphana-dr-anf_image6.png[Error: Missing Graphic Image]
+
+With the current version of Cross-Region Replication, only fixed schedules can be selected, and the actual replication update time cannot be defined by the user. Available schedules are daily, hourly and every 10 minutes. Using these schedule options, two different configurations make sense depending on the RPO requirements: data volume replication without log backup replication and log backup replication with different schedules, either hourly or every 10 minutes. The lowest achievable RPO is around 20 minutes. The following table summarizes the configuration options and the resulting RPO and RTO values.
+
+|===
+| |Data volume replication |Data and log backup volume replication |Data and log backup volume replication
+
+|CRR schedule data volume
+|Daily
+|Daily
+|Daily
+|CRR schedule log backup volume
+|n/a
+|Hourly
+|10 min
+|Max RPO
+|+24 hours +
+Snapshot schedule (e.g., 6 hours)+
+|1 hour
+|2 x 10 min
+|Max RTO
+|Primarily defined by HANA startup time
+|+HANA startup time +
+recovery time+
+|+HANA startup time +
+recovery time+
+|Forward recovery
+|NA
+|+Logs for the last 24 hours + Snapshot schedule
+(e.g., 6 hours)+
+|+Logs for the last 24 hours + Snapshot schedule
+(e.g., 6 hours)+
+|===
+
+link:saphana-dr-anf_requirements_and_best_practices.html[Next: Requirements and best practices.]
