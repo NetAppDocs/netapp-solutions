@@ -18,7 +18,9 @@ Trident is a storage orchestrator for containers. With Trident, microservices an
 
 To install Trident on the deployed user cluster and provision a persistent volume, complete the following steps:
 
-.	Download the installation archive to the admin workstation and extract the contents. The current version of Trident is 21.01, which can be downloaded https://github.com/NetApp/trident/releases/download/v21.01.0/trident-installer-21.01.0.tar.gz[here].
+NOTE: The following instructions are screen-capped from a Trident 21.01 install, but the same steps to manually deploy the Trident Operator also apply to the current 21.04 release.
+
+.	Download the installation archive to the admin workstation and extract the contents. The current version of Trident is 21.04, which can be downloaded https://github.com/NetApp/trident/releases/download/v21.04.0/trident-installer-21.04.0.tar.gz[here].
 +
 ----
 ubuntu@gke-admin-ws-200915-151421:~$ wget https://github.com/NetApp/trident/releases/download/v21.01.0/trident-installer-21.01.0.tar.gz
@@ -59,7 +61,7 @@ ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl create -f deploy/
 customresourcedefinition.apiextensions.k8s.io/tridentorchestrators.trident.netapp.io created
 ----
 
-. If one does not exist, create a Trident namespace in your cluster using the provided manifest.
+. If a Trident namespace does not exist, create one in your cluster using the provided manifest.
 +
 ----
 ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ kubectl apply -f deploy/namespace.yaml
@@ -194,13 +196,13 @@ ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ ./tridentctl -n trident v
 +----------------+----------------+
 ----
 
-. The next step in enabling Trident integration with the NetApp HCI solution and Anthos is to create a backend that enables communication with the storage system. NetApp has been validated for several different protocols through the Anthos-ready partner storage validation program. This allows NetApp Trident to provide support in Anthos environments for NFS through our ONTAP platforms and iSCSI from both ONTAP and Element storage utilized in NetApp HCI.
+. The next step in enabling Trident integration with the NetApp HCI solution and Anthos is to create a backend that enables communication with the storage system. NetApp has been validated for several different protocols through the Anthos-ready partner storage validation program. This allows NetApp Trident to provide support in Anthos environments for NFS through our ONTAP platforms and iSCSI from both the ONTAP and Element storage used in NetApp HCI.
 +
 
 NOTE: A NetApp HCI platform deploys with NetApp Element storage by default. In this guide we configure a backend for this system specifically. In addition to this, a customer can choose to connect to a remote ONTAP storage system or deploy an ONTAP Select software-defined storage system as a virtual appliance in VMware vSphere to provide additional NFS and iSCSI services. The configuration of each of these additional storage backends is beyond the scope of this guide.
 
 
-. There are sample backend files available in the downloaded installation archive in the `sample-input` folder. Copy the `backend-solidfire.json` to your working directory and edit it to provide information detailing the storage system environment. For Element-based iSCSI connections, copy and edit the `backend-solidfire.json` file.
+. There are sample backend files available in the downloaded installation archive in the `sample-input` folder. Copy `backend-solidfire.json` to your working directory and edit it to provide information detailing the storage system environment. For Element-based iSCSI connections, copy and edit the `backend-solidfire.json` file.
 +
 ----
 ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ cp sample-input/backend-solidfire.json ./
@@ -224,7 +226,7 @@ ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ $ vi backend-solidfire.js
 }
 ----
 
-. With this back-end file in place, run the following command to create your first backend.
+. With this backend file in place, run the following command to create your first backend.
 +
 ----
 ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ ./tridentctl -n trident create backend -f backend.json
@@ -242,7 +244,7 @@ ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ cp sample-input/storage-c
 ubuntu@gke-admin-ws-200915-151421:~/trident-installer$ vi storage-class-basic.yaml
 ----
 
-. The only edit that must be made to this file is to define the `backendType` value to the name of the storage driver from the newly created backend. Also note the name-field value, which must be referenced in a later step.
+. The only edit that must be made to this file is to define the `backendType` value to the name of the storage driver from the newly created backend. Also note the name-field value that must be referenced in a later step.
 +
 
 ----
