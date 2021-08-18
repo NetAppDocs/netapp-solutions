@@ -1,0 +1,83 @@
+---
+sidebar: sidebar
+permalink: ai/aks-anf_load_day_15_in_dask_and_train_a_dask_cuml_random_forest_model.html
+keywords: dask, cuml, dataframe, criteo, click, logs, pandas, scikit, cudf
+summary: This section describes the loading of Criteo Click Logs day 15 in Pandas and training a scikit-learn random forest model. In this example, we performed DataFrame loading with Dask cuDF and trained a random forest model in Dask cuML.
+---
+
+= Load Day 15 in Dask and train a Dask cuML random forest model
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-08-12 10:46:35.683934
+//
+
+link:aks-anf_load_criteo_click_logs_day_15_in_pandas_and_train_a_scikit-learn_random_forest_model.html[Previous: Load Criteo Click Logs day 15 in Pandas and train a scikit-learn random forest model.]
+
+In a manner similar to the previous section, load Criteo Click Logs day 15 in Pandas and train a scikit-learn random forest model. In this example, we performed DataFrame loading with Dask cuDF and trained a random forest model in Dask cuML. We compared the differences in training time and scale in the section link:aks-anf_training_time_comparison.html[“Training time comparison.”]
+
+== criteo_dask_RF.ipynb
+
+This notebook imports `numpy`, `cuml`,  and the necessary `dask` libraries, as shown in the following example:
+
+....
+import cuml
+from dask.distributed import Client, progress, wait
+import dask_cudf
+import numpy as np
+import cudf
+from cuml.dask.ensemble import RandomForestClassifier as cumlDaskRF
+from cuml.dask.common import utils as dask_utils
+....
+
+Initiate Dask Client().
+
+....
+client = Client()
+....
+
+If your cluster is configured correctly, you can see the status of worker nodes.
+
+....
+client
+workers = client.has_what().keys()
+n_workers = len(workers)
+n_streams = 8 # Performance optimization
+....
+
+In our AKS cluster, the following status is displayed:
+
+image:aks-anf_image12.png[Error: Missing Graphic Image]
+
+Note that Dask employs the lazy execution paradigm: rather than executing the processing code instantly, Dask builds a Directed Acyclic Graph (DAG) of execution instead.  DAG contains a set of tasks and their interactions that each worker needs to run. This layout means the tasks do not run until the user tells Dask to execute them in one way or another. With Dask you have three main options:
+
+* *Call compute() on a DataFrame.* This call processes all the partitions and then returns results to the scheduler for final aggregation and conversion to cuDF DataFrame. This option should be used sparingly and only on heavily reduced results unless your scheduler node runs out of memory.
+* *Call persist() on a DataFrame.* This call executes the graph, but, instead of returning the results to the scheduler node, it maintains them across the cluster in memory so the user can reuse these intermediate results down the pipeline without the need for rerunning the same processing.
+* *Call head() on a DataFrame.* Just like with cuDF, this call returns 10 records back to the scheduler node. This option can be used to quickly check if your DataFrame contains the desired output format, or if the records themselves make sense, depending on your processing and calculation.
+
+Therefore, unless the user calls either of these actions, the workers sit idle waiting for the scheduler to initiate the processing. This lazy execution paradigm is common in modern parallel and distributed computing frameworks such as Apache Spark.
+
+The following paragraph trains a random forest model by using Dask cuML for distributed GPU-accelerated computing and calculates model prediction accuracy.
+
+....
+Adsf
+# Random Forest building parameters
+n_streams = 8 # optimization
+max_depth = 10
+n_bins = 16
+n_trees = 10
+cuml_model = cumlDaskRF(max_depth=max_depth, n_estimators=n_trees, n_bins=n_bins, n_streams=n_streams, verbose=True, client=client)
+cuml_model.fit(gdf_sliced_small, Y)
+# Model prediction
+pred_df = cuml_model.predict(gdf_test)
+# calculate accuracy
+cu_score = cuml.metrics.accuracy_score( test_y, pred_df )
+....
+
+link:aks-anf_monitor_dask_using_native_task_streams_dashboard.html[Next: Monitor Dask using native Task Streams dashboard.]
