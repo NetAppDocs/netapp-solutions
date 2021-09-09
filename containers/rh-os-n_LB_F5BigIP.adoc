@@ -5,7 +5,7 @@ summary:
 keywords: OpenShift, Kubernetes, F5, BIG-IP, F5 CIS, F5 IPAM
 ---
 
-= Installing F5 BigIP Load Balancers
+= Installing F5 BIG-IP Load Balancers
 
 :hardbreaks:
 :nofooter:
@@ -13,11 +13,11 @@ keywords: OpenShift, Kubernetes, F5, BIG-IP, F5 CIS, F5 IPAM
 :linkattrs:
 :imagesdir: ./../media/
 
-F5 BIGIP is an Application Delivery Controller (ADC) that offers a broad set of production-grade advanced traffic management and security services like L4-L7 load balancing, SSL/TLS offload, DNS, firewall and many more, that drastically increase the availability, security and performance of your applications.
+F5 BIG-IP is an Application Delivery Controller (ADC) that offers a broad set of production-grade advanced traffic management and security services like L4-L7 load balancing, SSL/TLS offload, DNS, firewall and many more, that drastically increase the availability, security and performance of your applications.
 
-F5 BIGIP can be deployed and consumed in various ways – on dedicated hardware or in cloud or as a virtual appliance on-premises. Refer to the documentation here to explore and deploy F5 BIGIP as per requirement.
+F5 BIG-IP can be deployed and consumed in various ways – on dedicated hardware or in cloud or as a virtual appliance on-premises. Refer to the documentation here to explore and deploy F5 BIG-IP as per requirement.
 
-For efficient integration of F5 BIGIP services with Red Hat OpenShift, F5 offers BIG-IP Container Ingress Service (CIS). CIS is installed as a controller pod that watches OpenShift API for certain Custom Resource Definitions (CRDs) and manages the F5 BIG-IP system configuration. F5 BIG-IP CIS can be configured to control OpenShift service types LoadBalancers and Routes.
+For efficient integration of F5 BIG-IP services with Red Hat OpenShift, F5 offers BIG-IP Container Ingress Service (CIS). CIS is installed as a controller pod that watches OpenShift API for certain Custom Resource Definitions (CRDs) and manages the F5 BIG-IP system configuration. F5 BIG-IP CIS can be configured to control service types LoadBalancers and Routes in OpenShift.
 
 Further, for automatic IP address allocation to service type LoadBalancer, you can utilize F5 IPAM controller. F5 IPAM controller is installed as a controller pod that watches OpenShift API for LoadBalancer services with an ipamLabel annotation to allocate the IP address from a pre-configured pool.
 
@@ -32,7 +32,7 @@ NOTE: F5 BIG-IP system can be deployed on dedicated hardware or in cloud or as a
 |===
 |Technology |Software version
 |Red Hat OpenShift
-|4.7
+|4.6 EUS, 4.7
 |F5 BIG-IP VE edition
 |16.1.0
 |F5 Container Ingress Service
@@ -57,7 +57,7 @@ image:redhat_openshift_image109.jpg[iApps upload]
 +
 image:redhat_openshift_image110.jpg[AS3 install validation]
 
-.	Next step is to configure the resources required for allowing communication between OpenShift and BIGIP systems. First create a tunnel between OpenShift and BIGIP server. For that, create a VXLAN tunnel interface on BIG-IP system for OpenShift SDN. Navigate to `Network` -> `Tunnels` -> `Profiles`, click on `Create`, set the `Parent Profile` to vxlan and `Flooding Type` to Multicast. Enter a name for the profile and click on `Finished`.
+.	Next step is to configure the resources required for allowing communication between OpenShift and BIG-IP systems. First create a tunnel between OpenShift and BIG-IP server. For that, create a VXLAN tunnel interface on BIG-IP system for OpenShift SDN. Navigate to `Network` -> `Tunnels` -> `Profiles`, click on `Create`, set the `Parent Profile` to vxlan and `Flooding Type` to Multicast. Enter a name for the profile and click on `Finished`.
 +
 image:redhat_openshift_image111.jpg[Create VXLAN profile]
 
@@ -67,7 +67,7 @@ image:redhat_openshift_image112.jpg[Create VXLAN tunnel]
 
 .	Log into the Red Hat OpenShift cluster with cluster-admin privileges.
 
-.	Next step is to create a hostsubnet on OpenShift for F5 BIGIP server which will extend the subnet from OpenShift cluster to the F5 BIGIP server. Download the host subnet YAML definition.
+.	Next step is to create a hostsubnet on OpenShift for F5 BIG-IP server which will extend the subnet from OpenShift cluster to the F5 BIG-IP server. Download the host subnet YAML definition.
 +
 [source, cli]
 wget https://github.com/F5Networks/k8s-bigip-ctlr/blob/master/docs/config_examples/openshift/f5-kctlr-openshift-hostsubnet.yaml
@@ -124,7 +124,7 @@ image:redhat_openshift_image113.jpg[Create Self IP for VXLAN]
 +
 image:redhat_openshift_image114.jpg[Create BIG-IP Partition]
 +
-NOTE: It is recommended that no manual configuration be done on partition that is intended to be configured and used with CIS.
+NOTE: F5 recommends that no manual configuration be done on the partition that is managed by CIS.
 
 .	Now, install the F5 BIG-IP CIS using the operator from OperatorHub. Log into the Red Hat OpenShift cluster with cluster-admin privileges and create a secret with F5 BIG-IP system login credentials which is a pre-requisite for the operator.
 +
@@ -430,7 +430,7 @@ f5-demo-test-57c46f6f98-47wwp   1/1     Running   0          27s
 f5-demo-test-57c46f6f98-cl2m8   1/1     Running   0          27s
 ----
 
-.	Check if the corresponding virtual server is created for the service of type LoadBalancer in the BIG-IP system. Navigate to `Local Traffic` -> `Virtual Servers` -> `Virtual Server List`.
+.	Check if the corresponding virtual server is created in the BIG-IP system for the service of type LoadBalancer in OpenShift. Navigate to `Local Traffic` -> `Virtual Servers` -> `Virtual Server List`.
 +
 image:redhat_openshift_image121.jpg[Validate the creation of BIG-IP virtual servers for corresponding service type LoadBalancer]
 
