@@ -5,7 +5,7 @@ keywords: Advanced Configuration, Private Registry, Astra Trident, OpenShift Reg
 summary: This section is dedicated to creating and configuring a private image registry backed by persistent storage provided by Astra Trident.
 ---
 
-= Creating Private Image Registries: Red Hat OpenShift with NetApp
+= Creating Private Image Registries
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -19,9 +19,9 @@ This procedure documents creating a private image registry which is backed by a 
 
 NOTE: Astra Control Center requires a registry to host the images the Astra containers require. The following section describes the steps to setup a private registry on Red Hat OpenShift cluster and pushing the images required to support the installation of Astra Control Center.
 
-== Creating A Private Image Registry
+== Creating A private image registry
 
-.	Edit the imageregistry operator, enter the below storage parameters to `spec` section
+.	Edit the imageregistry operator by entering the following storage parameters in the `spec` section.
 +
 ----
 [netapp-user@rhel7 ~]$ oc edit configs.imageregistry.operator.openshift.io
@@ -31,7 +31,7 @@ storage:
     claim:
 ----
 
-.	Then enter the following parameters to `spec` section for creating a OpenShift route with a custom hostname, save and exit
+.	Enter the following parameters in the `spec` section for creating a OpenShift route with a custom hostname. Save and exit.
 +
 ----
 routes:
@@ -39,21 +39,21 @@ routes:
     name: netapp-astra-route
 ----
 +
-NOTE: The above route config is used when you want a custom hostname for your route. If you want OpenShift to create a route with default hostname, you can just add the following parameters to `spec` section – `defaultRoute: true`
+NOTE: The above route config is used when you want a custom hostname for your route. If you want OpenShift to create a route with a default hostname, you can add the following parameters to the `spec` section: `defaultRoute: true`.
 
 +
 
-.Custom TLS Certificates
+.Custom TLS certificates
 ****
-When you are using custom hostname for the route, by default, it uses the default TLS configuration of OpenShift Ingress operator. However, you can add a custom TLS configuration to the route. To do so, following the below steps –
+When you are using a custom hostname for the route, by default, it uses the default TLS configuration of the OpenShift Ingress operator. However, you can add a custom TLS configuration to the route. To do so, complete the following steps.
 
-..	Create a secret with the route’s TLS certificates and key –
+..	Create a secret with the route’s TLS certificates and key.
 +
 ----
 [netapp-user@rhel7 ~]$ oc create secret tls astra-route-tls -n openshift-image-registry –cert/home/admin/netapp-astra/tls.crt --key=/home/admin/netapp-astra/tls.key
 ----
 
-..	Edit the imageregistry operator and add the following parameters to the `spec` section –
+..	Edit the imageregistry operator and add the following parameters to the `spec` section.
 +
 ----
 [netapp-user@rhel7 ~]$ oc edit configs.imageregistry.operator.openshift.io
@@ -65,7 +65,7 @@ routes:
 ----
 ****
 
-.	Next step is to edit the imageregistry operator again and change the management state of the operator to `Managed` state, save and exit –
+.	Edit the imageregistry operator again and change the management state of the operator to the `Managed` state. Save and exit.
 +
 ----
 oc edit configs.imageregistry/cluster
@@ -73,7 +73,7 @@ oc edit configs.imageregistry/cluster
 managementState: Managed
 ----
 
-.	If all the pre-requisites are satisfied, it should start creating PVCs, pods and services for the private image registry. In a few minutes, the registry should be up.
+.	If all the prerequisites are satisfied, PVCs, pods, and services are created for the private image registry. In a few minutes, the registry should be up.
 +
 ----
 [netapp-user@rhel7 ~]$oc get all -n openshift-image-registry
@@ -122,13 +122,13 @@ NAME                                     HOST/PORT                              
 route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.com          image-registry   <all>   reencrypt     None
 ----
 
-.	If you are using the default TLS certificates of Ingress operator OpenShift registry route, you can fetch the TLS certificates using the below command.
+.	If you are using the default TLS certificates for the ingress operator OpenShift registry route, you can fetch the TLS certificates using the following command.
 +
 ----
 [netapp-user@rhel7 ~]$ oc extract secret/router-ca --keys=tls.crt -n openshift-ingress-operator
 ----
 
-.	To allow OpenShift nodes to access and pull the images from the registry, you need to add the certificates to the docker client on the OpenShift nodes. Create a configmap in  `openshift-config` namespace using the TLS certificates and patch it to the cluster image config to make the certificate trusted.
+.	To allow OpenShift nodes to access and pull the images from the registry, add the certificates to the docker client on the OpenShift nodes. Create a configmap in the `openshift-config` namespace using the TLS certificates and patch it to the cluster image config to make the certificate trusted.
 +
 ----
 [netapp-user@rhel7 ~]$ oc create configmap astra-ca -n openshift-config --from-file=astra-registry.apps.ocp-vmw.cie.netapp.com=tls.crt
@@ -136,9 +136,9 @@ route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.
 [netapp-user@rhel7 ~]$ oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"astra-ca"}}}' --type=merge
 ----
 
-.	OpenShift internal registry is controlled by authentication. All the OpenShift users can access the OpenShift registry, but the operations that the logged in user can perform depends on the user permissions.
+.	The OpenShift internal registry is controlled by authentication. All the OpenShift users can access the OpenShift registry, but the operations that the logged in user can perform depends on the user permissions.
 +
-..	To allow a user/group of users to pull images from the registry, the user/s must have registry-viewer role assigned.
+..	To allow a user or a group of users to pull images from the registry, the user(s) must have the registry-viewer role assigned.
 +
 ----
 [netapp-user@rhel7 ~]$ oc policy add-role-to-user registry-viewer ocp-user
@@ -146,7 +146,7 @@ route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.
 [netapp-user@rhel7 ~]$ oc policy add-role-to-group registry-viewer ocp-user-group
 ----
 
-..	To allow a user/group of users to write or push images, the user/s must have registry-editor role assigned.
+..	To allow a user or group of users to write or push images, the user(s) must have the registry-editor role assigned.
 +
 ----
 [netapp-user@rhel7 ~]$ oc policy add-role-to-user registry-editor ocp-user
@@ -154,7 +154,7 @@ route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.
 [netapp-user@rhel7 ~]$ oc policy add-role-to-group registry-editor ocp-user-group
 ----
 +
-.	For OpenShift nodes to access the registry and push/pull the images, you will need to configure a pull secret.
+.	For OpenShift nodes to access the registry and push or pull the images, you need to configure a pull secret.
 +
 ----
 [netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-credentials --docker-server= astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password
@@ -162,19 +162,19 @@ route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.
 
 .	This pull secret can then be patched to serviceaccounts or be referenced in the corresponding pod definition.
 +
-.. To patch it to service accounts
+.. To patch it to service accounts, run the following command.
 +
 ----
 [netapp-user@rhel7 ~]$ oc secrets link <service_account_name> astra-registry-credentials --for=pull
 ----
-.. To reference the pull secret in Pod definition, add the following parameter to the ‘spec’ section.
+.. To reference the pull secret in the pod definition, add the following parameter to the `spec` section.
 +
 ----
 imagePullSecrets:
   - name: astra-registry-credentials
 ----
 
-.	To push/pull an image from workstations apart from OpenShift node.
+.	To push or pull an image from workstations apart from OpenShift node, complete the following steps.
 +
 ..	Add the TLS certificates to the docker client.
 +
@@ -184,12 +184,12 @@ imagePullSecrets:
 [netapp-user@rhel7 ~]$ sudo cp /path/to/tls.crt /etc/docker/certs.d/astra-registry.apps.ocp-vmw.cie.netapp.com
 ----
 
-..	Log into OpenShift using oc login command.
+..	Log into OpenShift using the oc login command.
 +
 ----
 [netapp-user@rhel7 ~]$ oc login --token=sha256~D49SpB_lesSrJYwrM0LIO-VRcjWHu0a27vKa0 --server=https://api.ocp-vmw.cie.netapp.com:6443
 ----
-..	Log into the registry using OpenShift user credentials via podman/docker command.
+..	Log into the registry using OpenShift user credentials with the podman/docker command.
 +
 
 [role="tabbed-block"]
@@ -209,7 +209,7 @@ imagePullSecrets:
 --
 ====
 
-..	Push/pull the images.
+..	Push or pull the images.
 +
 
 [role="tabbed-block"]
