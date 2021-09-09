@@ -68,8 +68,8 @@ NOTE: To get started with a trial license for Astra Control, visit the https://c
 .	Unpack the tar ball and change the working directory to the resulting folder.
 +
 ----
-[netapp-user@rhel7 ~]$ tar -vxzf astra-control-center-21.08.57.tar.gz
-[netapp-user@rhel7 ~]$ cd astra-control-center-21.08.57
+[netapp-user@rhel7 ~]$ tar -vxzf astra-control-center-21.08.65.tar.gz
+[netapp-user@rhel7 ~]$ cd astra-control-center-21.08.65
 ----
 
 .	Before starting the installation, push the Astra Control Center images to an image registry.
@@ -172,16 +172,16 @@ NOTE: If you are using untrusted certificates for your registry, edit the shell 
 NOTE: If you are using an OpenShift internal registry with default TLS certificates from the ingress operator with a route, you still need to follow the previous step to patch the certificates to the route hostname. To extract the certificates from ingress operator, you can use the command `oc extract secret/router-ca --keys=tls.crt -n openshift-ingress-operator`.
 
 
-.	Create a namespace `acc-operator-system` for installing the Astra Control Center Operator.
+.	Create a namespace `netapp-acc-operator` for installing the Astra Control Center Operator.
 +
 ----
-[netapp-user@rhel7 ~]$ oc create ns acc-operator-system
+[netapp-user@rhel7 ~]$ oc create ns netapp-acc-operator
 ----
 
-.	Create a secret with credentials to log into the image registry in the `acc-operator-system` namespace.
+.	Create a secret with credentials to log into the image registry in `netapp-acc-operator` namespace.
 +
 ----
-[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-cred --docker-server=astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password -n acc-operator-system
+[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-cred --docker-server=astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password -n netapp-acc-operator
 secret/astra-registry-cred created
 ----
 
@@ -196,7 +196,7 @@ metadata:
   labels:
     control-plane: controller-manager
   name: acc-operator-controller-manager
-  namespace: acc-operator-system
+  namespace: netapp-acc-operator
 spec:
   replicas: 1
   selector:
@@ -288,7 +288,7 @@ kind: AstraControlCenter
 metadata:
   name: astra
 spec:
-  astraVersion: "21.08.57"
+  astraVersion: "21.08.65"
   astraAddress: "astra-control-center.cie.netapp.com"
   autoSupport:
     enrolled: true
@@ -318,7 +318,7 @@ NOTE: The previous file `astra_control_center_min.yaml` is the minimum version o
 . Check the `acc-operator-controller-manager` logs to ensure that the installation is completed.
 +
 ----
-[netapp-user@rhel7 ~]$ oc logs deploy/acc-operator-controller-manager -n acc-operator-system -c manager -f
+[netapp-user@rhel7 ~]$ oc logs deploy/acc-operator-controller-manager -n netapp-acc-operator -c manager -f
 ----
 +
 
@@ -326,7 +326,7 @@ NOTE: The following message should be displayed to indicate the successful insta
 
 +
 ----
-{"level":"info","ts":1624054318.029971,"logger":"controllers.AstraControlCenter","msg":"Successfully Reconciled AstraControlCenter in [seconds]s","AstraControlCenter":"netapp-astra-cc/astra","ae.Version":"[21.08.57]"}
+{"level":"info","ts":1624054318.029971,"logger":"controllers.AstraControlCenter","msg":"Successfully Reconciled AstraControlCenter in [seconds]s","AstraControlCenter":"netapp-astra-cc/astra","ae.Version":"[21.08.65]"}
 ----
 +
 .	The username for logging into Astra Control Center is the email address of the administrator provided in the CRD file and the password is a string `ACC-` appended to the Astra Control Center UUID. Run the following command:
