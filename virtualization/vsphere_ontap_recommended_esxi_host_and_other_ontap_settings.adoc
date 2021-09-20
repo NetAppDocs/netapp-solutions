@@ -1,0 +1,108 @@
+---
+sidebar: sidebar
+permalink: virtualization/vsphere_ontap_recommended_esxi_host_and_other_ontap_settings.html
+keywords:
+summary:
+---
+
+= Recommended ESXi host and other ONTAP settings
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-02-16 10:32:05.390906
+//
+
+NetApp has developed a set of ESXi host multipathing and HBA timeout settings for proper behavior with ONTAP based on NetApp testing. These are easily set using ONTAP tools for VMware vSphere. From the Summary dashboard, click Edit Settings in the Host Systems portlet or right-click the host in vCenter, then navigate to ONTAP tools > Set Recommended Values. Here are the currently recommended host settings with the 9.8 release.
+
+|===
+|Host setting
+|NetApp recommended value
+|ESXi advanced configuration
+|
+|VMFS3.HardwareAcceleratedLocking
+|Leave as set (VMware default is 1).
+|VMFS3.EnableBlockDelete
+|Leave as set (VMware default is 0, but this is not needed for VMFS6). For more information, see VMware KB article .
+|NFS Settings
+|
+|Net.TcpipHeapSize
+|vSphere 6.0 or later, set to 32.
+All other NFS configurations, set to 30.
+|Net.TcpipHeapMax
+|Set to 1536 for vSphere 6.0 and later.
+|NFS.MaxVolumes
+|vSphere 6.0 or later, set to 256.
+All other NFS configurations, set to 64.
+|NFS41.MaxVolumes
+|vSphere 6.0 or later, set to 256.
+|NFS.MaxQueueDepth
+|vSphere 6.0 or later, set to 128.
+|NFS.HeartbeatMaxFailures
+|Set to 10 for all NFS configurations.
+|NFS.HeartbeatFrequency
+|Set to 12 for all NFS configurations.
+|NFS.HeartbeatTimeout
+|Set to 5 for all NFS configurations.
+|SunRPC.MaxConnPerIP
+|vSphere 7.0 or later, set to 128.
+|FC/FCoE Settings
+|
+|Path selection policy
+|Set to RR (round robin) when FC paths with ALUA are used. Set to FIXED for all other configurations. Setting this value to RR helps provide load balancing across all active/optimized paths. The value FIXED is for older, non-ALUA configurations and helps prevent proxy I/O. In other words, it helps keep I/O from going to the other node of a high-availability (HA) pair in an environment that has Data ONTAP operating in 7-Mode.
+|Disk.QFullSampleSize
+|Set to 32 for all configurations. Setting this value helps prevent I/O errors.
+|Disk.QFullThreshold
+|Set to 8 for all configurations. Setting this value helps prevent I/O errors.
+|Emulex FC HBA timeouts
+|Use the default value.
+|QLogic FC HBA timeouts
+|Use the default value.
+|iSCSI Settings
+|
+|Path selection policy
+|Set to RR (round robin) for all iSCSI paths. Setting this value to RR helps provide load balancing across all active/optimized paths.
+|Disk.QFullSampleSize
+|Set to 32 for all configurations. Setting this value helps prevent I/O errors.
+|Disk.QFullThreshold
+|Set to 8 for all configurations. Setting this value helps prevent I/O errors.
+|===
+
+ONTAP tools also specify certain default settings when creating ONTAP FlexVol volumes and LUNs:
+
+|===
+|ONTAP tool
+|Default setting
+|Snapshot reserve (-percent-snapshot-space)
+|0
+|Fractional reserve (-fractional-reserve)
+|0
+|Access time update (-atime-update)
+|False
+|Minimum readahead (-min-readahead)
+|False
+|Scheduled Snapshot copies
+|None
+|Storage efficiency
+|Enabled
+|Volume guarantee
+|None (thin provisioned)
+|Volume Autosize
+|grow_shrink
+|LUN space reservation
+|Disabled
+|LUN space allocation
+|Enabled
+|===
+
+== Other host multipath configuration considerations
+
+While not currently configured by available ONTAP tools, NetApp suggests considering these configuration options:
+
+* In high-performance environments or when testing performance with a single LUN datastore, consider changing the load balance setting of the round-robin (VMW_PSP_RR) path selection policy (PSP) from the default IOPS setting of 1000 to a value of 1. See VMware KB https://kb.vmware.com/s/article/2069356[2069356^] for more info.
+* In vSphere 6.7 Update 1, VMware introduced a new latency load balance mechanism for the Round Robin PSP. The new option considers I/O bandwidth and path latency when selecting the optimal path for I/O. You might benefit from using it in environments with non-equivalent path connectivity, such as cases where there are more network hops on one path than another, or when using a NetApp All SAN Array system. See https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.storage.doc/GUID-B7AD0CA0-CBE2-4DB4-A22C-AD323226A257.html?hWord=N4IghgNiBcIA4Gc4AIJgC4FMB2BjAniAL5A[Path Selection Plug-Ins and Policies^] for more information.
