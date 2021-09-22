@@ -20,7 +20,9 @@ Certain prerequisites needs to be configured at both on-prem and cloud before an
 
 === 1. Setup Database Admin User in SnapCenter
 
-NetApp SnapCenter tool utilizes role based access control (RBAC) for managing user access and permission grants. There are prepopulated roles after SnapCenter installation. Custom roles can be created as well based on user needs or applications. It makes sense to have a dedicated admin user ID for each database platform supported by SnapCenter for database backup and recovery, disaster recovery. Some may also choose to use a single ID to manage all databases. In our test cases, we have created an dedicated admin user for Oracle and SQL Server respectively.
+NetApp SnapCenter tool utilizes role based access control (RBAC) for managing user resources access and permission grants. There are prepopulated roles after SnapCenter installation. Custom roles can be created as well based on user needs or applications. It makes sense to have a dedicated admin user ID for each database platform supported by SnapCenter for database backup and recovery, disaster recovery. Some may also choose to use a single ID to manage all databases. In our test cases, we have created an dedicated admin user for Oracle and SQL Server respectively.
+
+Certain SnapCenter resources can only be provisioned with SnapCenterAdmin role. Then resources can be assigned to other user IDs for access.
 
 In a pre installed and configured on-prem SnapCenter environment, following tasks may already have being done. If not, following are steps to create database admin user:
 
@@ -46,7 +48,7 @@ Generally, you want to use an administrator user accounts on the host as your ho
 ... The RBAC DB admin user must have both the resource group and backup privileges.
 
 . Unix host for Oracle:
-.. You must have enabled the password-based SSH connection for the root or non-root user.
+.. You must have enabled the password-based SSH connection for the root or non-root user by editing sshd.conf and restart sshd service. The password-based SSH authentication on AWS instance by default is turned off.
 .. Configure the sudo privileges for the non-root user to install and start the plug-in process. After installing the plug-in, the processes will be running as an effective root user.
 .. Create credentials with authentication mode as Linux for the install user.
 .. You must have installed Java 1.8.x, 64-bit, on your Linux host.
@@ -54,62 +56,77 @@ Generally, you want to use an administrator user accounts on the host as your ho
 
 === 3. SnapCenter Host Plugin Installation
 
-Following steps illustrate how a database host is added to SnapCenter while a SnapCenter plugin is installed on the host. The procedure applies to both adding on-prem hosts and adding cloud hosts. Following demonstrates adding a Windows host residing in AWS.
+Following steps illustrate how a database host is added to SnapCenter while a SnapCenter plugin is installed on the host. The procedure applies to both adding on-prem hosts and adding cloud hosts. Following demonstrates adding a Windows or a Linux host residing in AWS.
 
-. Add Windows host and installation of plugin on the host:
-.. Login to SnapCenter as an user ID with SnapCenterAdmin privilege
-.. Click on Hosts tab from left side menu list, then click on Add to open add host workflow
-.. Choose Windows for Host Type, Host Name can be either host name or IP address, however host name must be resolved to correct host IP address from SnapCenter host. Choose host credentials created in step 2. Choose Microsoft Windows and Microsoft SQL Server as the plugin packages to be installed
-+
+==== Add Windows host and installation of plugin on the host:
+. Login to SnapCenter as an user ID with SnapCenterAdmin privilege
+. Click on Hosts tab from left side menu list, then click on Add to open add host workflow
+. Choose Windows for Host Type, Host Name can be either host name or IP address, however host name must be resolved to correct host IP address from SnapCenter host. Choose host credentials created in step 2. Choose Microsoft Windows and Microsoft SQL Server as the plugin packages to be installed
+
 image:snapctr_add_windows_host_01.PNG[Error: Missing Graphic Image]
 
-.. After plugin is installed on a Windows host, its Overall Status is showing as "Configure log directory".
-+
+[start=4]
+. After plugin is installed on a Windows host, its Overall Status is showing as "Configure log directory".
+
 image:snapctr_add_windows_host_02.PNG[Error: Missing Graphic Image]
 
-.. Click on host Name to open SQL Server log directory configuration
-+
+[start=5]
+. Click on host Name to open SQL Server log directory configuration
+
 image:snapctr_add_windows_host_03.PNG[Error: Missing Graphic Image]
 
-.. Click on "Configure log directory" to open "Configure Plug-in for SQL Server"
-+
+[start=6]
+. Click on "Configure log directory" to open "Configure Plug-in for SQL Server"
+
 image:snapctr_add_windows_host_04.PNG[Error: Missing Graphic Image]
 
-.. Click on Browse to discover the NetApp storage that a log directory can be set. SnapCenter use this log directory to rollup the SQL server transaction log files, then click on Save.
-+
+[start=7]
+. Click on Browse to discover the NetApp storage that a log directory can be set. SnapCenter use this log directory to rollup the SQL server transaction log files, then click on Save.
+
 image:snapctr_add_windows_host_05.PNG[Error: Missing Graphic Image]
 
-.. After log directory is configured, the Windows host plugin Overall Status is changed to Running.
-+
+[start=8]
+. After log directory is configured, the Windows host plugin Overall Status is changed to Running.
+
 image:snapctr_add_windows_host_06.PNG[Error: Missing Graphic Image]
 
-.. Assign the host to database management user ID - navigating to Settings and Users and Access tab, click on the user ID that the host needs to be assigned to, click Save to complete the host resource assignment
-+
+[start=9]
+. Assign the host to database management user ID - navigating to Settings and Users and Access tab, click on the user ID that the host needs to be assigned to, click Save to complete the host resource assignment
+
 image:snapctr_add_windows_host_07.PNG[Error: Missing Graphic Image]
 image:snapctr_add_windows_host_08.PNG[Error: Missing Graphic Image]
 
-.. With successful installation, the database resources on the host can be immediately discovered. Click on resources tab discover the new resources on the host just enabled. Click on Refresh if resources are not discovered. If Windows credential does not have sysadmin access to database instance, additional database credential can be configured to unlock the red lock.
-+
-image:snapctr_add_windows_host_09.PNG[Error: Missing Graphic Image]
-image:snapctr_add_windows_host_10.PNG[Error: Missing Graphic Image]
+==== Add Unix host and installation of plugin on the host:
+. Login to SnapCenter as an user ID with SnapCenterAdmin privilege
+. Click on Hosts tab from left side menu list, then click on Add to open add host workflow
+. Choose Linux as Host Type, Host Name can be either host name or IP address, however host name must be resolved to correct host IP address from SnapCenter host. Choose host credentials created in step 2. The host Credential needs sudo privilege. Check Oracle Database as the Plug-ins to be installed, which would install both Oracle and Linux host plugins.
 
-.. After appropriate credential is configured either at Windows level or database level, the SQL Server Type is reviewed.
-+
-image:snapctr_add_windows_host_11.PNG[Error: Missing Graphic Image]
+image:snapctr_add_linux_host_01.PNG[Error: Missing Graphic Image]
 
+[start=4]
+. Click on more options and check "Skip preinstall checks". You will be prompted to confirm skipping of preinstall check, click on Yes to skip and Save.
 
+image:snapctr_add_linux_host_02.PNG[Error: Missing Graphic Image]
 
+[start=5]
+. Click on Submit to start plugin installation, you will be prompted to Confirm Fingerprint as shown below.
 
+image:snapctr_add_linux_host_03.PNG[Error: Missing Graphic Image]
 
+[start=6]
+. SnapCenter first performs host validation, registration and then the plugin is installed on Linux host. The Overall Status will be transitioned from Installing plugin in to running status.
 
+image:snapctr_add_linux_host_04.PNG[Error: Missing Graphic Image]
 
+[start=7]
+. Assign the newly added host to proper database management user ID
 
-
-
+image:snapctr_add_linux_host_05.PNG[Error: Missing Graphic Image]
+image:snapctr_add_linux_host_06.PNG[Error: Missing Graphic Image]
 
 === 4. DB Resource Discovery
 
-Once DB host plugin is installed, click on Resources tab on the left side menu. Then click on Refresh Resources tab. If the plugin is installed appropriately, the databases resources on the host should be discovered and displayed.
+With successful plugin installation, the database resources on the host can be immediately discovered. Click on Resources tab on the left side menu. Depending on the type of database platform, number of views are available such as database, resources group etc. You may need to click on Refresh Resources tab if the resources on the host somehow is not discovered and displayed.
 
 image:snapctr_resources_ora.PNG[Error: Missing Graphic Image]
 
@@ -119,13 +136,174 @@ When backup configuration or policy is setup and a backup has been executed, the
 
 image:snapctr_resources_sql.PNG[Error: Missing Graphic Image]
 
+If the database access credential is not properly setup, a red lock button indicates that database is not accessible such as a Windows credential does not have sysadmin access to database instance, database credential needs to be reconfigured to unlock the red lock.
+
+image:snapctr_add_windows_host_09.PNG[Error: Missing Graphic Image]
+image:snapctr_add_windows_host_10.PNG[Error: Missing Graphic Image]
+
+After appropriate credential is configured either at Windows level or database level, the SQL Server Type information is gathered and reviewed.
+
+image:snapctr_add_windows_host_11.PNG[Error: Missing Graphic Image]
+
 === 5. Setup Storage Cluster Peering and DB Volumes Replication
 
+To protect your on-prem database data using public cloud as target destination, on-prem ONTAP cluster database volumes are replicated to cloud CVO using NetApp snapmirror technology. The replicated target volumes then can be cloned for DEV/OPS or disaster recovery. Here are high level steps to setup the cluster peering and DB volumes replication.
 
+. Configure inter-cluster lifs for cluster Peering on both on-prem cluster and CVO cluster instance. This can be done through ONTAP System Manger. A default CVO deployment will have inter-cluster lifs configured automatically.
 
-=== 6. Using Ansible Automation to Sync Up DB Instances between On-prem and Cloud - Optional
+on-prem cluster:
+image:snapctr_cluster_replication_01.PNG[Error: Missing Graphic Image]
 
+target cvo cluster:
+image:snapctr_cluster_replication_02.PNG[Error: Missing Graphic Image]
 
+[start=2]
+. With inter-cluster lifs configured, cluster peering and volumes replication can be easily setup through Cloud Manager. Please refer to section for details.
+
+=== 6. Add CVO Database Storage SVM to SnapCenter
+. Login SnapCenter with an user ID with SnapCenterAdmin privilege
+. Click on Storage System tab from menu, then New to add CVO storage SVM that is hosting replicated target database volumes to SnapCenter. Enter cluster management IP in Storage System field and appropriate Username and password
+
+image:snapctr_add_cvo_svm_01.PNG[Error: Missing Graphic Image]
+
+[start=3]
+. Click on More Options to open additional storage configuration options. In the Platform field, choose Cloud Volumes ONTAP and check Secondary, then Save
+
+image:snapctr_add_cvo_svm_02.PNG[Error: Missing Graphic Image]
+
+[start=4]
+. Assign the storage systems to SnapCenter database management user IDs following similar procedure as shown in section 3 - SnapCenter Host Plugin Installation
+
+image:snapctr_add_cvo_svm_03.PNG[Error: Missing Graphic Image]
+
+=== 7. Setup Database Backup Policy in SnapCenter
+
+Following procedures demonstrates how to create a full database or log file backup policy. The policy then can be implemented to protect databases resources. The recovery point objective (RPO) or recovery time objective (RTO) dictates the frequency of database backup and/or log backup.
+
+==== Create a Full Database Backup Policy for Oracle
+
+. Login to SnapCenter as a database management user ID, Click on Settings, then Polices
+image:snapctr_ora_policy_data_01.PNG[Error: Missing Graphic Image]
+
+[start=2]
+. Click on New to launch new backup policy creation Workflow, or choose an existing policy for modification
+image:snapctr_ora_policy_data_02.PNG[Error: Missing Graphic Image]
+
+[start=3]
+. Select backup type and schedule frequency
+image:snapctr_ora_policy_data_03.PNG[Error: Missing Graphic Image]
+
+[start=4]
+. Set backup retention setting. This defines how many full database backup copies to keep.
+image:snapctr_ora_policy_data_04.PNG[Error: Missing Graphic Image]
+
+[start=5]
+. Select secondary replication options to push local primary snapshots backups to be replicated to secondary location in cloud
+image:snapctr_ora_policy_data_05.PNG[Error: Missing Graphic Image]
+
+[start=6]
+. Specify any optional script to run before and after a backup run
+image:snapctr_ora_policy_data_06.PNG[Error: Missing Graphic Image]
+
+[start=7]
+. Run backup verification if desired
+image:snapctr_ora_policy_data_07.PNG[Error: Missing Graphic Image]
+
+[start=8]
+. Summary
+image:snapctr_ora_policy_data_08.PNG[Error: Missing Graphic Image]
+
+==== Create a Database Log Backup Policy for Oracle
+
+. Login to SnapCenter as a database management user ID, Click on Settings, then Polices
+. Click on New to launch new backup policy creation Workflow, or choose an existing policy for modification
+
+image:snapctr_ora_policy_log_01.PNG[Error: Missing Graphic Image]
+
+[start=3]
+. Select backup type and schedule frequency
+image:snapctr_ora_policy_log_02.PNG[Error: Missing Graphic Image]
+
+[start=4]
+. Set the log retention period
+image:snapctr_ora_policy_log_03.PNG[Error: Missing Graphic Image]
+
+[start=5]
+. Enable replication to secondary location in public cloud
+image:snapctr_ora_policy_log_04.PNG[Error: Missing Graphic Image]
+
+[start=6]
+. Specify optional scripts to run before and after log backup if any
+image:snapctr_ora_policy_log_05.PNG[Error: Missing Graphic Image]
+
+[start=7]
+. Specify backup verification scripts if any
+image:snapctr_ora_policy_log_06.PNG[Error: Missing Graphic Image]
+
+[start=8]
+. Summary
+image:snapctr_ora_policy_log_07.PNG[Error: Missing Graphic Image]
+
+==== Create a Full Database Backup Policy for SQL
+
+. Login to SnapCenter as a database management user ID, Click on Settings, then Polices
+image:snapctr_sql_policy_data_01.PNG[Error: Missing Graphic Image]
+
+[start=2]
+. Click on New to launch new backup policy creation Workflow, or choose an existing policy for modification
+image:snapctr_sql_policy_data_02.PNG[Error: Missing Graphic Image]
+
+[start=3]
+. Define backup option and schedule frequency. For SQL Server configured with a availability group, a preferred backup replica can be set.
+image:snapctr_sql_policy_data_03.PNG[Error: Missing Graphic Image]
+
+[start=4]
+. Set the backup retention period
+image:snapctr_sql_policy_data_04.PNG[Error: Missing Graphic Image]
+
+[start=5]
+. Enable backup copy replication to secondary location in cloud
+image:snapctr_sql_policy_data_05.PNG[Error: Missing Graphic Image]
+
+[start=6]
+. Specify any optional scripts to run before or after backup job
+image:snapctr_sql_policy_data_06.PNG[Error: Missing Graphic Image]
+
+[start=7]
+. Specify the options to run backup verification
+image:snapctr_sql_policy_data_07.PNG[Error: Missing Graphic Image]
+
+[start=8]
+. Summary
+image:snapctr_sql_policy_data_08.PNG[Error: Missing Graphic Image]
+
+==== Create a Database Log Backup Policy for SQL
+
+. Login to SnapCenter as a database management user ID, Click on Settings, Polices, then New to launch a new policy creation workflow
+image:snapctr_sql_policy_log_01.PNG[Error: Missing Graphic Image]
+
+[start=2]
+. Define log backup option and schedule frequency. For SQL Server configured with a availability group, a preferred backup replica can be set.
+image:snapctr_sql_policy_data_02.PNG[Error: Missing Graphic Image]
+
+[start=3]
+. SQL server data backup policy defines the log backup retention, accept default here
+image:snapctr_sql_policy_data_03.PNG[Error: Missing Graphic Image]
+
+[start=4]
+. Enable log backup replication to secondary in cloud
+image:snapctr_sql_policy_data_04.PNG[Error: Missing Graphic Image]
+
+[start=5]
+. Specify any optional scripts to run before or after backup job
+image:snapctr_sql_policy_data_05.PNG[Error: Missing Graphic Image]
+
+[start=6]
+. Summary
+image:snapctr_sql_policy_data_06.PNG[Error: Missing Graphic Image]
+
+=== 8. Apply Backup Policy to Protect database
+=== 9. Validate Backup
 
 == Public Cloud
 
