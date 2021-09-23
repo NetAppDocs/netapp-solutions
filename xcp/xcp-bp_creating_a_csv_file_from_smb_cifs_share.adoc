@@ -1,0 +1,49 @@
+---
+sidebar: sidebar
+permalink: xcp-bp_creating_a_csv_file_from_smb_cifs_share.html
+keywords: csv, data dump
+summary: The command in this section dumps data in the CSV format. You can sum up the size column to get the total size of the data.
+---
+
+= Creating a CSV file from SMB/CIFS share 
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-09-20 14:39:42.322128
+//
+
+
+The following command dumps data in the CSV format. You can sum up the size column to get the total size of the data.
+
+....
+xcp scan -match "((now-x.atime) / 3600) > 31*day" -fmt "'{}, {}, {}, {}'.format(relpath, name, strftime(x.atime, '%y-%m-%d-%H:%M:%S'), humanize_size(size))" -preserve-atime  >file.csv
+....
+
+The output should look similar to this example:
+
+....
+erase\report_av_fp_cdot_crosstab.csvreport_av_fp_cdot_crosstab.csv20-01-29-10:26:2449.6MiB
+....
+
+To scan up to the depth of three subdirectories and provide the result in sorting order, run the `xcp -du` command and dump the size at each directory level up to the depth of three subdirectories.
+
+....
+./xcp  scan -du -depth 3 NFS_Server_IP:/source_vol
+ 
+....
+
+To sort, dump the information to a CSV file and sort the information.
+
+....
+xcp scan -match “type == d” -depth 3 -fmt "'{}, {}, {}, {}'.format(name, relpath, size)" NFS_Server_IP:/share > directory_report.csv
+....
+
+This is a custom report that uses the `-fmt` command.  It scans all the directories and dumps the name of the directory, path,  and size of directory into a CSV file. You can sort the size column from the spreadsheet application.
+
+
