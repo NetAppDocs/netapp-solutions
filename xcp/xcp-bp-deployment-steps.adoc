@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
-permalink: xcp-bp_deployment_steps.html
+permalink: xcp-bp-deployment-steps.html
 keywords: deployment, solution components, linux server, windows server aff a800, ha
-summary: This section covers deployment steps for NetApp XCP for data transfer. 
+summary: This section covers deployment steps for NetApp XCP for data transfer.
 ---
 
-= Deployment steps 
+= Deployment steps
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -18,15 +18,15 @@ summary: This section covers deployment steps for NetApp XCP for data transfer.
 // 2021-09-20 14:39:42.235956
 //
 
-== Test bed details 
+== Test bed details
 
-The following table provides the details of the test bed that was used for this deployment and performance validation. 
+The following table provides the details of the test bed that was used for this deployment and performance validation.
 
 |===
 |Solution components |Details
 
 |XCP version 1.7
-a|* One Linux server - Linux (RHEL 7.9 or RHEL 8) 
+a|* One Linux server - Linux (RHEL 7.9 or RHEL 8)
 * One Windows server – Windows Server 2019 standard
 |NetApp AFF storage array HA pair for the source volume
 a|* AFF8080
@@ -46,16 +46,16 @@ a|* AFF A800
 |10GbE
 |===
 
-== Steps for deployment 
+== Steps for deployment
 
 To deploy NetApp XCP for data transfer, first install and activate the XCP software on the destination location. You can review the details in the https://mysupport.netapp.com/documentation/productlibrary/index.html?productID=63064[NetApp XCP User Guide^]. To do so, complete the following steps:
 
 . Meet the prerequisites as detailed in the section (xref) “Prerequisites for XCP.”
-. Download the XCP software from the https://mysupport.netapp.com/site/products/all/details/netapp-xcp/downloads-tab[NetApp XCP (Downloads) page^].  
-. Copy the downloaded XCP tar files to the XCP server. 
+. Download the XCP software from the https://mysupport.netapp.com/site/products/all/details/netapp-xcp/downloads-tab[NetApp XCP (Downloads) page^].
+. Copy the downloaded XCP tar files to the XCP server.
 +
 ....
-# scp Documents/OneDrive\ -\ NetApp\ Inc/XCP/software/1.6.1/NETAPP_XCP_1.6.1.tgz 
+# scp Documents/OneDrive\ -\ NetApp\ Inc/XCP/software/1.6.1/NETAPP_XCP_1.6.1.tgz
 ....
 
 . Untar the tarfile.
@@ -88,7 +88,7 @@ To deploy NetApp XCP for data transfer, first install and activate the XCP softw
 [root@mastr-53 ~]# telnet 10.63.150.63 2049
 ....
 
-. Configure the catalog. 
+. Configure the catalog.
 .. Create an NFS volume and export NFS for the XCP catalog. You can also leverage the operating system NFS export for XCP catalog.
 +
 ....
@@ -110,11 +110,11 @@ A800-Node1-2::> volume mount -vserver Hadoop_SVM -volume xcpcatalog_vol -junctio
 # Sample xcp config
 [xcp]
 catalog = 10.63.150.64:/xcpcatalog
- 
+
 [root@mastr-53 ~]#
 ....
 
-. Find the source NAS exports by using `xcp show`. Look for: 
+. Find the source NAS exports by using `xcp show`. Look for:
 +
 ....
 == NFS Exports ==
@@ -151,7 +151,7 @@ A800-Node1-2::> volume show -volume xcpcatalog -fields files,files-used
 A800-Node1-2::> volume show -volume xcpdest -fields files,files-used
 A800-Node1-2::> volume modify -volume xcpcatalog -vserver A800-Node1_vs1 -files 2000000
 Volume modify successful on volume xcpcatalog of Vserver A800-Node1_vs1.
- 
+
 A800-Node1-2::> volume show -volume xcpcatalog -fields files,files-used
 ....
 
@@ -182,12 +182,12 @@ STATUS      : PASSED
 ....
 +
 [NOTE]
-By default, XCP creates seven parallel processes to copy the data. This can be tuned. 
+By default, XCP creates seven parallel processes to copy the data. This can be tuned.
 +
 [NOTE]
 NetApp recommends that the source volume be read only. In real time, the source volume is a live, active file system. The `xcp copy` operation might fail because NetApp XCP does not support a live source that is continuously changed by an application.
 +
-For Linux, XCP requires an Index ID because XCP Linux performs cataloging. 
+For Linux, XCP requires an Index ID because XCP Linux performs cataloging.
 
 . (Optional) Check the inodes on the destination NetApp volume.
 +
@@ -196,7 +196,7 @@ A800-Node1-2::> volume show -volume xcpdest -fields files,files-used
 vserver        volume  files    files-used
 -------------- ------- -------- ----------
 A800-Node1_vs1 xcpdest 21251126 15039685
- 
+
 A800-Node1-2::>
 ....
 
@@ -211,7 +211,7 @@ Total Time  : 3m31s.
 STATUS      : PASSED
 ....
 +
-For this document, to simulate real-time, the one million files in the source data were renamed,  and then the updated files were copied to the destination by using `xcp sync`. For Windows, XCP needs both source and destination paths. 
+For this document, to simulate real-time, the one million files in the source data were renamed, and then the updated files were copied to the destination by using `xcp sync`. For Windows, XCP needs both source and destination paths.
 
 . Validate data transfer. You can validate that the source and destination have the same data by using `xcp verify`.
 +
@@ -226,7 +226,6 @@ STATUS      : PASSED
 XCP documentation provides multiple options (with examples) for the `scan`, `copy`, `sync`, and `verify` operations. For more information, see the https://mysupport.netapp.com/documentation/productlibrary/index.html?productID=63064[NetApp XCP User Guide^].
 
 [NOTE]
-Windows customers should copy the data by using access control lists (ACLs). NetApp recommends using the command `xcp copy -acl -fallbackuser\<username> - fallbackgroup\<username or groupname> <source> <destination>`. To maximum performance,  considering the source volume that has SMB data with ACL and the data accessible by both NFS and SMB, the target must be an NTFS volume. Using XCP (NFS version), copy the data from the Linux server and execute the XCP (SMB version) sync with the `-acl` and `-nodata` options from the Windows server to copy the ACLs from source data to the target SMB data.
+Windows customers should copy the data by using access control lists (ACLs). NetApp recommends using the command `xcp copy -acl -fallbackuser\<username> -fallbackgroup\<username or groupname> <source> <destination>`. To maximum performance, considering the source volume that has SMB data with ACL and the data accessible by both NFS and SMB, the target must be an NTFS volume. Using XCP (NFS version), copy the data from the Linux server and execute the XCP (SMB version) sync with the `-acl` and `-nodata` options from the Windows server to copy the ACLs from source data to the target SMB data.
 
 For detailed steps, see https://helpcenter.netwrix.com/NA/Configure_IT_Infrastructure/Accounts/DCA_Manage_Auditing_Security_Log.html[Configuring 'Manage Auditing and Security Log' Policy^].
-
