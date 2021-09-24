@@ -1,0 +1,63 @@
+---
+sidebar: sidebar
+permalink: xcp/xcp-bp-troubleshooting.html
+keywords: troubleshooting, problems, error 70,
+summary: This section provides troubleshooting guidance for data migration using NetApp XCP.
+---
+
+= Troubleshooting
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-09-20 14:39:42.487089
+//
+
+link:xcp-bp-best-practice-guidelines-and-recommendations.html[Previous: Best practice guidelines and recommendations.]
+
+= Error 1: XCP Failed with nfs3 error 70: stale filehandle Error in the xcp.log
+
+*Reason and guidance.*
+
+Mount the source folder and verify that the folder exists. If it does not exist or if it has been removed, you will receive a `stale filehandle` error, in which case, you can ignore the error.
+
+= Error 2: NetApp NFS Destination Volume Has Space, but XCP Failed with nfs3 error 28: no space left on device
+
+*Reason and guidance.*
+
+. Check the space of the NFS destination volume by running the `df` command or check the storage.
++
+....
+root@workr-140: USER3# df -h /xcpdest
+Filesystem                 Size  Used Avail Use% Mounted on
+10.63.150.127:/xcpsrc_vol  4.3T  1.7T  2.6T  40% /xcpsrc_vol
+....
+
+. Check the inodes in the storage controller.
++
+....
+A800-Node1-2::> volume show -volume xcpdest -fields files,files-used
+vserver        volume  files    files-used
+-------------- ------- -------- ----------
+A800-Node1_vs1 xcpdest 21251126 21251126
+A800-Node1-2::>
+....
+
+. If inode is used, increase the number of inodes by running the following command:
++
+....
+A800-Node1-2::> volume modify -volume xcpdest -vserver A800-Node1_vs1 -files 40000000
+Volume modify successful on volume xcpdest of Vserver A800-Node1_vs1.
+A800-Node1-2::> volume show -volume xcpdest -fields files,files-used
+vserver        volume  files    files-used
+-------------- ------- -------- ----------
+A800-Node1_vs1 xcpdest 39999990 21251126
+A800-Node1-2::>
+....
+
+link:xcp-bp-where-to-find-additional-information.html[Next: Where to find additional information.]

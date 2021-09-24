@@ -1,0 +1,86 @@
+---
+sidebar: sidebar
+permalink: xcp/xcp-bp-specific-date-based-scan-and-copy-of-data.html
+keywords: copy, specific date
+summary: This solution is based on a customer who needs to copy data based on a specific date.
+---
+
+= Specific date-based scan and copy of data
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-09-20 14:39:42.311677
+//
+
+link:xcp-bp-duplicate-files.html[Previous: Duplicate files.]
+
+This solution is based on a customer who needs to copy data based on a specific date. Verify the following details:
+
+....
+Created a file in Y: and checked the scan command to list them.
+ 
+c:\XCP>dir Y:\karthik_test
+ Volume in drive Y is from
+ Volume Serial Number is 80F1-E201
+ 
+ Directory of Y:\karthik_test
+ 
+05/26/2020  02:51 PM    <DIR>          .
+05/26/2020  02:50 PM    <DIR>          ..
+05/26/2020  02:51 PM             2,295 testfile.txt
+               1 File(s)          2,295 bytes
+               2 Dir(s)     658,747,392 bytes free
+ 
+c:\XCP>
+ 
+c:\XCP>xcp scan -match "strftime(ctime,'%Y-%m-%d')>'2020-05-01'" -fmt "'{},{}'.format(iso(mtime),name)" Y:\
+XCP SMB 1.6; (c) 2020 NetApp, Inc.; Licensed to Calin Salagean [NetApp Inc] until Mon Dec 31 00:00:00 2029
+ 
+It appears that you are not running XCP as Administrator. To avoid access issues please run XCP as Administrator.
+ 
+2020-05-26_14:51:13.132465,testfile.txt
+2020-05-26_14:51:00.074216,karthik_test
+ 
+xcp scan -match strftime(ctime,'%Y-%m-%d')>'2020-05-01' -fmt '{},{}'.format(iso(mtime),name) Y:\ : PASSED
+30,205 scanned, 2 matched, 0 errors
+Total Time : 4s
+STATUS : PASSED
+ 
+Copy the files based on date (2020 YearMay month first date)  from Y:  to Z:
+c:\XCP>xcp copy -match "strftime(ctime,'%Y-%m-%d')>'2020-05-01'" Y: Z:\dest_karthik
+XCP SMB 1.6; (c) 2020 NetApp, Inc.; Licensed to Calin Salagean [NetApp Inc] until Mon Dec 31 00:00:00 2029
+ 
+It appears that you are not running XCP as Administrator. To avoid access issues please run XCP as Administrator.
+ 
+30,205 scanned, 3 matched, 0 copied, 0 errors, 5s
+xcp copy -match strftime(ctime,'%Y-%m-%d')>'2020-05-01' Y: Z:\dest_karthik : PASSED
+30,205 scanned, 3 matched, 2 copied, 0 errors
+Total Time : 6s
+STATUS : PASSED
+ 
+c:\XCP>
+ 
+Check the destination Z:
+ 
+c:\XCP>dir Z:\dest_karthik\karthik_test
+ Volume in drive Z is to
+ Volume Serial Number is 80F1-E202
+ 
+ Directory of Z:\dest_karthik\karthik_test
+ 
+05/26/2020  02:51 PM    <DIR>          .
+05/26/2020  02:50 PM    <DIR>          ..
+05/26/2020  02:51 PM             2,295 testfile.txt
+               1 File(s)          2,295 bytes
+               2 Dir(s)     659,316,736 bytes free
+ 
+c:\XCP>
+....
+
+link:xcp-bp-creating-a-csv-file-from-smb-cifs-share.html[Next: Creating a CSV file from SMB/CIFS share.]
