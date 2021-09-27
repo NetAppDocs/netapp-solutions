@@ -1,0 +1,62 @@
+---
+sidebar: sidebar
+permalink: xcp/xcp-bp-duplicate-files.html
+keywords: duplicate files, find
+summary: NetApp received a request to find duplicate files from a single volume or multiple volumes. NetApp provided the following solution.
+---
+
+= Duplicate files
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-09-20 14:39:42.304403
+//
+
+link:xcp-bp-using-the-xcp-data-mover-to-migrate-large-files.html[Previous: Using the XCP Data Mover to migrate large files.]
+
+NetApp received a request to find duplicate files from a single volume or multiple volumes. NetApp provided the following solution.
+
+For single volume, run the following commands:
+
+....
+[root@mastr-51 linux]# ./xcp -md5 -match 'type==f and nlinks==1 and size != 0' 10.63.150.213:/common_volume/nfsconnector_hw_cert/ | sort | uniq -cd --check-chars=32
+XCP 1.5; (c) 2020 NetApp, Inc.; Licensed to Calin Salagean [NetApp Inc] until Mon Dec 31 00:00:00 2029
+ 
+176,380 scanned, 138,116 matched, 138,115 summed, 10 giants, 61.1 GiB in (763 MiB/s), 172 MiB out (2.57 MiB/s), 1m5s
+ 
+Filtered: 38264 did not match
+176,380 scanned, 138,116 matched, 138,116 summed, 10 giants, 62.1 GiB in (918 MiB/s), 174 MiB out (2.51 MiB/s), 1m9s.
+      3 00004964ca155eca1a71d0949c82e37e nfsconnector_hw_cert/grid_01082017_174316/0/hadoopqe/accumulo/shell/pom.xml
+      2 000103fbed06d8071410c59047738389 nfsconnector_hw_cert/usr_hdp/2.5.3.0-37/hive2/doc/examples/files/dim-data.txt
+      2 000131053a46d67557d27bb678d5d4a1 nfsconnector_hw_cert/grid_01082017_174316/0/log/cluster/mahout_1/artifacts/classifier/20news_reduceddata/20news-bydate-test/alt.atheism/53265
+....
+
+For multiple volumes, run the following commands:
+
+....
+[root@mastr-51 linux]# cat multiplevolume_duplicate.sh
+#! /usr/bin/bash
+ 
+#user input
+JUNCTION_PATHS='/nc_volume1 /nc_volume2 /nc_volume3 /oplogarchivevolume'
+NFS_DATA_LIF='10.63.150.213'
+ 
+#xcp operation
+for i in $JUNCTION_PATHS
+do
+echo "start - $i" >> /tmp/duplicate_results
+/usr/src/xcp/linux/xcp -md5 -match 'type==f and nlinks==1 and size != 0' ${NFS_DATA_LIF}:$i | sort | uniq -cd --check-chars=32 | tee -a /tmp/duplicate_results
+echo "end - $i" >> /tmp/duplicate_results
+done
+ 
+[root@mastr-51 linux]# nohup bash +x multiplevolume_duplicate.sh &
+[root@mastr-51 linux]#  cat /tmp/duplicate_results
+....
+
+link:xcp-bp-specific-date-based-scan-and-copy-of-data.html[Next: Specific date-based scan and copy of data.]

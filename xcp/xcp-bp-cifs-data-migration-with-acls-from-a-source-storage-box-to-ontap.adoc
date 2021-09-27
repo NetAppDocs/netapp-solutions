@@ -1,0 +1,500 @@
+---
+sidebar: sidebar
+permalink: xcp/xcp-bp-cifs-data-migration-with-acls-from-a-source-storage-box-to-ontap.html
+keywords: cifs, ontap, migration, security information
+summary: This section covers the step-by-step procedure for migrating CIFS data with security information from a source to a target ONTAP system.
+---
+
+= CIFS data migration with ACLs from a source storage box to ONTAP
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-09-20 14:39:42.437084
+//
+
+link:xcp-bp-data-migration-from-7-mode-to-ontap.html[Previous: Data migration from 7-Mode to ONTAP.]
+
+This section covers the step-by-step procedure for migrating CIFS data with security information from a source to a target ONTAP system.
+
+. Verify that the target ONTAP system is healthy.
++
+....
+C1_sti96-vsim-ucs540m_cluster::> cluster show
+Node                  Health  Eligibility
+--------------------- ------- ------------
+sti96-vsim-ucs540m    true    true
+sti96-vsim-ucs540n    true    true
+2 entries were displayed.
+C1_sti96-vsim-ucs540m_cluster::> node show
+Node      Health Eligibility Uptime        Model       Owner    Location
+--------- ------ ----------- ------------- ----------- -------- ---------------
+sti96-vsim-ucs540m
+          true   true        15 days 21:17 SIMBOX      ahammed  sti
+sti96-vsim-ucs540n
+          true   true        15 days 21:17 SIMBOX      ahammed  sti
+2 entries were displayed.
+cluster::>  storage failover show
+                              Takeover
+Node           Partner        Possible State Description
+-------------- -------------- -------- -------------------------------------
+sti96-vsim-ucs540m
+               sti96-vsim-    true     Connected to sti96-vsim-ucs540n
+               ucs540n
+sti96-vsim-ucs540n
+               sti96-vsim-    true     Connected to sti96-vsim-ucs540m
+               ucs540m
+2 entries were displayed.
+C1_sti96-vsim-ucs540m_cluster::>
+....
+
+. Verify that at least one nonroot aggregate exists on the target system. The aggregate is normal.
++
+....
+cluster::*> storage aggregate show
+Aggregate     Size Available Used% State   #Vols  Nodes            RAID Status
+--------- -------- --------- ----- ------- ------ ---------------- ------------
+aggr0_sti96_vsim_ucs540o
+            7.58GB   373.3MB   95% online       1 sti96-vsim-      raid_dp,
+                                                  ucs540o          normal
+aggr0_sti96_vsim_ucs540p
+            7.58GB   373.3MB   95% online       1 sti96-vsim-      raid_dp,
+                                                  ucs540p          normal
+aggr_001   103.7GB   93.63GB   10% online       1 sti96-vsim-      raid_dp,
+                                                  ucs540p          normal
+sti96_vsim_ucs540o_aggr1
+           23.93GB   23.83GB    0% online       1 sti96-vsim-      raid_dp,
+                                                  ucs540o          normal
+sti96_vsim_ucs540p_aggr1
+           23.93GB   23.93GB    0% online       0 sti96-vsim-      raid_dp,
+                                                  ucs540p          normal
+5 entries were displayed.
+....
++
+[NOTE]
+If there is no data aggregate, create a new one using the `storage aggr create` command.
+
+. Create an SVM on the target cluster system.
++
+....
+cluster::*> vserver create -vserver vs1 -rootvolume root_vs1 -aggregate sti96_vsim_ucs540o_aggr1 -rootvolume-security-style mixed
+
+Verify that the SVM was successfully created.
+C2_sti96-vsim-ucs540o_cluster::*>  vserver show -vserver vs1
+                                    Vserver: vs1
+                               Vserver Type: data
+                            Vserver Subtype: default
+                               Vserver UUID: f8bc54be-d91b-11e9-b99c-005056a7e57e
+                                Root Volume: root_vs1
+                                  Aggregate: sti96_vsim_ucs540o_aggr1
+                                 NIS Domain: NSQA-RTP-NIS1
+                 Root Volume Security Style: mixed
+                                LDAP Client: esisconfig
+               Default Volume Language Code: C.UTF-8
+                            Snapshot Policy: default
+                              Data Services: data-nfs, data-cifs,
+                                             data-flexcache, data-iscsi
+                                    Comment: vs1
+                               Quota Policy: default
+                List of Aggregates Assigned: -
+ Limit on Maximum Number of Volumes allowed: unlimited
+                        Vserver Admin State: running
+                  Vserver Operational State: running
+   Vserver Operational State Stopped Reason: -
+                          Allowed Protocols: nfs, cifs, fcp, iscsi, ndmp
+                       Disallowed Protocols: -
+            Is Vserver with Infinite Volume: false
+                           QoS Policy Group: -
+                        Caching Policy Name: -
+                                Config Lock: false
+             Volume Delete Retention Period: 0
+                               IPspace Name: Default
+                         Foreground Process: -
+                   Is Msid Preserved for DR: false
+Force start required to start Destination in muliple IDP fan-out case: false
+                    Logical Space Reporting: false
+                  Logical Space Enforcement: false
+....
+
+. Create a new read-write data volume on the destination SVM. Verify that the security style, language settings, and capacity requirements match the source volume.
++
+....
+CLUSTER CLUSTER::> vol create -vserver vs1 -volume dest_vol -aggregate aggr_001 -size 150g type RW -state online -security-style ntfs
+....
+
+. Create a data LIF to serve SMB client requests.
++
+....
+CLUSTER::> network interface create -vserver vs1 -lif sti96-vsim-ucs540o_data1  -address 10.237.165.87 -netmask 255.255.240.0 -role data -data-protocol nfs,cifs -home-node sti96-vsim-ucs540o  -home-port e0d
+....
++
+Verify that the LIF was successfully created.
++
+....
+cluster::*>  network interface show -vserver vs1
+            Logical    Status     Network            Current       Current Is
+Vserver     Interface  Admin/Oper Address/Mask       Node          Port    Home
+----------- ---------- ---------- ------------------ ------------- ------- ----
+vs1
+            sti96-vsim-ucs540o_data1
+                         up/up    10.237.165.87/20   sti96-vsim-ucs540o
+                                                                   e0d     true
+....
+
+. If required, create a static route with the SVM.
++
+....
+Network route create -vserver dest -destination 0.0.0.0/0 -gateway 10.237.160.1
+....
++
+Verify that the route was successfully created.
++
+....
+cluster::*>  network route show -vserver vs1
+Vserver             Destination     Gateway         Metric
+------------------- --------------- --------------- ------
+vs1
+                    0.0.0.0/0       10.237.160.1    20
+                    ::/0            fd20:8b1e:b255:9155::1
+                                                    20
+2 entries were displayed.
+....
+
+. Mount the target data volume in the SVM namespace.
++
+....
+CLUSTER::> volume mount -vserver vs1 -volume dest_vol  -junction-path /dest_vol -active true
+....
++
+Verify that the volume is successfully mounted.
++
+....
+cluster::*> volume show -vserver vs1  -fields junction-path
+vserver volume   junction-path
+------- -------- -------------
+vs1     dest_vol /dest_vol
+vs1     root_vs1 /
+2 entries were displayed.
+Note: You can also specify the volume mount options (junction path) with the volume create command.
+....
+
+. Start the CIFs service on the target SVM.
++
+....
+cluster::*> vserver cifs start -vserver vs1
+Warning: The admin status of the CIFS server for Vserver "vs1" is already "up".
+....
++
+Verify that the service is started and running.
++
+....
+cluster::*>
+Verify the service is started and running
+C2_sti96-vsim-ucs540o_cluster::*> cifs show
+            Server          Status    Domain/Workgroup Authentication
+Vserver     Name            Admin     Name             Style
+----------- --------------- --------- ---------------- --------------
+vs1         D60AB15C2AFC4D6 up        CTL              domain
+....
+
+. Verify that the default export policy is applied to the target SVM.
++
+....
+CLUSTER::> vserver export-policy show -vserver dest
+Vserver          Policy Name
+---------------  -------------------
+dest             default
+....
++
+If required, create a new custom export policy for the target SVM.
++
+....
+CLUSTER::> vserver export-policy create -vserver vs1 -policyname xcpexport
+....
+
+. Modify the export policy rules to allow access to CIFs clients.
++
+....
+CLUSTER::> export-policy rule modify -vserver dest -ruleindex 1 -policyname xcpexportpolicy -clientmatch 0.0.0.0/0 -rorule any -rwrule any -anon 0
+....
++
+Verify that the policy rules are modified.
++
+....
+cluster::*> export-policy rule show -instance
+                                    Vserver: vs1
+                                Policy Name: default
+                                 Rule Index: 1
+                            Access Protocol: any
+List of Client Match Hostnames, IP Addresses, Netgroups, or Domains: 0.0.0.0/0
+                             RO Access Rule: any
+                             RW Access Rule: any
+User ID To Which Anonymous Users Are Mapped: 65534
+                   Superuser Security Types: any
+               Honor SetUID Bits in SETATTR: true
+                  Allow Creation of Devices: true
+                 NTFS Unix Security Options: fail
+         Vserver NTFS Unix Security Options: use_export_policy
+                      Change Ownership Mode: restricted
+              Vserver Change Ownership Mode: use_export_policy
+                                  Policy ID: 12884901889
+                                    Vserver: vs1
+                                Policy Name: default
+                                 Rule Index: 2
+                            Access Protocol: any
+List of Client Match Hostnames, IP Addresses, Netgroups, or Domains: 0:0:0:0:0:0:0:0/0
+                             RO Access Rule: any
+                             RW Access Rule: any
+User ID To Which Anonymous Users Are Mapped: 65534
+                   Superuser Security Types: none
+               Honor SetUID Bits in SETATTR: true
+                  Allow Creation of Devices: true
+                 NTFS Unix Security Options: fail
+         Vserver NTFS Unix Security Options: use_export_policy
+                      Change Ownership Mode: restricted
+              Vserver Change Ownership Mode: use_export_policy
+                                  Policy ID: 12884901889
+2 entries were displayed.
+....
+
+. Verify that the client is allowed access to the volume.
++
+....
+cluster::*> export-policy check-access -vserver vs1 -volume dest_vol -client-ip 10.234.17.81 -authentication-method none -protocol cifs -access-type read-write
+                                         Policy    Policy       Rule
+Path                          Policy     Owner     Owner Type  Index Access
+----------------------------- ---------- --------- ---------- ------ ----------
+/                             default    root_vs1  volume          1 read
+/dest_vol                     default    dest_vol  volume          1 read-write
+2 entries were displayed.
+....
+
+. Connect to the Windows client system where XCP is installed. Browse to the XCP install path.
++
+....
+C:\WRSHDNT>dir c:\netapp\xcp
+dir c:\netapp\xcp
+ Volume in drive C has no label.
+ Volume Serial Number is 5C04-C0C7
+ Directory of c:\netapp\xcp
+09/18/2019  09:30 AM    <DIR>          .
+09/18/2019  09:30 AM    <DIR>          ..
+06/25/2019  06:27 AM               304 license
+09/18/2019  09:30 AM    <DIR>          Logs
+09/29/2019  08:45 PM        12,143,105 xcp.exe
+               2 File(s)     12,143,409 bytes
+               3 Dir(s)  29,219,549,184 bytes free
+....
+
+. Query the source node SMB exports by running the `xcp show` command on the XCP Windows client host system.
++
+....
+C:\WRSHDNT>c:\netapp\xcp\xcp show \\10.237.165.71
+c:\netapp\xcp\xcp show \\10.237.165.71
+XCP SMB 1.6; (c) 2020 NetApp, Inc.; Licensed to XXX [NetApp Inc] until Mon Dec 31 00:00:00 2029
+ Shares   Errors   Server
+      6        0            10.237.165.71
+== SMB Shares ==
+ Space   Space   Current
+ Free    Used    Connections Share Path                   Folder Path
+ 9.50GiB 4.57MiB 1           \\10.237.165.71\source_share C:\source_vol
+ 94.3MiB 716KiB  0           \\10.237.165.71\ROOTSHARE    C:\
+ 0       0       N/A         \\10.237.165.71\ipc$         N/A
+ 94.3MiB 716KiB  0           \\10.237.165.71\c$           C:\
+== Attributes of SMB Shares ==
+ Share                             Types                             Remark
+ source_share                      DISKTREE
+ test share                        DISKTREE
+ test_sh                           DISKTREE
+ ROOTSHARE                         DISKTREE             \"Share mapped to top of Vserver global namespace, created bydeux_init \"
+ ipc$                              PRINTQ,SPECIAL,IPC,DEVICE
+ c$                                SPECIAL
+== Permissions of SMB Shares ==
+ Share                             Entity                                         Type
+ source_share                      Everyone                                       Allow/Full Control
+ROOTSHARE                         Everyone                                       Allow/Full Control
+ ipc$                              Everyone                                       Allow/Full Control
+ c$                                Administrators                                 Allow/Full Control/
+....
+
+. Run the `help` command for copy.
++
+....
+C:\WRSHDNT>c:\netapp\xcp\xcp help copy
+c:\netapp\xcp\xcp help copy
+XCP SMB 1.6; (c) 2020 NetApp, Inc.; Licensed to XXX [NetApp Inc] until Mon Dec 31 00:00:00 2029
+usage: xcp copy [-h] [-v] [-parallel <n>] [-match <filter>] [-preserve-atime]
+                [-acl] [-fallback-user FALLBACK_USER]
+                [-fallback-group FALLBACK_GROUP] [-root]
+                source target
+positional arguments:
+  source
+  target
+optional arguments:
+  -h, --help            show this help message and exit
+  -v                    increase debug verbosity
+  -parallel <n>         number of concurrent processes (default: <cpu-count>)
+  -match <filter>       only process files and directories that match the
+                        filter (see `xcp help -match` for details)
+  -preserve-atime       restore last accessed date on source
+  -acl                  copy security information
+  -fallback-user FALLBACK_USER
+                        the name of the user on the target machine to receive
+                        the permissions of local (non-domain) source machine
+                        users (eg. domain\administrator)
+  -fallback-group FALLBACK_GROUP
+                        the name of the group on the target machine to receive
+                        the permissions of local (non-domain) source machine
+                        groups (eg. domain\administrators)
+  -root                 copy acl for root directorytxt
+....
+
+. On the target ONTAP system, get the list of local user and local group names that you need to provide as values for the `fallback-user` and `fallback-group` arguments path.
++
+....
+cluster::*> local-user show
+  (vserver cifs users-and-groups local-user show)
+Vserver      User Name                   Full Name            Description
+------------ --------------------------- -------------------- -------------
+vs1          D60AB15C2AFC4D6\Administrator
+                                                              Built-in administrator account
+C2_sti96-vsim-ucs540o_cluster::*>  local-group show
+  (vserver cifs users-and-groups local-group show)
+Vserver        Group Name                       Description
+-------------- -------------------------------- ----------------------------
+vs1            BUILTIN\Administrators           Built-in Administrators group
+vs1            BUILTIN\Backup Operators         Backup Operators group
+vs1            BUILTIN\Guests                   Built-in Guests Group
+vs1            BUILTIN\Power Users              Restricted administrative privileges
+vs1            BUILTIN\Users                    All users
+5 entries were displayed
+....
+
+. To migrate the CIFs data with ACLs from the source to target, run the `xcp copy` command with the `-acl` and `–fallback-user/group` options.
++
+For the `fallback-user/group` options, specify any user or group that can be found in Active Directory or local user/group to target system.
++
+....
+C:\WRSHDNT>c:\netapp\xcp\xcp copy -acl -fallback-user D60AB15C2AFC4D6\Administrator -fallback-group BUILTIN\Users  \\10.237.165.79\source_share \\10.237.165.89\dest_share
+c:\netapp\xcp\xcp copy -acl -fallback-user D60AB15C2AFC4D6\Administrator -fallback-group BUILTIN\Users  \\10.237.165.79\source_share \\10.237.165.89\dest_share
+XCP SMB 1.6; (c) 2020 NetApp, Inc.; Licensed to XXX [NetApp Inc] until Mon Dec 31 00:00:00 2029
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 8s
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 13s
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 18s
+ERROR failed to obtain fallback security principal "BUILTIN\Users". Please check if the principal with the name "BUILTIN\Users" exists on "D60AB15C2AFC4D6".
+ERROR failed to obtain fallback security principal "D60AB15C2AFC4D6\Administrator". Please check if the principal with the name "D60AB15C2AFC4D6\Administrator" exists on "D60AB15C2AFC4D6".
+ERROR failed to obtain fallback security principal "BUILTIN\Users". Please check if the principal with the name "BUILTIN\Users" exists on "D60AB15C2AFC4D6".
+ERROR failed to obtain fallback security principal "BUILTIN\Users". Please check if the principal with the name "BUILTIN\Users" exists on "D60AB15C2AFC4D6".
+ERROR failed to obtain fallback security principal "BUILTIN\Users". Please check if the principal with the name "BUILTIN\Users" exists on "D60AB15C2AFC4D6".
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 23s
+ERROR failed to obtain fallback security principal "D60AB15C2AFC4D6\Administrator". Please check if the principal with the name "D60AB15C2AFC4D6\Administrator" exists on "D60AB15C2AFC4D6".
+ERROR failed to obtain fallback security principal "D60AB15C2AFC4D6\Administrator". Please check if the principal with the name "D60AB15C2AFC4D6\Administrator" exists on "D60AB15C2AFC4D6".
+ERROR failed to obtain fallback security principal "D60AB15C2AFC4D6\Administrator". Please check if the principal with the name "D60AB15C2AFC4D6\Administrator" exists on "D60AB15C2AFC4D6".
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 28s
+753 scanned, 0 errors, 0 skipped, 249 copied, 24.0KiB (4.82KiB/s), 33s
+753 scanned, 0 errors, 0 skipped, 744 copied, 54.4KiB (6.07KiB/s), 38s
+753 scanned, 0 errors, 0 skipped, 746 copied, 54.5KiB (20/s), 43s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (1.23KiB/s), 44s
+C:\WRSHDNT>
+....
+
+. If `xcp copy` results in the error message `ERROR failed to obtain fallback security principal`, add the destination box in the hosts file (`C:\Windows\System32\drivers\etc\hosts`).
++
+Use the following format for the NetApp storage destination box entry.
++
+....
+<data vserver data interface ip> 1 or more white spaces <cifs server name>
+....
++
+....
+cluster::*> cifs show
+            Server          Status    Domain/Workgroup Authentication
+Vserver     Name            Admin     Name             Style
+----------- --------------- --------- ---------------- --------------
+vs1         D60AB15C2AFC4D6 up        CTL              domain
+C2_sti96-vsim-ucs540o_cluster::*> network interface show
+            Logical    Status     Network            Current       Current Is
+Cluster
+            sti96-vsim-ucs540p_clus1
+                         up/up    192.168.148.136/24 sti96-vsim-ucs540p
+                                                                   e0a     true
+            sti96-vsim-ucs540p_clus2
+                         up/up    192.168.148.137/24 sti96-vsim-ucs540p
+                                                                   e0b     true
+vs1
+            sti96-vsim-ucs540o_data1
+                         up/up    10.237.165.87/20   sti96-vsim-ucs540o
+                                                                   e0d     true
+            sti96-vsim-ucs540o_data1_inet6
+                         up/up    fd20:8b1e:b255:9155::583/64
+                                                     sti96-vsim-ucs540o
+                                                                   e0d     true
+            sti96-vsim-ucs540o_data2
+                         up/up    10.237.165.88/20   sti96-vsim-ucs540o
+                                                                   e0e     true
+10.237.165.87  D60AB15C2AFC4D6  -> destination box entry to be added in hosts file.
+....
+
+. If you still get the error message `ERROR failed to obtain fallback security principal` after adding the destination box entry in the hosts files, then the user/group does not exist in the target system.
++
+....
+C:\WRSHDNT>c:\netapp\xcp\xcp copy -acl -fallback-user D60AB15C2AFC4D6\unknown_user -fallback-group BUILTIN\Users  \\10.237.165.79\source_share \\10.237.165.89\dest_share
+c:\netapp\xcp\xcp copy -acl -fallback-user D60AB15C2AFC4D6\unknown_user -fallback-group BUILTIN\Users  \\10.237.165.79\source_share \\10.237.165.89\dest_share
+XCP SMB 1.6; (c) 2020 NetApp, Inc.; Licensed to XXX [NetApp Inc] until Mon Dec 31 00:00:00 2029
+ERROR failed to obtain fallback security principal "D60AB15C2AFC4D6\unknown_user". Please check if the principal with the name "D60AB15C2AFC4D6\unknown_user" exists on "D60AB15C2AFC4D6".
+ERROR failed to obtain fallback security principal "D60AB15C2AFC4D6\unknown_user". Please check if the principal with the name "D60AB15C2AFC4D6\unknown_user" exists on "D60AB15C2AFC4D6".
+ERROR failed to obtain fallback security principal "D60AB15C2AFC4D6\unknown_user". Please check if the principal with the name "D60AB15C2AFC4D6\unknown_user" exists on "D60AB15C2AFC4D6".
+ERROR failed to obtain fallback security principal "D60AB15C2AFC4D6\unknown_user". Please check if the principal with the name "D60AB15C2AFC4D6\unknown_user" exists on "D60AB15C2AFC4D6".
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 5s
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 10s
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 15s
+753 scanned, 0 errors, 0 skipped, 284 copied, 27.6KiB (5.54KiB/s), 20s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (2.44KiB/s), 22s
+C:\WRSHDNT>
+....
+
+. Use `xcp copy` to migrate CIFs data with ACLs (with or without the root folder).
++
+Without the root folder, run the following commands:
++
+....
+C:\WRSHDNT>c:\netapp\xcp\xcp copy -acl -fallback-user  D60AB15C2AFC4D6\Administrator -fallback-group BUILTIN\Users  \\10.237.165.79\source_share \\10.237.165.89\dest_share
+c:\netapp\xcp\xcp copy -acl -fallback-user  D60AB15C2AFC4D6\Administrator -fallback-group BUILTIN\Users  \\10.237.165.79\source_share \\10.237.165.89\dest_share
+XCP SMB 1.6; (c) 2020 NetApp, Inc.; Licensed to XXX [NetApp Inc] until Mon Dec 31 00:00:00 2029
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 5s
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 10s
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 15s
+753 scanned, 0 errors, 0 skipped, 210 copied, 20.4KiB (4.08KiB/s), 20s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (2.38KiB/s), 22s
+C:\WRSHDNT>
+....
++
+With the root folder, run the following commands:
++
+....
+C:\WRSHDNT>c:\netapp\xcp\xcp copy -acl -root  -fallback-user  D60AB15C2AFC4D6\Administrator -fallback-group BUILTIN\Users  \\10.237.165.79\source_share \\10.237.165.89\dest_share
+c:\netapp\xcp\xcp copy -acl -root  -fallback-user  D60AB15C2AFC4D6\Administrator -fallback-group BUILTIN\Users  \\10.237.165.79\source_share \\10.237.165.89\dest_share
+XCP SMB 1.6; (c) 2020 NetApp, Inc.; Licensed to XXX [NetApp Inc] until Mon Dec 31 00:00:00 2029
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 5s
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 10s
+753 scanned, 0 errors, 0 skipped, 0 copied, 0 (0/s), 15s
+753 scanned, 0 errors, 0 skipped, 243 copied, 23.6KiB (4.73KiB/s), 20s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (6.21KiB/s), 25s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (0/s), 30s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (0/s), 35s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (0/s), 40s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (0/s), 45s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (0/s), 50s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (0/s), 55s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (0/s), 1m0s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (0/s), 1m5s
+753 scanned, 0 errors, 0 skipped, 752 copied, 54.7KiB (817/s), 1m8s
+C:\WRSHDNT>
+....
+
+link:xcp-bp-best-practice-guidelines-and-recommendations.html[Next: Best practice guidelines and recommendations.]

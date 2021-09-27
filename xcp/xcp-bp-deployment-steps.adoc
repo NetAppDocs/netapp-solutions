@@ -1,0 +1,235 @@
+---
+sidebar: sidebar
+permalink: xcp/xcp-bp-deployment-steps.html
+keywords: deployment, solution components, linux server, windows server aff a800, ha
+summary: This section covers deployment steps for NetApp XCP for data transfer.
+---
+
+= Deployment steps
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-09-20 14:39:42.235956
+//
+
+link:xcp-bp-file-analytics.html[Previous: File analytics.]
+
+== Test bed details
+
+The following table provides the details of the test bed that was used for this deployment and performance validation.
+
+|===
+|Solution components |Details
+
+|XCP version 1.7
+a|* One Linux server - Linux (RHEL 7.9 or RHEL 8)
+* One Windows server – Windows Server 2019 standard
+|NetApp AFF storage array HA pair for the source volume
+a|* AFF8080
+* NetApp ONTAP 9
+* NFS protocol
+|NetApp AFF storage array HA pair for destination volume
+a|* AFF A800
+* ONTAP 9
+* NFS protocol
+|Fujitsu PRIMERGY RX2540 server
+|Each equipped with:
+* 48 CPUs
+* Intel Xeon
+* 256GB physical memory
+* 10GbE dual port
+|Networking
+|10GbE
+|===
+
+== Steps for deployment
+
+To deploy NetApp XCP for data transfer, first install and activate the XCP software on the destination location. You can review the details in the https://mysupport.netapp.com/documentation/productlibrary/index.html?productID=63064[NetApp XCP User Guide^]. To do so, complete the following steps:
+
+. Meet the prerequisites as detailed in the section (xref) “Prerequisites for XCP.”
+. Download the XCP software from the https://mysupport.netapp.com/site/products/all/details/netapp-xcp/downloads-tab[NetApp XCP (Downloads) page^].
+. Copy the downloaded XCP tar files to the XCP server.
++
+....
+# scp Documents/OneDrive\ -\ NetApp\ Inc/XCP/software/1.6.1/NETAPP_XCP_1.6.1.tgz
+....
+
+. Untar the tarfile.
++
+....
+[root@mastr-53 src]# tar -zxvf NETAPP_XCP_1.6.1.tgz
+....
+
+. Download the license from https://xcp.netapp.com/license/xcp.xwic%20[https://xcp.netapp.com/license/xcp.xwic^] and copy to the XCP server.
+. Activate the license.
++
+....
+[root@mastr-53 linux]# ./xcp activate
+[root@mastr-53 src]# cp license /opt/NetApp/xFiles/xcp/license
+[root@mastr-53 src]# cd /usr/src/xcp/linux/
+[root@mastr-53 linux]# ./xcp activate
+....
+
+. Find the source NFS port and destination NFS server. The default port is 2049.
++
+....
+[root@mastr-53 ~]# rpcinfo -p 10.63.150.213
+[root@mastr-53 ~]# rpcinfo -p 10.63.150.63
+....
+
+. Check the NFS connection. Check the NFS server (for both source and destination) by using telnet to the NFS server port.
++
+....
+[root@mastr-53 ~]# telnet 10.63.150.127 2049
+[root@mastr-53 ~]# telnet 10.63.150.63 2049
+....
+
+. Configure the catalog.
+.. Create an NFS volume and export NFS for the XCP catalog. You can also leverage the operating system NFS export for XCP catalog.
++
+....
+A800-Node1-2::> volume create -vserver Hadoop_SVM -volume xcpcatalog -aggregate aggr_Hadoop_1 -size 50GB -state online -junction-path /xcpcatalog -policy default -unix-permissions ---rwxr-xr-x -type RW -snapshot-policy default -foreground true
+A800-Node1-2::> volume mount -vserver Hadoop_SVM -volume xcpcatalog_vol -junction-path /xcpcatalog
+....
+
+.. Check the NFS export.
++
+....
+[root@mastr-53 ~]# showmount -e 10.63.150.63 | grep xcpca
+/xcpcatalog (everyone)
+....
+
+.. Update `xcp.ini`.
++
+....
+[root@mastr-53 ~]# cat /opt/NetApp/xFiles/xcp/xcp.ini
+# Sample xcp config
+[xcp]
+catalog = 10.63.150.64:/xcpcatalog
+
+[root@mastr-53 ~]#
+....
+
+. Find the source NAS exports by using `xcp show`. Look for:
++
+....
+== NFS Exports ==
+== Attributes of NFS Exports ==
+....
++
+....
+[root@mastr-53 linux]# ./xcp show 10.63.150.127
+== NFS Exports ==
+<check here>
+== Attributes of NFS Exports ==
+<check here>
+....
+
+. (Optional) Scan the source NAS data.
++
+....
+[root@mastr-53 linux]# ./xcp scan -newid xcpscantest4 -stats 10.63.150.127:/xcpsrc_vol
+....
++
+Scanning the source NAS data helps you understand the data layout and find any potential issues for migration. The XCP scanning operation time is proportional to the number of files and the directory depth. You can skip this step if you are familiar with your NAS data.
++
+. Check the report created by `xcp scan`. Search mainly for unreadable folders and unreadable files.
++
+....
+[root@mastr-53 linux]# mount 10.63.150.64:/xcpcatalog  /xcpcatalog
+base) nkarthik-mac-0:~ karthikeyannagalingam$ scp -r root@10.63.150.53:/xcpcatalog/catalog/indexes/xcpscantest4 Documents/OneDrive\ -\ NetApp\ Inc/XCP/customers/reports/
+....
+
+. (Optional) Change the inode. View the number of inodes and modify the number based on the number of files to migrate or copy for both catalog and destination volumes (if required).
++
+....
+A800-Node1-2::> volume show -volume xcpcatalog -fields files,files-used
+A800-Node1-2::> volume show -volume xcpdest -fields files,files-used
+A800-Node1-2::> volume modify -volume xcpcatalog -vserver A800-Node1_vs1 -files 2000000
+Volume modify successful on volume xcpcatalog of Vserver A800-Node1_vs1.
+
+A800-Node1-2::> volume show -volume xcpcatalog -fields files,files-used
+....
+
+. Scan the destination volume.
++
+....
+[root@mastr-53 linux]# ./xcp scan -stats 10.63.150.63:/xcpdest
+....
+
+. Check the source and destination volume space.
++
+....
+[root@mastr-53 ~]# df -h /xcpsrc_vol
+[root@mastr-53 ~]# df -h /xcpdest/
+....
+
+. Copy the data from source to destination by using `xcp copy` and check the summary.
++
+....
+[root@mastr-53 linux]# ./xcp copy -newid create_Sep091599198212 10.63.150.127:/xcpsrc_vol 10.63.150.63:/xcpdest
+<command inprogress results removed>
+Xcp command : xcp copy -newid create_Sep091599198212 -parallel 23 10.63.150.127:/xcpsrc_vol 10.63.150.63:/xcpdest
+Stats       : 9.07M scanned, 9.07M copied, 118 linked, 9.07M indexed, 173 giants
+Speed       : 1.57 TiB in (412 MiB/s), 1.50 TiB out (392 MiB/s)
+Total Time  : 1h6m.
+STATUS      : PASSED
+[root@mastr-53 linux]#
+....
++
+[NOTE]
+By default, XCP creates seven parallel processes to copy the data. This can be tuned.
++
+[NOTE]
+NetApp recommends that the source volume be read only. In real time, the source volume is a live, active file system. The `xcp copy` operation might fail because NetApp XCP does not support a live source that is continuously changed by an application.
++
+For Linux, XCP requires an Index ID because XCP Linux performs cataloging.
+
+. (Optional) Check the inodes on the destination NetApp volume.
++
+....
+A800-Node1-2::> volume show -volume xcpdest -fields files,files-used
+vserver        volume  files    files-used
+-------------- ------- -------- ----------
+A800-Node1_vs1 xcpdest 21251126 15039685
+
+A800-Node1-2::>
+....
+
+. Perform the incremental update by using `xcp sync`.
++
+....
+[root@mastr-53 linux]# ./xcp sync -id create_Sep091599198212
+Xcp command : xcp sync -id create_Sep091599198212
+Stats       : 9.07M reviewed, 9.07M checked at source, no changes, 9.07M reindexed
+Speed       : 1.73 GiB in (8.40 MiB/s), 1.98 GiB out (9.59 MiB/s)
+Total Time  : 3m31s.
+STATUS      : PASSED
+....
++
+For this document, to simulate real-time, the one million files in the source data were renamed, and then the updated files were copied to the destination by using `xcp sync`. For Windows, XCP needs both source and destination paths.
+
+. Validate data transfer. You can validate that the source and destination have the same data by using `xcp verify`.
++
+....
+Xcp command : xcp verify 10.63.150.127:/xcpsrc_vol 10.63.150.63:/xcpdest
+Stats       : 9.07M scanned, 9.07M indexed, 173 giants, 100% found (6.01M have data), 6.01M compared, 100% verified (data, attrs, mods)
+Speed       : 3.13 TiB in (509 MiB/s), 11.1 GiB out (1.76 MiB/s)
+Total Time  : 1h47m.
+STATUS      : PASSED
+....
+
+XCP documentation provides multiple options (with examples) for the `scan`, `copy`, `sync`, and `verify` operations. For more information, see the https://mysupport.netapp.com/documentation/productlibrary/index.html?productID=63064[NetApp XCP User Guide^].
+
+[NOTE]
+Windows customers should copy the data by using access control lists (ACLs). NetApp recommends using the command `xcp copy -acl -fallbackuser\<username> -fallbackgroup\<username or groupname> <source> <destination>`. To maximum performance, considering the source volume that has SMB data with ACL and the data accessible by both NFS and SMB, the target must be an NTFS volume. Using XCP (NFS version), copy the data from the Linux server and execute the XCP (SMB version) sync with the `-acl` and `-nodata` options from the Windows server to copy the ACLs from source data to the target SMB data.
+
+For detailed steps, see https://helpcenter.netwrix.com/NA/Configure_IT_Infrastructure/Accounts/DCA_Manage_Auditing_Security_Log.html[Configuring 'Manage Auditing and Security Log' Policy^].
+
+link:xcp-bp-sizing-guidelines-overview.html[Next: Sizing guidelines.]
