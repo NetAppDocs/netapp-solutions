@@ -14,4 +14,141 @@ keywords: netapp, solutions, database, SnapCenter, devops
 :imagesdir: ./../media/
 
 [.lead]
-The agility of public cloud, the time to value, the cost savings are all meaningful value propositions for enterprises to adopt public cloud for database application development and testing effort. There is no better tool than SnapCenter to make this a reality in a hurry. Following are details of step by step processes using the tool.  
+The agility of public cloud, the time to value, the cost savings are all meaningful value propositions for enterprises to adopt public cloud for database application development and testing effort. There is no better tool than SnapCenter to make this a reality in a hurry. SnapCenter can not only protect your production database on-prem, but also it can quickly clone a copy for application development or code testing in public cloud while consuming very little extra storage. Following are details of step by step processes using the tool.
+
+== Clone Oracle Database for DEV/TEST from a Replicated Snapshot Backup
+
+. Login to SnapCenter as a database management user ID for Oracle. Navigate to Resources tab, which shows the Oracle databases being protected by SnapCenter.
+
+image:snapctr_ora_clone_01.PNG[Error: Missing Graphic Image]
+
+[start=2]
+. Click on intended on-prem database name for backups topology and detailed view. If secondary replicated location is enabled, it will show linked mirror backups.
+
+image:snapctr_ora_clone_02.PNG[Error: Missing Graphic Image]
+
+[start=3]
+. Toggled to mirrored backups view by clicking on mirrored backups. Secondary Mirror Backup(s) then will be displayed.
+
+image:snapctr_ora_clone_03.PNG[Error: Missing Graphic Image]
+
+[start=4]
+. Choose a mirrored secondary database backup copy to be cloned and determine a recovery point either by time and system change number or SCN. Generally the recovery point should be trailing the full database backup time or SCN to be cloned. Once a recovery point is decided, required log file backup needs to be mounted for recovery. The log file backup should be mounted to target DB server, where clone database is supposed to be hosted.
+
+image:snapctr_ora_clone_04.PNG[Error: Missing Graphic Image]
+image:snapctr_ora_clone_05.PNG[Error: Missing Graphic Image]
+
+[NOTE]
+If log pruning is enabled and recovery point extended beyond the last log pruning, multiple archive log backups may needs to be mounted.
+
+[start=5]
+. Highlight the full database backup copy to be cloned, then click on clone button to start DB clone Workflow
+
+image:snapctr_ora_clone_06.PNG[Error: Missing Graphic Image]
+
+[start=6]
+. Choose a proper clone DB SID for a complete container database or CDB clone
+
+image:snapctr_ora_clone_07.PNG[Error: Missing Graphic Image]
+
+[start=7]
+. Select target Clone host in cloud, datafile, control files and redo logs directories will be created by clone workflow.
+
+image:snapctr_ora_clone_08.PNG[Error: Missing Graphic Image]
+
+[start=8]
+. None credential name is meant to use OS based authentication, that renders database port irrelevant. Fill in proper Oracle Home, Oracle OS User, and Oracle OS Group as configured in the target clone DB server.
+
+image:snapctr_ora_clone_09.PNG[Error: Missing Graphic Image]
+
+[start=9]
+. Specify scripts to run before clone operation. More importantly, database instance parameter can be adjusted or defined here.
+
+image:snapctr_ora_clone_10.PNG[Error: Missing Graphic Image]
+
+[start=10]
+. Specify recovery point either by Date and Time or SCN. Until Cancel will recover database up to available archive logs. Specify the external archive log location from target host where the archive log volume is mounted. If target server Oracle owner is different from on-prem production server, ensure the archive log directory is readable by target server Oracle owner.
+
+image:snapctr_ora_clone_11.PNG[Error: Missing Graphic Image]
+image:snapctr_ora_clone_12.PNG[Error: Missing Graphic Image]
+
+[start=11]
+. Configure SMTP server for email notification if desire
+
+image:snapctr_ora_clone_13.PNG[Error: Missing Graphic Image]
+
+[start=12]
+. Clone Summary
+
+image:snapctr_ora_clone_14.PNG[Error: Missing Graphic Image]
+
+[start=13]
+. Validation after clone to make sure cloned database is operational. Some additional tasks such as starting up listener or turning off DB log archive mode may be performed on DEV or TEST database.
+
+image:snapctr_ora_clone_15.PNG[Error: Missing Graphic Image]
+
+== Clone SQL Database for DEV/TEST from a Replicated Snapshot Backup
+
+. Login to SnapCenter as a database management user ID for SQL Server. Navigate to Resources tab, which shows the SQL Sever user databases being protected by SnapCenter and a target standby SQL instance in public cloud.
+
+image:snapctr_sql_clone_01.PNG[Error: Missing Graphic Image]
+
+[start=2]
+. Click on intended on-prem SQL Server user database name for backups topology and detailed view. If secondary replicated location is enabled, it will show linked mirror backups.
+
+image:snapctr_sql_clone_02.PNG[Error: Missing Graphic Image]
+
+[start=3]
+. Toggled to mirrored backups view by clicking on mirrored backups. Secondary Mirror Backup(s) then will be displayed. Because SnapCenter backups SQL Server transaction log to a dedicated drive for recovery, only full database backups are displayed here.
+
+image:snapctr_sql_clone_03.PNG[Error: Missing Graphic Image]
+
+[start=4]
+. Choose a backup copy, then click on Clone button to launch Clone from backup workflow.
+
+image:snapctr_sql_clone_04_1.PNG[Error: Missing Graphic Image]
+image:snapctr_sql_clone_04.PNG[Error: Missing Graphic Image]
+
+[start=5]
+. Select a cloud server as target clone server, clone instance name and clone database name. Choose either a Auto assign mount point or a user defined mount point path.
+
+image:snapctr_sql_clone_05.PNG[Error: Missing Graphic Image]
+
+[start=6]
+. Determine a recovery point either by a log backup time or a specific date and time
+
+image:snapctr_sql_clone_06.PNG[Error: Missing Graphic Image]
+
+[start=7]
+. Specify optional scripts to run before and after the clone
+
+image:snapctr_sql_clone_07.PNG[Error: Missing Graphic Image]
+
+[start=8]
+. Configure SMTP server if email notification is desired.
+
+image:snapctr_sql_clone_08.PNG[Error: Missing Graphic Image]
+
+[start=9]
+. Clone Summary
+
+image:snapctr_sql_clone_09.PNG[Error: Missing Graphic Image]
+
+[start=10]
+. Monitor job status and validate that intended user database has been attached to target SQL instance in cloud clone server.
+
+image:snapctr_sql_clone_10.PNG[Error: Missing Graphic Image]
+
+== Post Clone Configuration
+
+. For Oracle production database on-prem, it in generally running in log archive mode. It is not necessary for development or test database. To turn off log archive mode, login to Oracle DB as sysdba and execute a log mode change command and start database for access.
+
+. Configure Oracle listener or register newly cloned DB with a existing listener for users access.
+
+. For SQL Server, change log mode from Full to Easy so that SQL Server DEV/Test log file can be easily shrink when it is filling up the log volume.
+
+== Refresh Clone database
+
+. Cloned database can be dropped, clone DB environment is cleaned up. Then follow above procedures to clone a new DB with fresh data. It only takes few minutes to clone a new DB.
+
+. Shutdown clone database, run a clone refresh command with CLI, and then start the clone database.
