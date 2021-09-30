@@ -185,3 +185,38 @@ image:cloud_central_add_we_23.PNG[Error: Missing Graphic Image]
 image:cloud_central_add_we_24.PNG[Error: Missing Graphic Image]
 . Once the deployment is complete, the CVO cluster will appear on the canvas and show the current capacity. The ONTAP cluster in its current state is fully configured to allow a true "out of the box" experience.
 image:cloud_central_add_we_25.PNG[Error: Missing Graphic Image]
+
+==== Configure SnapMirror from on-prem to cloud
+
+Now that you have a source ONTAP system and a destination ONTAP system deployed, you can start to replicate your volumes containing the database data into the cloud.
+
+For a guide on compatible ONTAP versions for SnapMirror, please reference the https://docs.netapp.com/ontap-9/index.jsp?topic=%2Fcom.netapp.doc.pow-dap%2FGUID-0810D764-4CEA-4683-8280-032433B1886B.html[SnapMirror Compatibility Matrix^].
+
+. Click on the source ONTAP system (on-prem) and either drag and drop to the destination, select Replication -> Enable, or select Replication -> Menu -> Replicate
+image:cloud_central_replication_1.png[Error: Missing Graphic Image]
+Select Enable
+image:cloud_central_replication_2.png[Error: Missing Graphic Image]
+Or Options
+image:cloud_central_replication_3.png[Error: Missing Graphic Image]
+Replicate
+image:cloud_central_replication_4.png[Error: Missing Graphic Image]
+. If you did not drag and drop, choose the destination cluster to replicate to.
+image:cloud_central_replication_5.png[Error: Missing Graphic Image]
+. Choose the volume that you'd like to replicate. We will replicate the data, and all log volumes.
+image:cloud_central_replication_6.png[Error: Missing Graphic Image]
+. Choose the destination disk type and tiering policy. For DR, we recommend an SSD as the disk type and to maintain data tiering. Data tiering will tier the mirrored data into low-cost object storage and save you money on the local disks. When you break the relationship or clone the volume, the data will use the local, fast storage.
+image:cloud_central_replication_7.png[Error: Missing Graphic Image]
+. Select the destination volume name - we chose "[source_volume_name]_dr".
+image:cloud_central_replication_8.png[Error: Missing Graphic Image]
+. Select the maximum transfer rate for the replication. This enables you to save bandwidth if you have a low bandwidth connection to the cloud such as a VPN.
+image:cloud_central_replication_9.png[Error: Missing Graphic Image]
+. Definte the replication policy. We chose a Mirror which will will take the most recent dataset and replicate that into the destination volume. You could also choose a different policy based on your requirements.
+image:cloud_central_replication_10.png[Error: Missing Graphic Image]
+. Choose the schedule for the replication to be triggered by. The recommendation is to set a schedule of "daily" for the data volume and "hourly" for the log volumes, although this can be changed based on requirements.
+image:cloud_central_replication_11.png[Error: Missing Graphic Image]
+. Review the information entered and click "Go" to trigger the cluster peer & SVM peer (if this is your first time replicating between the two clusters) and then implement and initialize the SnapMirror relationship
+image:cloud_central_replication_12.png[Error: Missing Graphic Image]
+. Continue this process for data volumes and log volumes.
+. To check all of your relationships, navigate to the Replication tab inside Cloud Manager. Here you can manage your relationships and check on their status.
+image:cloud_central_replication_13.png[Error: Missing Graphic Image]
+. Once all the volumes have been replicated, you are in a steady state and ready to move on to the DR and Dev/Test workflows!
