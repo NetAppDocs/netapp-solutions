@@ -1,0 +1,165 @@
+---
+sidebar: sidebar
+permalink: ent-apps-db/db_protection_awx_automation.html
+keywords: Linux, RHEL Oracle19c, NFS, ONTAP
+summary: This page describes the Automated Data Protection of Oracle19c on NetApp ONTAP storage.
+---
+
+= Step-by-step deployment procedure
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+
+
+== AWX/Tower deployment Oracle 19c Database
+
+=== 1. Create the inventory, group, hosts, and credentials for your environment
+
+This section describes the setup of inventory, groups, hosts, and access credentials in AWX/Ansible Tower that prepare the environment for consuming NetApp automated solutions.
+
+. Configure the inventory.
+.. Navigate to Resources → Inventories → Add, and click Add Inventory.
+.. Provide the name and organization details, and click Save.
+.. On the Inventories page, click the inventory created.
+.. If there are any inventory variables, paste them in the variables field.
+.. Navigate to the Groups sub-menu and click Add.
+.. Provide the name of the group for ONTAP, paste the group variables (if any) and click Save.
+.. Repeat the process for another group for Oracle.
+.. Select the ONTAP group created, go to the Hosts sub-menu and click Add New Host.
+.. Provide the IP address of the ONTAP cluster management IP, paste the host variables (if any), and click Save.
+.. This process must be repeated for the Oracle group and Oracle host(s) management IP/hostname.
+
+. Create credential types. For solutions involving ONTAP, you must configure the credential type to match username and password entries.
+.. Navigate to Administration → Credential Types, and click Add.
+.. Provide the name and description.
+.. Paste the following content in Input Configuration:
++
+
+[source, cli]
+fields:
+  - id: username
+    type: string
+    label: Username
+  - id: password
+    type: string
+    label: Password
+    secret: true
+  - id: vsadmin_password
+    type: string
+    label: vsadmin_password
+    secret: true
+
+.. Paste the following content into Injector Configuration:
++
+
+[source, cli]
+extra_vars:
+  password: '{{ password }}'
+  username: '{{ username }}'
+  vsadmin_password: '{{ vsadmin_password }}'
+
+. Configure the credentials.
+.. Navigate to Resources → Credentials, and click Add.
+.. Enter the name and organization details for ONTAP.
+.. Select the custom Credential Type you created for ONTAP.
+.. Under Type Details, enter the username, password, and vsadmin_password.
+.. Click Back to Credential and click Add.
+.. Enter the name and organization details for Oracle.
+.. Select the Machine credential type.
+.. Under Type Details, enter the Username and Password for the Oracle hosts.
+.. Select the correct Privilege Escalation Method, and enter the username and password.
+
+=== 2. Create a project
+
+. Go to Resources → Projects, and click Add.
+.. Enter the name and organization details.
+.. Select Git in the Source Control Credential Type field.
+.. enter <https://github.com/NetApp-Automation/na_oracle19c_deploy.git> as the source control URL.
+.. Click Save.
+.. The project might need to sync occasionally when the source code changes.
+
+
+=== 3. Configure Oracle host_vars
+
+The variables defined in this section are applied to each individual Oracle server and database.
+
+. Input your environment-specific parameters in the following embedded Oracle hosts variables or host_vars form.
+
+NOTE: The items in blue must be changed to match your environment.
+
+include::ent-apps-db/host_vars.adoc[]
+
+.. Fill in all variables in the blue fields.
+.. After completing variables input, click the Copy button on the form to copy all variables to be transferred to AWX or Tower.
+.. Navigate back to AWX or Tower and go to Resources → Hosts, and select and open the Oracle server configuration page.
+.. Under the Details tab, click edit and paste the copied variables from step 1 to the Variables field under the YAML tab.
+.. Click Save.
+.. Repeat this process for any additional Oracle servers in the system.
+
+=== 4. Configure global variables
+
+Variables defined in this section apply to all Oracle hosts, databases, and the ONTAP cluster.
+
+. Input your environment-specific parameters in following embedded global variables or vars form.
++
+
+NOTE: The items in blue must be changed to match your environment.
++
+
+include::ent-apps-db/vars.adoc[]
+
+. Fill in all variables in blue fields.
+. After completing variables input, click the Copy button on the form to copy all variables to be transferred to AWX or Tower into the following job template.
+
+=== 5. Configure and launch the job template.
+
+. Create the job template.
+.. Navigate to Resources → Templates → Add and click Add Job Template.
+.. Enter the name and description
+.. Select the Job type; Run configures the system based on a playbook, and Check performs a dry run of a playbook without actually configuring the system.
+.. Select the corresponding inventory, project, playbook, and credentials for the playbook.
+.. Select the all_playbook.yml as the default playbook to be executed.
+.. Paste global variables copied from step 4 into the Template Variables field under the YAML tab.
+.. Check the box Prompt on Launch in the Job Tags field.
+.. Click Save.
+. Launch the job template.
+.. Navigate to Resources → Templates.
+.. Click the desired template and then click Launch.
+.. When prompted on launch for Job Tags, type in requirements_config. You might need to click the Create Job Tag line below requirements_config to enter the job tag.
++
+NOTE: requirements_config ensures that you have the correct libraries to run the other roles.
+
+.. Click Next and then Launch to start the job.
+.. Click View → Jobs to monitor the job output and progress.
+.. When prompted on launch for Job Tags, type in ontap_config. You might need to click the Create "Job Tag" line right below ontap_config to enter the job tag.
+.. Click Next and then Launch to start the job.
+.. Click View → Jobs to monitor the job output and progress
+.. After the ontap_config role has completed, run the process again for linux_config.
+.. Navigate to Resources → Templates.
+.. Select the desired template and then click Launch.
+.. When prompted on launch for the Job Tags type in linux_config, you might need to select the Create "job tag" line right below linux_config to enter the job tag.
+.. Click Next and then Launch to start the job.
+.. Select View → Jobs to monitor the job output and progress.
+.. After the linux_config role has completed, run the process again for oracle_config.
+.. Go to Resources → Templates.
+.. Select the desired template and then click Launch.
+.. When prompted on launch for Job Tags, type oracle_config. You might need to select the Create "Job Tag" line right below oracle_config to enter the job tag.
+.. Click Next and then Launch to start the job.
+.. Select View → Jobs to monitor the job output and progress.
+
+=== 6. Deploy additional database on same Oracle host
+
+The Oracle portion of the playbook creates a single Oracle container database on an Oracle server per execution. To create additional container databases on the same server, complete the following steps.
+
+. Revise host_vars variables.
+.. Go back to step 2 - Configure Oracle host_vars.
+.. Change the Oracle SID to a different naming string.
+.. Change the listener port to different number.
+.. Change the EM Express port to a different number if you are installing EM Express.
+.. Copy and paste the revised host variables to the Oracle Host Variables field in the Host Configuration Detail tab.
+. Launch the deployment job template with only the oracle_config tag.
+
+include::ent-apps-db/validation.adoc[]
