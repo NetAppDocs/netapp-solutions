@@ -5,7 +5,7 @@ summary: hybrid cloud database solutions with SnapCenter getting started on aws 
 keywords: netapp, solutions, database, SnapCenter, "getting started"
 ---
 
-= Hybrid Cloud Database Workflow Getting Started - AWS
+= Hybrid Cloud Database Workflow Getting Started
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -13,12 +13,12 @@ keywords: netapp, solutions, database, SnapCenter, "getting started"
 :table-stripes: odd
 :imagesdir: ./../media/
 
-== Public Cloud
+== AWS Public Cloud
 
 [NOTE]
 To make things easier to follow, we have created this document based on a deployment in AWS, however the process is very similar in Azure and GCP too.
 
-=== Pre-flight check
+=== 1. Pre-flight check
 
 Before deploying anything, ensure that the infrastructure is in place to allow for the deployment in the next stage. This includes:
 
@@ -29,7 +29,7 @@ Before deploying anything, ensure that the infrastructure is in place to allow f
 * [ ] Permissions to add IAM roles into your AWS account
 * [ ] A secret key and access key for your AWS user
 
-=== Steps to deploy Cloud Manager and Cloud Volumes ONTAP in AWS
+=== 2. Steps to deploy Cloud Manager and Cloud Volumes ONTAP in AWS
 
 [NOTE]
 There are many methods for deploying Cloud Manager and Cloud Volumes ONTAP, this method is the simplest but requires the most permissions. If this method is not appropriate for your AWS environment, please consult the https://docs.netapp.com/us-en/occm/task_creating_connectors_aws.html[NetApp Cloud Documentation^].
@@ -156,3 +156,13 @@ image:cloud_central_replication_12.png[Error: Missing Graphic Image]
 . To check all of your relationships, navigate to the Replication tab inside Cloud Manager. Here you can manage your relationships and check on their status.
 image:cloud_central_replication_13.png[Error: Missing Graphic Image]
 . Once all the volumes have been replicated, you are in a steady state and ready to move on to the DR and Dev/Test workflows!
+
+=== 3. Deploy EC2 Compute Instance for Database Workload
+
+AWS has preconfigured ec2 compute instances for various workload. The choice of instance type determines the number of CPU cores,  memory capacity, storage type and capacity, and network performance. For the use cases, with exception of OS partition, the main storage to run database workload is allocated from CVO or FSx ONTAP storage engine. So the main factors to consider are choice of CPU cores, memory, and network performance level. Typical AWS ec2 instance type can be found here: https://us-east-2.console.aws.amazon.com/ec2/v2/home?region=us-east-2#InstanceTypes:[EC2 Instance Type]
+
+. Select right instance type based on required workload. Factors to consider includes number of business transactions to be supported, number of concurrent users, data sets sizing etc.
+
+. EC2 instance deployment can be launched through EC2 Dashboard. The exact deployment procedures are beyond scope of this solution documentation. Please refer to https://aws.amazon.com/pm/ec2/?trk=ps_a134p000004f2ZGAAY&trkCampaign=acq_paid_search_brand&sc_channel=PS&sc_campaign=acquisition_US&sc_publisher=Google&sc_category=Cloud%20Computing&sc_country=US&sc_geo=NAMER&sc_outcome=acq&sc_detail=%2Bec2%20%2Bcloud&sc_content=EC2%20Cloud%20Compute_bmm&sc_matchtype=b&sc_segment=536455698896&sc_medium=ACQ-P|PS-GO|Brand|Desktop|SU|Cloud%20Computing|EC2|US|EN|Text&s_kwcid=AL!4422!3!536455698896!b!!g!!%2Bec2%20%2Bcloud&ef_id=EAIaIQobChMIua378M-p8wIVToFQBh0wfQhsEAMYASAAEgKTzvD_BwE:G:s&s_kwcid=AL!4422!3!536455698896!b!!g!!%2Bec2%20%2Bcloud[Amazon EC2] for details.
+
+. Leverage NetApp Ansible DB automation roles to configure EC2 instance for database DEV/TEST and DR use cases. The automation code can be download from NetApp public GitHub site. https://github.com/NetApp-Automation/na_oracle19c_deploy[Oracle 19c Automated Deployment]. The goal is to install and configure database software stack on EC2 instance to match on-prem OS and database configuration for the use cases.  
