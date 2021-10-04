@@ -18,11 +18,11 @@ keywords: netapp, solutions, database, SnapCenter, "getting started"
 
 === 1. Setup Database Admin User in SnapCenter
 
-NetApp SnapCenter tool utilizes role based access control (RBAC) for managing user resources access and permission grants. There are prepopulated roles after SnapCenter installation. Custom roles can be created as well based on user needs or applications. It makes sense to have a dedicated admin user ID for each database platform supported by SnapCenter for database backup and recovery, disaster recovery. Some may also choose to use a single ID to manage all databases. In our test cases, we have created an dedicated admin user for Oracle and SQL Server respectively.
+NetApp SnapCenter tool utilizes role based access control (RBAC) for managing user resources access and permission grants. There are prepopulated roles after SnapCenter installation. Custom roles can be created as well based on user needs or applications. It makes sense to have a dedicated admin user ID for each database platform supported by SnapCenter for database backup, restoration, and/or disaster recovery. Some may also choose to use a single ID to manage all databases. In our test cases and demonstration, we have created an dedicated admin user for Oracle and SQL Server respectively.
 
 Certain SnapCenter resources can only be provisioned with SnapCenterAdmin role. Then resources can be assigned to other user IDs for access.
 
-In a pre installed and configured on-prem SnapCenter environment, following tasks may already have being done. If not, following are steps to create database admin user:
+In a pre installed and configured on-prem SnapCenter environment, following tasks may already have been done. If not, following are steps to create a database admin user:
 
 . Add the admin user to windows active directory
 . Login to SnapCenter using a ID granted with SnapCenterAdmin role
@@ -32,9 +32,9 @@ image:snapctr_admin_users.PNG[Error: Missing Graphic Image]
 
 === 2. SnapCenter Plugin Installation Prerequisites
 
-SnapCenter performs its backup, restore, clone etc. functions via a plugin agent running on DB hosts. It connects to database host and database via credential configured under Setting and Credentials tab for plugin istallation and other management functions. There are specific privileges requirements for Linux or Windows user based on target host and database type.
+SnapCenter performs its backup, restore, clone etc. functions via a plugin agent running on DB hosts. It connects to database host and database via credentials configured under Setting and Credentials tab for plugin istallation and other management functions. There are specific privileges requirements based on target host type such as Linux or Windows, as well as the type of databases.
 
-Generally, you want to use an administrator user accounts on the host as your host connection credentials for plugin installation. You can also grant the same user for database access using OS based authentication. On the other hand, you can also use different database user ID for DB management access. If you decided to use OS based authentication, the OS admin user ID must be granted DB access. For Windows domain based SQL Server installation, an domain admin account can be used to manage all SQL Server within the domain.
+DB hosts credentials need to be configured before SnapCenter plugin installation. Generally, you want to use an administrator user accounts on the DB host as your host connection credentials for plugin installation. You can also grant the same user ID for database access using OS based authentication. On the other hand, you can also employ database authentication with different database user IDs for DB management access. If you decided to use OS based authentication, the OS admin user ID must be granted DB access. For Windows domain based SQL Server installation, a domain admin account can be used to manage all SQL Servers within the domain.
 
 . Windows host for SQL server:
 .. If you are using Windows credentials for authentication, you must set up your credential before installing plug-ins.
@@ -55,6 +55,11 @@ Generally, you want to use an administrator user accounts on the host as your ho
 === 3. SnapCenter Host Plugin Installation
 
 Following steps illustrate how a database host is added to SnapCenter while a SnapCenter plugin is installed on the host. The procedure applies to both adding on-prem hosts and adding cloud hosts. Following demonstrates adding a Windows or a Linux host residing in AWS.
+
+==== Configure SnapCenter VMware Global Settings
+Navigate to Settings, then Global Settings and check "VMs have iSCSI direct attached disks or NFS for all the hosts" under Hypervisor Settings and click on Update.
+
+image:snapctr_vmware_global.PNG[Error: Missing Graphic Image]
 
 ==== Add Windows host and installation of plugin on the host:
 . Login to SnapCenter as an user ID with SnapCenterAdmin privilege
@@ -89,7 +94,7 @@ image:snapctr_add_windows_host_05.PNG[Error: Missing Graphic Image]
 image:snapctr_add_windows_host_06.PNG[Error: Missing Graphic Image]
 
 [start=9]
-. Assign the host to database management user ID - navigating to Settings and Users and Access tab, click on the user ID that the host needs to be assigned to, click Save to complete the host resource assignment
+. Assign the host to database management user ID - navigating to Settings and Users and Access tab, click on database management user ID, in our case sqldba that the host needs to be assigned to, click Save to complete the host resource assignment
 
 image:snapctr_add_windows_host_07.PNG[Error: Missing Graphic Image]
 image:snapctr_add_windows_host_08.PNG[Error: Missing Graphic Image]
@@ -117,7 +122,7 @@ image:snapctr_add_linux_host_03.PNG[Error: Missing Graphic Image]
 image:snapctr_add_linux_host_04.PNG[Error: Missing Graphic Image]
 
 [start=7]
-. Assign the newly added host to proper database management user ID
+. Assign the newly added host to proper database management user ID, in our case, oradba.
 
 image:snapctr_add_linux_host_05.PNG[Error: Missing Graphic Image]
 image:snapctr_add_linux_host_06.PNG[Error: Missing Graphic Image]
@@ -128,7 +133,7 @@ With successful plugin installation, the database resources on the host can be i
 
 image:snapctr_resources_ora.PNG[Error: Missing Graphic Image]
 
-When its initially discovered, the database Overall Status shows as "Not protected". The above screen shot an Oracle database not protected as yet by a backup policy.
+When it is initially discovered, the database Overall Status shows as "Not protected". The above screen shot shows an Oracle database not protected as yet by a backup policy.
 
 When backup configuration or policy is setup and a backup has been executed, the database Overall Status will show the backup status such as "Backup succeeded" and timestamp of last backup. Below screen shot shows the backup status of a SQL Server user database.
 
@@ -139,7 +144,7 @@ If the database access credential is not properly setup, a red lock button indic
 image:snapctr_add_windows_host_09.PNG[Error: Missing Graphic Image]
 image:snapctr_add_windows_host_10.PNG[Error: Missing Graphic Image]
 
-After appropriate credential is configured either at Windows level or database level, the SQL Server Type information is gathered and reviewed.
+After appropriate credential is configured either at Windows level or database level, the red lock disappears and SQL Server Type information is gathered and reviewed.
 
 image:snapctr_add_windows_host_11.PNG[Error: Missing Graphic Image]
 
@@ -147,7 +152,7 @@ image:snapctr_add_windows_host_11.PNG[Error: Missing Graphic Image]
 
 To protect your on-prem database data using public cloud as target destination, on-prem ONTAP cluster database volumes are replicated to cloud CVO using NetApp snapmirror technology. The replicated target volumes then can be cloned for DEV/OPS or disaster recovery. Here are high level steps to setup the cluster peering and DB volumes replication.
 
-. Configure inter-cluster lifs for cluster Peering on both on-prem cluster and CVO cluster instance. This can be done through ONTAP System Manger. A default CVO deployment will have inter-cluster lifs configured automatically.
+. Configure inter-cluster lifs for cluster peering on both on-prem cluster and CVO cluster instance. This can be done through ONTAP System Manger. A default CVO deployment will have inter-cluster lifs configured automatically.
 
 on-prem cluster:
 image:snapctr_cluster_replication_01.PNG[Error: Missing Graphic Image]
@@ -156,7 +161,7 @@ target cvo cluster:
 image:snapctr_cluster_replication_02.PNG[Error: Missing Graphic Image]
 
 [start=2]
-. With inter-cluster lifs configured, cluster peering and volumes replication can be easily setup by drag-and-drop using NetApp Cloud Manager. Please referred to cloud section xx for details.
+. With inter-cluster lifs configured, cluster peering and volumes replication can be easily setup by drag-and-drop using NetApp Cloud Manager. Please referred to Getting Started - AWS Public Cloud, section 2 for details.
 
 Alternatively, cluster peering and DB volumes replication  can also be accomplished using ONTAP System Manager as shown below:
 
@@ -206,7 +211,7 @@ Following procedures demonstrates how to create a full database or log file back
 image:snapctr_ora_policy_data_01.PNG[Error: Missing Graphic Image]
 
 [start=2]
-. Click on New to launch new backup policy creation Workflow, or choose an existing policy for modification
+. Click on New to launch new backup policy creation workflow, or choose an existing policy for modification
 
 image:snapctr_ora_policy_data_02.PNG[Error: Missing Graphic Image]
 
@@ -243,7 +248,7 @@ image:snapctr_ora_policy_data_08.PNG[Error: Missing Graphic Image]
 ==== Create a Database Log Backup Policy for Oracle
 
 . Login to SnapCenter as a database management user ID, Click on Settings, then Polices
-. Click on New to launch new backup policy creation Workflow, or choose an existing policy for modification
+. Click on New to launch new backup policy creation workflow, or choose an existing policy for modification
 
 image:snapctr_ora_policy_log_01.PNG[Error: Missing Graphic Image]
 
@@ -351,9 +356,9 @@ image:snapctr_sql_policy_log_06.PNG[Error: Missing Graphic Image]
 
 === 8. Implement Backup Policy to Protect database
 
-SnapCenter utilizes resource group to backup database in a logical grouping of database resources such as databases hosted on a server or database sharing same storage volumes or databases supporting a business application etc. Protecting a single database would create a resource group of its own. Following demonstrate how to implement backup policy created in section 8 to protect Oracle and SQL Server databases.
+SnapCenter utilizes resource group to backup database in a logical grouping of database resources such as databases hosted on a server or database sharing same storage volumes or databases supporting a business application etc. Protecting a single database would create a resource group of its own. Following demonstrate how to implement backup policy created in section 7 to protect Oracle and SQL Server databases.
 
-==== Create a Resource Group for Fully Backup of Oracle
+==== Create a Resource Group for Full Backup of Oracle
 
 . Login to SnapCenter as a database management user ID, navigate to Resources tab. In View drop down list, choose either Database or Resource Group to launch resource group creation workflow.
 
@@ -435,7 +440,7 @@ image:snapctr_ora_rgroup_log_07.PNG[Error: Missing Graphic Image]
 
 image:snapctr_ora_rgroup_log_08.PNG[Error: Missing Graphic Image]
 
-==== Create a Resource Group for Fully Backup of SQL Server
+==== Create a Resource Group for Full Backup of SQL Server
 
 . Login to SnapCenter as a database management user ID, navigate to Resources tab. In View drop down list, choose either Database or Resource Group to launch resource group creation workflow. Provide name and tags for the resource group. You can define a naming format for Snapshot copy.
 
