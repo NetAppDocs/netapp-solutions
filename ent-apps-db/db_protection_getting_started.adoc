@@ -2,7 +2,7 @@
 sidebar: sidebar
 permalink: ent-apps-db/db_protection_getting_started.html
 keywords: Linux, RHEL Oracle19c, NFS, ONTAP
-summary: This page describes the Automated method for deploying Oracle19c on NetApp ONTAP storage.
+summary: This page describes the Automated method for deploying Oracle Data Protection on NetApp ONTAP storage.
 ---
 
 = Getting started
@@ -30,7 +30,7 @@ For AWX/Tower environments, you are guided through creating an inventory of your
 |Environment | Requirements
 
 .4+| *Ansible environment* |
-AWX/Tower or Linux host to be the Ansible control host
+AWX/Tower
 | Ansible v.2.10 and higher
 | Python 3
 | Python libraries
@@ -38,15 +38,19 @@ AWX/Tower or Linux host to be the Ansible control host
 - xmltodict
 - jmespath
 .3+| *ONTAP* |
-ONTAP version 9.3 - 9.7
+ONTAP version 9.8 '+'
 | Two data aggregates
 | NFS vlan and ifgrp created
 .5+| *Oracle server(s)* |
-RHEL 7/8 | Oracle Linux 7/8 | Network interfaces for NFS, public, and optional mgmt | Oracle installation files on Oracle servers
+RHEL 7/8 | Oracle Linux 7/8 | Network interfaces for NFS, public, and optional mgmt | Existing Oracle environment on source, and the equivalent Linux operating system at the destination (DR Site or Public Cloud)
 |===
 
 == Automation Details
 
+[role="tabbed-block"]
+====
+.On-Prem
+--
 This automated deployment is designed with a single Ansible playbook that consists of three separate roles. The roles are for ONTAP, Linux, and Oracle configurations.
 The following table describes which tasks are being automated.
 
@@ -54,7 +58,7 @@ The following table describes which tasks are being automated.
 |===
 |Role | Tasks
 
-.5+|*ontap_config* |
+.5+|*ontap_setup* |
 Pre-check of the ONTAP environment
 | Creation of NFS based SVM for Oracle
 | Creation of export policy
@@ -80,7 +84,43 @@ Oracle software installation
 | Enable DNFS client
 | Enable database auto startup and shutdown between OS reboots
 |===
+--
+.CVO
+--
+This automated deployment is designed with a single Ansible playbook that consists of three separate roles. The roles are for ONTAP, Linux, and Oracle configurations.
+The following table describes which tasks are being automated.
 
+[width=100%, cols="4, 9",grid="all"]
+|===
+|Role | Tasks
+
+.5+|*cvo_setup* |
+Pre-check of the ONTAP environment
+| Creation of NFS based SVM for Oracle
+| Creation of export policy
+| Creation of volumes for Oracle
+| Creation of NFS LIFs
+.9+|*linux_config* |
+Create mount points and mount NFS volumes
+| Verify NFS mounts
+| OS specific configuration
+| Create Oracle directories
+| Configure hugepages
+| Disable SELinux and firewall daemon
+| Enable and start chronyd service
+| increase file descriptor hard limit
+| Create pam.d session file
+.8+|*oracle_config* |
+Oracle software installation
+| Create Oracle listener
+| Create Oracle databases
+| Oracle environment configuration
+| Save PDB state
+| Enable instance archive mode
+| Enable DNFS client
+| Enable database auto startup and shutdown between OS reboots
+|===
+--
 == Default parameters
 To simplify automation, we have preset many required Oracle deployment parameters with default values. It is generally not necessary to change the default parameters for most deployments. A more advanced user can make changes to the default parameters with caution. The default parameters are located in each role folder under defaults directory.
 
