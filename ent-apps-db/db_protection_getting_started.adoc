@@ -72,7 +72,8 @@ ONTAP version 9.8 +
 | Network interfaces for NFS, public, and optional mgmt
 | Existing Oracle environment on source, and the equivalent Linux operating system at the destination (DR Site or Public Cloud)
 .2+| *Cloud Manager/AWS* |
-AWS Access/Secret Key | NetApp Cloud Manager Account | NetApp Cloud Manager Refresh Token | Add source intercluster lifs to AWS Security group
+AWS Access/Secret Key
+| NetApp Cloud Manager Account | NetApp Cloud Manager Refresh Token | Add source intercluster lifs to AWS Security group
 |===
 --
 ====
@@ -87,32 +88,29 @@ The following table describes which tasks are being automated.
 
 [width=100%, cols="3, 9",grid="all"]
 |===
-|Role | Tasks
+|Playbook | Tasks
 
 .5+|*ontap_setup* |
 Pre-check of the ONTAP environment
-| Creation of NFS based SVM for Oracle
-| Creation of export policy
-| Creation of volumes for Oracle
-.9+|*linux_config* |
-Create mount points and mount NFS volumes
-| Verify NFS mounts
-| OS specific configuration
-| Create Oracle directories
-| Configure hugepages
-| Disable SELinux and firewall daemon
-| Enable and start chronyd service
-| increase file descriptor hard limit
-| Create pam.d session file
-.8+|*oracle_config* |
-Oracle software installation
-| Create Oracle listener
-| Create Oracle databases
-| Oracle environment configuration
-| Save PDB state
-| Enable instance archive mode
-| Enable DNFS client
-| Enable database auto startup and shutdown between OS reboots
+| Creation of Intercluster LIFs on source cluster (OPTIONAL)
+| Creation of Intercluster LIFs on destination cluster (OPTIONAL)
+| Creation of Cluster and SVM Peering
+| Creation of destination SnapMirror and Initialization of designated Oracle volumes
+.9+|*ora_replication_cg* |
+Enable backup mode for each database in /etc/oratab
+| Snapshot taken of Oracle Binary and Database volumes
+| Snapmirror Updated
+| Turn off backup mode for each database in /etc/oratab
+.9+|*ora_replication_log* |
+Switch current log for each database in /etc/oratab
+| Snapshot taken of Oracle Log volume
+| Snapmirror Updated
+.6+|*ora_recovery* |
+Break SnapMirror
+| Enable NFS and create junction path for Oracle volumes on the destination
+| Configure DR Oracle Host
+| Mount and verify Oracle volumes
+| Recover and start Oracle database
 |===
 --
 .CVO
@@ -122,7 +120,7 @@ The following table describes which tasks are being automated.
 
 [width=100%, cols="4, 9",grid="all"]
 |===
-|Role | Tasks
+|Playbook | Tasks
 
 .5+|*cvo_setup* |
 Pre-check of the ONTAP environment
