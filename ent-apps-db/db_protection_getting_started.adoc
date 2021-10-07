@@ -26,7 +26,7 @@ For AWX/Tower environments, you are guided through creating an inventory of your
 == Requirements
 [role="tabbed-block"]
 ====
-.[big]*On-Prem*
+.[big]*On-Prem*  *|*
 --
 [width=100%, cols="3, 9",grid="all"]
 |===
@@ -81,7 +81,7 @@ AWS Access/Secret Key
 
 [role="tabbed-block"]
 ====
-.[big]*On-Prem*
+.[big]*On-Prem*  *|*
 --
 This automated deployment is designed with a single Ansible playbook that consists of three separate roles. The roles are for ONTAP, Linux, and Oracle configurations.
 The following table describes which tasks are being automated.
@@ -122,31 +122,29 @@ The following table describes which tasks are being automated.
 |===
 |Playbook | Tasks
 
-.5+|*cvo_setup* |
-Pre-check of the ONTAP environment
-| Creation of NFS based SVM for Oracle
-| Creation of export policy
-| Creation of volumes for Oracle
-| Creation of NFS LIFs
-.9+|*linux_config* |
-Create mount points and mount NFS volumes
-| Verify NFS mounts
-| OS specific configuration
-| Create Oracle directories
-| Configure hugepages
-| Disable SELinux and firewall daemon
-| Enable and start chronyd service
-| increase file descriptor hard limit
-| Create pam.d session file
-.8+|*oracle_config* |
-Oracle software installation
-| Create Oracle listener
-| Create Oracle databases
-| Oracle environment configuration
-| Save PDB state
-| Enable instance archive mode
-| Enable DNFS client
-| Enable database auto startup and shutdown between OS reboots
+.7+|*cvo_setup* |
+Pre-check of the environment
+| AWS Configure/AWS Access Key ID/Secret Key/Default Region
+| Creation of AWS Role
+| Creation of NetApp Cloud Manager Connector instance in AWS
+| Creation of Cloud Volumes ONTAP (CVO) instance in AWS
+| Add On-Prem Source ONTAP Cluster to NetApp Cloud Manager
+| Creation of destination SnapMirror and Initialization of designated Oracle volumes
+.4+|*ora_replication_cg* |
+Enable backup mode for each database in /etc/oratab
+| Snapshot taken of Oracle Binary and Database volumes
+| Snapmirror Updated
+| Turn off backup mode for each database in /etc/oratab
+.3+|*ora_replication_log* |
+Switch current log for each database in /etc/oratab
+| Snapshot taken of Oracle Log volume
+| Snapmirror Updated
+.5+|*ora_recovery* |
+Break SnapMirror
+| Enable NFS and create junction path for Oracle volumes on the destination CVO
+| Configure DR Oracle Host
+| Mount and verify Oracle volumes
+| Recover and start Oracle database
 |===
 --
 ====
