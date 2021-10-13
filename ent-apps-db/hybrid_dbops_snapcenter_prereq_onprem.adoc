@@ -5,7 +5,7 @@ summary: hybrid cloud database solutions with SnapCenter getting started
 keywords: netapp, solutions, database, SnapCenter, prerequisites
 ---
 
-= Hybrid Cloud Database Workflow Prerequisites - On Premises
+= Hybrid Cloud Database Workflow Prerequisites - On-Premises
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -13,35 +13,37 @@ keywords: netapp, solutions, database, SnapCenter, prerequisites
 :table-stripes: odd
 :imagesdir: ./../media/
 
-[.lead]
-Following tasks needs to be completed on premises to prepare SnapCenter hybrid cloud database workload environment.
+link:hybrid_dbops_snapcenter_prerequisite.html[Previous: Prerequisites configuration.]
 
-=== 1. SnapCenter Installation and Configuration
+The following tasks must be completed on-premises to prepare the SnapCenter hybrid-cloud database workload environment.
 
-NetApp SnapCenter tool is a Windows based application that typically runs in a Windows domain environment although workgroup deployment is also possible. It is based on a multitiered architecture that includes a centralized management server (SnapCenter Server) and a SnapCenter plug-in on database server hosts for database workload. Here are few key considerations for hybrid cloud deployment.
+== SnapCenter installation and configuration
 
-. Single instance or HA deployment - HA deployment provides redundancy in case of a single SnapCenter server instance failure.
-. Name resolution - DNS needs to be configured on SnapCenter server to resolve all database hosts as well as storage SVM both forward and reverse lookup. DNS also need to be configured on database servers to resolve SnapCenter server and storage SVM both forward and reverse lookup.
-. Role based access control or RBAC configuration - For mixed database workloads, it maybe desirable to segregate the management responsibility using RBAC for different DB platform such as an admin for Oracle database and an admin for SQL Server etc. Necessary permissions needs to be granted for the DB admin user.
-. Enable policy based backup strategy to enforce backup consistency and reliability.
-. For on-prem SnapCenter server to communicate with agent installed in cloud DB host, necessary network ports needs to be open on the firewall.
-. SnapCenter server relies on the underlined ONTAP snapmirror for replicating onsite snapshot backups to cloud CVO storage SVMs. Necessary ports needs to be open to allow snapmirror traffic between on-prem and public cloud.
+The NetApp SnapCenter tool is a Windows-based application that typically runs in a Windows domain environment, although workgroup deployment is also possible. It is based on a multitiered architecture that includes a centralized management server (the SnapCenter server) and a SnapCenter plug-in on the database server hosts for database workloads. Here are a few key considerations for hybrid-cloud deployment.
 
-After careful preinstall planning and consideration, click following installation workflow for details of SnapCenter installation and configuration. link:https://docs.netapp.com/us-en/snapcenter/install/install_workflow.html[SnapCenter Install Workflow^]
+* *Single instance or HA deployment.* HA deployment provides redundancy in the case of a single SnapCenter instance server failure.
+* *Name resolution.* DNS must be configured on the SnapCenter server to resolve all database hosts as well as on the storage SVM for forward and reverse lookup. DNS must also be configured on database servers to resolve the SnapCenter server and the storage SVM for both forward and reverse lookup.
+* *Role-based access control (RBAC) configuration.* For mixed database workloads, you might want to use RBAC to segregate management responsibility for different DB platform such as an admin for Oracle database or an admin for SQL Server. Necessary permissions must be granted for the DB admin user.
+* *Enable policy-based backup strategy.* To enforce backup consistency and reliability.
+* *Open necessary network ports on the firewall.* For the on-premises SnapCenter server to communicate with agents installed in the cloud DB host.
+* *Ports must be open to allow SnapMirror traffic between on-prem and public cloud.* The SnapCenter server relies on ONTAP SnapMirror to replicate onsite snapshot backups to cloud CVO storage SVMs.
 
-=== 2. On-prem Database Server Storage Configuration
+After careful pre-installation planning and consideration, click this link:https://docs.netapp.com/us-en/snapcenter/install/install_workflow.html[SnapCenter installation workflow^] for the details of SnapCenter installation and configuration.
 
-Storage performance plays an important role in database and thus application overall performance. A well-designed storage layout can not only improve DB performance but also make it easy in managing DB backup and recovery. Several factors should be considered in defining your storage layout, including the size of the database, the rate of expected data change of the database, and the frequency with which you perform backups.
+== On-premises database server storage configuration
 
-Directly attached storage LUN to guest VM via either NFS or iSCSI for virtualized database workload generally provides better performance than storage allocated via VMDK. Following graphic shows NetApp recommended storage layout for large SQL Server database on LUNs:
+Storage performance plays an important role in the overall performance of databases and applications. A well-designed storage layout can not only improve DB performance, but also make it easy to manage database backup and recovery. Several factors should be considered when defining your storage layout, including the size of the database, the rate of expected data change for the database, and the frequency with which you perform backups.
+
+Directly attaching storage LUNs to the guest VM by either NFS or iSCSI for virtualized database workloads generally provides better performance than storage allocated via VMDK. NetApp recommends the storage layout for a large SQL Server database on LUNs depicted in the following figure.
 
 image:storage_layout_sqlsvr_large.PNG[Error: Missing Graphic Image]
 
-Following graphic shows NetApp recommended storage layout for small or medium SQL Server database on LUNs:
+The following figure shows the NetApp recommended storage layout for small or medium SQL Server database on LUNs.
 
 image:storage_layout_sqlsvr_smallmedium.PNG[Error: Missing Graphic Image]
 
-Note: the Log directory is dedicated to SnapCenter for transaction log rollup for database recovery. For extra large database, multiple LUNs may be allocated to a volume for better performance.
+NOTE
+the Log directory is dedicated to SnapCenter for transaction log rollup for database recovery. For extra large database, multiple LUNs may be allocated to a volume for better performance.
 
 For Oracle database workload SnapCenter supports database environments backed by ONTAP storage that are mounted to the host as either physical or as virtual devices. You can host the entire database on a single or multiple storage devices based on the criticality of the environment. Typically customers would isolate the data files on a dedicated storage from all other files such as control files, and redo and archive log files. This helps administrators to quickly restore (ONTAP single-file SnapRestore) or clone a large critical database (petabyte scale) using Snapshot technology within few seconds to minutes.
 
@@ -58,15 +60,15 @@ image:storage_layout_oracle_shared.PNG[Error: Missing Graphic Image]
 
 It should be noted that in order to facilitate the relocation of Oracle databases, Oracle binary should be installed on a separate LUN that is included in regular backup policy. This ensures that in the case of database relocation to a new server host, Oracle stack can be started for recovery without any potential issues due to out of sync Oracle binary.
 
-=== 3. Licensing Requirements
+== 3. Licensing Requirements
 
 SnapCenter is licensed software from NetApp. It is generally included in on-prem ONTAP license. However, for hybrid cloud deployment, a cloud license for SnapCenter is also required in order to add CVO to SnapCenter as a target data replication destination. Please review following links for SnapCenter standard capacity-based license for details:
 
 link:https://https://docs.netapp.com/us-en/snapcenter/install/concept_snapcenter_standard_capacity_based_licenses.html[SnapCenter standard capacity-based licenses^]
 
-=== 4. Networking and Security
+== 4. Networking and Security
 
-=== 5. Using Ansible Automation to Sync Up DB Instances between On-prem and Cloud - Optional
+== 5. Using Ansible Automation to Sync Up DB Instances between On-prem and Cloud - Optional
 
 To simplify management of hybrid cloud database environment, it is highly recommended but not required to deploy an Ansible controller to automate some of management tasks such as keeping compute instance between on-prem and cloud in sync. This is particular important as out of sync compute instance in cloud with on-prem might render the recovered database in cloud error prone because of missing kernel package etc.
 
@@ -76,3 +78,5 @@ Follow this instruction to setup your Ansible control node for RedHat or CentOS 
 Follow this instruction to setup your Ansible control node for Ubuntu or Debian machines: link:https://review.docs.netapp.com/us-en/netapp-solutions_acao_snapctr/automation/automation_ubuntu_debian_setup.html[Ubuntu/Debian Ansible Controller Setup^]
 
 link:hybrid_dbops_snapcenter_prereq_cloud.html[Public Cloud]
+
+link:hybrid_dbops_snapcenter_prereq_cloud.html[Next: Public cloud.]
