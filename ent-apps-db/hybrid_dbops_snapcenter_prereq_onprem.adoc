@@ -42,9 +42,16 @@ The following figure shows the NetApp recommended storage layout for small or me
 
 image:storage_layout_sqlsvr_smallmedium.PNG[Error: Missing Graphic Image]
 
+<<<<<<< HEAD
 NOTE: The Log directory is dedicated to SnapCenter to perform transaction log rollup for database recovery. For an extra large database, multiple LUNs can be allocated to a volume for better performance.
 
 For Oracle database workloads, SnapCenter supports database environments backed by ONTAP storage that are mounted to the host as either physical or virtual devices. You can host the entire database on a single or multiple storage devices based on the criticality of the environment. Typically, customers isolate data files on dedicated storage from all other files such as control files, redo files, and archive log files. This helps administrators to quickly restore (ONTAP single-file SnapRestore) or clone a large critical database (petabyte scale) using Snapshot technology within few seconds to minutes.
+=======
+[NOTE]
+The Log directory is dedicated to SnapCenter for transaction log rollup for database recovery. For extra large database, multiple LUNs may be allocated to a volume for better performance.
+
+For Oracle database workload, SnapCenter supports database environments backed by ONTAP storage that are mounted to the host as either physical or as virtual devices. You can host the entire database on a single or multiple storage devices based on the criticality of the environment. Typically customers would isolate the data files on a dedicated storage from all other files such as control files, and redo and archive log files. This helps administrators to quickly restore (ONTAP single-file SnapRestore) or clone a large critical database (petabyte scale) using Snapshot technology within few seconds to minutes.
+>>>>>>> c4c277d4bf578ce3e6b43ed923f41967a8731ab9
 
 image:storage_layout_oracle_typical.PNG[Error: Missing Graphic Image]
 
@@ -52,25 +59,50 @@ For mission critical workloads that are sensitive to latency, a dedicated storag
 
 image:storage_layout_oracle_dedicated.PNG[Error: Missing Graphic Image]
 
+<<<<<<< HEAD
 For smaller Oracle databases, SnapCenter supports shared storage layouts in which you can host multiple databases or part of a database on the same storage volume or LUN. As an example of this layout, you can host data files for all the databases on a +DATA ASM disk group or a volume group. The remainder of the files (redo, archive log, and control files) can be hosted on another dedicated disk group or volume group (LVM). Such a deployment scenario is illustrated below.
 
 image:storage_layout_oracle_shared.PNG[Error: Missing Graphic Image]
 
 To facilitate the relocation of Oracle databases, the Oracle binary should be installed on a separate LUN that is included in the regular backup policy. This ensures that in the case of database relocation to a new server host, the Oracle stack can be started for recovery without any potential issues due to an out-of-sync Oracle binary.
+=======
+If, on the other hand, for smaller Oracle databases, SnapCenter supports shared storage layouts in which you can host multiple databases or part of the databases on the same storage volume or LUN. A quick example of this layout would be that the data files of all the databases hosted on +DATA ASM disk group or volume group and the rest of the files (redo, archive log, and control files) on another dedicated disk group or volume group (LVM). Such a deployment scenario is illustrated below.
+
+image:storage_layout_oracle_shared.PNG[Error: Missing Graphic Image]
+
+[NOTE]
+In order to facilitate the migration of Oracle databases, Oracle binary should be installed on a separate LUN that is included in regular backup policy. This ensures that in the case of database migration to a new server host in public cloud, Oracle stack can be easily relinked and started for recovery without any potential issues due to out of sync Oracle binary.
+>>>>>>> c4c277d4bf578ce3e6b43ed923f41967a8731ab9
 
 == Licensing requirements
 
 SnapCenter is licensed software from NetApp. It is generally included in an on-premises ONTAP license. However, for hybrid cloud deployment, a cloud license for SnapCenter is also required to add CVO to SnapCenter as a target data replication destination. Please review following links for SnapCenter standard capacity-based license for details:
 
-link:https://https://docs.netapp.com/us-en/snapcenter/install/concept_snapcenter_standard_capacity_based_licenses.html[SnapCenter standard capacity-based licenses^]
+link:https://docs.netapp.com/us-en/snapcenter/install/concept_snapcenter_standard_capacity_based_licenses.html[SnapCenter standard capacity-based licenses^]
 
 == 4. Networking and Security
 
+<<<<<<< HEAD
 == 5. Using Ansible Automation to Sync Up DB Instances between On-prem and Cloud - Optional
+=======
+In a hybrid database operation that requires on-prem production database to be burstable to cloud for DEV/TEST and disaster recovery, networking and security is important factor to consider when setting up the environment and connectivity to public cloud from on-prem data center.
 
-To simplify management of hybrid cloud database environment, it is highly recommended but not required to deploy an Ansible controller to automate some of management tasks such as keeping compute instance between on-prem and cloud in sync. This is particular important as out of sync compute instance in cloud with on-prem might render the recovered database in cloud error prone because of missing kernel package etc.
+Public cloud generally utilize Virtual Private Cloud or VPC to isolate different users within a public cloud platform. Within an individual VPC, security is controlled using measures such as Security Groups that are configurable based on user needs for lockdown of a VPC.
 
+The connectivity from on-prem data center to VPC can be secured through a VPN tunnel. On VPN gateway, security can be hardened using NAT and firewall rules that block attempts to establish network connections from hosts on the internet to hosts inside corporate data center.
+
+For networking and security consideration, review the relevant inbound and outbound rules for CVO for respective public cloud of choice. link:https://docs.netapp.com/us-en/occm/reference_security_groups.html#rules-for-cloud-volumes-ontap[Security group rules for CVO - AWS^], link:https://docs.netapp.com/us-en/occm/reference_networking_azure.html#outbound-internet-access[Security group rules for CVO - Azure^], link:https://docs.netapp.com/us-en/occm/reference_networking_gcp.html#outbound-internet-access[Firewall rules for CVO - GCP^]
+
+=== 5. Using Ansible Automation to Sync Up DB Instances between On-prem and Cloud - Optional
+>>>>>>> c4c277d4bf578ce3e6b43ed923f41967a8731ab9
+
+To simplify management of hybrid cloud database environment, it is highly recommended but not required to deploy an Ansible controller to automate some of management tasks such as keeping compute instance between on-prem and cloud in sync. This is particular important as out of sync compute instance in cloud with on-prem might render the recovered database in cloud error prone as a result of missing kernel packages or database patches etc.
+
+<<<<<<< HEAD
 The automation capability of Ansible controller also could be used to augment SnapCenter for certain tasks such as breaking up the snapmirror to activate the DR data copy for production.
+=======
+The Ansible controller could be used to easily roll out database patches and OS update to on-prem and cloud standby servers in a parallel update fashion to ensure servers and databases are in sync for disaster recovery. Automation can also be used to deploy new compute instance and install database software to support DEV/TEST operation while improving DBA productivity and minimizing human errors.
+>>>>>>> c4c277d4bf578ce3e6b43ed923f41967a8731ab9
 
 Follow this instruction to setup your Ansible control node for RedHat or CentOS machines: link:https://review.docs.netapp.com/us-en/netapp-solutions_acao_snapctr/automation/automation_rhel_centos_setup.html[RedHat/CentOS Ansible Controller Setup^]
 Follow this instruction to setup your Ansible control node for Ubuntu or Debian machines: link:https://review.docs.netapp.com/us-en/netapp-solutions_acao_snapctr/automation/automation_ubuntu_debian_setup.html[Ubuntu/Debian Ansible Controller Setup^]
