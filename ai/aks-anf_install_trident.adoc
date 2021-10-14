@@ -1,0 +1,149 @@
+---
+sidebar: sidebar
+permalink: ai/aks-anf_install_trident.html
+keywords:
+summary:
+---
+
+= Install Trident
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-08-12 10:46:35.638276
+//
+
+link:aks-anf_peer_aks_vnet_and_azure_netapp_files_vnet.html[Previous: Peer AKS VNet and Azure NetApp Files VNet.]
+
+To install Trident using Helm, complete the following steps:
+
+. Install Helm (for installation instructions, visit the https://helm.sh/docs/intro/install/[source^]).
+. Download and extract the Trident 20.01.1 installer.
++
+....
+$wget
+$tar -xf trident-installer-21.01.1.tar.gz
+....
+
+. Change the directory to `trident-installer`.
++
+....
+$cd trident-installer
+....
+
+. Copy `tridentctl` to a directory in your system `$PATH`.
++
+....
+$sudo cp ./tridentctl /usr/local/bin
+....
+
+. Install Trident on the Kubernetes (K8s) cluster with Helm ( https://scaleoutsean.github.io/2021/02/02/trident-21.01-install-with-helm-on-netapp-hci.html[source^]):
+.. Change the directory to the `helm` directory.
++
+....
+$cd helm
+....
+
+.. Install Trident.
++
+....
+$helm install trident trident-operator-21.01.1.tgz --namespace trident --create-namespace
+....
+
+.. Check the status of Trident pods.
++
+....
+$kubectl -n trident get pods
+....
++
+If all the pods are up and running, then Trident is installed and you can move forward.
+
+. Set up the Azure NetApp Files backend and storage class for AKS.
+.. Create an Azure Service Principle.
++
+The service principal is how Trident communicates with Azure to manipulate your Azure NetApp Files resources.
++
+....
+$az ad sp create-for-rbac --name ""
+....
++
+The output should look like the following example:
++
+....
+{
+"appId": "xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", 
+"displayName": "netapptrident", 
+"name": "", 
+"password": "xxxxxxxxxxxxxxx.xxxxxxxxxxxxxx", 
+"tenant": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx"
+} 
+....
+
+. Create a Trident backend json file, example name `anf-backend.json`.
+
+. Using your preferred text editor, complete the following fields inside the `anf-backend.json` file:
++
+....
+{
+    "version": 1,
+    "storageDriverName": "azure-netapp-files",
+    "subscriptionID": "fakec765-4774-fake-ae98-a721add4fake",
+    "tenantID": "fakef836-edc1-fake-bff9-b2d865eefake",
+    "clientID": "fake0f63-bf8e-fake-8076-8de91e57fake",
+    "clientSecret": "SECRET",
+    "location": "westeurope",
+    "serviceLevel": "Standard",
+    "virtualNetwork": "anf-vnet",
+    "subnet": "default",
+    "nfsMountOptions": "vers=3,proto=tcp",
+    "limitVolumeSize": "500Gi",
+    "defaults": {
+    "exportRule": "0.0.0.0/0",
+    "size": "200Gi"
+}
+....
+
+. Substitute the following fields:
+
+** `subscriptionID`. Your Azure subscription ID.
+** `tenantID`. Your Azure Tenant ID from the output of `az ad sp` in the previous step.
+** `clientID`. Your appID from the output of `az ad sp` in the previous step.
+** `clientSecret`. Your password from the output of `az ad sp` in the previous step.
+
+. Instruct Trident to create the Azure NetApp Files backend in the `trident` namespace using `anf-backend.json` as the configuration file:
++
+....
+$tridentctl create backend -f anf-backend.json -n trident
+....
++
+image:aks-anf_image8.png[Error: Missing Graphic Image]
+
+. Create a storage class. Kubernetes users provision volumes by using PVCs that specify a storage class by name. Instruct K8s to create a storage class `azurenetappfiles` that references the Trident backend created in the previous step.
+
+. Create a YAML (`anf-storage-class.yaml`) file for storage class and copy.
++
+....
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+name: azurenetappfiles
+provisioner: netapp.io/trident
+parameters:
+backendType: "azure-netapp-files"
+$kubectl create -f anf-storage-class.yaml
+....
+
+. Verify that the storage class was created.
++
+....
+kubectl get sc azurenetappfiles
+....
+
+image:aks-anf_image9.png[Error: Missing Graphic Image]
+
+link:aks-anf_set_up_dask_with_rapids_deployment_on_aks_using_helm.html[Next: Set up Dask with RAPIDS deployment on AKS using Helm.]
