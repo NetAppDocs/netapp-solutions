@@ -5,7 +5,7 @@ summary: hybrid cloud database solutions with SnapCenter DR workflow
 keywords: netapp, solutions, database, SnapCenter, DR, "business continuity", "disaster recovery"
 ---
 
-= Hybrid Cloud Database DR Workflow Step by Step
+= Disaster recovery workflow
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -13,180 +13,154 @@ keywords: netapp, solutions, database, SnapCenter, DR, "business continuity", "d
 :table-stripes: odd
 :imagesdir: ./../media/
 
-[.lead]
-Enterprises have embraced public cloud as a viable resource and destination for disaster recovery. NetApp SnapCenter tool makes this entire process as seamless as possible. Hybrid cloud database DR workflow is very similar to clone but DB recovery run through last available log that was replicated to cloud to recover all business transactions possible. There are additional pre and after configuration specific to disaster recovery purpose.
+link:hybrid_dbops_snapcenter_devtest.html[Previous: Workflow for dev/test bursting to cloud.]
 
-Following are step by step processes in details:
+Enterprises have embraced the public cloud as a viable resource and destination for disaster recovery. SnapCenter makes this process as seamless as possible. This disaster recovery workflow is very similar to the clone workflow, but database recovery runs through the last available log that was replicated to cloud to recover all the business transactions possible. However, there are additional pre-configuration and post-configuration steps specific to disaster recovery.
 
-== Clone an On-Premises Oracle Production DB to Cloud for DR
+== Clone an on-premises Oracle production DB to cloud for DR
 
-. To validate that the clone recovery run through last available log, we created a small test table and inserted a row. The test data would be recovered after a full recovery to last available log.
-
+. To validate that the clone recovery runs through last available log, we created a small test table and inserted a row. The test data would be recovered after a full recovery to last available log.
++
 image:snapctr_ora_dr_01.PNG[Error: Missing Graphic Image]
 
-[start=2]
-. Login to SnapCenter as a database management user ID for Oracle. Navigate to Resources tab, which shows the Oracle databases being protected by SnapCenter.
-
+. Log into SnapCenter as a database management user ID for Oracle. Navigate to the Resources tab, which shows the Oracle databases being protected by SnapCenter.
++
 image:snapctr_ora_dr_02.PNG[Error: Missing Graphic Image]
 
-[start=3]
-. Select the oracle log resource group and click on Backup Now to manually run an Oracle log backup to flush latest transaction to destination in cloud. In a real DR scenario, last transaction recoverable is depending on database log volume replication frequency to cloud, which in turn hinges on RTO or RPO policy of a company.
-
+. Select the Oracle log resource group and click Backup Now to manually run an Oracle log backup to flush the latest transaction to the destination in the cloud. In a real DR scenario, the last transaction recoverable depends on the database log volume replication frequency to the cloud, which in turn depends on the RTO or RPO policy of the company.
++
 image:snapctr_ora_dr_03.PNG[Error: Missing Graphic Image]
++
 image:snapctr_ora_dr_04.PNG[Error: Missing Graphic Image]
-
++
 [NOTE]
-Asynchronous based SnapMirror will lose data that has not made it to cloud destination in between database log backup interval in a DR situation. To minimizing the data loss, more frequent log backup can be scheduled. However there is a limit in terms of log backup frequency that is technically achievable.
+Asynchronous SnapMirror loses data that has not made it to the cloud destination in the database log backup interval in a disaster recovery scenario. To minimize data loss, more frequent log backup can be scheduled. However there is a limit to the log backup frequency that is technically achievable.
 
-[start=4]
-. Select last log backup on Secondary Mirror Backup(s) and mount the log backup.
-
+. Select the last log backup on the Secondary Mirror Backup(s), and mount the log backup.
++
 image:snapctr_ora_dr_05.PNG[Error: Missing Graphic Image]
++
 image:snapctr_ora_dr_06.PNG[Error: Missing Graphic Image]
 
-[start=5]
-. Select last full database backup and click on Clone to initiate clone workflow.
-
+. Select the last full database backup and click Clone to initiate the clone workflow.
++
 image:snapctr_ora_dr_07.PNG[Error: Missing Graphic Image]
 
-[start=6]
-. Select a unique clone DB ID on the host
-
+. Select a unique clone DB ID on the host.
++
 image:snapctr_ora_dr_08.PNG[Error: Missing Graphic Image]
 
-[start=7]
-. Provision a log volume and mount to target DR server for Oracle flash recovery area and online logs
-
+. Provision a log volume and mount it to the target DR server for the Oracle flash recovery area and online logs.
++
 image:snapctr_ora_dr_09.PNG[Error: Missing Graphic Image]
++
 image:snapctr_ora_dr_10.PNG[Error: Missing Graphic Image]
-
++
 [NOTE]
-Oracle clone procedure does not create a log volume, which needs to be provisioned on the DR server before cloning.
+The Oracle clone procedure does not create a log volume, which needs to be provisioned on the DR server before cloning.
 
-[start=8]
-. Select the target clone host and location to place data files, control files, and redo logs
-
+. Select the target clone host and location to place the data files, control files, and redo logs.
++
 image:snapctr_ora_dr_11.PNG[Error: Missing Graphic Image]
 
-[start=9]
-. Select credentials for the clone. Fill in the details of Oracle home configuration on the target server.
-
+. Select the credentials for the clone. Fill in the details of the Oracle home configuration on the target server.
++
 image:snapctr_ora_dr_12.PNG[Error: Missing Graphic Image]
 
-[start=10]
-. Specify scripts to run before clone. Database parameters can be adjusted if needed.
-
+. Specify the scripts to run before cloning. Database parameters can be adjusted if needed.
++
 image:snapctr_ora_dr_13.PNG[Error: Missing Graphic Image]
 
-[start=11]
-. Select Until Cancel as recovery option so that the recovery run through all available archive logs to recoup last transaction replicated to secondary cloud location.
-
+. Select Until Cancel as the recovery option so that the recovery runs through all available archive logs to recoup the last transaction replicated to the secondary cloud location.
++
 image:snapctr_ora_dr_14.PNG[Error: Missing Graphic Image]
 
-[start=12]
-. Configure SMTP server for email notification if needed
-
+. Configure the SMTP server for email notification if needed.
++
 image:snapctr_ora_dr_15.PNG[Error: Missing Graphic Image]
 
-[start=13]
-. DR clone summary
-
+. DR clone summary.
++
 image:snapctr_ora_dr_16.PNG[Error: Missing Graphic Image]
 
-[start=14]
-. Cloned DBs are registered with SnapCenter immediately after clone completion and available for backup protection.
-
+. Cloned DBs are registered with SnapCenter immediately after clone completion and are then available for backup protection.
++
 image:snapctr_ora_dr_16_1.PNG[Error: Missing Graphic Image]
 
-== Post DR Clone Validation and Configuration for Oracle
+== Post DR clone validation and configuration for Oracle
 
-. Validate the last test transaction has been flushed and replicated, and recovered at DR location in Cloud
-
+. Validate the last test transaction that has been flushed, replicated, and recovered at the DR location in the cloud.
++
 image:snapctr_ora_dr_17.PNG[Error: Missing Graphic Image]
 
-[start=2]
-. Configure flash recovery area
-
+. Configure the flash recovery area.
++
 image:snapctr_ora_dr_18.PNG[Error: Missing Graphic Image]
 
-[start=3]
-. Configure Oracle listener for user access
+. Configure the Oracle listener for user access.
 
-[start=4]
-. Split cloned volume off replicated source volume
+. Split the cloned volume off of the replicated source volume.
 
-[start=5]
-. Reverse replication from cloud to on-premises and rebuilt failed on-premises database server.
+. Reverse replication from the cloud to on-premises and rebuild the failed on-premises database server.
 
 [NOTE]
-Clone split may incur storage space utilization much higher than normal operation temporarily. However, once on-premises DB server is rebuilt, the extra space can be released.
+Clone split may incur temporary storage space utilization that is much higher than normal operation. However, after the on-premises DB server is rebuilt, extra space can be released.
 
-== Clone an On-Premises SQL Production DB to cloud for DR
+== Clone an on-premises SQL production DB to cloud for DR
 
-. Similarly, to validate that the SQL clone recovery run through last available log, we created a small test table and inserted a row. The test data would be recovered after a full recovery to last available log.
-
+. Similarly, to validate that the SQL clone recovery ran through last available log, we created a small test table and inserted a row. The test data would be recovered after a full recovery to the last available log.
++
 image:snapctr_sql_dr_01.PNG[Error: Missing Graphic Image]
 
-[start=2]
-. Login to SnapCenter as a database management user ID for SQL Server. Navigate to Resources tab, which shows the SQL Server protection resources group.
-
+. Log into SnapCenter with a database management user ID for SQL Server. Navigate to the Resources tab, which shows the SQL Server protection resources group.
++
 image:snapctr_sql_dr_02.PNG[Error: Missing Graphic Image]
 
-[start=3]
-. Manually run a log backup to flush last transaction to be replicated to secondary storage in public cloud.
-
+. Manually run a log backup to flush the last transaction to be replicated to secondary storage in the public cloud.
++
 image:snapctr_sql_dr_03.PNG[Error: Missing Graphic Image]
 
-[start=4]
-. Select last full SQL Server backup for clone
-
+. Select the last full SQL Server backup for the clone.
++
 image:snapctr_sql_dr_04.PNG[Error: Missing Graphic Image]
 
-[start=5]
-. Set the clone setting such as Clone server, Clone instance, Clone name, and mount option. Secondary storage location, where clone is performed is auto populated.
-
+. Set the clone setting such as the Clone Server, Clone Instance, Clone Name, and mount option. The secondary storage location where cloning is performed is auto-populated.
++
 image:snapctr_sql_dr_05.PNG[Error: Missing Graphic Image]
 
-[start=6]
-. Select all log backups to be applied
-
+. Select all log backups to be applied.
++
 image:snapctr_sql_dr_06.PNG[Error: Missing Graphic Image]
 
-[start=7]
-. Specify any optional scripts to run before or after clone
-
+. Specify any optional scripts to run before or after cloning.
++
 image:snapctr_sql_dr_07.PNG[Error: Missing Graphic Image]
 
-[start=8]
-. Specify SMTP server if email notification is desired.
-
+. Specify an SMTP server if email notification is desired.
++
 image:snapctr_sql_dr_08.PNG[Error: Missing Graphic Image]
 
-[start=9]
 . DR clone summary. Cloned databases are immediately registered with SnapCenter and available for backup protection.
-
++
 image:snapctr_sql_dr_09.PNG[Error: Missing Graphic Image]
++
 image:snapctr_sql_dr_10.PNG[Error: Missing Graphic Image]
 
-== Post DR Clone Validation and Configuration for SQL
+== Post DR clone validation and configuration for SQL
 
-. Monitor clone job status
-
+. Monitor clone job status.
++
 image:snapctr_sql_dr_11.PNG[Error: Missing Graphic Image]
 
-[start=2]
-. Validate that last transaction has been replicated and recovered with all log file clone and recovery.
-
+. Validate that last transaction has been replicated and recovered with all log file clones and recovery.
++
 image:snapctr_sql_dr_12.PNG[Error: Missing Graphic Image]
 
-[start=3]
-. Configure a new SnapCenter log directory on DR server for SQL Server log backup
+. Configure a new SnapCenter log directory on the DR server for SQL Server log backup.
 
-[start=4]
-. Split cloned volume off replicated source volume
+. Split the cloned volume off of the replicated source volume.
 
-[start=5]
-. Reverse replication from cloud to on-premises and rebuilt failed on-premises database server.
+. Reverse replication from the cloud to on-premises and rebuild the failed on-premises database server.
 
 == Where to go for help?
-If you need help with the solution and use cases, please join the link:https://netapppub.slack.com/archives/C021R4WC0LC[NetApp Solution Automation community support slack channel] and look for the solution-automation channel to post your questions or inquires.
+If you need help with this solution and use cases, please join the link:https://netapppub.slack.com/archives/C021R4WC0LC[NetApp Solution Automation community support Slack channel] and look for the solution-automation channel to post your questions or inquires.
