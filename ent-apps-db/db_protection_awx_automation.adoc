@@ -24,48 +24,20 @@ This section describes the setup of inventory, groups, hosts, and access credent
 .. Navigate to Resources → Inventories → Add, and click Add Inventory.
 .. Provide the name and organization details, and click Save.
 .. On the Inventories page, click the inventory created.
-.. If there are any inventory variables, paste them in the variables field.
 .. Navigate to the Groups sub-menu and click Add.
-.. Provide the name of the group for the source ONTAP cluster, paste the group variables (if any) and click Save.
-.. Repeat the process for another group for Oracle.
-.. Select the ONTAP group created, go to the Hosts sub-menu and click Add New Host.
-.. Provide the IP address of the Source ONTAP cluster management IP, paste the host variables (if any), and click Save.
-.. This process must be repeated for the Oracle group and Source Oracle host(s) management IP/hostname.
-
-. Create credential types. For solutions involving ONTAP, you must configure the credential type to match username and password entries.
-.. Navigate to Administration → Credential Types, and click Add.
-.. Provide the name and description.
-.. Paste the following content in Input Configuration:
-+
-
-[source, cli]
-fields:
-  - id: username
-    type: string
-    label: Username
-  - id: password
-    type: string
-    label: Password
-    secret: true
-
-.. Paste the following content into Injector Configuration:
-+
-
-[source, cli]
-extra_vars:
-  password: '{{ password }}'
-  username: '{{ username }}'
+.. Provide the name oracle for your first group and click Save.
+.. Repeat the process for a second group called dr_oracle.
+.. Select the oracle group created, go to the Hosts sub-menu and click Add New Host.
+.. Provide the IP address of the Source Oracle host's management IP, and click Save.
+.. This process must be repeated for the dr_oracle group and add the the DR/Destination Oracle host's management IP/hostname.
 
 . Configure the credentials.
 .. Navigate to Resources → Credentials, and click Add.
-.. Enter the name and organization details for ONTAP.
-.. Select the custom Credential Type you created for ONTAP.
-.. Under Type Details, enter the username, password.
-.. Click Back to Credential and click Add.
-.. Enter the name and organization details for Oracle.
+.. Enter the name and organization details for Oracle
 .. Select the Machine credential type.
 .. Under Type Details, enter the Username and Password for the Oracle hosts.
 .. Select the correct Privilege Escalation Method, and enter the username and password.
+.. Repeat process if needed for a different credential for the dr_oracle host.
 
 === 2. Create a project
 
@@ -77,24 +49,7 @@ extra_vars:
 .. The project might need to sync occasionally when the source code changes.
 
 
-=== 3. Configure Oracle host_vars
-
-The variables defined in this section are applied to each individual Oracle server and database.
-
-. Input your environment-specific parameters in the following embedded Oracle hosts variables or host_vars form.
-
-NOTE: The items in blue must be changed to match your environment.
-
-include::ent-apps-db/host_vars.adoc[]
-
-.. Fill in all variables in the blue fields.
-.. After completing variables input, click the Copy button on the form to copy all variables to be transferred to AWX or Tower.
-.. Navigate back to AWX or Tower and go to Resources → Hosts, and select and open the Oracle server configuration page.
-.. Under the Details tab, click edit and paste the copied variables from step 1 to the Variables field under the YAML tab.
-.. Click Save.
-.. Repeat this process for any additional Oracle servers in the system.
-
-=== 4. Configure global variables
+=== 3. Configure global variables
 
 Variables defined in this section apply to all Oracle hosts, databases, and the ONTAP cluster.
 
@@ -117,7 +72,7 @@ include::ent-apps-db/db_protection_cvo_vars.adoc[]
 . Fill in all variables in blue fields.
 . After completing variables input, click the Copy button on the form to copy all variables to be transferred to AWX or Tower into the following job template.
 
-=== 5. Configure and launch the job template.
+=== 4. Configure and launch the job template.
 
 . Create the job template.
 .. Navigate to Resources → Templates → Add and click Add Job Template.
@@ -153,7 +108,7 @@ NOTE: requirements_config ensures that you have the correct libraries to run the
 .. Click Next and then Launch to start the job.
 .. Select View → Jobs to monitor the job output and progress.
 
-=== 6. Deploy additional database on same Oracle host
+=== 5. Deploy additional database on same Oracle host
 
 The Oracle portion of the playbook creates a single Oracle container database on an Oracle server per execution. To create additional container databases on the same server, complete the following steps.
 
