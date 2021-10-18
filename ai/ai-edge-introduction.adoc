@@ -1,0 +1,106 @@
+---
+sidebar: sidebar
+permalink: ai-edge-introduction.html
+keywords:
+summary:
+---
+
+= Introduction
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-10-18 12:10:22.498039
+//
+
+[.lead]
+Companies are increasingly generating massive volumes of data at the network edge. To achieve maximum value from smart sensors and IoT data, organizations are looking for a real-time event streaming solution that enables edge computing. Computationally demanding jobs are therefore increasingly performed at the edge, outside of data centers. AI inference is one of the drivers of this trend. Edge servers provide sufficient computational power for these workloads, especially when using accelerators, but limited storage is often an issue, especially in multiserver environments. In this document we show how you can deploy a shared storage system in the edge environment and how it benefits AI inference workloads without imposing a performance penalty.
+
+This document describes a reference architecture for AI inference at the edge. It combines multiple Lenovo ThinkSystem edge servers with a NetApp storage system to create a solution that is easy to deploy and manage. It is intended to be a baseline guide for practical deployments in various situations, such as the factory floor with multiple cameras and industrial sensors, point- of- sale (POS) systems in retail transactions, or Full Self-Driving (FSD) systems that identify visual anomalies in autonomous vehicles.
+
+This document covers testing and validation of a compute and storage configuration consisting of Lenovo ThinkSystem SE350 Edge Server and an entry-level NetApp AFF and EF-Series storage system. The reference architectures provide an efficient and cost-effective solution for AI deployments while also providing comprehensive data services, integrated data protection, seamless scalability, and cloud connected data storage with NetApp ONTAP and NetApp SANtricity data management software. 
+
+=== Target audience
+
+This document is intended for the following audiences:
+
+* Business leaders and enterprise architects who want to productize AI at the edge.
+* Data scientists, data engineers, AI/machine learning (ML) researchers,  and developers of AI systems.  
+* Enterprise architects who design solutions for the development of AI/ML models and applications.
+* Data scientists and AI engineers looking for efficient ways to deploy deep learning (DL) and ML models.
+* Edge device managers and edge server administrators responsible for deployment and management of edge inferencing models.
+
+=== Solution architecture
+
+This Lenovo ThinkSystem server and NetApp ONTAP or NetApp SANtricity storage solution is designed to handle AI inferencing on large datasets using the processing power of GPUs alongside traditional CPUs. This validation demonstrates high performance and optimal data management with an architecture that uses either single or multiple Lenovo SR350 edge servers interconnected with a single NetApp AFF storage system, as shown in the figure below.
+
+The logical architecture overview in the figure below shows the roles of the compute and storage elements in this architecture. Specifically, it shows the following: 
+
+* Edge compute devices performing inference on the data it receives from cameras, sensors, and so on.
+* A shared storage element that serves multiple purposes: 
+** Provides a central location for inference models and other data needed to perform the inference. Compute servers access the storage directly and use inference models across the network without the need to copy them locally. 
+** Updated models are pushed here. 
+** Archives input data that edge servers receive for later analysis. For example, if the edge devices are connected to cameras, the storage element keeps the videos captured by the cameras. 
+
+image:ai-edge-image3.png[Error: Missing Graphic Image]
+
+|===
+|  |Lenovo compute system |Edge devices performing inference on inputs from cameras, sensors, and so on. 
+
+| 
+|NetApp AFF storage system
+|Shared storage holding inference models and data from edge devices for later analysis. 
+|===
+
+This NetApp and Lenovo solution offers the following key benefits:
+
+* GPU accelerated computing at the edge. 
+* Deployment of multiple edge servers backed and managed from a shared storage. 
+* Robust data protection to meet low recovery point objectives (RPOs) and recovery time objectives (RTOs) with no data loss. 
+* Optimized data management with NetApp Snapshot copies and clones to streamline development workflows. 
+
+=== How to use this architecture 
+
+This document validates the design and performance of the proposed architecture. However, we have not tested certain software-level pieces, such us container, workload, or model management and data synchronization with cloud or data center on-premises, because they are specific to a deployment scenario. Here, multiple choices exist.
+
+At the container management level, Kubernetes container management is a good choice and is well supported in either a fully upstream version (Canonical) or in a modified version suitable for enterprise deployments (Red Hat). The https://www.netapp.com/pdf.html?item=/media/17241-tr4798pdf.pdf[NetApp AI Control Plane^]https://www.netapp.com/pdf.html?item=/media/17241-tr4798pdf.pdf[,^] which leverages NetApp Trident and the newly added https://github.com/NetApp/netapp-dataops-toolkit/releases/tag/v2.0.0[NetApp DataOps Toolkit^]https://github.com/NetApp/netapp-data-science-toolkit[,^] provides built-in traceability, data management functions, interfaces, and tools for data scientists and data engineers to integrate with NetApp storage. Kubeflow, the ML toolkit for Kubernetes, provides additional AI capabilities along with a support for model versioning and KFServing on several platforms such as TensorFlow Serving or NVIDIA Triton Inference Server. Another option is NVIDIA EGX platform, which provides workload management along with access to a catalog of GPU-enabled AI inference containers. However, these options might require significant effort and expertise to put them into production and might require the assistance of a third-party independent software vendor (ISV) or consultant. 
+
+=== Solution areas 
+
+The key benefit of AI inferencing and edge computing is the ability of devices to compute, process,  and analyze data with a high level of quality without latency. There are far too many examples of edge computing use cases to describe in this document, but here are a few prominent ones: 
+
+==== Automobiles: Autonomous vehicles
+
+The classic edge computing illustration is in the advanced driver-assistance systems (ADAS) in autonomous vehicles (AV). The AI in driverless cars must rapidly process a lot of data from cameras and sensors to be a successful safe driver. Taking too long to interpret between an object and a human can mean life or death, therefore being able to process that data as close to the vehicle as possible is crucial. In this case, one or more edge compute servers handles the input from cameras, RADAR, LiDAR, and other sensors, while shared storage holds inference models and stores input data from sensors. 
+
+==== Healthcare: Patient monitoring
+
+One of the greatest impacts of AI and edge computing is its ability to enhance continuous monitoring of patients for chronic diseases both in at-home care and intensive care units (ICUs). Data from edge devices that monitor insulin levels, respiration, neurological activity, cardiac rhythm, and gastrointestinal functions require instantaneous analysis of data that must be acted on immediately because there is limited time to act to save someone’s life.
+
+==== Retail: Cashier-less payment
+
+Edge computing can power AI and ML to help retailers reduce checkout time and increase foot traffic. Cashier-less systems support various components, such as the following:
+
+* Authentication and access.  Connecting the physical shopper to a validated account and permitting access to the retail space.
+* Inventory monitoring.  Using sensors, RFID tags, and computer vision systems to help confirm the selection or deselection of items by shoppers.
++
+Here, each of the edge servers handle each checkout counter and the shared storage system serves as a central synchronization point. 
+
+==== Financial services: Human safety at kiosks and fraud prevention
+
+Banking organizations are using AI and edge computing to innovate and create personalized banking experiences. Interactive kiosks using real-time data analytics and AI inferencing now enable ATMs to not only help customers withdraw money, but proactively monitor kiosks through the images captured from cameras to identify risk to human safety or fraudulent behavior. In this scenario, edge compute servers and shared storage systems are connected to interactive kiosks and cameras to help banks collect and process data with AI inference models.
+
+==== Manufacturing: Industry 4.0
+
+The fourth industrial revolution (Industry 4.0) has begun, along with emerging trends such as Smart Factory and 3D printing. To prepare for a data-led future, large-scale machine-to-machine (M2M) communication and IoT are integrated for increased automation without the need for human intervention. Manufacturing is already highly automated and adding AI features is a natural continuation of the long-term trend. AI enables automating operations that can be automated with the help of computer vision and other AI capabilities. You can automate quality control or tasks that rely on human vision or decision making to perform faster analyses of materials on assembly lines in factory floors to help manufacturing plants meet the required ISO standards of safety and quality management. Here, each compute edge server is connected to an array of sensors monitoring the manufacturing process and updated inference models are pushed to the shared storage, as needed. 
+
+==== Telecommunications: Rust detection, tower inspection, and network optimization
+
+The telecommunications industry uses computer vision and AI techniques to process images that automatically detect rust and identify cell towers that contain corrosion and, therefore, require further inspection. The use of drone images and AI models to identify distinct regions of a tower to analyze rust, surface cracks, and corrosion has increased in recent years. The demand continues to grow for AI technologies that enable telecommunication infrastructure and cell towers to be inspected efficiently, assessed regularly for degradation, and repaired promptly when required.
+
+Additionally, another emerging use case in telecommunication is the use of AI and ML algorithms to predict data traffic patterns, detect 5G-capable devices, and automate and augment multiple-input and multiple-output (MIMO) energy management. MIMO hardware is used at radio towers to increase network capacity; however, this comes with additional energy costs. ML models for “MIMO sleep mode” deployed at cell sites can predict the efficient use of radios and help reduce energy consumption costs for mobile network operators (MNOs). AI inferencing and edge computing solutions help MNOs reduce the amount of data transmitted back-and-forth to data centers, lower their TCO, optimize network operations, and improve overall performance for end users.
