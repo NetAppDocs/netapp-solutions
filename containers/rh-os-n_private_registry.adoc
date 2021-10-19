@@ -21,6 +21,16 @@ NOTE: Astra Control Center requires a registry to host the images the Astra cont
 
 == Creating A private image registry
 
+. Remove the default annotation from the current default storage class and annotate the Trident-backed storage class as default for the OpenShift cluster.
++
+----
+[netapp-user@rhel7 ~]$ oc patch storageclass thin -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+storageclass.storage.k8s.io/thin patched
+
+[netapp-user@rhel7 ~]$ oc patch storageclass ocp-trident -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
+storageclass.storage.k8s.io/ocp-trident patched
+----
+
 .	Edit the imageregistry operator by entering the following storage parameters in the `spec` section.
 +
 ----
@@ -157,7 +167,7 @@ route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.
 .	For OpenShift nodes to access the registry and push or pull the images, you need to configure a pull secret.
 +
 ----
-[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-credentials --docker-server= astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password
+[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-credentials --docker-server=astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password
 ----
 
 .	This pull secret can then be patched to serviceaccounts or be referenced in the corresponding pod definition.
@@ -197,8 +207,10 @@ imagePullSecrets:
 .podman
 --
 ----
-[netapp-user@rhel7 ~]$ podman login astra-registry.apps.ocp-vmw.cie.netapp.com -u kubeadmin -p $(oc whoami -t)
+[netapp-user@rhel7 ~]$ podman login astra-registry.apps.ocp-vmw.cie.netapp.com -u kubeadmin -p $(oc whoami -t) --tls-verify=false
 ----
++
+NOTE: If you are using `kubeadmin` user to log into the private registry, then use token instead of password.
 --
 
 .docker
@@ -206,6 +218,8 @@ imagePullSecrets:
 ----
 [netapp-user@rhel7 ~]$ docker login astra-registry.apps.ocp-vmw.cie.netapp.com -u kubeadmin -p $(oc whoami -t)
 ----
++
+NOTE: If you are using `kubeadmin` user to log into the private registry, then use token instead of password.
 --
 ====
 
