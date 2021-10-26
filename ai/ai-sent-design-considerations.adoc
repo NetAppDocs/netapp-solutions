@@ -1,0 +1,50 @@
+---
+sidebar: sidebar
+permalink: ai/ai-sent-design-considerations.html
+keywords: network, compute, design, storage, riva, best practices,
+summary: This section describes the design considerations for the different components of this solution.
+---
+
+= Design considerations
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-10-25 11:10:26.088561
+//
+
+link:ai-sent-architecture.html[Previous: Architecture.]
+
+== Network and compute design
+
+Depending on the restrictions on data security, all data must remain within the customer’s infrastructure or a secure environment.
+
+image:ai-sent-image9.png[Error: Missing Graphic Image]
+
+== Storage design
+
+The NetApp DataOps Toolkit serves as the primary service for managing storage systems. The DataOps Toolkit is a Python library that makes it simple for developers, data scientists, DevOps engineers, and data engineers to perform various data management tasks, such as near-instantaneous provisioning of a new data volume or JupyterLab workspace, near-instantaneous cloning of a data volume or JupyterLab workspace, and near-instantaneous snapshotting of a data volume or JupyterLab workspace for traceability or baselining. This Python library can function as either a command line utility or a library of functions that can be imported into any Python program or Jupyter Notebook.
+
+== RIVA best practices
+
+NVIDIA provides several general https://docs.nvidia.com/deeplearning/riva/user-guide/docs/best-practices.html[best data practices^] for using RIVA:
+
+* *Use lossless audio formats if possible.* The use of lossy codecs such as MP3 can reduce quality.
+* *Augment training data.* Adding background noise to audio training data can initially decrease accuracy and yet increase robustness.
+* *Limit vocabulary size if using scraped text.* Many online sources contain typos or ancillary pronouns and uncommon words. Removing these can improve the language model.
+* *Use a minimum sampling rate of 16kHz if possible.* However,  try not to resample, because doing so decreases audio quality.
+
+In addition to these best practices, customers must prioritize gathering a representative sample dataset with accurate labels for each step of the pipeline. In other words, the sample dataset should proportionally reflect specified characteristics exemplified in a target dataset. Similarly, the dataset annotators have a responsibility to balance accuracy and the speed of labeling so that the quality and quantity of the data are both maximized. For example, this support center solution requires audio files, labeled text, and sentiment labels. The sequential nature of this solution means that errors from the beginning of the pipeline are propagated all the way through to the end. If the audio files are of poor quality, the text transcriptions and sentiment labels will be as well.
+
+This error propagation similarly applies to the models trained on this data. If the sentiment predictions are 100% accurate but the speech-to-text model performs poorly, then the final pipeline is limited by the initial audio- to- text transcriptions. It is essential that developers consider each model’s performance individually and as a component of a larger pipeline. In this particular case, the end goal is to develop a pipeline that can accurately predict the sentiment. Therefore, the overall metric on which to assess the pipeline is the accuracy of the sentiments, which the speech-to-text transcription directly affects.
+
+image:ai-sent-image10.png[Error: Missing Graphic Image]
+
+The NetApp DataOps Toolkit complements the data quality-checking pipeline through the use of its near-instantaneous data cloning technology. Each labeled file must be assessed and compared to the existing labeled files. Distributing these quality checks across various data storage systems ensures that these checks are executed quickly and efficiently.
+
+link:ai-sent-deploying-support-center-sentiment-analysis.html[Next: Deploying support-center sentiment analysis.]

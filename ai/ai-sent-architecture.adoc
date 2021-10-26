@@ -1,0 +1,204 @@
+---
+sidebar: sidebar
+permalink: ai/ai-sent-architecture.html
+keywords: technology, architectural diagram, hardware requirements, NVIDIA RIVA, NVIDIA TAO Toolkit, Flash storage system, Cloud Sync
+summary: The architecture of this support center solution revolves around NVIDIA’s prebuilt tools and the NetApp DataOps Toolkit. NVIDIA’s tools are used to rapidly deploy high-performance AI-solutions using prebuilt models and pipelines. The NetApp DataOps Toolkit simplifies various data management tasks to speed up development.
+---
+
+= Architecture
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-10-25 11:10:26.078949
+//
+
+link:ai-sent-use-cases.html[Previous: Use cases.]
+
+The architecture of this support center solution revolves around NVIDIA’s prebuilt tools and the NetApp DataOps Toolkit. NVIDIA’s tools are used to rapidly deploy high-performance AI-solutions using prebuilt models and pipelines. The NetApp DataOps Toolkit simplifies various data management tasks to speed up development.
+
+== Solution technology
+
+link:https://developer.nvidia.com/riva[NVIDIA RIVA^] is a GPU-accelerated SDK for building multimodal conversational AI applications that deliver real-time performance on GPUs. The NVIDIA Train, Adapt, and Optimize (TAO) Toolkit provides a faster, easier way to accelerate training and quickly create highly accurate and performant, domain-specific AI models.
+
+The NetApp DataOps Toolkit is a Python library that makes it simple for developers, data scientists, DevOps engineers, and data engineers to perform various data management tasks. This includes near-instantaneous provisioning of a new data volume or JupyterLab workspace, near-instantaneous cloning of a data volume or JupyterLab workspace, and near-instantaneous snapshotting of a data volume or JupyterLab workspace for traceability and baselining.
+
+== Architectural Diagram
+
+The following diagram shows the solution architecture. There are three main environment categories: the cloud, the core, and the edge. Each of the categories can be geographically dispersed. For example, the cloud contains object stores with audio files in buckets in different regions, whereas the core might contain datacenters linked via a high-speed network or NetApp Cloud Sync. The edge nodes denote the individual human agent’s daily working platforms, where interactive dashboard tools and microphones are available to visualize sentiment and collect audio data from conversations with customers.
+
+In GPU-accelerated datacenters, businesses can use the NVIDIA https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html[RIVA^] framework to build conversational AI applications, to which the https://developer.nvidia.com/tao[Tao Toolkit^] connects for model finetuning and retraining using transfer L-learning techniques. These compute applications and workflows are powered by the https://github.com/NetApp/netapp-dataops-toolkit[NetApp DataOps Toolkit^], enabling the best data management capabilities ONTAP has to offer. The toolkit allows corporate data teams to rapidly prototype their models with associated structured and unstructured data via snapshots and clones for traceability, versioning, A/B testing, thus providing security, governance, and regulatory compliance. See the section link:ai-sent-design-considerations.html#storage-design["Storage Design"] for more details.
+
+This solution demonstrates the audio file processing, NLP model training, transfer learning, and data management detail steps. The resulting end-to-end pipeline generates a sentiment summary that displays in real-time on human support agents’ dashboards.
+
+image:ai-sent-image4.png[Error: Missing Graphic Image]
+
+=== Hardware requirements
+
+The following table lists the hardware components that are required to implement the solution. The hardware components that are used in any particular implementation of the solution might vary based on customer requirements.
+
+|===
+|Response latency tests |Time (milliseconds)
+
+|Data processing
+|10
+|Inferencing
+|10
+|===
+
+These response-time tests were run on 50,000+ audio files across 560 conversations. Each audio file was ~100KB in size as an MP3 and ~1 MB when converted to WAV. The data processing step converts MP3s into WAV files. The inference steps convert the audio files into text and extract a sentiment from the text. These steps are all independent of one another and can be parallelized to speed up the process.
+
+Taking into account the latency of transferring data between stores, managers should be able to see updates to the real time sentiment analysis within a second of the end of the sentence.
+
+==== NVIDIA RIVA hardware
+
+|===
+|Hardware  |Requirements
+
+|OS
+|Linux x86_64
+|GPU memory (ASR)
+|Streaming models: ~5600 MB
+Non-streaming models: ~3100 MB
+|GPU memory (NLP)
+|~500MB per BERT model
+|===
+
+==== NVIDIA TAO Toolkit hardware
+
+|===
+|Hardware |Requirements
+
+|System RAM
+|32GB
+|GPU RAM
+|32GB
+|CPU
+|8 core
+|GPU
+|NVIDIA (A100, V100 and RTX 30x0)
+|SSD
+|100GB
+|===
+
+=== Flash storage system
+
+==== NetApp ONTAP 9
+
+ONTAP 9.9,  the latest generation of storage management software from NetApp, enables businesses to modernize infrastructure and transition to a cloud-ready data center. Leveraging industry-leading data management capabilities, ONTAP enables the management and protection of data with a single set of tools, regardless of where that data resides. You can also move data freely to wherever it is needed:  the edge, the core, or the cloud. ONTAP 9.9 includes numerous features that simplify data management, accelerate, and protect critical data, and enable next generation infrastructure capabilities across hybrid cloud architectures.
+
+==== NetApp Cloud Sync
+
+https://docs.netapp.com/us-en/occm/concept_cloud_sync.html[Cloud Sync^] is a NetApp service for rapid and secure data synchronization that allows you to transfer files between on-premises NFS or SMB file shares to any of the following targets:
+
+* NetApp StorageGRID
+* NetApp ONTAP S3
+* NetApp Cloud Volumes Service
+* Azure NetApp Files
+* Amazon Simple Storage Service (Amazon S3)
+* Amazon Elastic File System (Amazon EFS)
+* Azure Blob
+* Google Cloud Storage
+* IBM Cloud Object Storage
+
+Cloud Sync moves the files where you need them quickly and securely. After your data is transferred, it is fully available for use on both the source and the target. Cloud Sync continuously synchronizes the data, based on your predefined schedule, moving only the deltas, so that time and money spent on data replication is minimized. Cloud Sync is a software as a service (SaaS) tool that is simple to set up and use. Data transfers that are triggered by Cloud Sync are carried out by data brokers. You can deploy Cloud Sync data brokers in AWS, Azure, Google Cloud Platform, or on-premises.
+
+==== NetApp StorageGRID
+
+The StorageGRID software-defined object storage suite supports a wide range of use cases across public, private, and hybrid multi-cloud environments seamlessly. With industry leading innovations, NetApp StorageGRID stores, secures, protect, and preserves unstructured data for multi-purpose use including automated lifecycle management for long periods of time. For more information, see the https://www.netapp.com/data-storage/storagegrid/documentation/[NetApp StorageGRID^] site.
+
+=== Software requirements
+
+The following table lists the software components that are required to implement this solution. The software components that are used in any particular implementation of the solution might vary based on customer requirements.
+
+|===
+|Host machine |Requirements
+
+|RIVA (formerly JARVIS)
+|1.4.0
+|TAO Toolkit (formerly Transfer Learning Toolkit)
+|3.0
+|ONTAP
+|9.9.1
+|DGX OS
+|5.1
+|DOTK
+|2.0.0
+|===
+
+==== NVIDIA RIVA Software
+
+|===
+|Software |Requirements
+
+|Docker
+|>19.02 (with nvidia-docker installed)>=19.03 if not using DGX
+|NVIDIA Driver
+|465.19.01+
+418.40+, 440.33+, 450.51+, 460.27+ for Data Center GPUs
+|Container OS
+|Ubuntu 20.04
+|CUDA
+|11.3.0
+|cuBLAS
+|11.5.1.101
+|cuDNN
+|8.2.0.41
+|NCCL
+|2.9.6
+|TensorRT
+|7.2.3.4
+|Triton Inference Server
+|2.9.0
+|===
+
+==== NVIDIA TAO Toolkit software
+
+|===
+|Software |Requirements
+
+|Ubuntu 18.04 LTS
+|18.04
+|python
+|>=3.6.9
+|docker-ce
+|>19.03.5
+|docker-API
+|1.40
+|nvidia-container-toolkit
+|>1.3.0-1
+|nvidia-container-runtime
+|3.4.0-1
+|nvidia-docker2
+|2.5.0-1
+|nvidia-driver
+|>455
+|python-pip
+|>21.06
+|nvidia-pyindex
+|Latest version
+|===
+
+=== Use case details
+
+This solution applies to the following use cases:
+
+* Speech-to-text
+* Sentiment analysis
+
+image:ai-sent-image6.png[Error: Missing Graphic Image]
+
+The speech-to-text use case begins by ingesting audio files for the support centers. This audio is then processed to fit the structure required by RIVA. If the audio files have not already been split into their units of analysis, then this must be done before passing the audio to RIVA. After the audio file is processed, it is passed to the RIVA server as an API call. The server employs one of the many models it is hosting and returns a response. This speech-to-text (part of Automatic Speech Recognition) returns a text representation of the audio. From there, the pipeline switches over to the sentiment analysis portion.
+
+For sentiment analysis, the text output from the Automatic Speech Recognition serves as the input to the Text Classification. Text Classification is the NVIDIA component for classifying text to any number of categories. The sentiment categories range from positive to negative for the support center conversations. The performance of the models can be assessed using a holdout set to determine the success of the fine-tuning step.
+
+image:ai-sent-image8.png[Error: Missing Graphic Image]
+
+A similar pipeline is used for both the speech-to-text and sentiment analysis within the TAO Toolkit. The major difference is the use of labels which are required for the fine-tuning of the models. The TAO Toolkit pipeline begins with the processing of the data files. Then the pretrained models (coming from the https://ngc.nvidia.com/catalog[NVIDIA NGC Catalog^]) are fine-tuned using the support center data. The fine-tuned models are evaluated based on their corresponding performance metrics and, if they are more performant than the pretrained models, are deployed to the RIVA server.
+
+link:ai-sent-design-considerations.html[Next: Design considerations.]
