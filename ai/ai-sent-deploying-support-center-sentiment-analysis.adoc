@@ -1,0 +1,127 @@
+---
+sidebar: sidebar
+permalink: ai/ai-sent-deploying-support-center-sentiment-analysis.html
+keywords: deploy, NetApp DataOps Toolkit, NGC Configuration, NVIDIA RIVA Server, NVIDIA TAO Toolkit, Export TAO models to RIVA
+summary: This section describes the detailed steps necessary to deploy this solution.
+---
+
+= Deploying support center sentiment analysis
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-10-25 11:10:26.096171
+//
+
+link:ai-sent-design-considerations.html[Previous: Design considerations.]
+
+Deploying the solution involves the following components:
+
+. NetApp DataOps Toolkit
+. NGC Configuration
+. NVIDIA RIVA Server
+. NVIDIA TAO Toolkit
+. Export TAO models to RIVA
+
+To perform deployment, complete the following steps:
+
+== NetApp DataOps Toolkit: Support center sentiment analysis
+
+To use the https://github.com/NetApp/netapp-dataops-toolkit[NetApp DataOps Toolkit^], complete the following steps:
+
+. Pip install the toolkit.
++
+....
+python3 -m pip install netapp-dataops-traditional
+....
+
+. Configure the data management
++
+....
+netapp_dataops_cli.py config
+....
+
+== NGC configuration: Support center sentiment analysis
+
+To set up https://ngc.nvidia.com/setup/installers/cli[NVIDIA NGC^], complete the following steps:
+
+. Download the NGC.
++
+....
+wget -O ngccli_linux.zip https://ngc.nvidia.com/downloads/ngccli_linux.zip && unzip -o ngccli_linux.zip && chmod u+x ngc
+....
+
+. Add your current directory to path.
++
+....
+echo "export PATH=\"\$PATH:$(pwd)\"" >> ~/.bash_profile && source ~/.bash_profile
+....
+
+. You must configure NGC CLI for your use so that you can run the commands. Enter the following command, including your API key when prompted.
++
+....
+ngc config set
+....
+
+For operating systems that are not Linux-based, visit https://ngc.nvidia.com/setup/installers/cli[here^].
+
+== NVIDIA RIVA server: Support center sentiment analysis
+
+To set up https://docs.nvidia.com/deeplearning/riva/user-guide/docs/quick-start-guide.html[NVIDIA RIVA^], complete the following steps:
+
+. Download the RIVA files from NGC.
++
+....
+ngc registry resource download-version nvidia/riva/riva_quickstart:1.4.0-beta
+....
+
+. Initialize the RIVA setup (`riva_init.sh`).
+. Start the RIVA server (`riva_start.sh`).
+. Start the RIVA client (`riva_start_client.sh`).
+. Within the RIVA client, install the audio processing library ( https://ffmpeg.org/download.html[FFMPEG^])
++
+....
+apt-get install ffmpeg
+....
+
+. Start the https://jupyter-server.readthedocs.io/en/latest/[Jupyter^] server.
+. Run the RIVA Inference Pipeline Notebook.
+
+== NVIDIA TAO Toolkit: Support center sentiment analysis
+
+To set up NVIDIA TAO Toolkit, complete the following steps:
+
+. Prepare and activate a https://docs.python.org/3/library/venv.html[virtual environment^] for TAO Toolkit.
+. Install the https://docs.nvidia.com/tao/tao-toolkit/text/tao_toolkit_quick_start_guide.html[required packages^].
+. Manually pull the image used during training and fine-tuning.
++
+....
+docker pull nvcr.io/nvidia/tao/tao-toolkit-pyt:v3.21.08-py3
+....
+
+. Start the https://jupyter-server.readthedocs.io/en/latest/[Jupyter^] server.
+. Run the TAO Fine-Tuning Notebook.
+
+== Export TAO models to RIVA: Support center sentiment analysis
+
+To use https://docs.nvidia.com/tao/tao-toolkit/text/riva_tao_integration.html[TAO Toolkit models in RIVA^], complete the following steps:
+
+. Save models within the TAO Fine-Tuning Notebook.
+. Copy TAO trained models to the RIVA model directory.
+. Start the RIVA server (`riva_start.sh`).
+
+== Deployment roadblocks
+
+Here are a few things to keep in mind as you develop your own solution:
+
+* The NetApp DataOps Toolkit is installed first to ensure that the data storage system runs optimally.
+* NVIDIA NGC must be installed before anything else because it authenticates the downloading of images and models.
+* RIVA must be installed before the TAO Toolkit. The RIVA installation configures the docker daemon to pull images as needed.
+* DGX and docker must have internet access to download the models.
+
+link:ai-sent-validation-results.html[Next: Validation results.]
