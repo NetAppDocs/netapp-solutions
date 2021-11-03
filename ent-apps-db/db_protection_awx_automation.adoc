@@ -1,0 +1,125 @@
+---
+sidebar: sidebar
+permalink: ent-apps-db/db_protection_awx_automation.html
+keywords: Linux, RHEL Oracle19c, NFS, ONTAP
+summary: This page describes the Automated Data Protection of Oracle19c on NetApp ONTAP storage.
+---
+
+= Step-by-step deployment procedure
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+
+
+== AWX/Tower Oracle Data Protection
+
+=== 1. Create the inventory, group, hosts, and credentials for your environment
+
+This section describes the setup of inventory, groups, hosts, and access credentials in AWX/Ansible Tower that prepare the environment for consuming NetApp automated solutions.
+
+. Configure the inventory.
+.. Navigate to Resources → Inventories → Add, and click Add Inventory.
+.. Provide the name and organization details, and click Save.
+.. On the Inventories page, click the inventory created.
+.. Navigate to the Groups sub-menu and click Add.
+.. Provide the name oracle for your first group and click Save.
+.. Repeat the process for a second group called dr_oracle.
+.. Select the oracle group created, go to the Hosts sub-menu and click Add New Host.
+.. Provide the IP address of the Source Oracle host's management IP, and click Save.
+.. This process must be repeated for the dr_oracle group and add the the DR/Destination Oracle host's management IP/hostname.
+
++
+
+NOTE: Below are instructions for creating the credential types and credentials for either On-Prem with ONTAP, or CVO on AWS.
+
+
+[role="tabbed-block"]
+====
+.On-Prem
+--
+include::ent-apps-db/db_protection_onprem_creds.adoc[]
+--
+.CVO
+--
+include::ent-apps-db/db_protection_cvo_creds.adoc[]
+--
+====
+
+
+=== 2. Create a project
+
+. Go to Resources → Projects, and click Add.
+.. Enter the name and organization details.
+.. Select Git in the Source Control Credential Type field.
+.. enter <https://github.com/NetApp-Automation/na_oracle19c_data_protection.git> as the source control URL.
+.. Click Save.
+.. The project might need to sync occasionally when the source code changes.
+
+
+=== 3. Configure global variables
+
+Variables defined in this section apply to all Oracle hosts, databases, and the ONTAP cluster.
+
+. Input your environment-specific parameters in following embedded global variables or vars form.
++
+
+NOTE: The items in blue must be changed to match your environment.
++
+
+[role="tabbed-block"]
+====
+.On-Prem
+--
+include::ent-apps-db/db_protection_onprem_vars.adoc[]
+--
+.CVO
+--
+include::ent-apps-db/db_protection_cvo_vars.adoc[]
+--
+====
+
+=== 4. Automation Playbooks
+
+There are four separate playbooks that need to be ran.
+
+. Playbook for Setting up your environment, On-Prem or CVO.
+. Playbook for replicating Oracle Binaries and Databases on a schedule
+. Playbook for replicating Oracle Logs on a schedule
+. Playbook for Recovering your database on a destination host
+
+[role="tabbed-block"]
+====
+.ONTAP/CVO Setup
+--
+include::ent-apps-db/db_protection_ontap_cvo_setup.adoc[]
+--
+.Replication For Binary and Database Volumes
+--
+include::ent-apps-db/db_protection_db_replication.adoc[]
+--
+.Replication for Log Volumes
+--
+include::ent-apps-db/db_protection_log_replication.adoc[]
+--
+.Restore and Recover Database
+--
+include::ent-apps-db/db_protection_restore_recovery.adoc[]
+--
+====
+
+=== 5. Recovering Oracle Database
+. On-premises production Oracle databases data volumes are protected via NetApp SnapMirror replication to either a redundant ONTAP cluster in secondary data center or Cloud Volume ONTAP in public cloud. In a fully configured disaster recovery environment, recovery compute instances in secondary data center or public cloud are standby and ready to recover the production database in the case of a disaster. The standby compute instances are kept in sync with on-prem instances by running paraellel updates on OS kernel patch or upgrade in a lockstep.
+. In this solution demonstrated, Oracle binary volume is replicated to target and mounted at target instance to bring up Oracle software stack. This approach to recover Oracle has advantage over a fresh installation of Oracle at last minute when a disaster occurred. It guarantees Oracle installation is fully in sync with current on-prem production software installation and patch levels etc. However, this may or may not have additional sofware licensing implication for the replicated Oracle binary volume at recovery site depending on how the software licensing is structured with Oracle. User is recommended to check with its software licensing personnel to assess the potential Oracle licensing requirement before deciding to use the same approach.
+. The standby Oracle host at the destination is configured with the Oracle prerequisite configurations.
+. The SnapMirrors are broken and the volumes are made writable and mounted to the standby Oracle host.
+. The Oracle recovery module performs following tasks to recovery and startup Oracle at recovery site after all DB volumes are mounted at standby compute instance.
+.. Sync the control file: We deployed duplicate Oracle control files on different database volume to protect critical database control file. One is on the data volume and another is on log volume. Since data and log volumes are replicated   at different frequency, they will be out of sync at the time of recovery.
+.. Relink Oracle binary: Since the Oracle binary is relocated to a new host, it needs a relink.
+.. Recover Oracle database: The recovery mechanism retrieves last System Change Number in last available archived log in Oracle log volume from control file and recovers Oracle database to recoup all business transactions that was able to   be replicated to DR site at the time of failure. The database is then started up in a new incarnation to carry on user connections and business transaction at recovery site.
+
+
+NOTE: Before running the Recovering playbook make sure you have the following:
+Make sure it copy over the /etc/oratab and /etc/oraInstall.loc from the source Oracle host to the destination host
