@@ -1,0 +1,298 @@
+---
+sidebar: sidebar
+permalink: ent-apps-db/hybrid_dbops_snapcenter_getting_started_aws.html
+summary: This section describes the process of deploying Cloud Manager and Cloud Volumes ONTAP in AWS.
+keywords: AWS, cloud volumes ontap, cloud manager, deploy
+---
+
+= Getting Started with AWS public cloud
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:table-stripes: odd
+:imagesdir: ./../media/
+
+link:hybrid_dbops_snapcenter_getting_started_onprem.html[Previous: Getting started on-premises.]
+
+== AWS public cloud
+
+[NOTE]
+To make things easier to follow, we have created this document based on a deployment in AWS. However, the process is very similar for Azure and GCP.
+
+=== 1. Pre-flight check
+
+Before deployment, make sure that the infrastructure is in place to allow for the deployment in the next stage. This includes the following:
+
+[%interactive]
+* [ ] AWS account
+* [ ] VPC in your region of choice
+* [ ] Subnet with access to the public internet
+* [ ] Permissions to add IAM roles into your AWS account
+* [ ] A secret key and access key for your AWS user
+
+=== 2. Steps to deploy Cloud Manager and Cloud Volumes ONTAP in AWS
+
+[NOTE]
+There are many methods for deploying Cloud Manager and Cloud Volumes ONTAP; this method is the simplest but requires the most permissions. If this method is not appropriate for your AWS environment, please consult the https://docs.netapp.com/us-en/occm/task_creating_connectors_aws.html[NetApp Cloud Documentation^].
+
+==== Deploy the Cloud Manager connector
+
+. Navigate to https://cloud.netapp.com/cloud-manager[NetApp Cloud Central^] and log in or sign up.
++
+image:cloud_central_login_page.PNG[Error: Missing Graphic Image]
+
+. After you log in, you should be taken to the Canvas.
++
+image:cloud_central_canvas_page.PNG[Error: Missing Graphic Image]
+
+. Click "Add Working Environment" and choose Cloud Volumes ONTAP in AWS. Here, you also choose whether you want to deploy a single node system or a high availability pair. I have chosen to deploy a high availability pair.
++
+image:cloud_central_add_we.PNG[Error: Missing Graphic Image]
+
+. If no connector has been created, a pop-up appears asking you to create a connector.
++
+image:cloud_central_add_conn_1.PNG[Error: Missing Graphic Image]
+
+. Click Lets Start, and then choose AWS.
++
+image:cloud_central_add_conn_3.PNG[Error: Missing Graphic Image]
+
+. Enter your secret key and access key. Make sure that your user has the correct permissions outlined on the https://mysupport.netapp.com/site/info/cloud-manager-policies[NetApp policies page^].
++
+image:cloud_central_add_conn_4.PNG[Error: Missing Graphic Image]
+
+. Give the connector a name and either use a predefined role as described on the https://mysupport.netapp.com/site/info/cloud-manager-policies[NetApp policies page^] or ask Cloud Manager to create the role for you.
++
+image:cloud_central_add_conn_5.PNG[Error: Missing Graphic Image]
+
+. Give the networking information needed to deploy the connector. Verify that outbound internet access is enabled by:
+.. Giving the connector a public IP address
+.. Giving the connector a proxy to work through
+.. Giving the connector a route to the public internet through an Internet Gateway
++
+image:cloud_central_add_conn_6.PNG[Error: Missing Graphic Image]
+
+. Provide communication with the connector via SSH, HTTP, and HTTPs by either providing a security group or creating a new security group. I have enabled access to the connector from my IP address only.
++
+image:cloud_central_add_conn_7.PNG[Error: Missing Graphic Image]
+
+. Review the information on the summary page and click Add to deploy the connector.
++
+image:cloud_central_add_conn_8.PNG[Error: Missing Graphic Image]
+
+. The connector now deploys using a cloud formation stack. You can monitor its progress from Cloud Manager or through AWS.
++
+image:cloud_central_add_conn_9.PNG[Error: Missing Graphic Image]
+
+. When the deployment is complete, a success page appears.
++
+image:cloud_central_add_conn_10.PNG[Error: Missing Graphic Image]
+
+==== Deploy Cloud Volumes ONTAP
+
+. Select AWS and the type of deployment based on your requirements.
++
+image:cloud_central_add_we_1.PNG[Error: Missing Graphic Image]
+
+. If no subscription has been assigned and you wish to purchase with PAYGO, choose Edit Credentials.
++
+image:cloud_central_add_we_2.PNG[Error: Missing Graphic Image]
+
+. Choose Add Subscription.
++
+image:cloud_central_add_we_3.PNG[Error: Missing Graphic Image]
+
+. Choose the type of contract that you wish to subscribe to. I chose Pay-as-you-go.
++
+image:cloud_central_add_we_4.PNG[Error: Missing Graphic Image]
+
+. You are redirected to AWS; choose Continue to Subscribe.
++
+image:cloud_central_add_we_5.PNG[Error: Missing Graphic Image]
+
+. Subscribe and you are redirected back to NetApp Cloud Central. If you have already subscribed and don't get redirected, choose the "Click here" link.
++
+image:cloud_central_add_we_6.PNG[Error: Missing Graphic Image]
+
+. You are redirected to Cloud Central where you must name your subscription and assign it to your Cloud Central account.
++
+image:cloud_central_add_we_7.PNG[Error: Missing Graphic Image]
+
+. When successful, a check mark page appears. Navigate back to your Cloud Manager tab.
++
+image:cloud_central_add_we_8.PNG[Error: Missing Graphic Image]
+
+. The subscription now appears in Cloud Central. Click Apply to continue.
++
+image:cloud_central_add_we_9.PNG[Error: Missing Graphic Image]
+
+. Enter the working environment details such as:
+.. Cluster name
+.. Cluster password
+.. AWS tags (Optional)
++
+image:cloud_central_add_we_10.PNG[Error: Missing Graphic Image]
+
+. Choose which additional services you would like to deploy. To discover more about these services, visit the https://cloud.netapp.com[NetApp Cloud Homepage^].
++
+image:cloud_central_add_we_11.PNG[Error: Missing Graphic Image]
+
+. Choose whether to deploy in multiple availability zones (reguires three subnets, each in a different AZ), or a single availability zone. I chose multiple AZs.
++
+image:cloud_central_add_we_12.PNG[Error: Missing Graphic Image]
+
+. Choose the region, VPC, and security group for the cluster to be deployed into. In this section, you also assign the availability zones per node (and mediator) as well as the subnets that they occupy.
++
+image:cloud_central_add_we_13.PNG[Error: Missing Graphic Image]
+
+. Choose the connection methods for the nodes as well as the mediator.
++
+image:cloud_central_add_we_14.PNG[Error: Missing Graphic Image]
+
+[TIP]
+The mediator requires communication with the AWS APIs. A public IP address is not required so long as the APIs are reachable after the mediator EC2 instance has been deployed.
+
+. Floating IP addresses are used to allow access to the various IP addresses that Cloud Volumes ONTAP uses, including cluster management and data serving IPs. These must be addresses that are not already routable within your network and are added to route tables in your AWS environment. These are required to enable consistent IP addresses for an HA pair during failover. More information about floating IP addresses can be found in the https://docs.netapp.com/us-en/occm/reference_networking_aws.html#requirements-for-ha-pairs-in-multiple-azs[NetApp Cloud Documenation^].
++
+image:cloud_central_add_we_15.PNG[Error: Missing Graphic Image]
+
+. Select which route tables the floating IP addresses are added to. These route tables are used by clients to communicate with Cloud Volumes ONTAP.
++
+image:cloud_central_add_we_16.PNG[Error: Missing Graphic Image]
+
+. Choose whether to enable AWS managed encryption or AWS KMS to encrypt the ONTAP root, boot, and data disks.
++
+image:cloud_central_add_we_17.PNG[Error: Missing Graphic Image]
+
+. Choose your licensing model. If you don't know which to choose, contact your NetApp representative.
++
+image:cloud_central_add_we_18.PNG[Error: Missing Graphic Image]
+
+. Select which configuration best suits your use case. This is related to the sizing considerations covered in the prerequisites page.
++
+image:cloud_central_add_we_19.PNG[Error: Missing Graphic Image]
+
+. Optionally, create a volume. This is not required, because the next steps use SnapMirror, which creates the volumes for us.
++
+image:cloud_central_add_we_20.PNG[Error: Missing Graphic Image]
+
+. Review the selections made and tick the boxes to verify that you understand that Cloud Manager deploys resources into your AWS environment. When ready, click Go.
++
+image:cloud_central_add_we_21.PNG[Error: Missing Graphic Image]
+
+. Cloud Volumes ONTAP now starts its deployment process. Cloud Manager uses AWS APIs and cloud formation stacks to deploy Cloud Volumes ONTAP. It then configures the system to your specifications, giving you a ready-to-go system that can be instantly utilized. The timing for this process varies depending on the selections made.
++
+image:cloud_central_add_we_22.PNG[Error: Missing Graphic Image]
+
+. You can monitor the progress by navigating to the Timeline.
++
+image:cloud_central_add_we_23.PNG[Error: Missing Graphic Image]
+
+. The Timeline acts as an audit of all actions performed in Cloud Manager. You can view all of the API calls that are made by Cloud Manager during setup to both AWS as well as the ONTAP cluster. This can also be effectively used to troubleshoot any issues that you face.
++
+image:cloud_central_add_we_24.PNG[Error: Missing Graphic Image]
+
+. After deployment is complete, the CVO cluster appears on the Canvas, which the current capacity. The ONTAP cluster in its current state is fully configured to allow a true, out-of-the-box experience.
++
+image:cloud_central_add_we_25.PNG[Error: Missing Graphic Image]
+
+==== Configure SnapMirror from on-premises to cloud
+
+Now that you have a source ONTAP system and a destination ONTAP system deployed, you can replicate volumes containing database data into the cloud.
+
+For a guide on compatible ONTAP versions for SnapMirror, see the https://docs.netapp.com/ontap-9/index.jsp?topic=%2Fcom.netapp.doc.pow-dap%2FGUID-0810D764-4CEA-4683-8280-032433B1886B.html[SnapMirror Compatibility Matrix^].
+
+. Click the source ONTAP system (on-premises) and either drag and drop it to the destination, select Replication > Enable, or select Replication > Menu > Replicate.
++
+image:cloud_central_replication_1.png[Error: Missing Graphic Image]
++
+Select Enable.
++
+image:cloud_central_replication_2.png[Error: Missing Graphic Image]
++
+Or Options.
++
+image:cloud_central_replication_3.png[Error: Missing Graphic Image]
++
+Replicate.
++
+image:cloud_central_replication_4.png[Error: Missing Graphic Image]
+
+. If you did not drag and drop, choose the destination cluster to replicate to.
++
+image:cloud_central_replication_5.png[Error: Missing Graphic Image]
+
+. Choose the volume that you'd like to replicate. We replicated the data and all log volumes.
++
+image:cloud_central_replication_6.png[Error: Missing Graphic Image]
+
+. Choose the destination disk type and tiering policy. For disaster recovery, we recommend an SSD as the disk type and to maintain data tiering. Data tiering tiers the mirrored data into low-cost object storage and saves you money on local disks. When you break the relationship or clone the volume, the data uses the fast, local storage.
++
+image:cloud_central_replication_7.png[Error: Missing Graphic Image]
+
+. Select the destination volume name: we chose `[source_volume_name]_dr`.
++
+image:cloud_central_replication_8.png[Error: Missing Graphic Image]
+
+. Select the maximum transfer rate for the replication. This enables you to save bandwidth if you have a low bandwidth connection to the cloud such as a VPN.
++
+image:cloud_central_replication_9.png[Error: Missing Graphic Image]
+
+. Define the replication policy. We chose a Mirror, which takes the most recent dataset and replicates that into the destination volume. You could also choose a different policy based on your requirements.
++
+image:cloud_central_replication_10.png[Error: Missing Graphic Image]
+
+. Choose the schedule for triggering replication. NetApp recommends setting a "daily" schedule of for the data volume and an "hourly" schedule for the log volumes, although this can be changed based on requirements.
++
+image:cloud_central_replication_11.png[Error: Missing Graphic Image]
+
+. Review the information entered, click Go to trigger the cluster peer and SVM peer (if this is your first time replicating between the two clusters), and then implement and initialize the SnapMirror relationship.
++
+image:cloud_central_replication_12.png[Error: Missing Graphic Image]
+
+. Continue this process for data volumes and log volumes.
+
+. To check all of your relationships, navigate to the Replication tab inside Cloud Manager. Here you can manage your relationships and check on their status.
++
+image:cloud_central_replication_13.png[Error: Missing Graphic Image]
+
+. After all the volumes have been replicated, you are in a steady state and ready to move on to the disaster recovery and dev/test workflows.
+
+=== 3. Deploy EC2 compute instance for database workload
+
+AWS has preconfigured EC2 compute instances for various workloads. The choice of instance type determines the number of CPU cores, memory capacity, storage type and capacity, and network performance. For the use cases, with the exception of the OS partition, the main storage to run database workload is allocated from CVO or the FSx ONTAP storage engine. Therefore, the main factors to consider are the choice of CPU cores, memory, and network performance level. Typical AWS EC2 instance types can be found here: https://us-east-2.console.aws.amazon.com/ec2/v2/home?region=us-east-2#InstanceTypes:[EC2 Instance Type].
+
+==== Sizing the compute instance
+
+. Select the right instance type based on the required workload. Factors to consider include the number of business transactions to be supported, the number of concurrent users, data set sizing, and so on.
+
+. EC2 instance deployment can be launched through the EC2 Dashboard. The exact deployment procedures are beyond the scope of this solution. See https://aws.amazon.com/pm/ec2/?trk=ps_a134p000004f2ZGAAY&trkCampaign=acq_paid_search_brand&sc_channel=PS&sc_campaign=acquisition_US&sc_publisher=Google&sc_category=Cloud%20Computing&sc_country=US&sc_geo=NAMER&sc_outcome=acq&sc_detail=%2Bec2%20%2Bcloud&sc_content=EC2%20Cloud%20Compute_bmm&sc_matchtype=b&sc_segment=536455698896&sc_medium=ACQ-P|PS-GO|Brand|Desktop|SU|Cloud%20Computing|EC2|US|EN|Text&s_kwcid=AL!4422!3!536455698896!b!!g!!%2Bec2%20%2Bcloud&ef_id=EAIaIQobChMIua378M-p8wIVToFQBh0wfQhsEAMYASAAEgKTzvD_BwE:G:s&s_kwcid=AL!4422!3!536455698896!b!!g!!%2Bec2%20%2Bcloud[Amazon EC2] for details.
+
+==== Linux instance configuration for Oracle workload
+
+This section contain additional configuration steps after an EC2 Linux instance is deployed.
+
+. Add an Oracle standby instance to the DNS server for name resolution within the SnapCenter management domain.
+
+. Add a Linux management user ID as the SnapCenter OS credentials with sudo permissions without a password. Enable the ID with SSH password authentication on the EC2 instance. (By default, SSH password authentication and passwordless sudo is turned off on EC2 instances.)
+
+. Configure Oracle installation to match with on-premises Oracle installation such as OS patches, Oracle versions and patches, and so on.
+
+. NetApp Ansible DB automation roles can be leveraged to configure EC2 instances for database dev/test and disaster recovery use cases. The automation code can be download from the NetApp public GitHub site: https://github.com/NetApp-Automation/na_oracle19c_deploy[Oracle 19c Automated Deployment^]. The goal is to install and configure a database software stack on an EC2 instance to match on-premises OS and database configurations.
+
+==== Windows instance configuration for SQL Server workload
+
+This section lists additional configuration steps after an EC2 Windows instance is initially deployed.
+
+. Retrieve the Windows administrator password to log in to an instance via RDP.
+
+. Disable the Windows firewall, join the host to Windows SnapCenter domain, and add the instance to the DNS server for name resolution.
+
+. Provision a SnapCenter log volume to store SQL Server log files.
+
+. Configure iSCSI on the Windows host to mount the volume and format the disk drive.
+
+. Again, many of the previous tasks can be automated with the NetApp automation solution for SQL Server. Check the NetApp automation public GitHub site for newly published roles and solutions: https://github.com/NetApp-Automation[NetApp Automation^].
+
+link:hybrid_dbops_snapcenter_devtest.html[Next: Workflow for dev/test bursting to cloud.]
