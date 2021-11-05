@@ -50,13 +50,13 @@ NOTE: See the link link:rh-os-n_load_balancers.html[here] for information about 
 +
 NOTE: See the link link:rh-os-n_private_registry.html[here] to install and configure an OpenShift private registry for this purpose.
 
-.	You must have Cluster-Admin access to the Red Hat OpenShift cluster.
+.	You must have Cluster Admin access to the Red Hat OpenShift cluster.
 
 .	You must have Admin access to NetApp ONTAP clusters.
 
 .	An admin workstation with docker or podman, tridentctl, and oc or kubectl tools installed and added to your $PATH.
-
-NOTE: Docker or Podman installations must be at least version 20.10.
++
+NOTE: Docker installations must have docker version greater than 20.10 and Podman installations must have podman version greater than 3.0.
 
 
 == Install Astra Control Center
@@ -91,6 +91,11 @@ NOTE: You can choose to do this with either Docker or Podman; instructions for b
 ----
 [netapp-user@rhel7 ~]$ podman login -u ocp-user -p password --tls-verify=false astra-registry.apps.ocp-vmw.cie.netapp.com
 ----
++
+NOTE: If you are using `kubeadmin` user to log into the private registry, then use token instead of password - `podman login -u ocp-user -p token --tls-verify=false astra-registry.apps.ocp-vmw.cie.netapp.com`.
+
++
+NOTE: Alternatively, you can create a service account, assign registry-editor and/or registry-viewer role (based on whether you require push/pull access) and log into the registry using service account's token.
 
 .. Create a shell script file and paste the following content in it.
 +
@@ -129,8 +134,13 @@ NOTE: If you are using untrusted certificates for your registry, edit the shell 
 .. Log into the registry.
 +
 ----
-[netapp-user@rhel7 ~]$ docker login -u ocp-user -p password --tls-verify=false astra-registry.apps.ocp-vmw.cie.netapp.com
+[netapp-user@rhel7 ~]$ docker login -u ocp-user -p password astra-registry.apps.ocp-vmw.cie.netapp.com
 ----
++
+NOTE: If you are using `kubeadmin` user to log into the private registry, then use token instead of password - `docker login -u ocp-user -p token astra-registry.apps.ocp-vmw.cie.netapp.com`.
+
++
+NOTE: Alternatively, you can create a service account, assign registry-editor and/or registry-viewer role (based on whether you require push/pull access) and log into the registry using service account's token.
 
 ..	Create a shell script file and paste the following content in it.
 +
@@ -143,8 +153,6 @@ for astraImageFile in $(ls images/*.tar); do
    docker push $registry/$(echo $astraImage | sed 's/^[^\/]\+\///')
 done
 ----
-+
-NOTE: If you are using untrusted certificates for your registry, edit the shell script and use `--tls-verify=false` for the docker push command `docker push $registry/$(echo $astraImage | sed 's/^[^\/]\+\///') --tls-verify=false`.
 
 .. Make the file executable.
 +
@@ -185,7 +193,7 @@ NOTE: If you are using an OpenShift internal registry with default TLS certifica
 secret/astra-registry-cred created
 ----
 
-.	Edit the Astra Control Center Operator CR `astra_control_center_operator_deploy.yaml`, which is a set of all resources Astra Control Center deploys. In the operator CR, find the deployment definition for `acc-operator-controller-manager` and enter the FQDN for your registry along with the organization name as it was given while pushing the images to registry (in this example, `astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra`) by replacing the text `[your.registry.goes.here]` and provide the name of the secret we just created. Verify other details of the operator, save, and close.
+.	Edit the Astra Control Center Operator CR `astra_control_center_operator_deploy.yaml`, which is a set of all resources Astra Control Center deploys. In the operator CR, find the deployment definition for `acc-operator-controller-manager` and enter the FQDN for your registry along with the organization name as it was given while pushing the images to registry (in this example, `astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra`) by replacing the text `ASTRA_IMAGE_REGISTRY` and provide the name of the secret we just created in `imagePullSecrets` section. Verify other details of the operator, save, and close.
 +
 ----
 [netapp-user@rhel7 ~]$ vim astra_control_center_operator_deploy.yaml
@@ -213,7 +221,7 @@ spec:
         - --upstream=http://127.0.0.1:8080/
         - --logtostderr=true
         - --v=10
-        image: astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra/kube-rbac-proxy:v0.5.0
+        image: ASTRA_IMAGE_REGISTRY/kube-rbac-proxy:v0.5.0
         name: kube-rbac-proxy
         ports:
         - containerPort: 8443
@@ -227,7 +235,7 @@ spec:
         env:
         - name: ACCOP_LOG_LEVEL
           value: "2"
-        image: astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra/acc-operator:21.05.68
+        image: astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra/acc-operator:21.08.7
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -244,11 +252,11 @@ spec:
           periodSeconds: 10
         resources:
           limits:
-            cpu: 100m
-            memory: 150Mi
+            cpu: 300m
+            memory: 750Mi
           requests:
             cpu: 100m
-            memory: 50Mi
+            memory: 75Mi
         securityContext:
           allowPrivilegeEscalation: false
       imagePullSecrets: [name: astra-registry-cred]
@@ -273,7 +281,7 @@ namespace/netapp-astra-cc created
 .	Create the secret for accessing the image registry in that namespace.
 +
 ----
-[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-cred --docker-server= astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password -n netapp-astra-cc
+[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-cred --docker-server=astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password -n netapp-astra-cc
 
 secret/astra-registry-cred created
 ----
@@ -288,11 +296,14 @@ kind: AstraControlCenter
 metadata:
   name: astra
 spec:
+  accountName: "NetApp HCG Solutions"
   astraVersion: "21.08.65"
   astraAddress: "astra-control-center.cie.netapp.com"
   autoSupport:
     enrolled: true
   email: "solutions_tme@netapp.com"
+  firstName: "NetApp HCG"
+  lastName: "Admin"
   imageRegistry:
     name: "astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra"     # use your registry
     secret: "astra-registry-cred"             # comment out if not needed
@@ -353,7 +364,7 @@ traefik                                    LoadBalancer   172.30.99.142    10.61
 +
 image:redhat_openshift_image122.jpg[Add DNS entry for ACC GUI]
 
-.	 Log into the Astra Control Center GUI by browsing to its FQDN.
+.	 Log into the Astra Control Center GUI by browsing its FQDN.
 +
 image:redhat_openshift_image87.jpg[Astra Control Center login]
 
