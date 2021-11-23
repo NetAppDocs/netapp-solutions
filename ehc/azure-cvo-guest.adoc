@@ -1,0 +1,167 @@
+---
+sidebar: sidebar
+permalink: ehc/azure-cvo-guest.html
+keywords: NetApp Solutions, microsoft azure, avs, azure, vmware managed cloud, enterprise, hybrid, cloud, cloud volumes ontap, cvo
+summary:
+---
+
+= Deploy new Cloud Volumes ONTAP in Azure
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+Cloud Volumes ONTAP shares and LUNs can be mounted from VMs that are created in the Azure VMware Solution SDDC environment. The volumes can also be mounted on the Linux client and on Windows client because Cloud Volumes ONTAP supports iSCSI, SMB, and NFS protocols. Cloud Volumes ONTAP volumes can be set up in a few simple steps.
+
+To replicate volumes from an on-premises environment to the cloud for disaster recovery or migration purposes, establish network connectivity to Azure, either using a site-to-site VPN or ExpressRoute. Replicating data from on-premises to Cloud Volumes ONTAP is outside the scope of this document. To replicate data between on-premises and Cloud Volumes ONTAP systems, see link:https://docs.netapp.com/us-en/occm/task_replicating_data.html#setting-up-data-replication-between-systems[Setting up data replication between systems].
+
+NOTE: Use Cloud volumes sizer to accurately size the Cloud Volumes ONTAP instances. Also monitor on-premises performance to use as inputs in the Cloud Volumes ONTAP sizer.
+
+. Log in to NetApp Cloud Central—the Fabric View screen is displayed. Locate the Cloud Volumes ONTAP tab and select Go to Cloud Manager. After you are logged in, the Canvas screen is displayed.
++
+image:azure-cvo-guest-1.png[]
+
+. On the Cloud Manager home page, click Add a Working Environment and then select Microsoft Azure as the cloud and the type of the system configuration.
++
+image:azure-cvo-guest-2.png[]
+
+. When creating the first Cloud Volumes ONTAP working environment, Cloud Manager prompts you to deploy a Connector.
++
+image:azure-cvo-guest-3.png[]
+
+. After the connector is created, update the Details and Credentials fields.
++
+image:azure-cvo-guest-4.png[]
+
+. Provide the details of the environment to be created including the environment name and admin credentials. Add resource group tags for the Azure environment as an optional parameter. After you are done, click Continue.
++
+image:azure-cvo-guest-5.png[]
+
+. Select the add-on services for Cloud Volumes ONTAP deployment, including Cloud Data Sense, Cloud Backup, and Cloud Insights. Select the services and then click Continue.
++
+image:azure-cvo-guest-6.png[]
+
+. Configure the Azure location and connectivity. Select the Azure Region, resource group, VNet, and subnet to be used.
++
+image:azure-cvo-guest-7.png[]
+
+. Select the license option: Pay-As-You-Go or BYOL for using existing license. In this example, Pay-As-You-Go option is used.
++
+image:azure-cvo-guest-8.png[]
+
+. Select between several preconfigured packages available for the various types of workloads.
++
+image:azure-cvo-guest-9.png[]
+
+. Accept the two agreements regarding activating support and allocation of Azure resources.To create the Cloud Volumes ONTAP instance, click Go.
++
+image:azure-cvo-guest-10.png[]
+
+. After Cloud Volumes ONTAP is provisioned, it is listed in the working environments on the Canvas page.
++
+image:azure-cvo-guest-11.png[]
+
+
+== Additional configurations for SMB volumes
+
+. After the working environment is ready, make sure the CIFS server is configured with the appropriate DNS and Active Directory configuration parameters. This step is required before you can create the SMB volume.
++
+image:azure-cvo-guest-20.png[]
+
+. Creating the SMB volume is an easy process. Select the CVO instance to create the volume and click the Create Volume option. Choose the appropriate size and cloud manager chooses the containing aggregate or use advanced allocation mechanism to place on a specific aggregate. For this demo, SMB is selected as the protocol.
++
+image:azure-cvo-guest-21.png[]
+
+. After the volume is provisioned, it will be availabe under the Volumes pane. Because a CIFS share is provisioned, give your users or groups permission to the files and folders and verify that those users can access the share and create a file. This step is not required if the volume is replicated from an on-premises environment because the file and folder permissions are all retained as part of SnapMirror replication.
++
+image:azure-cvo-guest-22.png[]
+
+. After the volume is created, use the mount command to connect to the share from the VM running on the Azure VMware Solution SDDC hosts.
+
+. Copy the following path and use the Map Network Drive option to mount the volume on the VM running on Azure VMware Solution SDDC.
++
+image:azure-cvo-guest-23.png[]
++
+image:azure-cvo-guest-24.png[]
+
+== Connect the LUN to a host
+
+To connect the LUN to a host, complete the following steps:
+
+. On the Canvas page, double-click the Cloud Volumes ONTAP working environment to create and manage volumes.
+
+. Click Add Volume > New Volume and select iSCSI and click Create Initiator Group. Click Continue.
++
+image:azure-cvo-guest-30.png[]
+
+. After the volume is provisioned, select the volume, and then click Target IQN. To copy the iSCSI Qualified Name (IQN), click Copy. Set up an iSCSI connection from the host to the LUN.
++
+To accomplish the same for the host residing on Azure VMware Solution SDDC:
++
+.. RDP to the VM hosted on Azure VMware Solution SDDC.
++
+.. Open the iSCSI Initiator Properties dialog box: Server Manager > Dashboard > Tools > iSCSI Initiator.
++
+.. From the Discovery tab, click Discover Portal or Add Portal and then enter the IP address of the iSCSI target port.
++
+.. From the Targets tab, select the target discovered and then click Log on or Connect.
++
+.. Select Enable multipath, and then select Automatically Restore This Connection When the Computer Starts or Add This Connection to the List of Favorite Targets. Click Advanced.
++
+*Note:* The Windows host must have an iSCSI connection to each node in the cluster. The native DSM selects the best paths to use.
++
+image:azure-cvo-guest-31.png[]
+
+LUNs on storage virtual machine (SVM) appear as disks to the Windows host. Any new disks that are added are not automatically discovered by the host. Trigger a manual rescan to discover the disks by completing the following steps:
+
+. Open the Windows Computer Management utility: Start > Administrative Tools > Computer Management.
+
+. Expand the Storage node in the navigation tree.
+
+. Click Disk Management.
+
+. Click Action > Rescan Disks.
+
+image:azure-cvo-guest-32.png[]
+
+When a new LUN is first accessed by the Windows host, it has no partition or file system. Initialize the LUN; and optionally, format the LUN with a file system by completing the following steps:
+
+. Start Windows Disk Management.
+
+. Right-click the LUN, and then select the required disk or partition type.
+
+. Follow the instructions in the wizard. In this example, drive E: is mounted
+
+image:azure-cvo-guest-33.png[]
+
+image:azure-cvo-guest-34.png[]
+
+== Common scenarios
+
+NetApp Cloud Volumes along with Azure VMware Solution provides great potential for organizations looking to leverage hybrid cloud. The rest of this section provides the use cases that show integrating NetApp Cloud Volumes enables true hybrid multicloud capabilities.
+
+=== Use case #1: Optimizing storage
+
+When performing a sizing exercise using RVtools output, it is always evident that the horsepower (vCPU/vMem) scale is parallel with storage. Many times, organizations find themselves in a situation where the storage space requires drives the size of the cluster well beyond what is needed for horsepower. By integrating NetApp Cloud Volumes, organizations can realize a vSphere-based cloud solution with a simple migration approach, with no replatforming, no IP changes, and no architectural changes. Additionally, this optimization enables you to scale the storage footprint while keeping the host count to least amount required in vSphere, but no change to the storage hierarchy, security, or files made available. This allows you to optimize the deployment and reduce the overall TCO by 35–45%. This integration also enables you to scale storage from warm storage to production-level performance in seconds.
+
+=== Use case #2: Cloud migration
+
+Organizations are under pressure to migrate applications from on-premises data centers to the Azure Cloud for multiple reasons: an upcoming lease expiration; a finance directive to move from capital expenditure (capex) spending to operational expenditures (opex) spending; or simply a top-down mandate to move everything to the cloud. When speed is critical, only a streamlined migration approach is feasible because replatforming and refactoring applications to adapt to the cloud’s particular IaaS platform is slow and expensive, often taking months. By combining NetApp Cloud Volumes with the bandwidth-efficient SnapMirror replication for guest-connected storage (including RDMs in conjunction with application-consistent Snapshot copies and HCX, Azure Migrate, or third-party products for replicating VMs), this transition is even easier than relying on time-consuming I/O filters mechanisms.
+
+=== Use case #3: Data center expansion
+
+When a data center reaches capacity limits due to seasonal demand spikes or just steady organic growth, moving to the cloud-hosted VMware along with NetApp Cloud Volumes is an easy solution. Leveraging NetApp Cloud Volumes allows storage creation, replication, and expansion very easily by providing high availability across availability zones and dynamic scaling capabilities. Leveraging NetApp Cloud Volumes helps in minimizing host cluster capacity by overcoming the need for stretch clusters.
+
+=== Use case #4: Disaster recovery to the cloud
+
+In a traditional approach, if a disaster occurs, the VMs replicated to the cloud would require conversion to the cloud’s own hypervisor platform before they could be restored – not a task to be handled during a crisis. By using NetApp Cloud Volumes for guest-connected storage using SnapCenter and SnapMirror replication from on-premises along with Azure VMware Solution, a better approach for disaster recovery can be devised allowing VM replicas to be recovered on fully consistent VMware SDDC infrastructure along with Azure Site Recovery or equivalent third-party tools such as Veeam. This approach also enables you to perform disaster recovery drills and recovery from ransomware quickly. This also enables you to scale to full production for testing or during a disaster by adding hosts on-demand.
+
+=== Use case #5: Application modernization
+
+After applications are in the Azure cloud, organizations will want to take advantage of the hundreds of powerful Azure services to modernize and extend them. With the use of NetApp Cloud Volumes, modernization is an easy process because the application data is not locked into vSAN and allows data mobility for a wide range of use cases, including Kubernetes.
+
+== Conclusion
+
+Whether you are targeting an all-cloud or hybrid cloud, NetApp Cloud Volumes provides excellent options to deploy and manage the application workloads along with file services and block protocols while reducing the TCO by making the data requirements seamless to the application layer. Whatever the use case, choose Azure VMware Solution with NetApp Cloud Volumes for rapid realization of cloud benefits, consistent infrastructure, and operations across on-premises and multiple clouds, bidirectional portability of workloads, and enterprise-grade capacity and performance. It is the same familiar process and procedures that are used to connect the storage. Remember, it is just the position of the data that changed with new names; the tools and processes all remain the same and NetApp Cloud Volumes helps in optimizing the overall deployment.
