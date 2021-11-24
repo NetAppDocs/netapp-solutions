@@ -1,0 +1,32 @@
+---
+sidebar: sidebar
+permalink: data-analytics/confluent-kafka-best-practice-guidelines.html
+keywords: best practices, guidelines, nfs, san
+summary: This section presents lessons learned from this certification.
+---
+
+= Best practice guidelines
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-11-15 09:15:45.972373
+//
+
+link:confluent-kafka-confluent-kafka-rebalance.html[Previous: Confluent Kafka rebalance.]
+
+* Based on our validation, NFS is not the right protocol for a Confluent Kafka broker to keep data.
+* We can use SAN (specifically FC) to keep the broker data or local disk, because, in the Confluent tiered storage configuration, the size of the data held in the brokers data directory is based on the segment size and retention time when the data is moved to object storage.
+* Object stores provide better performance when segment.bytes is higher; we tested 512MB.
+* In Kafka, the length of the key or value (in bytes) for each record produced to the topic is controlled by the `length.key.value` parameter. For StorageGRID, S3 object ingest and retrieve performance increased to higher values. For example, 512 bytes provided a 5.8GBps retrieve, 1024 bytes provided a 7.5GBps s3 retrieve, and 2048 bytes provided close to 10GBps.
+
+The following figure presents the S3 object ingest and retrieve based on `length.key.value`.
+
+image:confluent-kafka-image11.png[Error: Missing Graphic Image]
+
+link:confluent-kafka-conclusion.html[Next: Conclusion.]
