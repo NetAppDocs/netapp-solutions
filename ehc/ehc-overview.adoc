@@ -48,7 +48,9 @@ Regardless of the cloud used, when a VMware SDDC is deployed, the initial cluste
 
 == Storage configuration
 
-For customers planning to host storage-intensive workloads and scale out on any cloud-hosted VMware solution, the default hyper-converged infrastructure dictates that the expansion should be on both the compute and storage resources. By integrating with NetApp Cloud Volumes, such as Azure NetApp Files, Cloud Volumes ONTAP, and Cloud Volumes Service, customers now have options to independently scale their storage separately, and only add compute nodes to the SDDC cluster as needed.
+For customers planning to host storage-intensive workloads and scale out on any cloud-hosted VMware solution, the default hyper-converged infrastructure dictates that the expansion should be on both the compute and storage resources.
+
+By integrating with NetApp Cloud Volumes, such as Azure NetApp Files, Amazon FSx for NetApp ONTAP, Cloud Volumes ONTAP (available in all three major hyperscalers), and Cloud Volumes Service for Google Cloud, customers now have options to independently scale their storage separately, and only add compute nodes to the SDDC cluster as needed.
 
 === Notes:
 
@@ -60,9 +62,9 @@ For customers planning to host storage-intensive workloads and scale out on any 
 
 * It is very easy to reach the limits of storage capacity of vSAN built on top of the cluster hosts. Use NetApp Cloud Volumes to scale storage to either host active datasets or tier cooler data to persistent storage.
 
-* Use in-guest mechanisms to connect storage to guest VMs as external datastores are not currently supported in any cloud hosted VMware solutions. The support stance for datastores will change soon.
+Azure NetApp Files, Amazon FSx for NetApp ONTAP, Cloud Volumes ONTAP (available in all three major hyperscalers), and Cloud Volumes Service for Google Cloud can be used in conjunction with guest VMs. This hybrid storage architecture consists of a vSAN datastore that holds the guest operating system and application binary data. The application data is attached to the VM through a guest-based iSCSI initiator or the NFS/SMB mounts that communicate directly with Amazon FSx for NetApp ONTAP, Cloud Volume ONTAP, Azure NetApp Files and Cloud Volumes Service for Google Cloud respectively. This configuration allows you to easily overcome challenges with storage capacity as with vSAN, the available free space depends on the slack space and storage policies used.
 
-Azure NetApp Files or Cloud Volumes ONTAP can be used in conjunction with guest VMs. This hybrid storage architecture consists of a vSAN datastore that holds the guest operating system and application binary data. The application data is attached to the VM through a guest-based iSCSI initiator or the NFS/SMB mounts that communicate directly with Cloud Volume ONTAP and Azure NetApp Files respectively. This configuration allows you to easily overcome challenges with storage capacity¾as with vSAN, the available free space depends on the slack space and storage policies used.
+NOTE: NetApp storage as a datastore is currently available as Private preview in all the major hyperscale clouds.
 
 Let’s consider a three-node SDDC cluster on VMware Cloud on AWS:
 
@@ -82,17 +84,21 @@ For example:
 
 ** RAID 5 = effective free space = 17.5TB (usable raw capacity/1.33)
 
-Thus, using NetApp Cloud Volumes would help in expanding the storage and optimizing the TCO while meeting the performance and data protection requirements:
+Thus, using NetApp Cloud Volumes as guest-connected storage would help in expanding the storage and optimizing the TCO while meeting the performance and data protection requirements.
+
+=== Points to Remember
 
 * In hybrid storage models, place tier 1 or high priority workloads on vSAN datastore to address any specific latency requirements because they are part of the host itself and within proximity. Use in-guest mechanisms for any workload VMs for which transactional latencies are acceptable.
 
-* Use NetApp SnapMirror® technology to replicate the workload data from the on-premises ONTAP system to Cloud Volumes ONTAP to ease migration using block level mechanisms.
+* Use NetApp SnapMirror® technology to replicate the workload data from the on-premises ONTAP system to Cloud Volumes ONTAP or Amazon FSx for NetApp ONTAP to ease migration using block-level mechanisms. This does not apply to Azure NetApp Files and Cloud Volumes Services. For migrating data to Azure NetApp Files or Cloud Volumes Services, use NetApp XCP, Cloud sync, rysnc or robocopy depending on the file protocol used.
 
 * Testing shows 2-4ms additional latency while accessing storage from the respective SDDCs. Factor this additional latency into the application requirements when mapping the storage.
 
 * For mounting guest-connected storage during test failover and actual failover, make sure iSCSI initiators are reconfigured, DNS is updated for SMB shares, and NFS mount points are updated in fstab.
 
 * Make sure that in-guest Microsoft Multipath I/O (MPIO), firewall, and disk timeout registry settings are configured properly inside the VM.
+
+NOTE: This applies to guest connected storage.
 
 == Benefits of NetApp cloud storage
 
@@ -126,6 +132,6 @@ NOTE: Engage NetApp solution architects and respective hyperscaler cloud archite
 
 == Detailed architecture
 
-From a high-level perspective, this architecture (shown in the figure below) covers how to achieve hybrid multi-cloud connectivity and app portability across multiple cloud providers using NetApp Cloud Volumes ONTAP and Azure NetApp Files as an additional in-guest storage option.
+From a high-level perspective, this architecture (shown in the figure below) covers how to achieve hybrid multi-cloud connectivity and app portability across multiple cloud providers using NetApp Cloud Volumes ONTAP, Cloud Volumes Service for Google Cloud and Azure NetApp Files as an additional in-guest storage option.
 
 image:ehc-architecture.png[Enterprise Hybrid Cloud Architecture]
