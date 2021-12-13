@@ -48,16 +48,16 @@ a|* AFF A800
 |10GbE
 |===
 
-== Steps for deployment
+== Deployment steps - NAS
 
 To deploy NetApp XCP for data transfer, first install and activate the XCP software on the destination location. You can review the details in the https://mysupport.netapp.com/documentation/productlibrary/index.html?productID=63064[NetApp XCP User Guide^]. To do so, complete the following steps:
 
-. Meet the prerequisites as detailed in the section (xref) “Prerequisites for XCP.”
+. Meet the prerequisites as detailed in the section link:xcp-bp-netapp-xcp-overview.html#prerequisites-for-xcp[“Prerequisites for XCP.”]
 . Download the XCP software from the https://mysupport.netapp.com/site/products/all/details/netapp-xcp/downloads-tab[NetApp XCP (Downloads) page^].
 . Copy the downloaded XCP tar files to the XCP server.
 +
 ....
-# scp Documents/OneDrive\ -\ NetApp\ Inc/XCP/software/1.6.1/NETAPP_XCP_1.6.1.tgz
+# scp Documents/OneDrive\ -\ NetApp\ Inc/XCP/software/1.6.1/NETAPP_XCP_1.6.1.tgz mailto:root@10.63.150.53:/usr/src
 ....
 
 . Untar the tarfile.
@@ -231,5 +231,94 @@ XCP documentation provides multiple options (with examples) for the `scan`, `cop
 Windows customers should copy the data by using access control lists (ACLs). NetApp recommends using the command `xcp copy -acl -fallbackuser\<username> -fallbackgroup\<username or groupname> <source> <destination>`. To maximum performance, considering the source volume that has SMB data with ACL and the data accessible by both NFS and SMB, the target must be an NTFS volume. Using XCP (NFS version), copy the data from the Linux server and execute the XCP (SMB version) sync with the `-acl` and `-nodata` options from the Windows server to copy the ACLs from source data to the target SMB data.
 
 For detailed steps, see https://helpcenter.netwrix.com/NA/Configure_IT_Infrastructure/Accounts/DCA_Manage_Auditing_Security_Log.html[Configuring 'Manage Auditing and Security Log' Policy^].
+
+== Deployment steps - HDFS/MapRFS data migration
+
+In this section, we discuss the new XCP feature called Hadoop Filesystem Data Transfer to NAS, which migrates data from HDFS/MapRFS to NFS and vice versa.
+
+=== Prerequisites
+
+For the MapRFS/HDFS feature, you must perform the following procedure in a non-root user environment. Normally the non-root user is hdfs, mapr, or a user who has permission to make changes in the HDFS and MapRFS filesystem.
+
+.	Set the CLASSPATH, HADOOP_HOME, NHDFS_LIBJVM_PATH, LB_LIBRARY_PATH, and NHDFS_LIBHDFS_PATH variables in the CLI or the .bashrc file of the user along with the `xcp` command.
+** NHDFS_LIBHDFS_PATH points to the libhdfs.so file. This file provides HDFS APIs to interact and manipulate the HDFS/MapRFS files and filesystem as a part of the Hadoop distribution.
+** NHDFS_LIBJVM_PATH points to the libjvm.so file. This is a shared JAVA virtual machine library in the jre location.
+** CLASSPATH points to all jars files using (Hadoop classpath –glob) values.
+** LD_LIBRARY_PATH points to the Hadoop native library folder location.
++
+See the following sample based on a Cloudera cluster.
++
+----
+export CLASSPATH=$(hadoop classpath --glob)
+export LD_LIBRARY_PATH=/usr/java/jdk1.8.0_181-cloudera/jre/lib/amd64/server/
+export HADOOP_HOME=/opt/cloudera/parcels/CDH-6.3.4-1.cdh6.3.4.p0.6751098/
+#export HADOOP_HOME=/opt/cloudera/parcels/CDH/
+export NHDFS_LIBJVM_PATH=/usr/java/jdk1.8.0_181-cloudera/jre/lib/amd64/server/libjvm.so
+export NHDFS_LIBHDFS_PATH=$HADOOP_HOME/lib64/libhdfs.so
+----
+In this release, we support XCP scan, copy, and verify operations and data migration from HDFS to NFS. You can transfer data from a data lake cluster single worker node and multiple worker nodes. In the 1.8 release, root and non-root users can perform data migration.
+
+=== Deployment steps - Non-root user migrates HDFS/MaprFS data to NetApp NFS
+
+.	Follow the same steps mentioned from 1-9 steps from steps for deployment section.
+.	In the following example, the user migrates data from HDFS to NFS.
+..	Create a folder and files (using `hadoop fs -copyFromLocal`) in HDFS.
++
+----
+[root@n138 ~]# su - tester -c 'hadoop fs -mkdir /tmp/testerfolder_src/util-linux-2.23.2/mohankarthikhdfs_src'
+[root@n138 ~]# su - tester -c 'hadoop fs -ls -d  /tmp/testerfolder_src/util-linux-2.23.2/mohankarthikhdfs_src'
+drwxr-xr-x   - tester supergroup          0 2021-11-16 16:52 /tmp/testerfolder_src/util-linux-2.23.2/mohankarthikhdfs_src
+[root@n138 ~]# su - tester -c "echo 'testfile hdfs' > /tmp/a_hdfs.txt"
+[root@n138 ~]# su - tester -c "echo 'testfile hdfs 2' > /tmp/b_hdfs.txt"
+[root@n138 ~]# ls -ltrah /tmp/*_hdfs.txt
+-rw-rw-r-- 1 tester tester 14 Nov 16 17:00 /tmp/a_hdfs.txt
+-rw-rw-r-- 1 tester tester 16 Nov 16 17:00 /tmp/b_hdfs.txt
+[root@n138 ~]# su - tester -c 'hadoop fs -copyFromLocal /tmp/*_hdfs.txt hdfs:///tmp/testerfolder_src/util-linux-2.23.2/mohankarthikhdfs_src'
+[root@n138 ~]#
+----
+
+..	Check permissions in the HDFS folder.
++
+----
+[root@n138 ~]# su - tester -c 'hadoop fs -ls hdfs:///tmp/testerfolder_src/util-linux-2.23.2/mohankarthikhdfs_src'
+Found 2 items
+-rw-r--r--   3 tester supergroup         14 2021-11-16 17:01 hdfs:///tmp/testerfolder_src/util-linux-2.23.2/mohankarthikhdfs_src/a_hdfs.txt
+-rw-r--r--   3 tester supergroup         16 2021-11-16 17:01 hdfs:///tmp/testerfolder_src/util-linux-2.23.2/mohankarthikhdfs_src/b_hdfs.txt
+----
+
+..	Create a folder in NFS and check permissions.
++
+----
+[root@n138 ~]# su - tester -c 'mkdir /xcpsrc_vol/mohankarthiknfs_dest'
+[root@n138 ~]# su - tester -c 'ls -l /xcpsrc_vol/mohankarthiknfs_dest'
+total 0
+[root@n138 ~]# su - tester -c 'ls -d /xcpsrc_vol/mohankarthiknfs_dest'
+/xcpsrc_vol/mohankarthiknfs_dest
+[root@n138 ~]# su - tester -c 'ls -ld /xcpsrc_vol/mohankarthiknfs_dest'
+drwxrwxr-x 2 tester tester 4096 Nov 16 14:32 /xcpsrc_vol/mohankarthiknfs_dest
+[root@n138 ~]#
+----
+
+.. Copy the files from HDFS to NFS using XCP, and check permissions.
++
+----
+[root@n138 ~]# su - tester -c '/usr/src/hdfs_nightly/xcp/linux/xcp copy -chown hdfs:///tmp/testerfolder_src/util-linux-2.23.2/mohankarthikhdfs_src/ 10.63.150.126:/xcpsrc_vol/mohankarthiknfs_dest'
+XCP Nightly_dev; (c) 2021 NetApp, Inc.; Licensed to Karthikeyan Nagalingam [NetApp Inc] until Wed Feb  9 13:38:12 2022
+
+xcp: WARNING: No index name has been specified, creating one with name: autoname_copy_2021-11-16_17.04.03.652673
+
+Xcp command : xcp copy -chown hdfs:///tmp/testerfolder_src/util-linux-2.23.2/mohankarthikhdfs_src/ 10.63.150.126:/xcpsrc_vol/mohankarthiknfs_dest
+Stats       : 3 scanned, 2 copied, 3 indexed
+Speed       : 3.44 KiB in (650/s), 80.2 KiB out (14.8 KiB/s)
+Total Time  : 5s.
+STATUS      : PASSED
+[root@n138 ~]# su - tester -c 'ls -l /xcpsrc_vol/mohankarthiknfs_dest'
+total 0
+-rw-r--r-- 1 tester supergroup 14 Nov 16 17:01 a_hdfs.txt
+-rw-r--r-- 1 tester supergroup 16 Nov 16 17:01 b_hdfs.txt
+[root@n138 ~]# su - tester -c 'ls -ld /xcpsrc_vol/mohankarthiknfs_dest'
+drwxr-xr-x 2 tester supergroup 4096 Nov 16 17:01 /xcpsrc_vol/mohankarthiknfs_dest
+[root@n138 ~]#
+----
 
 link:xcp-bp-sizing-guidelines-overview.html[Next: Sizing guidelines.]
