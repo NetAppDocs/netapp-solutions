@@ -1,0 +1,117 @@
+---
+sidebar: sidebar
+permalink: data-analytics/confluent-kafka-sizing.html
+keywords: solution, architecture, details, hardware, software
+summary: This section covers the hardware and software used for Confluent certification. This information is applicable to Kafka deployment with NetApp storage.
+---
+
+= Sizing
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-11-15 09:15:45.920602
+//
+
+link:confluent-kafka-best-practice-guidelines.html[Previous: Best practice guidelines.]
+
+Kafka sizing can be performed with four configuration modes: simple, granular, reverse, and partitions.
+
+== Simple
+
+The simple mode is appropriate for the first-time Apache Kafka users or early state use cases. For this mode, you provide requirements such as throughput MBps, read fanout, retention, and the resource utilization percentage (60% is default). You also enter the environment, such as on-premises (bare-metal, VMware, Kubernetes, or OpenStack) or cloud. Based on this information, the sizing of a Kafka cluster provides the number of servers required for the broker, the zookeeper, Apache Kafka connect workers, the schema registry, a REST Proxy, ksqlDB, and the Confluent control center.
+
+For tiered storage, consider the granular configuration mode for sizing a Kafka cluster. Granular mode is appropriate for experienced Apache Kafka users or well-defined use cases. This section describes sizing for producers, stream processors, and consumers.
+
+=== Producers
+
+To describe the producers for Apache Kafka (for example a native client, REST proxy, or Kafka connector), provide the following information:
+
+*	*Name.* Spark.
+*	*Producer type.* Application or service, proxy (REST, MQTT, other), and existing database (RDBMS, NOSQL, other). You can also select “I don’t know.”
+*	*Average throughput.* In events per second (1,000,000 for example).
+*	*Peak throughput.* In events per second (4,000,000 for example).
+*	*Average message size.* In bytes, uncompressed (max 1MB; 1000 for example).
+*	*Message format.* Options include Avro, JSON, protocol buffers, binary, text, “I don’t know,” and other.
+* *Replication factor.* Options are 1, 2, 3 (Confluent recommendation), 4, 5, or 6.
+* *Retention time.* One day (for example). How long do you want your data to be stored in Apache Kafka? Enter -1 with any unit for an infinite time. The calculator assumes a retention time of 10 years for infinite retention.
+*	Select the check box for "Enable Tiered Storage to Decrease Broker Count and Allow for Infinite Storage?"
+*	When tiered storage is enabled, the retention fields control the hot set of data that is stored locally on the broker. The archival retention fields control how long data is stored in archival object storage.
+*	*Archival Storage Retention.* One year (for example). How long do you want your data to be stored in archival storage? Enter -1 with any unit for an infinite duration. The calculator assumes a retention of 10 years for infinite retention.
+*	*Growth Multiplier.* 1 (for example). If the value of this parameter is based on current throughput, set it to 1. To size based on additional growth, set this parameter to a growth multiplier.
+*	*Number of producer instances.* 10 (for example). How many producer instances will be running? This input is required to incorporate the CPU load into the sizing calculation. A blank value indicates that CPU load is not incorporated into the calculation.
+
+Based on this example input, sizing has the following effect on producers:
+
+*	Average throughput in uncompressed bytes: 1GBps. Peak throughput in uncompressed bytes: 4GBps. Average throughput in compressed bytes: 400MBps. Peak throughput in compressed bytes: 1.6GBps. This is based on a default 60% compression rate (you can change this value).
+•	Total on-broker hotset storage required: 31,104TB, including replication, compressed. Total off-broker archival storage required: 378,432TB, compressed. Use link:https://fusion.netapp.com[https://fusion.netapp.com^] for StorageGRID sizing.
+
+Stream Processors must describe their applications or services that consume data from Apache Kafka and produce back into Apache Kafka. In most cases these are built in ksqlDB or Kafka Streams.
+
+*	*Name.* Spark streamer.
+*	*Processing time.* How long does this processor take to process a single message?
+**	1 ms (simple, stateless transformation) [example], 10ms (stateful in-memory operation).
+**	100ms (stateful network or disk operation), 1000ms (3rd party REST call).
+** I have benchmarked this parameter and know exactly how long it takes.
+*	*Output Retention.* 1 day (example). A stream processor produces its output back to Apache Kafka. How long do you want this output data to be stored in Apache Kafka? Enter -1 with any unit for an infinite duration.
+*	Select the check box "Enable Tiered Storage to Decrease Broker Count and Allow for Infinite Storage?"
+*	*Archival Storage Retention.* 1 year (for example). How long do you want your data to be stored in archival storage? Enter -1 with any unit for an infinite duration. The calculator assumes a retention of 10 years for infinite retention.
+*	*Output Passthrough Percentage.* 100 (for example). A stream processor produces its output back to Apache Kafka. What percentage of inbound throughput will be outputted back into Apache Kafka? For example, if inbound throughput is 20MBps and this value is 10, the output throughput will be 2MBps.
+*	From which applications does this read from? Select “Spark,” the name used in producer type-based sizing.
+Based on the above input, you can expect the following effects of sizing on stream processer instances and topic partition estimates:
+*	This stream processor application requires the following number of instances. The incoming topics likely require this many partitions as well. Contact Confluent to confirm this parameter.
+**	1,000 for average throughput with no growth multiplier
+**	4,000 for peak throughput with no growth multiplier
+**	1,000 for average throughput with a growth multiplier
+**	4,000 for peak throughput with a growth multiplier
+
+=== Consumers
+Describe your applications or services that consume data from Apache Kafka and do not produce back into Apache Kafka; for example, a native client or Kafka Connector.
+
+*	*Name.* Spark consumer.
+*	*Processing time.* How long does this consumer take to process a single message?
+**	1ms (for example, a simple and stateless task like logging)
+**	10ms (fast writes to a datastore)
+**	100ms (slow writes to a datastore)
+**	1000ms (third party REST call)
+**	Some other benchmarked process of known duration.
+*	*Consumer type.* Application, proxy, or sink to an existing datastore (RDBMS, NoSQL, other).
+*	From which applications does this read from? Connect this parameter with producer and stream sizing determined previously.
+
+Based on the above input, you must determine the sizing for consumer instances and topic partition estimates. A consumer application requires the following number of instances.
+
+*	2,000 for average throughput, no growth multiplier
+*	8,000 for peak throughput, no growth multiplier
+*	2,000 for average throughput, including growth multiplier
+*	8,000 for peak throughput, including growth multiplier
+
+The incoming topics likely need this number of partitions as well. Contact Confluent to confirm.
+
+In addition to the requirements for producers, stream processors, and consumers, you must provide the following additional requirements:
+
+*	*Rebuild time.* For example, 4 hours. If an Apache Kafka broker host fails, its data is lost, and a new host is provisioned to replace the failed host, how fast must this new host rebuild itself? Leave this parameter blank if the value is unknown.
+*	*Resource utilization target (percentage).* For example, 60. How utilized do you want your hosts to be during average throughput? Confluent recommends 60% utilization unless you are using Confluent self-balancing clusters, in which case utilization can be higher.
+
+=== Describe your environment
+
+*	*What environment will your cluster be running in?* Amazon Web Services, Microsoft Azure, Google cloud platform, bare-metal on premises, VMware on premises, OpenStack on premises, or Kubernates on premises?
+*	*Host details.* Number of cores: 48 (for example), network card type (10GbE, 40GbE, 16GbE, 1GbE, or another type).
+*	*Storage volumes.* Host: 12 (for example). How many hard drives or SSDs are supported per host? Confluent recommends 12 hard drives per host.
+*	*Storage capacity/volume (in GB).* 1000 (for example). How much storage can a single volume store in gigabytes? Confluent recommends 1TB disks.
+*	*Storage configuration.* How are storage volumes configured? Confluent recommends RAID10 to take advantage of all Confluent features. JBOD, SAN, RAID 1, RAID 0, RAID 5, and other types are also supported.
+*	*Single volume throughput (MBps).* 125 (for example). How fast can a single storage volume read or write in megabytes per second? Confluent recommends standard hard drives, which typically have 125MBps throughput.
+*	*Memory capacity (GB).* 64 (for example).
+
+After you have determined your environmental variables, select Size my Cluster. Based on the example parameters indicated above, we determined the following sizing for Confluent Kafka:
+
+*	*Apache Kafka.* Broker count: 22. Your cluster is storage-bound. Consider enabling tiered storage to decrease your host count and allow for infinite storage.
+*	*Apache ZooKeeper.* Count: 5; Apache Kafka Connect Workers: Count: 2; Schema Registry: Count: 2; REST Proxy: Count: 2; ksqlDB: Count: 2; Confluent Control Center: Count: 1.
+
+Use reverse mode for platform teams without a use case in mind. Use partitions mode to calculate how many partitions a single topic requires. See https://eventsizer.io for sizing based on the reverse and partitions modes.
+
+link:confluent-kafka-conclusion.html[Next: Conclusion.]
