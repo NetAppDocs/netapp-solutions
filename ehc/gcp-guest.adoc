@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
-permalink: ehc/gcp-cvo-guest.html
+permalink: ehc/gcp-guest.html
 keywords: NetApp Solutions, google cloud, gcp, gcve, enterprise, hybrid, cloud, cloud volumes ontap, cvo
 summary:
 ---
 
-= Deploy Cloud Volumes ONTAP in Google Cloud (Do It Yourself)
+= NetApp Storage Options for GCP
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -13,6 +13,15 @@ summary:
 :imagesdir: ./../media/
 
 [.lead]
+Google Cloud supports NetApp storage in the following configurations:
+
+* link:#cvo[Cloud Volumes ONTAP (CVO) as guest connected storage]
+* link:#cvs[Cloud Volumes Service (CVS) as guest connected storage]
+
+[[cvo]]
+
+== Deploy Cloud Volumes ONTAP in Google Cloud (Do It Yourself)
+
 Cloud Volumes ONTAP shares and LUNs can be mounted from VMs that are created in the GCVE private cloud environment. The volumes can also be mounted on the Linux client and on Windows client and LUNS can be accessed on Linux or Windows clients as block devices when mounted over iSCSI because Cloud Volumes ONTAP supports iSCSI, SMB, and NFS protocols. Cloud Volumes ONTAP volumes can be set up in a few simple steps.
 
 To replicate volumes from an on-premises environment to the cloud for disaster recovery or migration purposes, establish network connectivity to Google Cloud, either using a site-to-site VPN or Cloud Interconnect. Replicating data from on-premises to Cloud Volumes ONTAP is outside the scope of this document. To replicate data between on-premises and Cloud Volumes ONTAP systems, see link:mailto:CloudOwner@gve.local#setting-up-data-replication-between-systems[Setting up data replication between systems].
@@ -90,7 +99,7 @@ Once mapped, it can be easily accessed, and the NTFS permissions can be set acco
 +
 image:gcve-cvo-guest-15.png[]
 
-== Connect the LUN on Cloud Volumes ONTAP to a host
+=== Connect the LUN on Cloud Volumes ONTAP to a host
 
 To connect the cloud volumes ONTAP LUN to a host, complete the following steps:
 
@@ -136,7 +145,7 @@ On the Linux clients, ensure the iSCSI daemon is running. Once the LUNs are prov
 image:gcve-cvo-guest-21.png[]
 image:gcve-cvo-guest-22.png[]
 
-== Mount Cloud Volumes ONTAP NFS volume on Linux client
+=== Mount Cloud Volumes ONTAP NFS volume on Linux client
 
 To mount the Cloud Volumes ONTAP (DIY) file system from VMs within Google Cloud VMware Engine, follow the below steps:
 
@@ -166,3 +175,161 @@ image:gcve-cvo-guest-25.png[]
 +
 image:gcve-cvo-guest-26.png[]
 image:gcve-cvo-guest-27.png[]
+
+[[cvs]]
+
+== Configure Cloud Volumes Service with VMware Engine
+
+Cloud Volumes Service shares can be mounted from VMs that are created in the VMware Engine environment. The volumes can also be mounted on the Linux client and mapped on the Windows client because Cloud Volumes Service supports SMB and NFS protocols. Cloud Volumes Service volumes can be set up in simple steps.
+
+Cloud Volume Service and Google Cloud VMware Engine private cloud must be in the same region.
+
+To purchase, enable and configure NetApp Cloud Volumes Service for Google Cloud from the Google Cloud Marketplace, follow this detailed link:https://cloud.google.com/vmware-engine/docs/quickstart-prerequisites[guide].
+
+=== Create a CVS NFS volume to GCVE private cloud
+
+To create and mount NFS volumes, complete the following steps:
+
+. Access Cloud Volumes from Partner Solutions within the Google cloud console.
++
+image:gcve-cvs-guest-1.png[]
+
+. In the Cloud Volumes Console, go to the Volumes page and click Create.
++
+image:gcve-cvs-guest-2.png[]
+
+. On the Create File System page, specify the volume name and billing labels as required for chargeback mechanisms.
++
+image:gcve-cvs-guest-3.png[]
+
+. Select the appropriate service. For GCVE, choose CVS-Performance and desired service level for improved latency and higher performance based on the application workload requirements.
++
+image:gcve-cvs-guest-4.png[]
+
+. Specify the Google Cloud region for the volume and volume path (The volume path must be unique across all of cloud volumes in the project)
++
+image:gcve-cvs-guest-5.png[]
+
+. Select the level of performance for the volume.
++
+image:gcve-cvs-guest-6.png[]
+
+. Specify the size of the volume and the protocol type. In this testing, NFSv3 is used.
++
+image:gcve-cvs-guest-7.png[]
+
+. In this step, select the VPC Network from which the volume will be accessible. Ensure VPC peering is in place.
++
+HINT: If VPC peering has not been done, a pop-up button will be displayed to guide you through the peering commands. Open a Cloud Shell session and execute the appropriate commands to peer your VPC with Cloud Volumes Service producer. In case you decide to prepare VPC peering in beforehand, refer to these instructions.
++
+image:gcve-cvs-guest-8.png[]
+
+. Manage the Export policy rules by adding the appropriate rules and Select the checkbox for the corresponding NFS version.
++
+Note: Access to NFS volumes won't be possible unless an export policy is added.
++
+image:gcve-cvs-guest-9.png[]
+
+. Click Save to create the volume.
++
+image:gcve-cvs-guest-10.png[]
+
+=== Mounting NFS exports to VMs running on VMware Engine
+
+Before preparing to mount the NFS volume, ensure the peering status of private connection is listed as Active. Once status is Active, use the mount command.
+
+To mount an NFS volume, do the following:
+
+. In the Cloud Console, go to Cloud Volumes > Volumes.
+. Go to the Volumes page
+. Click the NFS volume for which you want to mount NFS exports.
+. Scroll to the right, under Show More, click Mount Instructions.
+
+To perform the mounting process from within the guest OS of the VMware VM, follow the below steps:
+
+. Use SSH client and SSH to the virtual machine.
+. Install the nfs client on the instance.
+.. On Red Hat Enterprise Linux or SuSE Linux instance:
+
+   sudo yum install -y nfs-utils
+
+.. On an Ubuntu or Debian instance:
+
+   sudo apt-get install nfs-common
+
+. Create a new directory on the instance, such as "/nimCVSNFSol01":
+
+   sudo mkdir /nimCVSNFSol01
++
+image:gcve-cvs-guest-20.png[]
+
+. Mount the volume using the appropriate command. Example command from the lab is below:
+
+  sudo mount -t nfs -o rw,hard,rsize=65536,wsize=65536,vers=3,tcp 10.53.0.4:/nimCVSNFSol01 /nimCVSNFSol01
++
+image:gcve-cvs-guest-21.png[]
+image:gcve-cvs-guest-22.png[]
+
+=== Creating and Mounting SMB Share to VMs running on VMware Engine
+
+For SMB volumes, make sure the Active Directory connections is configured prior to creating the SMB volume.
+
+image:gcve-cvs-guest-30.png[]
+
+Once the AD connection is in place, create the volume with the desired service level. The steps are like creating NFS volume except selecting the appropriate protocol.
+
+. In the Cloud Volumes Console, go to the Volumes page and click Create.
+
+. On the Create File System page, specify the volume name and billing labels as required for chargeback mechanisms.
++
+image:gcve-cvs-guest-31.png[]
+
+. Select the appropriate service. For GCVE, choose CVS-Performance and desired service level for improved latency and higher performance based on the workload requirements.
++
+image:gcve-cvs-guest-32.png[]
+
+. Specify the Google Cloud region for the volume and volume path (The volume path must be unique across all of cloud volumes in the project)
++
+image:gcve-cvs-guest-33.png[]
+
+. Select the level of performance for the volume.
++
+image:gcve-cvs-guest-34.png[]
+
+. Specify the size of the volume and the protocol type. In this testing, SMB is used.
++
+image:gcve-cvs-guest-35.png[]
+
+. In this step, select the VPC Network from which the volume will be accessible. Ensure VPC peering is in place.
++
+HINT: If VPC peering has not been done, a pop-up button will be displayed to guide you through the peering commands. Open a Cloud Shell session and execute the appropriate commands to peer your VPC with Cloud Volumes Service producer. In case you decide to prepare VPC peering in beforehand, refer to these link:https://cloud.google.com/architecture/partners/netapp-cloud-volumes/setting-up-private-services-access?hl=en[instructions].
++
+image:gcve-cvs-guest-36.png[]
+
+. Click Save to create the volume.
++
+image:gcve-cvs-guest-37.png[]
+
+To mount the SMB volume, do the following:
+
+. In the Cloud Console, go to Cloud Volumes > Volumes.
+. Go to the Volumes page
+. Click the SMB volume for which you want to map an SMB share.
+. Scroll to the right, under Show More, click Mount Instructions.
+
+To perform the mounting process from within the Windows guest OS of the VMware VM, follow the below steps:
+
+. Click the Start button and then click on Computer.
+. Click Map Network Drive.
+. In the Drive list, click any available drive letter.
+. In the folder box, type:
++
+  \\nimsmb-3830.nimgcveval.com\nimCVSMBvol01
++
+image:gcve-cvs-guest-38.png[]
++
+To connect every time you log on to your computer, select the Reconnect at sign-in check box.
+
+. Click Finish.
++
+image:gcve-cvs-guest-39.png[]
