@@ -5,7 +5,7 @@ keywords: certification, setup, configuration, benchmark
 summary: We have performed the certification with Confluent Platform with Kafka for tiered storage in NetApp StorageGRID.
 ---
 
-= Confluent Kafka certification
+= Confluent verification
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -20,19 +20,19 @@ summary: We have performed the certification with Confluent Platform with Kafka 
 
 link:confluent-kafka-technology-overview.html[Previous: Technology overview.]
 
-We have performed the certification with Confluent Platform with Kafka for tiered storage in NetApp StorageGRID. Tiered storage separates the data processing and storage management which helps to reduce the operation burden and cost as well as scale the brokers based on computation requirements. Tiered storage sends warm data to cost effective object storage. The NetApp and Confluent teams worked on this certification together and ran the test cases required for certification.
+We performed verification with Confluent Platform 6.2 Tiered Storage in NetApp StorageGRID. The NetApp and Confluent teams worked on this verification together and ran the test cases required for verification.
 
-== Confluent Kafka setup
+== Confluent Platform setup
 
-We used the following setup for the certification.
+We used the following setup for verification.
 
-In this certification, we used three zookeepers, five brokers, and five tools servers with 256GB RAM and 16 CPUs. For NetApp storage, we used StorageGRID with an SG1000 load balancer with four SG6024s. The storage and brokers were connected via 100GbE connections.
+For verification, we used three zookeepers, five brokers, five test-script executing servers, named tools servers with 256GB RAM, and 16 CPUs. For NetApp storage, we used StorageGRID with an SG1000 load balancer with four SGF6024s. The storage and brokers were connected via 100GbE connections.
 
-The following figure shows the network topology of configuration used for confluent Kafka certification.
+The following figure shows the network topology of configuration used for Confluent verification.
 
 image:confluent-kafka-image7.png[Error: Missing Graphic Image]
 
-The tools servers act as an application client that sends the Kafka requests to Kafka brokers.
+The tools servers act as application clients that send requests to Confluent nodes.
 
 == Confluent tiered storage configuration
 
@@ -51,36 +51,36 @@ confluent.tier.s3.aws.endpoint.override=http://kafkasgd.rtpppe.netapp.com:10444/
 confluent.tier.s3.force.path.style.access=true
 ....
 
-For certification, we used StorageGRID with the HTTP protocol, but HTTPS also works. The access key and secret key are stored in the file name provided in the `confluent.tier.s3.cred.file.path` parameter.
+For verification, we used StorageGRID with the HTTP protocol, but HTTPS also works. The access key and secret key are stored in the file name provided in the `confluent.tier.s3.cred.file.path` parameter.
 
-== NetApp storage controller – StorageGrid
+== NetApp object storage - StorageGRID
 
-We configured single-site configuration in StorageGRID for certification.
+We configured single-site configuration in StorageGRID for verfication.
 
 image:confluent-kafka-image8.png[Error: Missing Graphic Image]
 
-== Certification tests
+== Verification tests
 
-We completed the following five test cases for the certification. The first two were functionality tests and the remaining three were performance tests.
+We completed the following five test cases for the verification. These tests are executed on the Trogdor framework. The first two were functionality tests and the remaining three were performance tests.
 
 === Object store correctness test
 
-This test performs basic operations such as get, put, and delete on the object store used for the tied storage using API calls.
+This test determines whether all basic operations (for example, get/put/delete) on the object store API work well according to the needs of tiered storage. It is a basic test that every object store service should expect to pass ahead of the following tests. It is an assertive test that either passes or fails.
 
 === Tiering functionality correctness test
 
-This test checks the end-to-end functionality of the object storage. It creates a topic, produces an event stream to the newly created topic, waits for the brokers to archive the segments to the object storage, consumes the event stream, and validates the consumed stream matches with the produced stream. We have performed this test with and without an object-store fault injection. We simulated node failure by stopping the service manager service in one of the nodes in StorageGRID and validating that the end-to-end functionality works with object storage.
+This test determines if end-to-end tiered storage functionality works well with an assertive test that either passes or fails. The test creates a test topic that by default is configured with tiering enabled and highly a reduced hotset size. It produces an event stream to the newly created test topic, it waits for the brokers to archive the segments to the object store, and it then consumes the event stream and validates that the consumed stream matches the produced stream. The number of messages produced to the event stream is configurable, which lets the user generate a sufficiently large workload according to the needs of testing. The reduced hotset size ensures that the consumer fetches outside the active segment are served only from the object store; this helps test the correctness of the object store for reads. We have performed this test with and without an object-store fault injection. We simulated node failure by stopping the service manager service in one of the nodes in StorageGRID and validating that the end-to-end functionality works with object storage.
 
 === Tier fetch benchmark
 
 This test validated the read performance of the tiered object storage and checked the range fetch read requests under heavy load from segments generated by the benchmark. In this benchmark, Confluent developed custom clients to serve the tier fetch requests.
 
-=== Produce-consume workload generator
+=== Produce-consume workload benchmark
 
-This test indirectly generated write workload on the object store through the archival of segments. The read workload (segments read) was generated from object storage when consumer groups fetched the segments. This workload was generated by TOCC script. This test checked the performance of read and write on the object storage in parallel threads. We tested with and without object store fault injection like the way we did for the tiering functionality correctness test.
+This test indirectly generated write workload on the object store through the archival of segments. The read workload (segments read) was generated from object storage when consumer groups fetched the segments. This workload was generated by the test script. This test checked the performance of read and write on the object storage in parallel threads. We tested with and without object store fault injection as we did for the tiering functionality correctness test.
 
-=== Retention workload generator
+=== Retention workload benchmark
 
-This test checked the deletion performance of an object storage under a heavy topic-retention workload. The retention workload was generated using a TOCC script that produces a large number of messages in parallel to a test topic. The test topic was configuring with an aggressive size-based and time-based retention setting that caused the event stream to be continuously purged from the object store. The segments were then archived. This led to a large number of deletions in the object storage by the broker and collection of the performance of the object- store delete operations.
+This test checked the deletion performance of an object store under a heavy topic-retention workload. The retention workload was generated using a test script that produces many messages in parallel to a test topic. The test topic was configuring with an aggressive size-based and time-based retention setting that caused the event stream to be continuously purged from the object store. The segments were then archived. This led to a large number of deletions in the object storage by the broker and collection of the performance of the object-store delete operations.
 
 link:confluent-kafka-performance-tests-with-scalability.html[Next: Performance tests with scalability.]
