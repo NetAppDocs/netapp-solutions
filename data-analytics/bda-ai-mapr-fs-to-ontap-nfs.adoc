@@ -1,0 +1,327 @@
+---
+sidebar: sidebar
+permalink: data-analytics/bda-ai-mapr-fs-to-ontap-nfs.html
+keywords: details, protocol, mapr-fs, nfs, netapp xcp
+summary: This section provides the detailed steps needed to move MapR-FS data into ONTAP NFS by using NetApp XCP.
+---
+
+= MapR-FS to ONTAP NFS
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-02-03 19:40:46.932651
+//
+
+link:bda-ai-gpfs-to-nfs-detailed-steps.html[Previous: GPFS to NFS - Detailed steps.]
+
+This section provides the detailed steps needed to move MapR-FS data into ONTAP NFS by using NetApp XCP.
+
+. Provision three LUNs for each MapR node and give the LUNs ownership of all MapR nodes.
+. During installation, choose newly added LUNs for MapR cluster disks that are used for MapR-FS.
+. Install a MapR cluster according to the https://mapr.com/docs/61/install.html[MapR 6.1 documentation^].
+. Check the basic Hadoop operations using MapReduce commands such as `hadoop jar xxx`.
+. Keep customer data in MapR-FS. For example, we generated approximately a terabyte of sample data in MapR-FS by using Teragen.
+. Configure MapR-FS as NFS export.
+.. Disable the nlockmgr service on all MapR nodes.
+
+....
+root@workr-138: ~$ rpcinfo -p
+   program vers proto   port  service
+    100000    4   tcp    111  portmapper
+    100000    3   tcp    111  portmapper
+    100000    2   tcp    111  portmapper
+    100000    4   udp    111  portmapper
+    100000    3   udp    111  portmapper
+    100000    2   udp    111  portmapper
+    100003    4   tcp   2049  nfs
+    100227    3   tcp   2049  nfs_acl
+    100003    4   udp   2049  nfs
+    100227    3   udp   2049  nfs_acl
+    100021    3   udp  55270  nlockmgr
+    100021    4   udp  55270  nlockmgr
+    100021    3   tcp  35025  nlockmgr
+    100021    4   tcp  35025  nlockmgr
+    100003    3   tcp   2049  nfs
+    100005    3   tcp   2049  mountd
+    100005    1   tcp   2049  mountd
+    100005    3   udp   2049  mountd
+    100005    1   udp   2049  mountd
+root@workr-138: ~$
+ 
+root@workr-138: ~$ rpcinfo -d 100021 3
+root@workr-138: ~$ rpcinfo -d 100021 4
+....
+
+.. Export specific folders from MapR-FS on all MapR nodes in the `/opt/mapr/conf/exports` file. Do not export the parent folder with different permissions when you export sub folders.
+
+....
+[mapr@workr-138 ~]$ cat /opt/mapr/conf/exports
+# Sample Exports file
+# for /mapr exports
+# <Path> <exports_control>
+#access_control -> order is specific to default
+# list the hosts before specifying a default for all
+#  a.b.c.d,1.2.3.4(ro) d.e.f.g(ro) (rw)
+#  enforces ro for a.b.c.d & 1.2.3.4 and everybody else is rw
+# special path to export clusters in mapr-clusters.conf. To disable exporting,
+# comment it out. to restrict access use the exports_control
+#
+#/mapr (rw)
+#karthik
+/mapr/my.cluster.com/tmp/testnfs /maprnfs3 (rw)
+#to export only certain clusters, comment out the /mapr & uncomment.
+#/mapr/clustername (rw)
+#to export /mapr only to certain hosts (using exports_control)
+#/mapr a.b.c.d(rw),e.f.g.h(ro)
+# export /mapr/cluster1 rw to a.b.c.d & ro to e.f.g.h (denied for others)
+#/mapr/cluster1 a.b.c.d(rw),e.f.g.h(ro)
+# export /mapr/cluster2 only to e.f.g.h (denied for others)
+#/mapr/cluster2 e.f.g.h(rw)
+# export /mapr/cluster3 rw to e.f.g.h & ro to others
+#/mapr/cluster2 e.f.g.h(rw) (ro)
+#to export a certain cluster, volume or a subdirectory as an alias,
+#comment out  /mapr & uncomment
+#/mapr/clustername         /alias1 (rw)
+#/mapr/clustername/vol     /alias2 (rw)
+#/mapr/clustername/vol/dir /alias3 (rw)
+#only the alias will be visible/exposed to the nfs client not the mapr path, host options as before
+[mapr@workr-138 ~]$
+....
+
+. Refresh the MapR-FS NFS service.
+
+....
+root@workr-138: tmp$ maprcli nfsmgmt refreshexports
+ERROR (22) -  You do not have a ticket to communicate with 127.0.0.1:9998. Retry after obtaining a new ticket using maprlogin
+root@workr-138: tmp$ su - mapr
+[mapr@workr-138 ~]$ maprlogin password -cluster my.cluster.com
+[Password for user 'mapr' at cluster 'my.cluster.com': ]
+MapR credentials of user 'mapr' for cluster 'my.cluster.com' are written to '/tmp/maprticket_5000'
+[mapr@workr-138 ~]$ maprcli nfsmgmt refreshexports
+....
+
+. Assign a virtual IP range to a specific server or a set of servers in the MapR cluster. Then the MapR cluster assigns an IP to a specific server for NFS data access. The IPs enable high availability, which means that, if a server or network with a particular IP experiences failure, the next IP from the range of IPs can be used for NFS access.
+
+[NOTE]
+If you would like to provide NFS access from all MapR nodes, then you can assign a set of virtual IPs to each server, and you can use the resources from each MapR node for NFS data access.
+
+image:bda-ai-image7.png[Error: Missing Graphic Image]
+
+image:bda-ai-image8.png[Error: Missing Graphic Image]
+
+image:bda-ai-image9.png[Error: Missing Graphic Image]
+
+. Check the virtual IPs assigned on each MapR node and use them for NFS data access.
+
+....
+root@workr-138: ~$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: ens3f0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9000 qdisc mq state UP group default qlen 1000
+    link/ether 90:1b:0e:d1:5d:f9 brd ff:ff:ff:ff:ff:ff
+    inet 10.63.150.138/24 brd 10.63.150.255 scope global noprefixroute ens3f0
+       valid_lft forever preferred_lft forever
+    inet 10.63.150.96/24 scope global secondary ens3f0:~m0
+       valid_lft forever preferred_lft forever
+    inet 10.63.150.97/24 scope global secondary ens3f0:~m1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::921b:eff:fed1:5df9/64 scope link
+       valid_lft forever preferred_lft forever
+3: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 90:1b:0e:d1:af:b4 brd ff:ff:ff:ff:ff:ff
+4: ens3f1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 90:1b:0e:d1:5d:fa brd ff:ff:ff:ff:ff:ff
+5: eno2: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state DOWN group default qlen 1000
+    link/ether 90:1b:0e:d1:af:b5 brd ff:ff:ff:ff:ff:ff
+[root@workr-138: ~$
+[root@workr-140 ~]# ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: ens3f0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9000 qdisc mq state UP group default qlen 1000
+    link/ether 90:1b:0e:d1:5e:03 brd ff:ff:ff:ff:ff:ff
+    inet 10.63.150.140/24 brd 10.63.150.255 scope global noprefixroute ens3f0
+       valid_lft forever preferred_lft forever
+    inet 10.63.150.92/24 scope global secondary ens3f0:~m0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::921b:eff:fed1:5e03/64 scope link noprefixroute
+       valid_lft forever preferred_lft forever
+3: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 90:1b:0e:d1:af:9a brd ff:ff:ff:ff:ff:ff
+4: ens3f1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 90:1b:0e:d1:5e:04 brd ff:ff:ff:ff:ff:ff
+5: eno2: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state DOWN group default qlen 1000
+    link/ether 90:1b:0e:d1:af:9b brd ff:ff:ff:ff:ff:ff
+[root@workr-140 ~]#
+....
+
+. Mount the NFS- exported MapR-FS using the assigned virtual IP for checking the NFS operation. However, this step is not required for data transfer using NetApp XCP.
+
+....
+root@workr-138: tmp$ mount -v -t nfs 10.63.150.92:/maprnfs3 /tmp/testmount/
+mount.nfs: timeout set for Thu Dec  5 15:31:32 2019
+mount.nfs: trying text-based options 'vers=4.1,addr=10.63.150.92,clientaddr=10.63.150.138'
+mount.nfs: mount(2): Protocol not supported
+mount.nfs: trying text-based options 'vers=4.0,addr=10.63.150.92,clientaddr=10.63.150.138'
+mount.nfs: mount(2): Protocol not supported
+mount.nfs: trying text-based options 'addr=10.63.150.92'
+mount.nfs: prog 100003, trying vers=3, prot=6
+mount.nfs: trying 10.63.150.92 prog 100003 vers 3 prot TCP port 2049
+mount.nfs: prog 100005, trying vers=3, prot=17
+mount.nfs: trying 10.63.150.92 prog 100005 vers 3 prot UDP port 2049
+mount.nfs: portmap query retrying: RPC: Timed out
+mount.nfs: prog 100005, trying vers=3, prot=6
+mount.nfs: trying 10.63.150.92 prog 100005 vers 3 prot TCP port 2049
+root@workr-138: tmp$ df -h
+Filesystem              Size  Used Avail Use% Mounted on
+/dev/sda7                84G   48G   37G  57% /
+devtmpfs                126G     0  126G   0% /dev
+tmpfs                   126G     0  126G   0% /dev/shm
+tmpfs                   126G   19M  126G   1% /run
+tmpfs                   126G     0  126G   0% /sys/fs/cgroup
+/dev/sdd1               3.7T  201G  3.5T   6% /mnt/sdd1
+/dev/sda6               946M  220M  726M  24% /boot
+tmpfs                    26G     0   26G   0% /run/user/5000
+gpfs1                   7.3T  9.1G  7.3T   1% /gpfs1
+tmpfs                    26G     0   26G   0% /run/user/0
+localhost:/mapr         100G     0  100G   0% /mapr
+10.63.150.92:/maprnfs3   53T  8.4G   53T   1% /tmp/testmount
+root@workr-138: tmp$
+....
+
+. Configure NetApp XCP to transfer data from the MapR-FS NFS gateway to ONTAP NFS.
+.. Configure the catalog location for XCP.
+
+....
+[root@hdp2 linux]# cat /opt/NetApp/xFiles/xcp/xcp.ini
+# Sample xcp config
+[xcp]
+#catalog =  10.63.150.51:/gpfs1
+catalog =  10.63.150.213:/nc_volume1
+....
+
+.. Copy the license file to `/opt/NetApp/xFiles/xcp/`.
+
+....
+root@workr-138: src$ cd /opt/NetApp/xFiles/xcp/
+root@workr-138: xcp$ ls -ltrha
+total 252K
+drwxr-xr-x 3 root   root     16 Apr  4  2019 ..
+-rw-r--r-- 1 root   root    105 Dec  5 19:04 xcp.ini
+drwxr-xr-x 2 root   root     59 Dec  5 19:04 .
+-rw-r--r-- 1 faiz89 faiz89  336 Dec  6 21:12 license
+-rw-r--r-- 1 root   root    192 Dec  6 21:13 host
+-rw-r--r-- 1 root   root   236K Dec 17 14:12 xcp.log
+root@workr-138: xcp$
+....
+
+.. Activate XCP using the `xcp activate` command.
+.. Check the source for NFS export.
+
+....
+[root@hdp2 linux]# ./xcp show 10.63.150.92
+XCP 1.4-17914d6; (c) 2019 NetApp, Inc.; Licensed to Karthikeyan Nagalingam [NetApp Inc] until Wed Feb  5 11:07:27 2020
+getting pmap dump from 10.63.150.92 port 111...
+getting export list from 10.63.150.92...
+sending 1 mount and 4 nfs requests to 10.63.150.92...
+== RPC Services ==
+'10.63.150.92': TCP rpc services: MNT v1/3, NFS v3/4, NFSACL v3, NLM v1/3/4, PMAP v2/3/4, STATUS v1
+'10.63.150.92': UDP rpc services: MNT v1/3, NFS v4, NFSACL v3, NLM v1/3/4, PMAP v2/3/4, STATUS v1
+== NFS Exports ==
+ Mounts  Errors  Server
+      1       0  10.63.150.92
+     Space    Files      Space    Files
+      Free     Free       Used     Used Export
+  52.3 TiB    53.7B   8.36 GiB    53.7B 10.63.150.92:/maprnfs3
+== Attributes of NFS Exports ==
+drwxr-xr-x --- root root 2 2 10m51s 10.63.150.92:/maprnfs3
+1.77 KiB in (8.68 KiB/s), 3.16 KiB out (15.5 KiB/s), 0s.
+[root@hdp2 linux]#
+....
+
+.. Transfer the data using XCP from multiple MapR nodes from multiple source IPs and multiple destination IPs (ONTAP LIFs).
+
+....
+root@workr-138: linux$ ./xcp_yatin copy --parallel 20 10.63.150.96,10.63.150.97:/maprnfs3/tg4 10.63.150.85,10.63.150.86:/datapipeline_dataset/tg4_dest
+XCP 1.6-dev; (c) 2019 NetApp, Inc.; Licensed to Karthikeyan Nagalingam [NetApp Inc] until Wed Feb  5 11:07:27 2020
+xcp: WARNING: No index name has been specified, creating one with name: autoname_copy_2019-12-06_21.14.38.652652
+xcp: mount '10.63.150.96,10.63.150.97:/maprnfs3/tg4': WARNING: This NFS server only supports 1-second timestamp granularity. This may cause sync to fail because changes will often be undetectable.
+ 130 scanned, 128 giants, 3.59 GiB in (723 MiB/s), 3.60 GiB out (724 MiB/s), 5s
+ 130 scanned, 128 giants, 8.01 GiB in (889 MiB/s), 8.02 GiB out (890 MiB/s), 11s
+ 130 scanned, 128 giants, 12.6 GiB in (933 MiB/s), 12.6 GiB out (934 MiB/s), 16s
+ 130 scanned, 128 giants, 16.7 GiB in (830 MiB/s), 16.7 GiB out (831 MiB/s), 21s
+ 130 scanned, 128 giants, 21.1 GiB in (907 MiB/s), 21.1 GiB out (908 MiB/s), 26s
+ 130 scanned, 128 giants, 25.5 GiB in (893 MiB/s), 25.5 GiB out (894 MiB/s), 31s
+ 130 scanned, 128 giants, 29.6 GiB in (842 MiB/s), 29.6 GiB out (843 MiB/s), 36s
+….
+[root@workr-140 linux]# ./xcp_yatin copy  --parallel 20 10.63.150.92:/maprnfs3/tg4_2 10.63.150.85,10.63.150.86:/datapipeline_dataset/tg4_2_dest
+XCP 1.6-dev; (c) 2019 NetApp, Inc.; Licensed to Karthikeyan Nagalingam [NetApp Inc] until Wed Feb  5 11:07:27 2020
+xcp: WARNING: No index name has been specified, creating one with name: autoname_copy_2019-12-06_21.14.24.637773
+xcp: mount '10.63.150.92:/maprnfs3/tg4_2': WARNING: This NFS server only supports 1-second timestamp granularity. This may cause sync to fail because changes will often be undetectable.
+ 130 scanned, 128 giants, 4.39 GiB in (896 MiB/s), 4.39 GiB out (897 MiB/s), 5s
+ 130 scanned, 128 giants, 9.94 GiB in (1.10 GiB/s), 9.96 GiB out (1.10 GiB/s), 10s
+ 130 scanned, 128 giants, 15.4 GiB in (1.09 GiB/s), 15.4 GiB out (1.09 GiB/s), 15s
+ 130 scanned, 128 giants, 20.1 GiB in (953 MiB/s), 20.1 GiB out (954 MiB/s), 20s
+ 130 scanned, 128 giants, 24.6 GiB in (928 MiB/s), 24.7 GiB out (929 MiB/s), 25s
+ 130 scanned, 128 giants, 29.0 GiB in (877 MiB/s), 29.0 GiB out (878 MiB/s), 31s
+ 130 scanned, 128 giants, 33.2 GiB in (852 MiB/s), 33.2 GiB out (853 MiB/s), 36s
+ 130 scanned, 128 giants, 37.8 GiB in (941 MiB/s), 37.8 GiB out (942 MiB/s), 41s
+ 130 scanned, 128 giants, 42.0 GiB in (860 MiB/s), 42.0 GiB out (861 MiB/s), 46s
+ 130 scanned, 128 giants, 46.1 GiB in (852 MiB/s), 46.2 GiB out (853 MiB/s), 51s
+ 130 scanned, 128 giants, 50.1 GiB in (816 MiB/s), 50.2 GiB out (817 MiB/s), 56s
+ 130 scanned, 128 giants, 54.1 GiB in (819 MiB/s), 54.2 GiB out (820 MiB/s), 1m1s
+ 130 scanned, 128 giants, 58.5 GiB in (897 MiB/s), 58.6 GiB out (898 MiB/s), 1m6s
+ 130 scanned, 128 giants, 62.9 GiB in (900 MiB/s), 63.0 GiB out (901 MiB/s), 1m11s
+ 130 scanned, 128 giants, 67.2 GiB in (876 MiB/s), 67.2 GiB out (877 MiB/s), 1m16s
+....
+
+.. Check the load distribution on the storage controller.
+
+....
+Hadoop-AFF8080::*> statistics show-periodic -interval 2 -iterations 0 -summary true -object nic_common -counter rx_bytes|tx_bytes -node Hadoop-AFF8080-01 -instance e3b
+Hadoop-AFF8080: nic_common.e3b: 12/6/2019 15:55:04
+ rx_bytes tx_bytes
+ -------- --------
+    879MB   4.67MB
+    856MB   4.46MB
+    973MB   5.66MB
+    986MB   5.88MB
+    945MB   5.30MB
+    920MB   4.92MB
+    894MB   4.76MB
+    902MB   4.79MB
+    886MB   4.68MB
+    892MB   4.78MB
+    908MB   4.96MB
+    905MB   4.85MB
+    899MB   4.83MB
+Hadoop-AFF8080::*> statistics show-periodic -interval 2 -iterations 0 -summary true -object nic_common -counter rx_bytes|tx_bytes -node Hadoop-AFF8080-01 -instance e9b
+Hadoop-AFF8080: nic_common.e9b: 12/6/2019 15:55:07
+ rx_bytes tx_bytes
+ -------- --------
+    950MB   4.93MB
+    991MB   5.84MB
+    959MB   5.63MB
+    914MB   5.06MB
+    903MB   4.81MB
+    899MB   4.73MB
+    892MB   4.71MB
+    890MB   4.72MB
+    905MB   4.86MB
+    902MB   4.90MB
+....
+
+link:bda-ai-where-to-find-additional-information.html[Next: Where to find additional information.]

@@ -1,0 +1,841 @@
+---
+sidebar: sidebar
+permalink: data-analytics/bda-ai-gpfs-to-nfs-detailed-steps.html
+keywords: gpfs, nfs, details, protocol
+summary: This section provides the detailed steps needed to configure GPFS and move data into NFS by using NetApp XCP.
+---
+
+= GPFS to NFS-Detailed steps
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-02-03 19:40:46.815507
+//
+
+link:bda-ai-business-benefits.html[Previous: Business benefits.]
+
+This section provides the detailed steps needed to configure GPFS and move data into NFS by using NetApp XCP.
+
+== Configure GPFS
+
+. Download and Install Spectrum Scale Data Access for Linux on one of the servers.
+
+....
+[root@mastr-51 Spectrum_Scale_Data_Access-5.0.3.1-x86_64-Linux-install_folder]# ls
+Spectrum_Scale_Data_Access-5.0.3.1-x86_64-Linux-install
+[root@mastr-51 Spectrum_Scale_Data_Access-5.0.3.1-x86_64-Linux-install_folder]# chmod +x Spectrum_Scale_Data_Access-5.0.3.1-x86_64-Linux-install
+[root@mastr-51 Spectrum_Scale_Data_Access-5.0.3.1-x86_64-Linux-install_folder]# ./Spectrum_Scale_Data_Access-5.0.3.1-x86_64-Linux-install --manifest
+manifest
+…
+<contents removes to save page space>
+…
+....
+
+. Install the prerequisite package (including chef and the kernel headers) on all nodes.
+
+....
+[root@mastr-51 5.0.3.1]# for i in 51 53 136 138 140  ; do ssh 10.63.150.$i "hostname; rpm -ivh  /gpfs_install/chef* "; done
+mastr-51.netapp.com
+warning: /gpfs_install/chef-13.6.4-1.el7.x86_64.rpm: Header V4 DSA/SHA1 Signature, key ID 83ef826a: NOKEY
+Preparing...                          ########################################
+package chef-13.6.4-1.el7.x86_64 is already installed
+mastr-53.netapp.com
+warning: /gpfs_install/chef-13.6.4-1.el7.x86_64.rpm: Header V4 DSA/SHA1 Signature, key ID 83ef826a: NOKEY
+Preparing...                          ########################################
+Updating / installing...
+chef-13.6.4-1.el7                     ########################################
+Thank you for installing Chef!
+workr-136.netapp.com
+warning: /gpfs_install/chef-13.6.4-1.el7.x86_64.rpm: Header V4 DSA/SHA1 Signature, key ID 83ef826a: NOKEY
+Preparing...                          ########################################
+Updating / installing...
+chef-13.6.4-1.el7                     ########################################
+Thank you for installing Chef!
+workr-138.netapp.com
+warning: /gpfs_install/chef-13.6.4-1.el7.x86_64.rpm: Header V4 DSA/SHA1 Signature, key ID 83ef826a: NOKEY
+Preparing...                          ########################################
+Updating / installing...
+chef-13.6.4-1.el7                     ########################################
+Thank you for installing Chef!
+workr-140.netapp.com
+warning: /gpfs_install/chef-13.6.4-1.el7.x86_64.rpm: Header V4 DSA/SHA1 Signature, key ID 83ef826a: NOKEY
+Preparing...                          ########################################
+Updating / installing...
+chef-13.6.4-1.el7                     ########################################
+Thank you for installing Chef!
+[root@mastr-51 5.0.3.1]#
+[root@mastr-51 installer]# for i in 51 53 136 138 140  ; do ssh 10.63.150.$i "hostname; yumdownloader kernel-headers-3.10.0-862.3.2.el7.x86_64 ; rpm -Uvh --oldpackage kernel-headers-3.10.0-862.3.2.el7.x86_64.rpm"; done
+mastr-51.netapp.com
+Loaded plugins: priorities, product-id, subscription-manager
+Preparing...                          ########################################
+Updating / installing...
+kernel-headers-3.10.0-862.3.2.el7     ########################################
+Cleaning up / removing...
+kernel-headers-3.10.0-957.21.2.el7    ########################################
+mastr-53.netapp.com
+Loaded plugins: product-id, subscription-manager
+Preparing...                          ########################################
+Updating / installing...
+kernel-headers-3.10.0-862.3.2.el7     ########################################
+Cleaning up / removing...
+kernel-headers-3.10.0-862.11.6.el7    ########################################
+workr-136.netapp.com
+Loaded plugins: product-id, subscription-manager
+Repository ambari-2.7.3.0 is listed more than once in the configuration
+Preparing...                          ########################################
+Updating / installing...
+kernel-headers-3.10.0-862.3.2.el7     ########################################
+Cleaning up / removing...
+kernel-headers-3.10.0-862.11.6.el7    ########################################
+workr-138.netapp.com
+Loaded plugins: product-id, subscription-manager
+Preparing...                          ########################################
+package kernel-headers-3.10.0-862.3.2.el7.x86_64 is already installed
+workr-140.netapp.com
+Loaded plugins: product-id, subscription-manager
+Preparing...                          ########################################
+Updating / installing...
+kernel-headers-3.10.0-862.3.2.el7     ########################################
+Cleaning up / removing...
+kernel-headers-3.10.0-862.11.6.el7    ########################################
+[root@mastr-51 installer]#
+....
+
+. Disable SELinux in all nodes.
+
+....
+[root@mastr-51 5.0.3.1]# for i in 51 53 136 138 140  ; do ssh 10.63.150.$i "hostname; sudo setenforce 0"; done
+mastr-51.netapp.com
+setenforce: SELinux is disabled
+mastr-53.netapp.com
+setenforce: SELinux is disabled
+workr-136.netapp.com
+setenforce: SELinux is disabled
+workr-138.netapp.com
+setenforce: SELinux is disabled
+workr-140.netapp.com
+setenforce: SELinux is disabled
+[root@mastr-51 5.0.3.1]#
+....
+
+. Set up the install node.
+
+....
+[root@mastr-51 installer]# ./spectrumscale setup -s 10.63.150.51
+[ INFO  ] Installing prerequisites for install node
+[ INFO  ] Existing Chef installation detected. Ensure the PATH is configured so that chef-client and knife commands can be run.
+[ INFO  ] Your control node has been configured to use the IP 10.63.150.51 to communicate with other nodes.
+[ INFO  ] Port 8889 will be used for chef communication.
+[ INFO  ] Port 10080 will be used for package distribution.
+[ INFO  ] Install Toolkit setup type is set to Spectrum Scale (default). If an ESS is in the cluster, run this command to set ESS mode: ./spectrumscale setup -s server_ip -st ess
+[ INFO  ] SUCCESS
+[ INFO  ] Tip : Designate protocol, nsd and admin nodes in your environment to use during install:./spectrumscale -v node add <node> -p  -a -n
+[root@mastr-51 installer]#
+....
+
+. Add the admin node and the GPFS node to the cluster definition file.
+
+....
+[root@mastr-51 installer]# ./spectrumscale node add mastr-51 -a
+[ INFO  ] Adding node mastr-51.netapp.com as a GPFS node.
+[ INFO  ] Setting mastr-51.netapp.com as an admin node.
+[ INFO  ] Configuration updated.
+[ INFO  ] Tip : Designate protocol or nsd nodes in your environment to use during install:./spectrumscale node add <node> -p -n
+[root@mastr-51 installer]#
+....
+
+. Add the manager node and the GPFS node.
+
+....
+[root@mastr-51 installer]# ./spectrumscale node add mastr-53 -m
+[ INFO  ] Adding node mastr-53.netapp.com as a GPFS node.
+[ INFO  ] Adding node mastr-53.netapp.com as a manager node.
+[root@mastr-51 installer]#
+....
+
+. Add the quorum node and the GPFS node.
+
+....
+[root@mastr-51 installer]# ./spectrumscale node add workr-136 -q
+[ INFO  ] Adding node workr-136.netapp.com as a GPFS node.
+[ INFO  ] Adding node workr-136.netapp.com as a quorum node.
+[root@mastr-51 installer]#
+....
+
+. Add the NSD servers and the GPFS node.
+
+....
+[root@mastr-51 installer]# ./spectrumscale node add workr-138 -n
+[ INFO  ] Adding node workr-138.netapp.com as a GPFS node.
+[ INFO  ] Adding node workr-138.netapp.com as an NSD server.
+[ INFO  ] Configuration updated.
+[ INFO  ] Tip :If all node designations are complete, add NSDs to your cluster definition and define required filessytems:./spectrumscale nsd add <device> -p <primary node> -s <secondary node> -fs <file system>
+[root@mastr-51 installer]#
+....
+
+. Add the GUI, admin, and GPFS nodes.
+
+....
+[root@mastr-51 installer]# ./spectrumscale node add workr-136 -g
+[ INFO  ] Setting workr-136.netapp.com as a GUI server.
+[root@mastr-51 installer]# ./spectrumscale node add workr-136 -a
+[ INFO  ] Setting workr-136.netapp.com as an admin node.
+[ INFO  ] Configuration updated.
+[ INFO  ] Tip : Designate protocol or nsd nodes in your environment to use during install:./spectrumscale node add <node> -p -n
+[root@mastr-51 installer]#
+....
+
+. Add another GUI server.
+
+....
+[root@mastr-51 installer]# ./spectrumscale node add mastr-53 -g
+[ INFO  ] Setting mastr-53.netapp.com as a GUI server.
+[root@mastr-51 installer]#
+....
+
+. Add another GPFS node.
+
+....
+[root@mastr-51 installer]# ./spectrumscale node add workr-140
+[ INFO  ] Adding node workr-140.netapp.com as a GPFS node.
+[root@mastr-51 installer]#
+....
+
+. Verify and list all nodes.
+
+....
+[root@mastr-51 installer]# ./spectrumscale node list
+[ INFO  ] List of nodes in current configuration:
+[ INFO  ] [Installer Node]
+[ INFO  ] 10.63.150.51
+[ INFO  ]
+[ INFO  ] [Cluster Details]
+[ INFO  ] No cluster name configured
+[ INFO  ] Setup Type: Spectrum Scale
+[ INFO  ]
+[ INFO  ] [Extended Features]
+[ INFO  ] File Audit logging     : Disabled
+[ INFO  ] Watch folder           : Disabled
+[ INFO  ] Management GUI         : Enabled
+[ INFO  ] Performance Monitoring : Disabled
+[ INFO  ] Callhome               : Enabled
+[ INFO  ]
+[ INFO  ] GPFS                 Admin  Quorum  Manager   NSD   Protocol   GUI   Callhome   OS   Arch
+[ INFO  ] Node                  Node   Node     Node   Server   Node    Server  Server
+[ INFO  ] mastr-51.netapp.com    X                                                      rhel7  x86_64
+[ INFO  ] mastr-53.netapp.com                    X                        X             rhel7  x86_64
+[ INFO  ] workr-136.netapp.com   X       X                                X             rhel7  x86_64
+[ INFO  ] workr-138.netapp.com                           X                              rhel7  x86_64
+[ INFO  ] workr-140.netapp.com                                                          rhel7  x86_64
+[ INFO  ]
+[ INFO  ] [Export IP address]
+[ INFO  ] No export IP addresses configured
+[root@mastr-51 installer]#
+....
+
+. Specify a cluster name in the cluster definition file.
+
+....
+[root@mastr-51 installer]# ./spectrumscale config gpfs -c mastr-51.netapp.com
+[ INFO  ] Setting GPFS cluster name to mastr-51.netapp.com
+[root@mastr-51 installer]#
+....
+
+. Specify the profile.
+
+....
+[root@mastr-51 installer]# ./spectrumscale config gpfs -p default
+[ INFO  ] Setting GPFS profile to default
+[root@mastr-51 installer]#
+Profiles options: default [gpfsProtocolDefaults], random I/O [gpfsProtocolsRandomIO], sequential I/O [gpfsProtocolDefaults], random I/O [gpfsProtocolRandomIO]
+....
+
+. Specify the remote shell binary to be used by GPFS;  use `-r argument`.
+
+....
+[root@mastr-51 installer]# ./spectrumscale config gpfs -r /usr/bin/ssh
+[ INFO  ] Setting Remote shell command to /usr/bin/ssh
+[root@mastr-51 installer]#
+....
+
+. Specify the remote file copy binary to be used by GPFS;  use `-rc argument`.
+
+....
+[root@mastr-51 installer]# ./spectrumscale config gpfs -rc /usr/bin/scp
+[ INFO  ] Setting Remote file copy command to /usr/bin/scp
+[root@mastr-51 installer]#
+....
+
+. Specify the port range to be set on all GPFS nodes;  use `-e argument`.
+
+....
+[root@mastr-51 installer]# ./spectrumscale config gpfs -e 60000-65000
+[ INFO  ] Setting GPFS Daemon communication port range to 60000-65000
+[root@mastr-51 installer]#
+....
+
+. View the GPFS config settings.
+
+....
+[root@mastr-51 installer]# ./spectrumscale config gpfs --list
+[ INFO  ] Current settings are as follows:
+[ INFO  ] GPFS cluster name is mastr-51.netapp.com.
+[ INFO  ] GPFS profile is default.
+[ INFO  ] Remote shell command is /usr/bin/ssh.
+[ INFO  ] Remote file copy command is /usr/bin/scp.
+[ INFO  ] GPFS Daemon communication port range is 60000-65000.
+[root@mastr-51 installer]#
+....
+
+. Add an admin node.
+
+....
+[root@mastr-51 installer]# ./spectrumscale node add 10.63.150.53 -a
+[ INFO  ] Setting mastr-53.netapp.com as an admin node.
+[ INFO  ] Configuration updated.
+[ INFO  ] Tip : Designate protocol or nsd nodes in your environment to use during install:./spectrumscale node add <node> -p -n
+[root@mastr-51 installer]#
+....
+
+. Disable the data collection and upload the data package to the IBM Support Center.
+
+....
+[root@mastr-51 installer]# ./spectrumscale callhome disable
+[ INFO  ] Disabling the callhome.
+[ INFO  ] Configuration updated.
+[root@mastr-51 installer]#
+....
+
+. Enable NTP.
+
+....
+[root@mastr-51 installer]# ./spectrumscale config ntp -e on
+[root@mastr-51 installer]# ./spectrumscale config ntp -l
+[ INFO  ] Current settings are as follows:
+[ WARN  ] No value for Upstream NTP Servers(comma separated IP's with NO space between multiple IPs) in clusterdefinition file.
+[root@mastr-51 installer]# ./spectrumscale config ntp -s 10.63.150.51
+[ WARN  ] The NTP package must already be installed and full bidirectional access to the UDP port 123 must be allowed.
+[ WARN  ] If NTP is already running on any of your nodes, NTP setup will be skipped. To stop NTP run 'service ntpd stop'.
+[ WARN  ] NTP is already on
+[ INFO  ] Setting Upstream NTP Servers(comma separated IP's with NO space between multiple IPs) to 10.63.150.51
+[root@mastr-51 installer]# ./spectrumscale config ntp -e on
+[ WARN  ] NTP is already on
+[root@mastr-51 installer]# ./spectrumscale config ntp -l
+[ INFO  ] Current settings are as follows:
+[ INFO  ] Upstream NTP Servers(comma separated IP's with NO space between multiple IPs) is 10.63.150.51.
+[root@mastr-51 installer]#
+
+[root@mastr-51 installer]# service ntpd start
+Redirecting to /bin/systemctl start ntpd.service
+[root@mastr-51 installer]# service ntpd status
+Redirecting to /bin/systemctl status ntpd.service
+● ntpd.service - Network Time Service
+   Loaded: loaded (/usr/lib/systemd/system/ntpd.service; enabled; vendor preset: disabled)
+   Active: active (running) since Tue 2019-09-10 14:20:34 UTC; 1s ago
+  Process: 2964 ExecStart=/usr/sbin/ntpd -u ntp:ntp $OPTIONS (code=exited, status=0/SUCCESS)
+ Main PID: 2965 (ntpd)
+   CGroup: /system.slice/ntpd.service
+           └─2965 /usr/sbin/ntpd -u ntp:ntp -g
+
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: ntp_io: estimated max descriptors: 1024, initial socket boundary: 16
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: Listen and drop on 0 v4wildcard 0.0.0.0 UDP 123
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: Listen and drop on 1 v6wildcard :: UDP 123
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: Listen normally on 2 lo 127.0.0.1 UDP 123
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: Listen normally on 3 enp4s0f0 10.63.150.51 UDP 123
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: Listen normally on 4 lo ::1 UDP 123
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: Listen normally on 5 enp4s0f0 fe80::219:99ff:feef:99fa UDP 123
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: Listening on routing socket on fd #22 for interface updates
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: 0.0.0.0 c016 06 restart
+Sep 10 14:20:34 mastr-51.netapp.com ntpd[2965]: 0.0.0.0 c012 02 freq_set kernel 11.890 PPM
+[root@mastr-51 installer]#
+....
+
+. Precheck the configurations before Install.
+
+....
+[root@mastr-51 installer]# ./spectrumscale install -pr
+[ INFO  ] Logging to file: /usr/lpp/mmfs/5.0.3.1/installer/logs/INSTALL-PRECHECK-10-09-2019_14:51:43.log
+[ INFO  ] Validating configuration
+[ INFO  ] Performing Chef (deploy tool) checks.
+[ WARN  ] NTP is already running on: mastr-51.netapp.com. The install toolkit will no longer setup NTP.
+[ INFO  ] Node(s): ['workr-138.netapp.com'] were defined as NSD node(s) but the toolkit has not been told about any NSDs served by these node(s) nor has the toolkit been told to create new NSDs on these node(s). The install will continue and these nodes will be assigned server licenses.  If NSDs are desired, either add them to the toolkit with <./spectrumscale nsd add> followed by a <./spectrumscale install> or add them manually afterwards using mmcrnsd.
+[ INFO  ] Install toolkit will not configure file audit logging as it has been disabled.
+[ INFO  ] Install toolkit will not configure watch folder as it has been disabled.
+[ INFO  ] Checking for knife bootstrap configuration...
+[ INFO  ] Performing GPFS checks.
+[ INFO  ] Running environment checks
+[ INFO  ] Skipping license validation as no existing GPFS cluster detected.
+[ INFO  ] Checking pre-requisites for portability layer.
+[ INFO  ] GPFS precheck OK
+[ INFO  ] Performing Performance Monitoring checks.
+[ INFO  ] Running environment checks for Performance Monitoring
+[ INFO  ] Performing GUI checks.
+[ INFO  ] Performing FILE AUDIT LOGGING checks.
+[ INFO  ] Running environment checks for file  Audit logging
+[ INFO  ] Network check from admin node workr-136.netapp.com to all other nodes in the cluster passed
+[ INFO  ] Network check from admin node mastr-51.netapp.com to all other nodes in the cluster passed
+[ INFO  ] Network check from admin node mastr-53.netapp.com to all other nodes in the cluster passed
+[ INFO  ] The install toolkit will not configure call home as it is disabled. To enable call home, use the following CLI command: ./spectrumscale callhome enable
+[ INFO  ] Pre-check successful for install.
+[ INFO  ] Tip : ./spectrumscale install
+[root@mastr-51 installer]#
+....
+
+. Configure the NSD disks.
+
+....
+[root@mastr-51 cluster-test]# cat disk.1st
+%nsd: device=/dev/sdf
+nsd=nsd1
+servers=workr-136
+usage=dataAndMetadata
+failureGroup=1
+
+%nsd: device=/dev/sdf
+nsd=nsd2
+servers=workr-138
+usage=dataAndMetadata
+failureGroup=1
+....
+
+. Create the NSD disks.
+
+....
+[root@mastr-51 cluster-test]# mmcrnsd -F disk.1st -v no
+mmcrnsd: Processing disk sdf
+mmcrnsd: Processing disk sdf
+mmcrnsd: Propagating the cluster configuration data to all
+  affected nodes.  This is an asynchronous process.
+[root@mastr-51 cluster-test]#
+....
+
+. Check the NSD disk status.
+
+....
+[root@mastr-51 cluster-test]# mmlsnsd
+
+ File system   Disk name    NSD servers
+---------------------------------------------------------------------------
+ (free disk)   nsd1         workr-136.netapp.com
+ (free disk)   nsd2         workr-138.netapp.com
+
+[root@mastr-51 cluster-test]#
+....
+
+. Create the GPFS.
+
+....
+[root@mastr-51 cluster-test]# mmcrfs gpfs1 -F disk.1st -B 1M -T /gpfs1
+
+The following disks of gpfs1 will be formatted on node workr-136.netapp.com:
+    nsd1: size 3814912 MB
+    nsd2: size 3814912 MB
+Formatting file system ...
+Disks up to size 33.12 TB can be added to storage pool system.
+Creating Inode File
+Creating Allocation Maps
+Creating Log Files
+Clearing Inode Allocation Map
+Clearing Block Allocation Map
+Formatting Allocation Map for storage pool system
+Completed creation of file system /dev/gpfs1.
+mmcrfs: Propagating the cluster configuration data to all
+  affected nodes.  This is an asynchronous process.
+[root@mastr-51 cluster-test]#
+....
+
+. Mount the GPFS.
+
+....
+[root@mastr-51 cluster-test]# mmmount all -a
+Tue Oct  8 18:05:34 UTC 2019: mmmount: Mounting file systems ...
+[root@mastr-51 cluster-test]#
+....
+
+. Check and provide the required permissions to the GPFS.
+
+....
+[root@mastr-51 cluster-test]# mmlsdisk gpfs1
+disk         driver   sector     failure holds    holds                            storage
+name         type       size       group metadata data  status        availability pool
+------------ -------- ------ ----------- -------- ----- ------------- ------------ ------------
+nsd1         nsd         512           1 Yes      Yes   ready         up           system
+nsd2         nsd         512           1 Yes      Yes   ready         up           system
+[root@mastr-51 cluster-test]#
+
+[root@mastr-51 cluster-test]# for i in 51 53 136 138  ; do ssh 10.63.150.$i "hostname; chmod 777 /gpfs1" ; done;
+mastr-51.netapp.com
+mastr-53.netapp.com
+workr-136.netapp.com
+workr-138.netapp.com
+[root@mastr-51 cluster-test]#
+....
+
+. Check the GPFS read and write by running the `dd` command.
+
+....
+[root@mastr-51 cluster-test]# dd if=/dev/zero of=/gpfs1/testfile bs=1024M count=5
+5+0 records in
+5+0 records out
+5368709120 bytes (5.4 GB) copied, 8.3981 s, 639 MB/s
+[root@mastr-51 cluster-test]# for i in 51 53 136 138  ; do ssh 10.63.150.$i "hostname; ls -ltrh /gpfs1" ; done;
+mastr-51.netapp.com
+total 5.0G
+-rw-r--r-- 1 root root 5.0G Oct  8 18:10 testfile
+mastr-53.netapp.com
+total 5.0G
+-rw-r--r-- 1 root root 5.0G Oct  8 18:10 testfile
+workr-136.netapp.com
+total 5.0G
+-rw-r--r-- 1 root root 5.0G Oct  8 18:10 testfile
+workr-138.netapp.com
+total 5.0G
+-rw-r--r-- 1 root root 5.0G Oct  8 18:10 testfile
+[root@mastr-51 cluster-test]#
+....
+
+== Export GPFS into NFS
+
+To export GPFS into NFS, complete the following steps:
+
+. Export the GPFS as NFS through the `/etc/exports` file.
+
+....
+[root@mastr-51 gpfs1]# cat /etc/exports
+/gpfs1        *(rw,fsid=745)
+[root@mastr-51 gpfs1]
+....
+
+. Install the required NFS server packages.
+
+....
+[root@mastr-51 ~]# yum install rpcbind
+Loaded plugins: priorities, product-id, search-disabled-repos, subscription-manager
+Resolving Dependencies
+--> Running transaction check
+---> Package rpcbind.x86_64 0:0.2.0-47.el7 will be updated
+---> Package rpcbind.x86_64 0:0.2.0-48.el7 will be an update
+--> Finished Dependency Resolution
+
+Dependencies Resolved
+
+==============================================================================================================================================================================================================================================
+ Package                                               Arch                                                 Version                                                    Repository                                                        Size
+==============================================================================================================================================================================================================================================
+Updating:
+ rpcbind                                               x86_64                                               0.2.0-48.el7                                               rhel-7-server-rpms                                                60 k
+
+Transaction Summary
+==============================================================================================================================================================================================================================================
+Upgrade  1 Package
+
+Total download size: 60 k
+Is this ok [y/d/N]: y
+Downloading packages:
+No Presto metadata available for rhel-7-server-rpms
+rpcbind-0.2.0-48.el7.x86_64.rpm                                                                                                                                                                                        |  60 kB  00:00:00
+Running transaction check
+Running transaction test
+Transaction test succeeded
+Running transaction
+  Updating   : rpcbind-0.2.0-48.el7.x86_64                                                                                                                                                                                                1/2
+  Cleanup    : rpcbind-0.2.0-47.el7.x86_64                                                                                                                                                                                                2/2
+  Verifying  : rpcbind-0.2.0-48.el7.x86_64                                                                                                                                                                                                1/2
+  Verifying  : rpcbind-0.2.0-47.el7.x86_64                                                                                                                                                                                                2/2
+
+Updated:
+  rpcbind.x86_64 0:0.2.0-48.el7
+
+Complete!
+[root@mastr-51 ~]#
+....
+
+. Start the NFS service.
+
+....
+[root@mastr-51 ~]# service nfs status
+Redirecting to /bin/systemctl status nfs.service
+● nfs-server.service - NFS server and services
+   Loaded: loaded (/usr/lib/systemd/system/nfs-server.service; disabled; vendor preset: disabled)
+  Drop-In: /run/systemd/generator/nfs-server.service.d
+           └─order-with-mounts.conf
+   Active: inactive (dead)
+[root@mastr-51 ~]# service rpcbind start
+Redirecting to /bin/systemctl start rpcbind.service
+[root@mastr-51 ~]# service nfs start
+Redirecting to /bin/systemctl start nfs.service
+[root@mastr-51 ~]# service nfs status
+Redirecting to /bin/systemctl status nfs.service
+● nfs-server.service - NFS server and services
+   Loaded: loaded (/usr/lib/systemd/system/nfs-server.service; disabled; vendor preset: disabled)
+  Drop-In: /run/systemd/generator/nfs-server.service.d
+           └─order-with-mounts.conf
+   Active: active (exited) since Wed 2019-11-06 16:34:50 UTC; 2s ago
+  Process: 24402 ExecStartPost=/bin/sh -c if systemctl -q is-active gssproxy; then systemctl reload gssproxy ; fi (code=exited, status=0/SUCCESS)
+  Process: 24383 ExecStart=/usr/sbin/rpc.nfsd $RPCNFSDARGS (code=exited, status=0/SUCCESS)
+  Process: 24379 ExecStartPre=/usr/sbin/exportfs -r (code=exited, status=0/SUCCESS)
+ Main PID: 24383 (code=exited, status=0/SUCCESS)
+   CGroup: /system.slice/nfs-server.service
+
+Nov 06 16:34:50 mastr-51.netapp.com systemd[1]: Starting NFS server and services...
+Nov 06 16:34:50 mastr-51.netapp.com systemd[1]: Started NFS server and services.
+[root@mastr-51 ~]#
+....
+
+. List the files in GPFS to validate the NFS client.
+
+....
+[root@mastr-51 gpfs1]# df -Th
+Filesystem                                 Type      Size  Used Avail Use% Mounted on
+/dev/mapper/rhel_stlrx300s6--22--irmc-root xfs        94G   55G   39G  59% /
+devtmpfs                                   devtmpfs   32G     0   32G   0% /dev
+tmpfs                                      tmpfs      32G     0   32G   0% /dev/shm
+tmpfs                                      tmpfs      32G  3.3G   29G  11% /run
+tmpfs                                      tmpfs      32G     0   32G   0% /sys/fs/cgroup
+/dev/sda7                                  xfs       9.4G  210M  9.1G   3% /boot
+tmpfs                                      tmpfs     6.3G     0  6.3G   0% /run/user/10065
+tmpfs                                      tmpfs     6.3G     0  6.3G   0% /run/user/10068
+tmpfs                                      tmpfs     6.3G     0  6.3G   0% /run/user/10069
+10.63.150.213:/nc_volume3                  nfs4      380G  8.0M  380G   1% /mnt
+tmpfs                                      tmpfs     6.3G     0  6.3G   0% /run/user/0
+gpfs1                                      gpfs      7.3T  9.1G  7.3T   1% /gpfs1
+[root@mastr-51 gpfs1]#
+[root@mastr-51 ~]# cd /gpfs1
+[root@mastr-51 gpfs1]# ls
+catalog  ces  gpfs-ces  ha  testfile
+[root@mastr-51 gpfs1]#
+[root@mastr-51 ~]# cd /gpfs1
+[root@mastr-51 gpfs1]# ls
+ces  gpfs-ces  ha  testfile
+[root@mastr-51 gpfs1]# ls -ltrha
+total 5.1G
+dr-xr-xr-x   2 root root 8.0K Jan  1  1970 .snapshots
+-rw-r--r--   1 root root 5.0G Oct  8 18:10 testfile
+dr-xr-xr-x. 30 root root 4.0K Oct  8 18:19 ..
+drwxr-xr-x   2 root root 4.0K Nov  5 20:02 gpfs-ces
+drwxr-xr-x   2 root root 4.0K Nov  5 20:04 ha
+drwxrwxrwx   5 root root 256K Nov  5 20:04 .
+drwxr-xr-x   4 root root 4.0K Nov  5 20:35 ces
+[root@mastr-51 gpfs1]#
+....
+
+== Configure the NFS client
+
+To configure the NFS client, complete the following steps:
+
+. Install packages in the NFS client.
+
+....
+[root@hdp2 ~]# yum install nfs-utils rpcbind
+Loaded plugins: product-id, search-disabled-repos, subscription-manager
+HDP-2.6-GPL-repo-4                                                                             | 2.9 kB  00:00:00
+HDP-2.6-repo-4                                                                                 | 2.9 kB  00:00:00
+HDP-3.0-GPL-repo-2                                                                             | 2.9 kB  00:00:00
+HDP-3.0-repo-2                                                                                 | 2.9 kB  00:00:00
+HDP-3.0-repo-3                                                                                 | 2.9 kB  00:00:00
+HDP-3.1-repo-1                                                                                 | 2.9 kB  00:00:00
+HDP-3.1-repo-51                                                                                | 2.9 kB  00:00:00
+HDP-UTILS-1.1.0.22-repo-1                                                                      | 2.9 kB  00:00:00
+HDP-UTILS-1.1.0.22-repo-2                                                                      | 2.9 kB  00:00:00
+HDP-UTILS-1.1.0.22-repo-3                                                                      | 2.9 kB  00:00:00
+HDP-UTILS-1.1.0.22-repo-4                                                                      | 2.9 kB  00:00:00
+HDP-UTILS-1.1.0.22-repo-51                                                                     | 2.9 kB  00:00:00
+ambari-2.7.3.0                                                                                 | 2.9 kB  00:00:00
+epel/x86_64/metalink                                                                           |  13 kB  00:00:00
+epel                                                                                           | 5.3 kB  00:00:00
+mysql-connectors-community                                                                     | 2.5 kB  00:00:00
+mysql-tools-community                                                                          | 2.5 kB  00:00:00
+mysql56-community                                                                              | 2.5 kB  00:00:00
+rhel-7-server-optional-rpms                                                                    | 3.2 kB  00:00:00
+rhel-7-server-rpms                                                                             | 3.5 kB  00:00:00
+(1/10): mysql-connectors-community/x86_64/primary_db                                           |  49 kB  00:00:00
+(2/10): mysql-tools-community/x86_64/primary_db                                                |  66 kB  00:00:00
+(3/10): epel/x86_64/group_gz                                                                   |  90 kB  00:00:00
+(4/10): mysql56-community/x86_64/primary_db                                                    | 241 kB  00:00:00
+(5/10): rhel-7-server-optional-rpms/7Server/x86_64/updateinfo                                  | 2.5 MB  00:00:00
+(6/10): rhel-7-server-rpms/7Server/x86_64/updateinfo                                           | 3.4 MB  00:00:00
+(7/10): rhel-7-server-optional-rpms/7Server/x86_64/primary_db                                  | 8.3 MB  00:00:00
+(8/10): rhel-7-server-rpms/7Server/x86_64/primary_db                                           |  62 MB  00:00:01
+(9/10): epel/x86_64/primary_db                                                                 | 6.9 MB  00:00:08
+(10/10): epel/x86_64/updateinfo                                                                | 1.0 MB  00:00:13
+Resolving Dependencies
+--> Running transaction check
+---> Package nfs-utils.x86_64 1:1.3.0-0.61.el7 will be updated
+---> Package nfs-utils.x86_64 1:1.3.0-0.65.el7 will be an update
+---> Package rpcbind.x86_64 0:0.2.0-47.el7 will be updated
+---> Package rpcbind.x86_64 0:0.2.0-48.el7 will be an update
+--> Finished Dependency Resolution
+
+Dependencies Resolved
+
+======================================================================================================================
+ Package                 Arch                 Version                          Repository                        Size
+======================================================================================================================
+Updating:
+ nfs-utils               x86_64               1:1.3.0-0.65.el7                 rhel-7-server-rpms               412 k
+ rpcbind                 x86_64               0.2.0-48.el7                     rhel-7-server-rpms                60 k
+
+Transaction Summary
+======================================================================================================================
+Upgrade  2 Packages
+
+Total download size: 472 k
+Is this ok [y/d/N]: y
+Downloading packages:
+No Presto metadata available for rhel-7-server-rpms
+(1/2): rpcbind-0.2.0-48.el7.x86_64.rpm                                                         |  60 kB  00:00:00
+(2/2): nfs-utils-1.3.0-0.65.el7.x86_64.rpm                                                     | 412 kB  00:00:00
+----------------------------------------------------------------------------------------------------------------------
+Total                                                                                 1.2 MB/s | 472 kB  00:00:00
+Running transaction check
+Running transaction test
+Transaction test succeeded
+Running transaction
+  Updating   : rpcbind-0.2.0-48.el7.x86_64                                                                        1/4
+service rpcbind start
+
+  Updating   : 1:nfs-utils-1.3.0-0.65.el7.x86_64                                                                  2/4
+  Cleanup    : 1:nfs-utils-1.3.0-0.61.el7.x86_64                                                                  3/4
+  Cleanup    : rpcbind-0.2.0-47.el7.x86_64                                                                        4/4
+  Verifying  : 1:nfs-utils-1.3.0-0.65.el7.x86_64                                                                  1/4
+  Verifying  : rpcbind-0.2.0-48.el7.x86_64                                                                        2/4
+  Verifying  : rpcbind-0.2.0-47.el7.x86_64                                                                        3/4
+  Verifying  : 1:nfs-utils-1.3.0-0.61.el7.x86_64                                                                  4/4
+
+Updated:
+  nfs-utils.x86_64 1:1.3.0-0.65.el7                           rpcbind.x86_64 0:0.2.0-48.el7
+
+Complete!
+[root@hdp2 ~]#
+....
+
+. Start the NFS client services.
+
+....
+[root@hdp2 ~]# service rpcbind start
+Redirecting to /bin/systemctl start rpcbind.service
+ [root@hdp2 ~]#
+....
+
+. Mount the GPFS through the NFS protocol on the NFS client.
+
+....
+[root@hdp2 ~]# mkdir /gpfstest
+[root@hdp2 ~]# mount 10.63.150.51:/gpfs1 /gpfstest
+[root@hdp2 ~]# df -h
+Filesystem                            Size  Used Avail Use% Mounted on
+/dev/mapper/rhel_stlrx300s6--22-root  1.1T  113G  981G  11% /
+devtmpfs                              126G     0  126G   0% /dev
+tmpfs                                 126G   16K  126G   1% /dev/shm
+tmpfs                                 126G  510M  126G   1% /run
+tmpfs                                 126G     0  126G   0% /sys/fs/cgroup
+/dev/sdd2                             197M  191M  6.6M  97% /boot
+tmpfs                                  26G     0   26G   0% /run/user/0
+10.63.150.213:/nc_volume2              95G  5.4G   90G   6% /mnt
+10.63.150.51:/gpfs1                   7.3T  9.1G  7.3T   1% /gpfstest
+[root@hdp2 ~]#
+....
+
+. Validate the list of GPFS files in the NFS-mounted folder.
+
+....
+[root@hdp2 ~]# cd /gpfstest/
+[root@hdp2 gpfstest]# ls
+ces  gpfs-ces  ha  testfile
+[root@hdp2 gpfstest]# ls -l
+total 5242882
+drwxr-xr-x 4 root root       4096 Nov  5 15:35 ces
+drwxr-xr-x 2 root root       4096 Nov  5 15:02 gpfs-ces
+drwxr-xr-x 2 root root       4096 Nov  5 15:04 ha
+-rw-r--r-- 1 root root 5368709120 Oct  8 14:10 testfile
+[root@hdp2 gpfstest]#
+....
+
+. Move the data from the GPFS- exported NFS to the NetApp NFS by using XCP.
+
+....
+[root@hdp2 linux]# ./xcp copy -parallel 20 10.63.150.51:/gpfs1 10.63.150.213:/nc_volume2/
+XCP 1.4-17914d6; (c) 2019 NetApp, Inc.; Licensed to Karthikeyan Nagalingam [NetApp Inc] until Tue Nov  5 12:39:36 2019
+
+xcp: WARNING: your license will expire in less than one week! You can renew your license at https://xcp.netapp.com
+xcp: open or create catalog 'xcp': Creating new catalog in '10.63.150.51:/gpfs1/catalog'
+xcp: WARNING: No index name has been specified, creating one with name: autoname_copy_2019-11-11_12.14.07.805223
+xcp: mount '10.63.150.51:/gpfs1': WARNING: This NFS server only supports 1-second timestamp granularity. This may cause sync to fail because changes will often be undetectable.
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 301 MiB in (59.5 MiB/s), 784 KiB out (155 KiB/s), 6s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 725 MiB in (84.6 MiB/s), 1.77 MiB out (206 KiB/s), 11s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 1.17 GiB in (94.2 MiB/s), 2.90 MiB out (229 KiB/s), 16s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 1.56 GiB in (79.8 MiB/s), 3.85 MiB out (194 KiB/s), 21s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 1.95 GiB in (78.4 MiB/s), 4.80 MiB out (191 KiB/s), 26s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 2.35 GiB in (80.4 MiB/s), 5.77 MiB out (196 KiB/s), 31s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 2.79 GiB in (89.6 MiB/s), 6.84 MiB out (218 KiB/s), 36s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 3.16 GiB in (75.3 MiB/s), 7.73 MiB out (183 KiB/s), 41s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 3.53 GiB in (75.4 MiB/s), 8.64 MiB out (183 KiB/s), 46s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 4.00 GiB in (94.4 MiB/s), 9.77 MiB out (230 KiB/s), 51s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 4.46 GiB in (94.3 MiB/s), 10.9 MiB out (229 KiB/s), 56s
+ 34 scanned, 32 copied, 32 indexed, 1 giant, 4.86 GiB in (80.2 MiB/s), 11.9 MiB out (195 KiB/s), 1m1s
+Sending statistics...
+34 scanned, 33 copied, 34 indexed, 1 giant, 5.01 GiB in (81.8 MiB/s), 12.3 MiB out (201 KiB/s), 1m2s.
+[root@hdp2 linux]#
+....
+
+. Validate the GPFS files on the NFS client.
+
+....
+[root@hdp2 mnt]# df -Th
+Filesystem                           Type      Size  Used Avail Use% Mounted on
+/dev/mapper/rhel_stlrx300s6--22-root xfs       1.1T  113G  981G  11% /
+devtmpfs                             devtmpfs  126G     0  126G   0% /dev
+tmpfs                                tmpfs     126G   16K  126G   1% /dev/shm
+tmpfs                                tmpfs     126G  518M  126G   1% /run
+tmpfs                                tmpfs     126G     0  126G   0% /sys/fs/cgroup
+/dev/sdd2                            xfs       197M  191M  6.6M  97% /boot
+tmpfs                                tmpfs      26G     0   26G   0% /run/user/0
+10.63.150.213:/nc_volume2            nfs4       95G  5.4G   90G   6% /mnt
+10.63.150.51:/gpfs1                  nfs4      7.3T  9.1G  7.3T   1% /gpfstest
+[root@hdp2 mnt]#
+[root@hdp2 mnt]# ls -ltrha
+total 128K
+dr-xr-xr-x   2 root        root                4.0K Dec 31  1969 .snapshots
+drwxrwxrwx   2 root        root                4.0K Feb 14  2018 data
+drwxrwxrwx   3 root        root                4.0K Feb 14  2018 wcresult
+drwxrwxrwx   3 root        root                4.0K Feb 14  2018 wcresult1
+drwxrwxrwx   2 root        root                4.0K Feb 14  2018 wcresult2
+drwxrwxrwx   2 root        root                4.0K Feb 16  2018 wcresult3
+-rw-r--r--   1 root        root                2.8K Feb 20  2018 READMEdemo
+drwxrwxrwx   3 root        root                4.0K Jun 28 13:38 scantg
+drwxrwxrwx   3 root        root                4.0K Jun 28 13:39 scancopyFromLocal
+-rw-r--r--   1 hdfs        hadoop              1.2K Jul  3 19:28 f3
+-rw-r--r--   1 hdfs        hadoop              1.2K Jul  3 19:28 README
+-rw-r--r--   1 hdfs        hadoop              1.2K Jul  3 19:28 f9
+-rw-r--r--   1 hdfs        hadoop              1.2K Jul  3 19:28 f6
+-rw-r--r--   1 hdfs        hadoop              1.2K Jul  3 19:28 f5
+-rw-r--r--   1 hdfs        hadoop              1.2K Jul  3 19:30 f4
+-rw-r--r--   1 hdfs        hadoop              1.2K Jul  3 19:30 f8
+-rw-r--r--   1 hdfs        hadoop              1.2K Jul  3 19:30 f2
+-rw-r--r--   1 hdfs        hadoop              1.2K Jul  3 19:30 f7
+drwxrwxrwx   2 root        root                4.0K Jul  9 11:14 test
+drwxrwxrwx   3 root        root                4.0K Jul 10 16:35 warehouse
+drwxr-xr-x   3       10061 tester1             4.0K Jul 15 14:40 sdd1
+drwxrwxrwx   3 testeruser1 hadoopkerberosgroup 4.0K Aug 20 17:00 kermkdir
+-rw-r--r--   1 testeruser1 hadoopkerberosgroup    0 Aug 21 14:20 newfile
+drwxrwxrwx   2 testeruser1 hadoopkerberosgroup 4.0K Aug 22 10:13 teragen1copy_3
+drwxrwxrwx   2 testeruser1 hadoopkerberosgroup 4.0K Aug 22 10:33 teragen2copy_1
+-rw-rwxr--   1 root        hdfs                1.2K Sep 19 16:38 R1
+drwx------   3 root        root                4.0K Sep 20 17:28 user
+-rw-r--r--   1 root        root                5.0G Oct  8 14:10 testfile
+drwxr-xr-x   2 root        root                4.0K Nov  5 15:02 gpfs-ces
+drwxr-xr-x   2 root        root                4.0K Nov  5 15:04 ha
+drwxr-xr-x   4 root        root                4.0K Nov  5 15:35 ces
+dr-xr-xr-x. 26 root        root                4.0K Nov  6 11:40 ..
+drwxrwxrwx  21 root        root                4.0K Nov 11 12:14 .
+drwxrwxrwx   7 nobody      nobody              4.0K Nov 11 12:14 catalog
+[root@hdp2 mnt]#
+....
+
+link:bda-ai-mapr-fs-to-ontap-nfs.html[Next: MapR-FS to ONTAP NFS.]
