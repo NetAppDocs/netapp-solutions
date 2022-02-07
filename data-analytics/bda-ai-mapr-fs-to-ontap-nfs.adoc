@@ -29,7 +29,7 @@ This section provides the detailed steps needed to move MapR-FS data into ONTAP 
 . Keep customer data in MapR-FS. For example, we generated approximately a terabyte of sample data in MapR-FS by using Teragen.
 . Configure MapR-FS as NFS export.
 .. Disable the nlockmgr service on all MapR nodes.
-
++
 ....
 root@workr-138: ~$ rpcinfo -p
    program vers proto   port  service
@@ -59,7 +59,7 @@ root@workr-138: ~$ rpcinfo -d 100021 4
 ....
 
 .. Export specific folders from MapR-FS on all MapR nodes in the `/opt/mapr/conf/exports` file. Do not export the parent folder with different permissions when you export sub folders.
-
++
 ....
 [mapr@workr-138 ~]$ cat /opt/mapr/conf/exports
 # Sample Exports file
@@ -95,7 +95,7 @@ root@workr-138: ~$ rpcinfo -d 100021 4
 ....
 
 . Refresh the MapR-FS NFS service.
-
++
 ....
 root@workr-138: tmp$ maprcli nfsmgmt refreshexports
 ERROR (22) -  You do not have a ticket to communicate with 127.0.0.1:9998. Retry after obtaining a new ticket using maprlogin
@@ -107,18 +107,18 @@ MapR credentials of user 'mapr' for cluster 'my.cluster.com' are written to '/tm
 ....
 
 . Assign a virtual IP range to a specific server or a set of servers in the MapR cluster. Then the MapR cluster assigns an IP to a specific server for NFS data access. The IPs enable high availability, which means that, if a server or network with a particular IP experiences failure, the next IP from the range of IPs can be used for NFS access.
-
++
 [NOTE]
 If you would like to provide NFS access from all MapR nodes, then you can assign a set of virtual IPs to each server, and you can use the resources from each MapR node for NFS data access.
-
++
 image:bda-ai-image7.png[Error: Missing Graphic Image]
-
++
 image:bda-ai-image8.png[Error: Missing Graphic Image]
-
++
 image:bda-ai-image9.png[Error: Missing Graphic Image]
 
 . Check the virtual IPs assigned on each MapR node and use them for NFS data access.
-
++
 ....
 root@workr-138: ~$ ip a
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
@@ -169,7 +169,7 @@ root@workr-138: ~$ ip a
 ....
 
 . Mount the NFS- exported MapR-FS using the assigned virtual IP for checking the NFS operation. However, this step is not required for data transfer using NetApp XCP.
-
++
 ....
 root@workr-138: tmp$ mount -v -t nfs 10.63.150.92:/maprnfs3 /tmp/testmount/
 mount.nfs: timeout set for Thu Dec  5 15:31:32 2019
@@ -204,7 +204,7 @@ root@workr-138: tmp$
 
 . Configure NetApp XCP to transfer data from the MapR-FS NFS gateway to ONTAP NFS.
 .. Configure the catalog location for XCP.
-
++
 ....
 [root@hdp2 linux]# cat /opt/NetApp/xFiles/xcp/xcp.ini
 # Sample xcp config
@@ -214,7 +214,7 @@ catalog =  10.63.150.213:/nc_volume1
 ....
 
 .. Copy the license file to `/opt/NetApp/xFiles/xcp/`.
-
++
 ....
 root@workr-138: src$ cd /opt/NetApp/xFiles/xcp/
 root@workr-138: xcp$ ls -ltrha
@@ -230,7 +230,7 @@ root@workr-138: xcp$
 
 .. Activate XCP using the `xcp activate` command.
 .. Check the source for NFS export.
-
++
 ....
 [root@hdp2 linux]# ./xcp show 10.63.150.92
 XCP 1.4-17914d6; (c) 2019 NetApp, Inc.; Licensed to Karthikeyan Nagalingam [NetApp Inc] until Wed Feb  5 11:07:27 2020
@@ -253,7 +253,7 @@ drwxr-xr-x --- root root 2 2 10m51s 10.63.150.92:/maprnfs3
 ....
 
 .. Transfer the data using XCP from multiple MapR nodes from multiple source IPs and multiple destination IPs (ONTAP LIFs).
-
++
 ....
 root@workr-138: linux$ ./xcp_yatin copy --parallel 20 10.63.150.96,10.63.150.97:/maprnfs3/tg4 10.63.150.85,10.63.150.86:/datapipeline_dataset/tg4_dest
 XCP 1.6-dev; (c) 2019 NetApp, Inc.; Licensed to Karthikeyan Nagalingam [NetApp Inc] until Wed Feb  5 11:07:27 2020
@@ -289,7 +289,7 @@ xcp: mount '10.63.150.92:/maprnfs3/tg4_2': WARNING: This NFS server only support
 ....
 
 .. Check the load distribution on the storage controller.
-
++
 ....
 Hadoop-AFF8080::*> statistics show-periodic -interval 2 -iterations 0 -summary true -object nic_common -counter rx_bytes|tx_bytes -node Hadoop-AFF8080-01 -instance e3b
 Hadoop-AFF8080: nic_common.e3b: 12/6/2019 15:55:04
