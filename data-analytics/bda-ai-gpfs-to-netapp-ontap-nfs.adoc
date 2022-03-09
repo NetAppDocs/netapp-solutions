@@ -1,0 +1,81 @@
+---
+sidebar: sidebar
+permalink: data-analytics/bda-ai-gpfs-to-netapp-ontap-nfs.html
+keywords: GPFS, nfs, nsd, admin node, quorum node, manager node, nsd server, protocol node
+summary: In this validation, we used four servers as Network Shared Disk (NSD) servers to provide physical disks for GPFS. GPFS is created on top of the NSD disks to export them as NFS exports so that NFS clients can access them, as shown in the figure below. We used XCP to copy the data from GPFS- exported NFS to a NetApp NFS volume.
+---
+
+= GPFS to NetApp ONTAP NFS
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-02-03 19:40:46.792743
+//
+
+link:bda-ai-data-mover-solution-for-ai.html[Previous: Data mover solution for AI.]
+
+In this validation, we used four servers as Network Shared Disk (NSD) servers to provide physical disks for GPFS. GPFS is created on top of the NSD disks to export them as NFS exports so that NFS clients can access them, as shown in the figure below. We used XCP to copy the data from GPFS- exported NFS to a NetApp NFS volume.
+
+image:bda-ai-image5.png[Error: Missing Graphic Image]
+
+== GPFS essentials
+
+The following node types are used in GPFS:
+
+* *Admin node.* Specifies an optional field containing a node name used by the administration commands to communicate between nodes. For example, the admin node `mastr-51.netapp.com` could pass a network check to all other nodes in the cluster.
+* *Quorum node.* Determines whether a node is included in the pool of nodes from which quorum is derived. You need at least one node as a quorum node.
+* *Manager Node.* Indicates whether a node is part of the node pool from which file system managers and token managers can be selected. It is a good idea to define more than one node as a manager node. How many nodes you designate as manager depends on the workload and the number of GPFS server licenses you have. If you are running large parallel jobs, you might need more manager nodes than in a four-node cluster supporting a web application.
+* *NSD Server.* The server that prepares each physical disk for use with GPFS.
+* *Protocol node.* The node that shares GPFS data directly through any Secure Shell (SSH) protocol with the NFS. This node requires a GPFS server license.
+
+== List of operations for GPFS, NFS, and XCP
+
+This section provides the list of operations that create GPFS, export GPFS as an NFS export, and transfer the data by using XCP.
+
+=== Create GPFS
+
+To create GPFS, complete the following steps:
+
+. Download and install spectrum-scale data access for the Linux version on one of the servers.
+. Install the prerequisite package (chef for example) in all nodes and disable Security-Enhanced Linux (SELinux) in all nodes.
+. Set up the install node and add the admin node and the GPFS node to the cluster definition file.
+. Add the manager node, the quorum node, the NSD servers, and the GPFS node.
+. Add the GUI, admin, and GPFS nodes, and add an additional GUI server if required.
+. Add another GPFS node and check the list of all nodes.
+. Specify a cluster name, profile, remote shell binary, remote file copy binary, and port range to be set on all the GPFS nodes in the cluster definition file.
+. View the GPFS configuration settings and add an additional admin node.
+. Disable the data collection and upload the data package to the IBM Support Center.
+. Enable NTP and precheck the configurations before install.
+. Configure, create, and check the NSD disks.
+. Create the GPFS.
+. Mount the GPFS.
+. Verify and provide the required permissions to the GPFS.
+. Verify the GPFS read and write by running the `dd` command.
+
+=== Export GPFS into NFS
+
+To export the GPFS into NFS, complete the following steps:
+
+. Export GPFS as NFS through the `/etc/exports` file.
+. Install the required NFS server packages.
+. Start the NFS service.
+. List the files in the GPFS to validate the NFS client.
+
+=== Configure NFS client
+
+To configure the NFS client, complete the following steps:
+
+. Export the GPFS as NFS through the `/etc/exports` file.
+. Start the NFS client services.
+. Mount the GPFS through the NFS protocol on the NFS client.
+. Validate the list of GPFS files in the NFS mounted folder.
+. Move the data from GPFS exported NFS to NetApp NFS by using XCP.
+. Validate the GPFS files on the NFS client.
+
+link:bda-ai-hdfs-and-mapr-fs-to-ontap-nfs.html[Next: HDFS and MapR-FS to ONTAP NFS.]
