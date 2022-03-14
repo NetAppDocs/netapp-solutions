@@ -1,0 +1,85 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-n_openshift_BM.html
+keywords: OpenShift, bare metal, IPI
+summary:
+---
+
+= OpenShift on Bare Metal
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 0.9 (June 4, 2020)
+//
+// 2020-06-25 14:31:33.555482
+//
+
+OpenShift on Bare Metal provides an automated deployment of the OpenShift Container Platform on commodity servers.
+
+OpenShift on Bare Metal is similar to virtual deployments of OpenShift, which provide ease of deployment, rapid provisioning, and scaling of OpenShift clusters, while supporting virtualized workloads for applications that are not ready to be containerized. By deploying on bare metal, you do not require the extra overhead necessary to manage the host hypervisor environment in addition to the OpenShift environment. By deploying directly on bare metal servers, you can also reduce the physical overhead limitations of having to share resources between the host and OpenShift environment.
+
+== OpenShift on Bare Metal provides the following features:
+
+* *IPI or assisted installer deployment.* With an OpenShift cluster deployed by Installer Provisioned Infrastructure (IPI) on bare metal servers, customers can deploy a highly versatile, easily scalable OpenShift environment directly on commodity servers, without the need to manage a hypervisor layer.
+
+* *Compact cluster design.* To minimize the hardware requirements, OpenShift on bare metal allows for users to deploy clusters of just 3 nodes, by enabling the OpenShift control plane nodes to also act as worker nodes and host containers.
+
+* *OpenShift virtualization.* OpenShift can run virtual machines within containers by using OpenShift Virtualization. This container-native virtualization runs the KVM hypervisor inside of a container, and attaches persistent volumes for VM storage.
+
+* *AI/ML-optimized infrastructure.* Deploy applications like Kubeflow for machine learning applications by incorporating GPU-based worker nodes to your OpenShift environment and leveraging OpenShift Advanced Scheduling.
+
+
+== Network design
+
+The Red Hat OpenShift on NetApp solution uses two data switches to provide primary data connectivity at 25Gbps. It also uses two management switches that provide connectivity at 1Gbps for in-band management for the storage nodes and out-of-band management for IPMI functionality.
+
+For OpenShift bare-metal IPI deployment, you must create a provisioner node, a Red Hat Enterprise Linux 8 machine that must have network interfaces attached to separate networks.
+
+* *Provisioning network.* This network is used to boot the bare-metal nodes and install the necessary images and packages to deploy the OpenShift cluster.
+
+* *Bare-metal network.* This network is used for public-facing communication of the cluster after it is deployed.
+
+For the setup of the provisioner node, the customer creates bridge interfaces that allow the traffic to route properly on the node itself and on the Bootstrap VM that is provisioned for deployment purposes. After the cluster is deployed, the API and ingress VIP addresses are migrated from the bootstrap node to the newly deployed cluster.
+
+The following images depict the environment both during IPI deployment and after the deployment is complete.
+
+image:redhat_openshift_image36.png[Error: Missing Graphic Image]
+
+image:redhat_openshift_image37.png[Error: Missing Graphic Image]
+
+=== VLAN requirements
+
+The Red Hat OpenShift with NetApp solution is designed to logically separate network traffic for different purposes by using virtual local area networks (VLANs).
+
+|===
+|VLANs |Purpose |VLAN ID
+|Out-of-band management network
+|Management for bare metal nodes and IPMI
+|16
+|Bare-metal network
+|Network for OpenShift services once cluster is available
+|181
+|Provisioning network
+|Network for PXE boot and installation of bare metal nodes via IPI
+|3485
+|===
+
+NOTE: Although each of these networks is virtually separated by VLANs, each physical port must be set up in Access Mode with the primary VLAN assigned, because there is no way to pass a VLAN tag during a PXE boot sequence.
+
+=== Network infrastructure support resources
+
+The following infrastructure should be in place prior to the deployment of the OpenShift container platform:
+
+* At least one DNS server that provides a full host-name resolution accessible from the in-band management network and the VM network.
+
+* At least one NTP server that is accessible from the in-band management network and the VM network.
+
+* (Optional) Outbound internet connectivity for both the in-band management network and the VM network.
+
+
+link:rh-os-n_overview_netapp.html[Next: NetApp storage overview.]

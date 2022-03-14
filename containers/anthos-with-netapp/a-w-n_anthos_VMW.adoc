@@ -1,0 +1,108 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-n_openshift_VMW.html
+keywords: OpenShift, VMware vSphere, ESXi
+summary: VMware vSphere is a virtualization platform for centrally managing a large number of virtualized servers and networks running on the ESXi hypervisor.
+---
+
+= OpenShift on VMware vSphere
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 0.9 (June 4, 2020)
+//
+// 2020-06-25 14:31:33.555482
+//
+
+VMware vSphere is a virtualization platform for centrally managing a large number of virtualized servers and networks running on the ESXi hypervisor.
+
+For more information about VMware vSphere, see the https://www.vmware.com/products/vsphere.html[VMware vSphere website^].
+
+VMware vSphere provides the following features:
+
+* *VMware vCenter Server.* VMware vCenter Server provides unified management of all hosts and VMs from a single console and aggregates performance monitoring of clusters, hosts, and VMs.
+
+* *VMware vSphere vMotion.* VMware vCenter allows you to hot migrate VMs between nodes in the cluster upon request in a nondisruptive manner.
+
+* *vSphere High Availability.* To avoid disruption in the event of host failures, VMware vSphere allows hosts to be clustered and configured for High Availability. VMs that are disrupted by host failure are rebooted shortly on other hosts in the cluster, restoring services.
+
+* *Distributed Resource Scheduler (DRS).* A VMware vSphere cluster can be configured to load balance the resource needs of the VMs it is hosting. VMs with resource contentions can be hot migrated to other nodes in the cluster to make sure that enough resources are available.
+
+
+image:redhat_openshift_image33.png[Error: Missing Graphic Image]
+
+
+== Network design
+
+The Red Hat OpenShift on NetApp solution uses two data switches to provide primary data connectivity at 25Gbps. It also uses two additional management switches that provide connectivity at 1Gbps for in-band management for the storage nodes and out-of-band management for IPMI functionality. OCP uses the VM logical network on VMware vSphere for its cluster management. This section describes the arrangement and purpose of each virtual network segment used in the solution and outlines the prerequisites for deployment of the solution.
+
+=== VLAN requirements
+
+Red Hat OpenShift on VMware vSphere is designed to logically separate network traffic for different purposes by using virtual local area networks (VLANs). This configuration can be scaled to meet customer demands or to provide further isolation for specific network services. The following table lists the VLANs that are required to implement the solution while validating the solution at NetApp.
+
+|===
+|VLANs |Purpose |VLAN ID
+
+|Out-of-band management network
+|Management for physical nodes and IPMI
+|16
+|VM Network
+|Virtual guest network access
+|181
+|Storage network
+|Storage network for ONTAP NFS
+|184
+|Storage network
+|Storage network for ONTAP iSCSI
+|185
+|In-band management network
+|Management for ESXi Nodes, VCenter Server, ONTAP Select
+|3480
+|Storage network
+|Storage network for NetApp Element iSCSI
+|3481
+|Migration network
+|Network for virtual guest migration
+|3482
+|===
+
+=== Network infrastructure support resources
+
+The following infrastructure should be in place prior to the deployment of the OpenShift Container Platform:
+
+* At least one DNS server providing full host-name resolution that is accessible from the in-band management network and the VM network.
+
+* At least one NTP server that is accessible from the in-band management network and the VM network.
+
+* (Optional) Outbound internet connectivity for both the in-band management network and the VM network.
+
+== Best practices for production deployments
+
+This section lists several best practices that an organization should take into consideration before deploying this solution into production.
+
+=== Deploy OpenShift to an ESXi cluster of at least three nodes
+
+The verified architecture described in this document presents the minimum hardware deployment suitable for HA operations by deploying two ESXi hypervisor nodes and ensuring a fault tolerant configuration by enabling VMware vSphere HA and VMware vMotion. This configuration allows deployed VMs to migrate between the two hypervisors and reboot should one host become unavailable.
+
+Because Red Hat OpenShift initially deploys with three master nodes, at least two masters in a two-node configuration can occupy the same node under some circumstances, which can lead to a possible outage for OpenShift if that specific node becomes unavailable. Therefore, it is a Red Hat best practice that at least three ESXi hypervisor nodes must be deployed so that the OpenShift masters can be distributed evenly, which provides an added degree of fault tolerance.
+
+=== Configure virtual machine and host affinity
+
+Ensuring the distribution of the OpenShift masters across multiple hypervisor nodes can be achieved by enabling VM and host affinity.
+
+Affinity or anti-affinity is a way to define rules for a set of VMs and/or hosts that determine whether the VMs run together on the same host or hosts in the group or on different hosts. It is applied to VMs by creating affinity groups that consist of VMs and/or hosts with a set of identical parameters and conditions. Depending on whether the VMs in an affinity group run on the same host or hosts in the group or separately on different hosts, the parameters of the affinity group can define either positive affinity or negative affinity.
+
+To configure affinity groups, see the https://docs.vmware.com/en/VMware-vSphere/6.7/com.vmware.vsphere.resmgmt.doc/GUID-FF28F29C-8B67-4EFF-A2EF-63B3537E6934.html[vSphere 6.7 Documentation: Using DRS Affinity Rules^].
+
+=== Use a custom install file for OpenShift deployment
+
+IPI makes the deployment of OpenShift clusters easy through the interactive wizard discussed earlier in this document. However, it is possible that you might need to change some default values as a part of a cluster deployment.
+
+In these instances, you can run and task the wizard without immediately deploying a cluster, but instead the wizard creates a configuration file from which the cluster can be deployed later. This is very useful if you need to changes any IPI defaults, or if you want to deploy multiple identical clusters in your environment for other uses such as multitenancy. For more information about creating a customized install configuration for OpenShift, see https://docs.openshift.com/container-platform/4.7/installing/installing_vsphere/installing-vsphere-installer-provisioned-customizations.html[Red Hat OpenShift Installing a Cluster on vSphere with Customizations^].
+
+link:rh-os-n_overview_netapp.html[Next: NetApp Storage Overview.]

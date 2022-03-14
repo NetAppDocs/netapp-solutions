@@ -1,0 +1,256 @@
+.	Log into the NetApp Support Site and download the latest version of NetApp Astra Control Center. To do so requires a license attached to your NetApp account. After you download the tarball, transfer it to the admin workstation.
++
+NOTE: To get started with a trial license for Astra Control, visit the https://cloud.netapp.com/astra-register[Astra registration site^].
+
+.	Unpack the tar ball and change the working directory to the resulting folder.
++
+----
+[netapp-user@rhel7 ~]$ tar -vxzf astra-control-center-21.08.65.tar.gz
+[netapp-user@rhel7 ~]$ cd astra-control-center-21.08.65
+----
+
+.	Before starting the installation, push the Astra Control Center images to an image registry.
++
+NOTE: You can choose to do this with either Docker or Podman; instructions for both are provided in this step.
+
+[role="tabbed-block"]
+====
+.podman
+---
+..	Export the registry FQDN with the organization/namespace/project name as a environment variable ‘registry’.
++
+----
+[netapp-user@rhel7 ~]$ export registry=astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra
+----
+
+..	Log into the registry.
++
+----
+[netapp-user@rhel7 ~]$ podman login -u ocp-user -p password --tls-verify=false astra-registry.apps.ocp-vmw.cie.netapp.com
+----
++
+NOTE: If you are using `kubeadmin` user to log into the private registry, then use token instead of password - `podman login -u ocp-user -p token --tls-verify=false astra-registry.apps.ocp-vmw.cie.netapp.com`.
+
++
+NOTE: Alternatively, you can create a service account, assign registry-editor and/or registry-viewer role (based on whether you require push/pull access) and log into the registry using service account's token.
+
+.. Create a shell script file and paste the following content in it.
++
+----
+[netapp-user@rhel7 ~]$ vi push-images-to-registry.sh
+
+for astraImageFile in $(ls images/*.tar); do
+   astraImage=$(podman load --input ${astraImageFile} | sed 's/Loaded image(s): //')
+   podman tag $astraImage $registry/$(echo $astraImage | sed 's/^[^\/]\+\///')
+   podman push $registry/$(echo $astraImage | sed 's/^[^\/]\+\///')
+done
+----
++
+NOTE: If you are using untrusted certificates for your registry, edit the shell script and use `--tls-verify=false` for the podman push command `podman push $registry/$(echo $astraImage | sed 's/^[^\/]\+\///') --tls-verify=false`.
+
+.. Make the file executable.
++
+----
+[netapp-user@rhel7 ~]$ chmod +x push-images-to-registry.sh
+----
+
+.. Execute the shell script.
++
+----
+[netapp-user@rhel7 ~]$ ./push-images-to-registry.sh
+----
+---
+.docker
+---
+.. Export the registry FQDN with the organization/namespace/project name as a environment variable ‘registry’.
++
+----
+[netapp-user@rhel7 ~]$ export registry=astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra
+----
+
+.. Log into the registry.
++
+----
+[netapp-user@rhel7 ~]$ docker login -u ocp-user -p password astra-registry.apps.ocp-vmw.cie.netapp.com
+----
++
+NOTE: If you are using `kubeadmin` user to log into the private registry, then use token instead of password - `docker login -u ocp-user -p token astra-registry.apps.ocp-vmw.cie.netapp.com`.
+
++
+NOTE: Alternatively, you can create a service account, assign registry-editor and/or registry-viewer role (based on whether you require push/pull access) and log into the registry using service account's token.
+
+..	Create a shell script file and paste the following content in it.
++
+----
+[netapp-user@rhel7 ~]$ vi push-images-to-registry.sh
+
+for astraImageFile in $(ls images/*.tar); do
+   astraImage=$(docker load --input ${astraImageFile} | sed 's/Loaded image: //')
+   docker tag $astraImage $registry/$(echo $astraImage | sed 's/^[^\/]\+\///')
+   docker push $registry/$(echo $astraImage | sed 's/^[^\/]\+\///')
+done
+----
+
+.. Make the file executable.
++
+----
+[netapp-user@rhel7 ~]$ chmod +x push-images-to-registry.sh
+----
+
+.. Execute the shell script.
++
+----
+[netapp-user@rhel7 ~]$ ./push-images-to-registry.sh
+----
+---
+====
+
+[start=4]
+.	Next, upload the image registry TLS certificates to the OpenShift nodes. To do so, create a configmap in the openshift-config namespace using the TLS certificates and patch it to the cluster image config to make the certificate trusted.
++
+----
+[netapp-user@rhel7 ~]$ oc create configmap default-ingress-ca -n openshift-config --from-file=astra-registry.apps.ocp-vmw.cie.netapp.com=tls.crt
+
+[netapp-user@rhel7 ~]$ oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"default-ingress-ca"}}}' --type=merge
+----
++
+NOTE: If you are using an OpenShift internal registry with default TLS certificates from the ingress operator with a route, you still need to follow the previous step to patch the certificates to the route hostname. To extract the certificates from ingress operator, you can use the command `oc extract secret/router-ca --keys=tls.crt -n openshift-ingress-operator`.
+
+
+.	Create a namespace `netapp-acc-operator` for installing the Astra Control Center Operator.
++
+----
+[netapp-user@rhel7 ~]$ oc create ns netapp-acc-operator
+----
+
+.	Create a secret with credentials to log into the image registry in `netapp-acc-operator` namespace.
++
+----
+[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-cred --docker-server=astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password -n netapp-acc-operator
+secret/astra-registry-cred created
+----
+
+.	Edit the Astra Control Center Operator CR `astra_control_center_operator_deploy.yaml`, which is a set of all resources Astra Control Center deploys. In the operator CR, find the deployment definition for `acc-operator-controller-manager` and enter the FQDN for your registry along with the organization name as it was given while pushing the images to registry (in this example, `astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra`) by replacing the text `ASTRA_IMAGE_REGISTRY` and provide the name of the secret we just created in `imagePullSecrets` section. Verify other details of the operator, save, and close.
++
+----
+[netapp-user@rhel7 ~]$ vim astra_control_center_operator_deploy.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: acc-operator-controller-manager
+  namespace: netapp-acc-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=10
+        image: ASTRA_IMAGE_REGISTRY/kube-rbac-proxy:v0.5.0
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+      - args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        command:
+        - /manager
+        env:
+        - name: ACCOP_LOG_LEVEL
+          value: "2"
+        image: astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra/acc-operator:21.08.7
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 300m
+            memory: 750Mi
+          requests:
+            cpu: 100m
+            memory: 75Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      imagePullSecrets: [name: astra-registry-cred]
+      securityContext:
+        runAsUser: 65532
+      terminationGracePeriodSeconds: 10
+----
+
+.	Create the operator by running the following command.
++
+----
+[netapp-user@rhel7 ~]$ oc create -f astra_control_center_operator_deploy.yaml
+----
+
+.	Create a dedicated namespace for installing all the Astra Control Center resources.
++
+----
+[netapp-user@rhel7 ~]$ oc create ns netapp-astra-cc
+namespace/netapp-astra-cc created
+----
+
+.	Create the secret for accessing the image registry in that namespace.
++
+----
+[netapp-user@rhel7 ~]$ oc create secret docker-registry astra-registry-cred --docker-server=astra-registry.apps.ocp-vmw.cie.netapp.com --docker-username=ocp-user --docker-password=password -n netapp-astra-cc
+
+secret/astra-registry-cred created
+----
+
+.	Edit the Astra Control Center CRD file `astra_control_center_min.yaml` and enter the FQDN, image registry details, administrator email address, and other details.
++
+----
+[netapp-user@rhel7 ~]$ vim astra_control_center_min.yaml
+
+apiVersion: astra.netapp.io/v1
+kind: AstraControlCenter
+metadata:
+  name: astra
+spec:
+  accountName: "NetApp HCG Solutions"
+  astraVersion: "21.08.65"
+  astraAddress: "astra-control-center.cie.netapp.com"
+  autoSupport:
+    enrolled: true
+  email: "solutions_tme@netapp.com"
+  firstName: "NetApp HCG"
+  lastName: "Admin"
+  imageRegistry:
+    name: "astra-registry.apps.ocp-vmw.cie.netapp.com/netapp-astra"     # use your registry
+    secret: "astra-registry-cred"             # comment out if not needed
+----
+
+.	Create the Astra Control Center CRD in the namespace created for it.
++
+----
+[netapp-user@rhel7 ~]$ oc apply -f astra_control_center_min.yaml -n netapp-astra-cc
+astracontrolcenter.astra.netapp.io/astra created
+----
+
+NOTE: The previous file `astra_control_center_min.yaml` is the minimum version of the Astra Control Center CRD. If you want to create the CRD with more control, such as defining a storageclass other than the default for creating PVCs or providing SMTP details for mail notifications, you can edit the file `astra_control_center.yaml`, enter then needed details, and use it to create the CRD.
