@@ -1,17 +1,17 @@
 ---
 sidebar: sidebar
-permalink: containers/rh-os-n_openshift_VMW.html
-keywords: OpenShift, VMware vSphere, ESXi
+permalink: containers/rh-os-n_anthos_VMW.html
+keywords: Anthos, VMware vSphere, ESXi, on_prem
 summary: VMware vSphere is a virtualization platform for centrally managing a large number of virtualized servers and networks running on the ESXi hypervisor.
 ---
 
-= OpenShift on VMware vSphere
+= Anthos Clusters on VMware
 
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
-:imagesdir: ./../media/
+:imagesdir: ./../../media/
 
 //
 // This file was created with NDAC Version 0.9 (June 4, 2020)
@@ -19,90 +19,145 @@ summary: VMware vSphere is a virtualization platform for centrally managing a la
 // 2020-06-25 14:31:33.555482
 //
 
+Anthos clusters on VMware is an extension of Google Kubernetes Engine that is deployed in an end user’s private data center. An organization can deploy the same applications designed to run in containers in Google Cloud in Kubernetes clusters on-premises.
+Anthos clusters on VMware can be deployed into an existing VMware vSphere environment in your data center which can save on capital expenses, and allow for more rapid deployment and scaling operations.
+
+The deployment of Anthos clusters on VMware includes the following components:
+
+* *Anthos Admin Workstation* A deployment host from which gkectl and kubectl commands can be run to deploy and interact with Anthos deployments.
+* *Admin Cluster* The initial cluster deployed when setting up Anthos clusters on VMware. This cluster manages all subordinate user cluster actions, including deployment, scaling, and upgrade.
+* *User Cluster* Each user cluster is deployed with it's own load balancer instance or partition, allowing it to act as a standalone Kubernetes cluster for individual users or groups, helping to achieve full multitenancy.
+
+The following graphic is a description of an Anthos clusters on VMware deployment.
+
+image:a-w-n_anthos_vm_architecture.png[Error: Missing Graphic Image]
+
+
+== Benefits
+
+Anthos clusters on VMware offers the following benefits:
+
+* *Advanced Multi-tenancy* Each end user can be assigned their own user cluster, deployed with the virtual resources necessary for their own development environment.
+
+* *Cost Savings* End users can realize significant cost savings by deploying multiple user clusters to the same physical environment, utilizing their own physical resources for their application deployments instead of provisioning resources in their Google Cloud environment or on large bare metal clusters.
+
+* *Develop Then Publish* On-premises deployments can be used while applications are in development, which allows for testing of applications in the privacy of a local data center before being made publicly available in the cloud.
+
+* *Security Requirements* Customers with increased security concerns or sensitive data sets that cannot be stored in the public cloud are able to run their applications from the security of their own data centers, thereby meeting organizational requirements.
+
+
+== VMware vSphere
+
 VMware vSphere is a virtualization platform for centrally managing a large number of virtualized servers and networks running on the ESXi hypervisor.
 
 For more information about VMware vSphere, see the https://www.vmware.com/products/vsphere.html[VMware vSphere website^].
 
 VMware vSphere provides the following features:
 
-* *VMware vCenter Server.* VMware vCenter Server provides unified management of all hosts and VMs from a single console and aggregates performance monitoring of clusters, hosts, and VMs.
+* *VMware vCenter Server* VMware vCenter Server provides unified management of all hosts and VMs from a single console and aggregates performance monitoring of clusters, hosts, and VMs.
 
-* *VMware vSphere vMotion.* VMware vCenter allows you to hot migrate VMs between nodes in the cluster upon request in a nondisruptive manner.
+* *VMware vSphere vMotion* VMware vCenter allows you to hot migrate VMs between nodes in the cluster upon request in a nondisruptive manner.
 
-* *vSphere High Availability.* To avoid disruption in the event of host failures, VMware vSphere allows hosts to be clustered and configured for High Availability. VMs that are disrupted by host failure are rebooted shortly on other hosts in the cluster, restoring services.
+* *vSphere High Availability* To avoid disruption in the event of host failures, VMware vSphere allows hosts to be clustered and configured for High Availability. VMs that are disrupted by host failure are rebooted shortly on other hosts in the cluster, restoring services.
 
-* *Distributed Resource Scheduler (DRS).* A VMware vSphere cluster can be configured to load balance the resource needs of the VMs it is hosting. VMs with resource contentions can be hot migrated to other nodes in the cluster to make sure that enough resources are available.
-
-
-image:redhat_openshift_image33.png[Error: Missing Graphic Image]
+* *Distributed Resource Scheduler (DRS)* A VMware vSphere cluster can be configured to load balance the resource needs of the VMs it is hosting. VMs with resource contentions can be hot migrated to other nodes in the cluster to make sure that enough resources are available.
 
 
-== Network design
+== Hardware requirements
 
-The Red Hat OpenShift on NetApp solution uses two data switches to provide primary data connectivity at 25Gbps. It also uses two additional management switches that provide connectivity at 1Gbps for in-band management for the storage nodes and out-of-band management for IPMI functionality. OCP uses the VM logical network on VMware vSphere for its cluster management. This section describes the arrangement and purpose of each virtual network segment used in the solution and outlines the prerequisites for deployment of the solution.
+=== Compute
 
-=== VLAN requirements
+Google Cloud periodically requests updated validation of partner server platforms with new releases of Anthos through their Anthos Ready platform partner program. A listing of currently validated server platforms, and the versions of Anthos supported can be found https://cloud.google.com/anthos/docs/resources/partner-platforms[here^].
 
-Red Hat OpenShift on VMware vSphere is designed to logically separate network traffic for different purposes by using virtual local area networks (VLANs). This configuration can be scaled to meet customer demands or to provide further isolation for specific network services. The following table lists the VLANs that are required to implement the solution while validating the solution at NetApp.
+The following table contains server platforms that have been tested by NetApp and NetApp partner engineers for the validation of Anthos clusters on VMware deployments. These include solutions such as the https://www.netapp.com/data-storage/flexpod/documentation/[NetApp FlexPod^] with Cisco UCS servers, and the https://docs.netapp.com/us-en/hci/[NetApp HCI^] hybrid cloud infrastructure platform.
 
 |===
-|VLANs |Purpose |VLAN ID
-
-|Out-of-band management network
-|Management for physical nodes and IPMI
-|16
-|VM Network
-|Virtual guest network access
-|181
-|Storage network
-|Storage network for ONTAP NFS
-|184
-|Storage network
-|Storage network for ONTAP iSCSI
-|185
-|In-band management network
-|Management for ESXi Nodes, VCenter Server, ONTAP Select
-|3480
-|Storage network
-|Storage network for NetApp Element iSCSI
-|3481
-|Migration network
-|Network for virtual guest migration
-|3482
+|Manufacturer | Make  |Model
+|Cisco | UCS |B200 M5
+|NetApp | HCI | C410
 |===
+
+=== Operating System
+
+Anthos clusters on VMware can be deployed to both vSphere 6 and 7 environments as chosen by the customer to help match their current datacenter infrastructure.
+
+The following table contains a list of Linux operating systems that have been used by NetApp and our partners to validate the solution.
+
+|===
+|Operating System  |Release |Anthos Versions
+
+|VMware vSphere
+|6.7U3
+|1.10
+|VMware vSphere
+|7.0U3
+|1.10
+|===
+
+=== Additional Hardware
+
+To complete the deployment of Anthos on bare metal as a fully validated solution, additional data center components for networking and storage have been tested by NetApp and our partner engineers.
+
+The following table includes information about these additional infrastructure components.
+
+|===
+|Manufacturer  | Hardware Name | Model
+
+|Mellanox  | SN | 2010
+|NetApp  | AFF | A250
+|NetApp  |HCI |S410
+|===
+
+
+=== Additional Software
+
+The following table includes a list of software versions deployed in the validation environment
+
+|===
+|Manufacturer  | Software Name | Version
+
+|Cisco  | UCS | 4.1(3e)
+|NetApp  | Element | 12
+|NetApp  | HCI | 1.8
+|NetApp  | ONTAP | 9.9.1
+|NetApp  | Astra Trident | 22.01
+|===
+
+During the Anthos Ready platform validation performed by NetApp the lab environment was built based on the diagram below which allowed us to test multiple deployed user clusters alongside multiple NetApp Storage systems and storage backends.
+
+image:a-w-n_anthos_vmware_validation.png[Error: Missing Graphic Image]
+
 
 === Network infrastructure support resources
 
-The following infrastructure should be in place prior to the deployment of the OpenShift Container Platform:
+The following infrastructure should be in place prior to the deployment of Anthos:
 
 * At least one DNS server providing full host-name resolution that is accessible from the in-band management network and the VM network.
 
 * At least one NTP server that is accessible from the in-band management network and the VM network.
 
+* A DHCP server available to provide network address leases on demand should clusters need to scale dynamically.
+
 * (Optional) Outbound internet connectivity for both the in-band management network and the VM network.
+
 
 == Best practices for production deployments
 
 This section lists several best practices that an organization should take into consideration before deploying this solution into production.
 
-=== Deploy OpenShift to an ESXi cluster of at least three nodes
+=== Deploy Anthos to an ESXi cluster of at least three nodes
 
-The verified architecture described in this document presents the minimum hardware deployment suitable for HA operations by deploying two ESXi hypervisor nodes and ensuring a fault tolerant configuration by enabling VMware vSphere HA and VMware vMotion. This configuration allows deployed VMs to migrate between the two hypervisors and reboot should one host become unavailable.
-
-Because Red Hat OpenShift initially deploys with three master nodes, at least two masters in a two-node configuration can occupy the same node under some circumstances, which can lead to a possible outage for OpenShift if that specific node becomes unavailable. Therefore, it is a Red Hat best practice that at least three ESXi hypervisor nodes must be deployed so that the OpenShift masters can be distributed evenly, which provides an added degree of fault tolerance.
+While it is possible to install Anthos to a vSphere cluster of less than three nodes for demonstration or evaluation purposes, this is not recommended for production workloads. While two nodes will allow for basic HA and fault tolerance, an Anthos cluster configuration must be modified to disable default host affinity and this deployment method is not supported by Google Cloud.
 
 === Configure virtual machine and host affinity
 
-Ensuring the distribution of the OpenShift masters across multiple hypervisor nodes can be achieved by enabling VM and host affinity.
+Ensuring the distribution of the Anthos cluster nodes across multiple hypervisor nodes can be achieved by enabling VM and host affinity.
 
 Affinity or anti-affinity is a way to define rules for a set of VMs and/or hosts that determine whether the VMs run together on the same host or hosts in the group or on different hosts. It is applied to VMs by creating affinity groups that consist of VMs and/or hosts with a set of identical parameters and conditions. Depending on whether the VMs in an affinity group run on the same host or hosts in the group or separately on different hosts, the parameters of the affinity group can define either positive affinity or negative affinity.
 
-To configure affinity groups, see the https://docs.vmware.com/en/VMware-vSphere/6.7/com.vmware.vsphere.resmgmt.doc/GUID-FF28F29C-8B67-4EFF-A2EF-63B3537E6934.html[vSphere 6.7 Documentation: Using DRS Affinity Rules^].
+To configure affinity groups, see the appropriate link below for your version of VMWare vSphere.
 
-=== Use a custom install file for OpenShift deployment
+https://docs.vmware.com/en/VMware-vSphere/6.7/com.vmware.vsphere.resmgmt.doc/GUID-FF28F29C-8B67-4EFF-A2EF-63B3537E6934.html[vSphere 6.7 Documentation: Using DRS Affinity Rules^].
+https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.resmgmt.doc/GUID-FF28F29C-8B67-4EFF-A2EF-63B3537E6934.html[vSphere 7.0 Documentation: Using DRS Affinity Rules^].
 
-IPI makes the deployment of OpenShift clusters easy through the interactive wizard discussed earlier in this document. However, it is possible that you might need to change some default values as a part of a cluster deployment.
-
-In these instances, you can run and task the wizard without immediately deploying a cluster, but instead the wizard creates a configuration file from which the cluster can be deployed later. This is very useful if you need to changes any IPI defaults, or if you want to deploy multiple identical clusters in your environment for other uses such as multitenancy. For more information about creating a customized install configuration for OpenShift, see https://docs.openshift.com/container-platform/4.7/installing/installing_vsphere/installing-vsphere-installer-provisioned-customizations.html[Red Hat OpenShift Installing a Cluster on vSphere with Customizations^].
-
-link:rh-os-n_overview_netapp.html[Next: NetApp Storage Overview.]
+link:anthos-with-netapp/a-w-n_overview_netapp.html[Next: NetApp Storage Overview.]

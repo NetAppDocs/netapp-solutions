@@ -1,17 +1,17 @@
 ---
 sidebar: sidebar
-permalink: containers/rh-os-n_openshift_BM.html
-keywords: OpenShift, bare metal, IPI
+permalink: containers/anthos-with-netapp/a-w-n_anthos_BM.html
+keywords: Anthos, bare metal, linux
 summary:
 ---
 
-= OpenShift on Bare Metal
+= Anthos on bare metal
 
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
-:imagesdir: ./../media/
+:imagesdir: ./../../media/
 
 //
 // This file was created with NDAC Version 0.9 (June 4, 2020)
@@ -19,61 +19,96 @@ summary:
 // 2020-06-25 14:31:33.555482
 //
 
-OpenShift on Bare Metal provides an automated deployment of the OpenShift Container Platform on commodity servers.
 
-OpenShift on Bare Metal is similar to virtual deployments of OpenShift, which provide ease of deployment, rapid provisioning, and scaling of OpenShift clusters, while supporting virtualized workloads for applications that are not ready to be containerized. By deploying on bare metal, you do not require the extra overhead necessary to manage the host hypervisor environment in addition to the OpenShift environment. By deploying directly on bare metal servers, you can also reduce the physical overhead limitations of having to share resources between the host and OpenShift environment.
+== Benefits
 
-== OpenShift on Bare Metal provides the following features:
+The hardware-agnostic capabilities of Anthos on bare metal allow you to select a compute platform optimized for your personalized use case, and provide many additional benefits.
 
-* *IPI or assisted installer deployment.* With an OpenShift cluster deployed by Installer Provisioned Infrastructure (IPI) on bare metal servers, customers can deploy a highly versatile, easily scalable OpenShift environment directly on commodity servers, without the need to manage a hypervisor layer.
+Examples include:
 
-* *Compact cluster design.* To minimize the hardware requirements, OpenShift on bare metal allows for users to deploy clusters of just 3 nodes, by enabling the OpenShift control plane nodes to also act as worker nodes and host containers.
+* *Bring your own server.* You can select to use servers that match your existing infrastructure and reduce capital expenditure and management costs.
 
-* *OpenShift virtualization.* OpenShift can run virtual machines within containers by using OpenShift Virtualization. This container-native virtualization runs the KVM hypervisor inside of a container, and attaches persistent volumes for VM storage.
+* *Bring your own Linux OS.* By choosing the Linux OS that you wish to deploy your Anthos on bare metal environment to, you can ensure that the Anthos environment fits neatly into your already existing infrastructure and management schemes.
 
-* *AI/ML-optimized infrastructure.* Deploy applications like Kubeflow for machine learning applications by incorporating GPU-based worker nodes to your OpenShift environment and leveraging OpenShift Advanced Scheduling.
+* *Improved performance and lowered cost.* Without the requirement of a hypervisor, Anthos on bare metal clusters all for direct access to server hardware resources including performance optimized hardware devices like GPUs.
+
+* *Improved network performance and lowered latency.* Because the Anthos on bare metal server nodes are directly connected to your network, without a virtualized abstraction layer, they can be optimized for low latency and performance.
 
 
-== Network design
+== Hardware requirements
 
-The Red Hat OpenShift on NetApp solution uses two data switches to provide primary data connectivity at 25Gbps. It also uses two management switches that provide connectivity at 1Gbps for in-band management for the storage nodes and out-of-band management for IPMI functionality.
+=== Compute
 
-For OpenShift bare-metal IPI deployment, you must create a provisioner node, a Red Hat Enterprise Linux 8 machine that must have network interfaces attached to separate networks.
+Google Cloud periodically requests updated validation of partner server platforms with new releases of Anthos through their Anthos Ready platform partner program. A listing of currently validated server platforms, and the versions of Anthos supported can be found https://cloud.google.com/anthos/docs/resources/partner-platforms[here^].
 
-* *Provisioning network.* This network is used to boot the bare-metal nodes and install the necessary images and packages to deploy the OpenShift cluster.
-
-* *Bare-metal network.* This network is used for public-facing communication of the cluster after it is deployed.
-
-For the setup of the provisioner node, the customer creates bridge interfaces that allow the traffic to route properly on the node itself and on the Bootstrap VM that is provisioned for deployment purposes. After the cluster is deployed, the API and ingress VIP addresses are migrated from the bootstrap node to the newly deployed cluster.
-
-The following images depict the environment both during IPI deployment and after the deployment is complete.
-
-image:redhat_openshift_image36.png[Error: Missing Graphic Image]
-
-image:redhat_openshift_image37.png[Error: Missing Graphic Image]
-
-=== VLAN requirements
-
-The Red Hat OpenShift with NetApp solution is designed to logically separate network traffic for different purposes by using virtual local area networks (VLANs).
+The following table contains server platforms that have been tested by NetApp and NetApp partner engineers for the validation of Anthos on bare metal deployments.
 
 |===
-|VLANs |Purpose |VLAN ID
-|Out-of-band management network
-|Management for bare metal nodes and IPMI
-|16
-|Bare-metal network
-|Network for OpenShift services once cluster is available
-|181
-|Provisioning network
-|Network for PXE boot and installation of bare metal nodes via IPI
-|3485
+|Manufacturer | Make  |Model
+|Cisco | UCS |B200 M5
+|HPE  | Proliant |DL360
 |===
 
-NOTE: Although each of these networks is virtually separated by VLANs, each physical port must be set up in Access Mode with the primary VLAN assigned, because there is no way to pass a VLAN tag during a PXE boot sequence.
+=== Operating System
 
-=== Network infrastructure support resources
+Anthos on bare metal nodes can be configured with several different Linux distributions as chosen by the customer to help match their current datacenter infrastructure.
 
-The following infrastructure should be in place prior to the deployment of the OpenShift container platform:
+The following table contains a list of Linux operating systems that have been used by NetApp and our partners to validate the solution.
+
+|===
+|Operating System  |Release |Anthos Versions
+
+|CentOS
+|8.4
+|1.9
+|Red Hat Enterprise Linux
+|8.4
+|1.9
+|Ubuntu
+|18.04 LTS
+|1.9
+|Ubuntu
+|20.04 LTS
+|1.9
+|===
+
+=== Additional Hardware
+
+To complete the deployment of Anthos on bare metal as a fully validated solution, additional data center components for networking and storage have been tested by NetApp and our partner engineers.
+
+The following table includes information about these additional infrastructure components.
+
+|===
+|Manufacturer  | Hardware Name | Model
+
+|Cisco  | Nexus | C9336C-FX2
+|NetApp  | AFF | A250
+|===
+
+
+=== Additional Software
+
+The following table includes a list of additional software versions deployed in the validation environment
+
+|===
+|Manufacturer  | Software Name | Version
+
+|Cisco  | NXOS | 9.3(5)
+|NetApp | ONTAP | 9.8
+|NetApp  | Astra Trident | 21.10
+|===
+
+During the Anthos Ready platform validation performed by NetApp and our partner team at World Wide Technology (WWT) the a lab environment was built based on the diagram below which allowed us to test the functionality of each server type, operating system, the network devices, and storage systems deployed in the solution.
+
+image:a-w-n_anthos_baremetal_validation.png[Error: Missing Graphic Image]
+
+
+[NOTE]
+This multi-OS environment shows the interoperability with supported OS versions for the Anthos on bare metal solution. We anticipate that customers will standardize on one or a subset of operating systems for their own deployment.
+
+=== Infrastructure support resources
+
+The following infrastructure should be in place prior to the deployment of Anthos on bare metal:
 
 * At least one DNS server that provides a full host-name resolution accessible from the in-band management network and the VM network.
 
@@ -82,4 +117,4 @@ The following infrastructure should be in place prior to the deployment of the O
 * (Optional) Outbound internet connectivity for both the in-band management network and the VM network.
 
 
-link:rh-os-n_overview_netapp.html[Next: NetApp storage overview.]
+link:anthos-with-netapp/a-w-n_overview_netapp.html[Next: NetApp storage overview.]
