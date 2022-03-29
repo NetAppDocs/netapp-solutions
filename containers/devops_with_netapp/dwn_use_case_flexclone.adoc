@@ -13,27 +13,15 @@ summary: Using FlexClone technology to rapidly deploy
 :linkattrs:
 :imagesdir: ./../../media/
 
-== Prerequisites
-
-.	A supported Kubernetes Distribution: Red Hat OpenShift, Rancher, Kubernetes 1.20+.
-.	NetApp Astra Control Center 21.12+.
-.	A NetApp ONTAP system with a storage backend configured through NetApp Astra Trident.
-. Ansible 2.9.27+.
-. Templates for the environments that you'd like to clone as managed applications in NetApp Astra Control.
-
 == Overview
 
 Being able to clone a deployed application in a Kubernetes cluster is a very useful tool for developers that would like to expedite their workflows by ensuring that they can share like environment with partners, or test new versions of code in a development environment without affecting the version they are currently working on. The stateful and application-consistent cloning of a Kubernetes application is one major feature included with NetApp Astra Control alongside backup and restore of applications. A bonus to this, is that if an application is cloned within the same Kubernetes cluster, and using the same storage backend, Astra Control defaults to using NetApp FlexClone technology for duplicating the persistent data volumes, speeding up the entire process tremendously. By accelerating this process, the cloned environment is provisioned and available for use in a few moments, allowing developers to resume their work with just a brief pause when compared to having to redeploy their test or development environment. It’s also an additional convenience that all of the functions available in NetApp Astra Control can be called via an API which allows for easy integration into automation frameworks like Ansible and can result environments being staged even more rapidly since only minor changes need to be made to a playbook or role to begin the cloning procedure.
-
-== What is a NetApp FlexClone?
 
 NetApp FlexClone technology is a writeable, point-in-time snapshot based copy of a NetApp FlexVol. They are provisioned almost instantly and contain all of the data previously existing in the source volume, and they consume no additional storage space until the data in the new volume begins to diverge from the source. They are often used in development or template based environments when multiple copies of data come in very handy for staging purposes, and storage systems have limited resources in order to provision those volumes. Compared to a traditional storage system where data would have to be copied multiple times over resulting in additional consumption of space, in additional to the time needed to complete the copies, NetApp FlexClones can be quite beneficial to those looking to accelerate their storage dependant tasks.
 
 image::Astra-DevOps-UC3-FlexClone.png[FlexClone Image]
 
 To find out more about NetApp FlexClone Technology, visit the page on https://docs.netapp.com/us-en/ontap/concepts/flexclone-volumes-files-luns-concept.html[NetApp Docs].
-
-== Use Case Introduction
 
 For this use case we visualize something similar to the following workflow:
 
@@ -59,7 +47,15 @@ image::Astra-DevOps-UC3-Templates.png[Templates Image]
 
 Each of these environments is managed by NetApp Astra control, with persistent volumes currently stored on a NetApp ONTAP storage system with an NFS backend provided by NetApp Astra Trident.
 
-== Use Case Steps
+== Pre-requisites
+
+.	A supported Kubernetes Distribution: Red Hat OpenShift 4.6.8+, Rancher 2.5+, Kubernetes 1.19+.
+.	NetApp Astra Control Center 21.12+.
+.	A NetApp ONTAP system with a storage backend configured through NetApp Astra Trident.
+. Ansible 2.9+.
+. Templates for the environments that you'd like to clone as managed applications in NetApp Astra Control.
+
+== Ansible Playbook for Application Clones
 
 . Clone the ansible toolkit provided by the NetApp Solutions Engineering team which includes the cloning role, and the application update playbook.
 +
