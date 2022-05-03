@@ -5,7 +5,7 @@ keywords: Advanced Configuration, Private Registry, Astra Trident, OpenShift Reg
 summary: This section is dedicated to creating and configuring a private image registry backed by persistent storage provided by Astra Trident.
 ---
 
-= Creating Private Image Registries
+= Creating private image registries
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -15,9 +15,9 @@ summary: This section is dedicated to creating and configuring a private image r
 
 For most deployments of Red Hat OpenShift, using a public registry like https://quay.io[Quay.io] or https://hub.docker.com[DockerHub] meets most customer's needs. However there are times when a customer may want to host their own private or customized images.
 
-This procedure documents creating a private image registry which is backed by a persistent volume provided by Astra Trident and NetApp ONTAP.
+This procedure documents creating a private image registry that is backed by a persistent volume provided by Astra Trident and NetApp ONTAP.
 
-NOTE: Astra Control Center requires a registry to host the images the Astra containers require. The following section describes the steps to setup a private registry on Red Hat OpenShift cluster and pushing the images required to support the installation of Astra Control Center.
+NOTE: Astra Control Center requires a registry to host the images the Astra containers require. The following section describes the steps to setup a private registry on a Red Hat OpenShift cluster and pushing the images required to support the installation of Astra Control Center.
 
 == Creating A private image registry
 
@@ -132,7 +132,7 @@ NAME                                     HOST/PORT                              
 route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.com          image-registry   <all>   reencrypt     None
 ----
 
-.	If you are using the default TLS certificates for the ingress operator OpenShift registry route, you can fetch the TLS certificates using the following command.
+.	If you are using the default TLS certificates for the ingress operator OpenShift registry route, you can fetch the TLS certificates using the following command:
 +
 ----
 [netapp-user@rhel7 ~]$ oc extract secret/router-ca --keys=tls.crt -n openshift-ingress-operator
@@ -146,7 +146,7 @@ route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.
 [netapp-user@rhel7 ~]$ oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"astra-ca"}}}' --type=merge
 ----
 
-.	The OpenShift internal registry is controlled by authentication. All the OpenShift users can access the OpenShift registry, but the operations that the logged in user can perform depends on the user permissions.
+.	The OpenShift internal registry is controlled by authentication. All the OpenShift users can access the OpenShift registry, but the operations that the logged-in user can perform depends on the user permissions.
 +
 ..	To allow a user or a group of users to pull images from the registry, the user(s) must have the registry-viewer role assigned.
 +
@@ -172,7 +172,7 @@ route.route.openshift.io/public-routes   astra-registry.apps.ocp-vmw.cie.netapp.
 
 .	This pull secret can then be patched to serviceaccounts or be referenced in the corresponding pod definition.
 +
-.. To patch it to service accounts, run the following command.
+.. To patch it to service accounts, run the following command:
 +
 ----
 [netapp-user@rhel7 ~]$ oc secrets link <service_account_name> astra-registry-credentials --for=pull
@@ -184,7 +184,7 @@ imagePullSecrets:
   - name: astra-registry-credentials
 ----
 
-.	To push or pull an image from workstations apart from OpenShift node, complete the following steps.
+.	To push or pull an image from workstations apart from OpenShift node, complete the following steps:
 +
 ..	Add the TLS certificates to the docker client.
 +
@@ -210,7 +210,7 @@ imagePullSecrets:
 [netapp-user@rhel7 ~]$ podman login astra-registry.apps.ocp-vmw.cie.netapp.com -u kubeadmin -p $(oc whoami -t) --tls-verify=false
 ----
 +
-NOTE: If you are using `kubeadmin` user to log into the private registry, then use token instead of password.
+NOTE: If you are using `kubeadmin` user to log into the private registry, then use a token instead of a password.
 --
 
 .docker
@@ -219,7 +219,7 @@ NOTE: If you are using `kubeadmin` user to log into the private registry, then u
 [netapp-user@rhel7 ~]$ docker login astra-registry.apps.ocp-vmw.cie.netapp.com -u kubeadmin -p $(oc whoami -t)
 ----
 +
-NOTE: If you are using `kubeadmin` user to log into the private registry, then use token instead of password.
+NOTE: If you are using `kubeadmin` user to log into the private registry, then use a token instead of a password.
 --
 ====
 
