@@ -1,0 +1,201 @@
+---
+sidebar: sidebar
+permalink: containers/anthos-with-netapp/a-w-n_LB_F5BigIP.html
+summary:
+keywords: Anthos, GKE, Kubernetes, F5, BigIP, LoadBalancer
+---
+
+= Installing F5 BIG-IP load balancers: Anthos with NetApp
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+F5 BIG-IP is an Application Delivery Controller (ADC) that offers a broad set of advanced, production-grade traffic management and security services like L4-L7 load balancing, SSL/TLS offload, DNS, firewall, and many more. These services drastically increase the availability, security, and performance of your applications.
+
+F5 BIG-IP can be deployed and consumed in various ways, including on dedicated hardware, in the cloud, or as a virtual appliance on-premises. Refer to the documentation here to explore and deploy F5 BIG-IP as per requirement.
+
+F5 BIG-IP was the first of the bundled load balancer solutions available with Anthos On-Prem and was used in a number of the early Anthos Ready partner validations for the Anthos with NetApp solution.
+
+NOTE: F5 BIG-IP can be deployed in standalone or cluster mode. For the purpose of this validation, F5 BIG-IP was deployed in standalone mode, but, for production purposes, it is preferred to have a cluster of BIG-IPs to avoid a single point of failure.
+
+NOTE: An F5 BIG-IP system can be deployed on dedicated hardware, in the cloud, or as a virtual appliance on-premises with versions greater than 12.x for it to be integrated with F5 CIS. For the purpose of this document, the F5 BIG-IP system was validated as a virtual appliance, for example using the BIG-IP VE edition.
+
+== Validated releases
+
+This solution makes use of the virtual appliance deployed in VMware vSphere. Networking for the F5 Big-IP virtual appliance can be configured in a two-armed or three-armed configuration based on your network environment. The deployment in this document is based on the two-armed configuration. Additional details on configuring the virtual appliance for use with Anthos can be found https://cloud.google.com/solutions/partners/installing-f5-big-ip-adc-for-gke-on-prem[here].
+
+The solutions engineering team at NetApp have validated the releases in the following table in our lab to work with deployments of Anthos On-Prem:
+
+|===
+|Make  | Type | Version
+|F5  | BIG-IP VE | 15.0.1-0.0.11
+|F5  | BIG-IP VE | 16.1.0-0.0.19
+|===
+
+== Installation
+
+To install F5 BIG-IP, complete the following steps:
+
+1. Download the virtual application Open Virtual Appliance (OVA) file from F5 https://downloads.f5.com/esd/serveDownload.jsp?path=/big-ip/big-ip_v15.x/15.0.1/english/virtual-edition/&sw=BIG-IP&pro=big-ip_v15.x&ver=15.0.1&container=Virtual-Edition&file=BIGIP-15.0.1-0.0.11.ALL-vmware.ova[here].
++
+
+NOTE:	To download the appliance, a user must register with F5. They provide a 30-day demo license for the Big-IP Virtual Edition Load Balancer. NetApp recommends a permanent 10Gbps license for the production deployment of an appliance.
+
+2. Right-click the Infrastructure Resource Pool and select Deploy OVF Template. A wizard launches that allows you to select the OVA file that you just downloaded in Step 1. Click Next.
++
+
+image::deploy-big_ip_1.PNG[Deploy Big-IP Appliance]
+
+3. Click Next to continue through each step and accept the default values for each screen presented until you reach the storage selection screen. Select the VM_Datastore that was created earlier, and then click Next.
+
+4. The next screen presented by the wizard allows you to customize the virtual networks for use in the environment. Select VM_Network for the External field and select Management_Network for the Management field. Internal and HA are used for advanced configurations for the F5 Big-IP appliance and are not configured. These parameters can be left alone, or they can be configured to connect to non-infrastructure, distributed port groups. Click Next.
++
+
+image::deploy-big_ip_2.PNG[Deploy Big_IP Appliance, Part 2]
+
+5. Review the summary screen for the appliance, and, if all the information is correct, click Finish to start the deployment.
+
+6. After the virtual appliance is deployed, right-click it and power it up. It should receive a DHCP address on the management network. The appliance is Linux-based, and it has VMware Tools deployed, so you can view the DHCP address it receives in the vSphere client.
++
+
+image::deploy-big_ip_3.PNG[Deploy Big-IP Appliance, Part 3]
+
+7. Open a web browser and connect to the appliance at the IP address from the previous step. The default login is admin/admin, and, after the first login, the appliance immediately prompts you to change the admin password. It then returns you to a screen where you must log in with the new credentials.
++
+
+image::big-IP_config_1.PNG[Big-IP Configuration]
+
+8. The first screen prompts the user to complete the Setup Utility. Begin the utility by clicking Next.
++
+
+image::big-IP_config_2.PNG[Big-IP Configuration, Part 2]
+
+9. The next screen prompts for activation of the license for the appliance. Click Activate to begin. When prompted on the next page, paste either the 30-day evaluation license key you received when you registered for the download or the permanent license you acquired when you purchased the appliance. Click Next.
++
+
+image::big-IP_config_3.PNG[Big-IP Configuration, Part 3]
++
+
+NOTE:	For the device to perform activation, the network defined on the management interface must be able to reach the internet.
+
+10. On the next screen, the End User License Agreement (EULA) is presented. If the terms in the license are acceptable, click Accept.
+
+11. The next screen counts the elapsed time as it verifies the configuration changes that have been made so far. Click Continue to resume with the initial configuration.
++
+
+image::big-IP_config_4.PNG[Big-IP Configuration, Part 4]
+
+12. The Configuration Change window closes, and the Setup Utility displays the Resource Provisioning menu. This window lists the features that are currently licensed and the current resource allocations for the virtual appliance and each running service.
++
+
+image::big-IP_config_5.png[Big-IP Configuration, Part 5]
+
+13. Clicking the Platform menu option on the left enables additional modification of the platform. Modifications include setting the management IP address configured with DHCP, setting the host name and the time zone the appliance is installed in, and securing the appliance from SSH accessibility.
++
+
+image::big-IP_config_6.PNG[Big-IP Configuration, Part 6]
+
+14. Next click the Network menu, which enables you to configure standard networking features. Click Next to begin the Standard Network Configuration wizard.
++
+
+image::big-IP_config_7.PNG[Big-IP Configuration, Part 7]
+
+15. The first page of the wizard configures redundancy; leave the defaults and click Next. The next page enables you to configure an internal interface on the load balancer. Interface 1.1 maps to the vmnic labeled Internal in the OVF deployment wizard.
++
+
+image::big-IP_config_8.png[Big-IP Configuration, Part 8]
++
+
+NOTE:	The spaces in this page for Self IP Address, Netmask, and Floating IP address can be filled with a non-routable IP for use as a placeholder. They can also be filled with an internal network that has been configured as a distributed port group for virtual guests if you are deploying the three-armed configuration. They must be completed to continue with the wizard.
+
+16.	The next page enables you to configure an external network that is used to map services to the pods deployed in Kubernetes. Select a static IP from the VM_Network range, the appropriate subnet mask, and a floating IP from that same range. Interface 1.2 maps to the vmnic labeled External in the OVF deployment wizard.
++
+
+image::big-IP_config_9.png[Big-IP Configuration, Part 9]
+
+17.	On the next page, you can configure an internal-HA network if you are deploying multiple virtual appliances in the environment. To proceed, you must fill the Self-IP Address and the Netmask fields, and you must select interface 1.3 as the VLAN Interface, which maps to the HA network defined by the OVF template wizard.
++
+
+image::big-IP_config_10.png[Big-IP Configuration, Part 10]
+
+18. The next page enables you to configure the NTP servers. Then click Next to continue to the DNS setup. The DNS servers and domain search list should already be populated by the DHCP server. Click Next to accept the defaults and continue.
+
+19. For the remainder of the wizard, click Next to continue through the advanced peering setup, the configuration of which is beyond the scope of this document. Then click Finish to exit the wizard.
+
+20. Create individual partitions for the Anthos admin cluster and each user cluster deployed in the environment. Click System in the menu on the left, navigate to Users, and click Partition List.
++
+
+image::big-IP_config_11.PNG[Big-IP Configuration, Part 11]
+
+21. The displayed screen only shows the current common partition. Click Create on the right to create the first additional partition, and name it `GKE-Admin`. Then click Repeat, and name the partition `User-Cluster-1`, and click the Repeat button again to name the next partition `User-Cluster-2`. Finally click Finished to complete the wizard. The Partition list screen returns with all the partitions now listed.
++
+
+image::big-IP_config_12.PNG[Big-IP Configuration, Part 12]
+
+== Integration with Anthos
+
+There is a section in each configuration file, respectively for the admin cluster, and each user cluster that you choose to deploy to configure the load balancer so that it will be managed by Anthos On Prem.
+
+The following is a sample from the configuration of the partition for the GKE-Admin cluster, the values that need to be uncommented and modified are placed in bold text below:
+
+[subs="+quotes,+verbatim"]
+----
+# (Required) Load balancer configuration
+*loadBalancer:*
+  # (Required) The VIPs to use for load balancing
+  *vips:*
+    # Used to connect to the Kubernetes API
+    *controlPlaneVIP: "10.61.181.230"*
+    # # (Optional) Used for admin cluster addons (needed for multi cluster features). Must
+    # # be the same across clusters
+    # # addonsVIP: ""
+  # (Required) Which load balancer to use "F5BigIP" "Seesaw" or "ManualLB". Uncomment
+  # the corresponding field below to provide the detailed spec
+  *kind: F5BigIP*
+  # # (Required when using "ManualLB" kind) Specify pre-defined nodeports
+  # manualLB:
+  #   # NodePort for ingress service's http (only needed for user cluster)
+  #   ingressHTTPNodePort: 0
+  #   # NodePort for ingress service's https (only needed for user cluster)
+  #   ingressHTTPSNodePort: 0
+  #   # NodePort for control plane service
+  #   controlPlaneNodePort: 30968
+  #   # NodePort for addon service (only needed for admin cluster)
+  #   addonsNodePort: 31405
+  # # (Required when using "F5BigIP" kind) Specify the already-existing partition and
+  # # credentials
+  *f5BigIP:*
+    *address: "172.21.224.21"*
+    *credentials:*
+      *username: "admin"*
+      *password: "admin-password"*
+    *partition: "GKE-Admin"*
+  #   # # (Optional) Specify a pool name if using SNAT
+  #   # snatPoolName: ""
+  # (Required when using "Seesaw" kind) Specify the Seesaw configs
+  # seesaw:
+    # (Required) The absolute or relative path to the yaml file to use for IP allocation
+    # for LB VMs. Must contain one or two IPs.
+    #  ipBlockFilePath: ""
+    # (Required) The Virtual Router IDentifier of VRRP for the Seesaw group. Must
+    # be between 1-255 and unique in a VLAN.
+    #  vrid: 0
+    # (Required) The IP announced by the master of Seesaw group
+    #  masterIP: ""
+    # (Required) The number CPUs per machine
+    #  cpus: 4
+    # (Required) Memory size in MB per machine
+    #   memoryMB: 8192
+    # (Optional) Network that the LB interface of Seesaw runs in (default: cluster
+    # network)
+    #   vCenter:
+      # vSphere network name
+      #     networkName: VM_Network
+    # (Optional) Run two LB VMs to achieve high availability (default: false)
+    #   enableHA: false
+----
+
+link:a-w-n_use_cases.html[Next: Solution Validation/Use Cases: Anthos with NetApp.]
