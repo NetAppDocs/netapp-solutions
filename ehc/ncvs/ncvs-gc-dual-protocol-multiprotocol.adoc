@@ -1,0 +1,52 @@
+---
+sidebar: sidebar
+permalink: ehc/ncvs/ncvs-gc-dual-protocol-multiprotocol.html
+keywords: access control, user mapping, permission model
+summary: Cloud Volumes Service offers the ability to share the same datasets to both SMB and NFS clients while maintaining proper access permissions dual-protocol. This is done by coordinating identity mapping between protocols and using a centralized backend LDAP server to provide the UNIX identities to Cloud Volumes Service. You can use Windows Active Directory to provide both Windows and UNIX users for ease of use.
+
+---
+
+= Dual-protocol/multiprotocol
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-05-09 14:20:41.058195
+//
+
+link:ncvs-gc-smb.html[Previous: SMB.]
+
+Cloud Volumes Service offers the ability to share the same datasets to both SMB and NFS clients while maintaining proper access permissions (https://cloud.google.com/architecture/partners/netapp-cloud-volumes/managing-dual-protocol-access[dual-protocol^]). This is done by coordinating identity mapping between protocols and using a centralized backend LDAP server to provide the UNIX identities to Cloud Volumes Service. You can use Windows Active Directory to provide both Windows and UNIX users for ease of use.
+
+== Access control
+
+* *Share access controls.* Determine which clients and/or user and groups can access a NAS share. For NFS, export policies and rules control client access to exports. NFS exports are managed from the Cloud Volumes Service instance. SMB makes use of CIFS/SMB shares and share ACLs to provide more granular control at the user and group level. You can only configure share-level ACLs from SMB clients by using https://library.netapp.com/ecmdocs/ECMP1401220/html/GUID-C1772CDF-8AEE-422B-AB87-CFCB7E50FF94.html[MMC/Computer Management^] with an account that has administrator rights on the Cloud Volumes Service instance (see the section link:ncvs-gc-smb.html#accounts-with-local/builtin-administrator/backup-rights[“Accounts with local/BUILTIN administrator/backup rights.”]).
+* *File access controls.* Control permissions at a file or folder level and are always managed from the NAS client. NFS clients can make use of traditional mode bits (rwx) or NFSv4 ACLs. SMB clients leverage NTFS permissions.
+
+The access control for volumes that serve data to both NFS and SMB depends on the protocol in use. For information on permissions with dual protocol, see the section “<<Permission model>>.”
+
+== User mapping
+
+When a client accesses a volume, Cloud Volumes Service attempts to map the incoming user to a valid user in the opposite direction. This is necessary for proper access to be determined across protocols and to ensure that the user requesting access is indeed who they claim to be.
+
+For example, if a Windows user named `joe` attempts access to a volume with UNIX permissions through SMB, then Cloud Volumes Service performs a search to find a corresponding UNIX user named `joe`. If one exists, then files that are written to an SMB share as Windows user `joe` appears as UNIX user `joe` from NFS clients.
+
+Alternately, if a UNIX user named `joe` attempts access to a Cloud Volumes Service volume with Windows permissions, then the UNIX user must be able to map to a valid Windows user. Otherwise, access to the volume is denied.
+
+Currently, only Active Directory is supported for external UNIX identity management with LDAP. For more information about configuring access to this service, see https://cloud.google.com/architecture/partners/netapp-cloud-volumes/creating-smb-volumes[Creating an AD connection^].
+
+== Permission model
+
+When using dual-protocol setups, Cloud Volumes Service makes use of security styles for volumes to determine the type of ACL. These security styles are set based on which NAS protocol is specified, or in the case of dual protocol, is a choice made at the time of Cloud Volumes Service volume creation.
+
+* If you are only using NFS, Cloud Volumes Service volumes use UNIX permissions.
+* If you are only using SMB, Cloud Volumes Service volumes use NTFS permissions.
+
+If you are creating a dual-protocol volume, you can choose the ACL style at volume creation. This decision should be made based on the desired permissions management. If your users manage permissions from Windows/SMB clients, select NTFS. If your users prefer using NFS clients and chmod/chown, use UNIX security styles.
+
+link:ncvs-gc-considerations--creating-active-directory-connections.html[Next: Considerations for creating Active Directory connections.]
