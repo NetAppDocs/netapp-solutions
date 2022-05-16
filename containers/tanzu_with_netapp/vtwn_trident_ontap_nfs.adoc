@@ -13,21 +13,27 @@ summary: To enable Trident integration with the NetApp ONTAP storage system you 
 :linkattrs:
 :imagesdir: ./../../media/
 
-To enable Trident integration with the NetApp ONTAP storage system, you must create a backend that enables communication with the storage system. We configure a basic backend in this solution, but if you are looking for more customized options, visit the documentation https://docs.netapp.com/us-en/trident/trident-use/ontap-nas.html[^here]
+To enable Trident integration with the NetApp ONTAP storage system, you must create a backend that enables communication with the storage system. We configure a basic backend in this solution, but if you are looking for more customized options, visit the documentation link:https://docs.netapp.com/us-en/trident/trident-use/ontap-nas.html[here^]
 
 === Create an SVM in ONTAP
 
 . Log into ONTAP System Manager and navigate to `Storage` -> `Storage VMs`, and click on `Add`.
 
-. Enter a name for the SVM, enable NFS or iSCSI protocol as needed. If enabling NFS, check the `Enable NFS Client Access` checkbox and add the subnets that your worker nodes are on in the export policy rules for allowing the volumes to be mounted as PVs in your workload clusters. 
+. Enter a name for the SVM, enable NFS or iSCSI protocol as needed. If enabling NFS, check the `Enable NFS Client Access` checkbox and add the subnets that your worker nodes are on in the export policy rules for allowing the volumes to be mounted as PVs in your workload clusters.
++
+image::vtwn_image06.jpg[SVM Create with NFS]
 +
 NOTE: If you are using NAT'ed deployment of user clusters or workload clusters with NSX-T, you need to add the Egress subnet [in case of TKGS] or the Floating IP subnet [in case of TKGI] to the export policy rules.
 
 . Provide the details for data LIFs and the details for SVM administration account, then click on Save.
++
+image::vtwn_image07.jpg[SVM Data LIFs and SVM administration]
 
 . Next step is to assign the aggregates to SVM. Navigate to `Storage` -> `Storage VMs`, click on the ellipsis next to the newly created SVM and then click `Edit`. Check the `Limit resource creation to preferred local tiers` checkbox and attach the required aggregates to it.
++
+image::vtwn_image08.jpg[SVM aggregate allocation]
 
-. In case of NAT'ed deployments of user or workload clusters on which Trident is to be installed, the storage mount request might arrive from a non-standard port due to SNAT. By default, ONTAP only allows the volume mount requests when originated from root port. Thus, modify the setting to allow mount requests from non-standard ports.
+. In case of NAT'ed deployments of user or workload clusters on which Trident is to be installed, the storage mount request might arrive from a non-standard port due to SNAT. By default, ONTAP only allows the volume mount requests when originated from root port. Thus, log into ONTAP CLI and modify the setting to allow mount requests from non-standard ports.
 +
 ----
 ontap-01> vserver nfs modify -vserver tanzu_svm -mount-rootonly disabled
