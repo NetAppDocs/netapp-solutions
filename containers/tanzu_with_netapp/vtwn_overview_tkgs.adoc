@@ -1,0 +1,48 @@
+---
+sidebar: sidebar
+permalink: containers/tanzu_with_netapp/vtwn_overview_tkgs.html
+keywords: VMware Tanzu, Tanzu, Tanzu Kubernetes Grid Service, vSphere with Tanzu, DevOps, Netapp, Astra Trident, Astra Control, Astra
+summary:
+---
+
+= VMware Tanzu Kubernetes Grid Service Overview
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+VMware Tanzu Kubernetes Grid Service or also known as vSphere with Tanzu, lets you create and operate Tanzu Kubernetes clusters natively in vSphere and allows you to run some smaller workloads directly on the ESXi hosts. It basically allows you to transform vSphere into a platform for running containerized workloads natively on the hypervisor layer. Tanzu Kubernetes Grid Service deploys a supervisor cluster on vSphere when enabled which deploys and operates the clusters required for the workloads. It is tightly integrated with vSphere and in fact, it leverages many reliable vSphere features like vCenter SSO, Content Library, vSphere networking, vSphere storage, vSphere HA and DRS, and vSphere security for a much better seamless Kubernetes experience.
+
+vSphere with Tanzu offers a single platform for hybrid application environments where you can run your application components either in containers or in VMs. Thus, providing better visibility and ease of operations for developers, DevOps engineers, and vSphere administrators.
+
+image::vtwn_image03.png[VMware Tanzu Kubernetes Service]
+
+For more information on Tanzu Kubernetes Grid Service, follow the documentation https://docs.vmware.com/en/VMware-vSphere/7.0/vmware-vsphere-with-tanzu/GUID-152BE7D2-E227-4DAA-B527-557B564D9718.html[^here].
+
+There are a lot of architectural considerations in terms of feature set, networking, etc. Depending on the architecture chosen, the prerequisites and the deployment process of Tanzu Kubernetes Grid Service differ. To deploy and configure Tanzu Kubernetes Grid Service in your environment, follow the guide https://docs.vmware.com/en/VMware-vSphere/7.0/vmware-vsphere-with-tanzu/GUID-74EC2571-4352-4E15-838E-5F56C8C68D15.html[^here].
+
+[NOTE]
+====
+Points to Note:
+
+.	The deployment of NetApp Astra Control Center requires at least 3 worker nodes with at least 4 vCPUs and 12GB RAM. So, while deploying the user or workload clusters, ensure to deploy the worker nodes with least the required resources as mentioned above.
+.	When Tanzu Kubernetes clusters are created in a namespace, the users that have been assigned the `owner` or `edit` permissions can create pods directly in any namespace by using the user account. This is because the users with `owner` or `edit` permissions are allotted the cluster administrator role. But when creating deployments or daemon sets or stateful sets etc. in any namespace, you need to assign a role with the required permissions to the corresponding service accounts. This is required since the deployments or daemon sets etc. utilize service accounts to deploy the pods.
++
+An example of ClusterRoleBinding is to assign the cluster administrator role to all service accounts in the cluster:
++
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: all_sa_ca
+subjects:
+- kind: Group
+  name: system:serviceaccounts
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: psp:vmware-system-privileged
+  apiGroup: rbac.authorization.k8s.io
+----
+====
