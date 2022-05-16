@@ -15,4 +15,79 @@ summary: Astra Trident is an open-source and fully-supported storage orchestrato
 
 include::../../_include/containers_common_intro_sections.adoc[tags=trident_overview]
 
-Refer to the documentation link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-operator.html[here^] to install and use Astra Trident.
+=== Deploy Trident operator using Helm
+
+. First set the location of the user cluster’s `kubeconfig` file as an environment variable so that you don’t have to reference it, because Trident has no option to pass this file.
++
+----
+[netapp-user@rhel7]$ export KUBECONFIG=~/ocp-install/auth/kubeconfig
+----
+
+. Add NetApp Astra Trident helm repository.
++
+----
+[netapp-user@rhel7]$ helm repo add netapp-trident https://netapp.github.io/trident-helm-chart
+"netapp-trident" has been added to your repositories
+----
+
+. Update helm repositories.
++
+----
+[netapp-user@rhel7]$ helm repo update
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "netapp-trident" chart repository
+...Successfully got an update from the "bitnami" chart repository
+Update Complete. ⎈Happy Helming!⎈
+----
+
+. Create a new namespace to install Trident in it.
++
+----
+[netapp-user@rhel7]$ kubetcl create ns trident
+----
+
+. Create a secret with DockerHub credentials to download the Astra Trident images.
++
+----
+[netapp-user@rhel7]$ kubectl create secret docker-registry docker-registry-cred --docker-server=docker.io --docker-username=netapp-solutions-tme --docker-password=xxxxxx -n trident
+----
+
+. For user or workload clusters managed by TKGS (vSphere with Tanzu) or TKG with management cluster deployments, follow the below procedure to install Astra Trident:
+.. Ensure that the logged in user has the permissions to create service accounts in trident namespace and that the service accounts in trident namespace have the permissions to create pods.
+.. Run the below helm command to install Trident operator in the namespace created.
++
+----
+[netapp-user@rhel7]$ helm install trident netapp-trident/trident-operator -n trident --set imagePullSecrets[0]=docker-registry-cred
+----
+
+. For user or workload cluster managed by TKGI deployments, run the below helm command to install Trident operator in the namespace created.
++
+----
+[netapp-user@rhel7]$ helm install trident netapp-trident/trident-operator -n trident --set imagePullSecrets[0]=docker-registry-cred,kubeletDir="/var/vcap/data/kubelet"
+----
+
+. Verify that the Trident pods are up and running.
++
+----
+NAME                                READY   STATUS    RESTARTS        AGE
+trident-csi-6vv62                   2/2     Running   0               14m
+trident-csi-cfd844bcc-sqhcg         6/6     Running   0               12m
+trident-csi-dfcmz                   2/2     Running   0               14m
+trident-csi-pb2n7                   2/2     Running   0               14m
+trident-csi-qsw6z                   2/2     Running   0               14m
+trident-operator-67c94c4768-xw978   1/1     Running   0               14m
+
+[netapp-user@rhel7]$ ./tridentctl -n trident version
++----------------+----------------+
+| SERVER VERSION | CLIENT VERSION |
++----------------+----------------+
+| 22.01.0          | 22.01.0          |
++----------------+----------------+
+----
+
+== Create storage-system backends
+
+After completing the Astra Trident Operator install, you must configure the backend for the specific NetApp storage platform you are using. Follow the links below in order to continue the setup and configuration of Astra Trident.
+
+
+* link:rh-os-n_trident_ontap_nfs.html[NetApp ONTAP NFS]
