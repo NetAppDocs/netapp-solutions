@@ -5,7 +5,7 @@ keywords: Anthos, Astra Trident, NetApp ONTAP, ONTAP, Trident
 summary: How to deploy an application to your Anthos GKE cluster on prem, using the Google Cloud Console.
 ---
 
-= Deploy An Application from the Google Cloud Console
+= Deploy An Application from the Google Cloud Console Marketplace
 
 
 :hardbreaks:
@@ -16,20 +16,98 @@ summary: How to deploy an application to your Anthos GKE cluster on prem, using 
 
 == Prerequisites
 
-* An Anthos cluster deployed on-prem and registered with Google Cloud.
+* An Anthos cluster deployed on-prem and registered with Google Cloud Console.
 * A MetalLB load balancer configured in your Anthos cluster.
 * An account with permissions to deploy applications to the cluster.
 * A billing account with Google Cloud if you choose an application with associated costs. (Optional)
 
 == Deploying An Application
 
+For this use case we will deploy a simple WordPress application to one of our Anthos clusters using the Google Cloud Console. The deployment will use persistent storage provided by NetApp ONTAP, in a pre-defined storageclass. Lastly we will demonstrate two different methods to modify the applications default service so that the MetalLB load balancer will supply it an ip address and expose it to the world.
 
+.	Check and see that the cluster you want to deploy to is accessible in Google Cloud Console.
++
+image::a-w-n_use_case_deploy_app-10.png[Registered Clusters]
++
+.	Select *Applications* from the left side menu, select the three-dot option menu at the top, and select *Deploy from Marketplace* which will bring up a new window where you can select an application from the Google Cloud Marketplace.
++
+image::a-w-n_use_case_deploy_app-09.png[Application Marketplace]
++
+.	Search for the application you want to install, in this case *WordPress*.
++
+image::a-w-n_use_case_deploy_app-08.png[Search For WordPress]
++
+. Once you select the WordPress application, an overview screen will display. Click the *Configure* button.
++
+image:a-w-n_use_case_deploy_app-07.png[WordPress Overview Screen]
++
+. On the next page you will be tasked with selecting the cluster to deploy to, in our case *Demo-Cluster*, select or create a new namespace and application instance name, and select which storage classes and persistent volume sizes you need for both the WordPress application, and it's backing MariaDB database. In both cases I chose the ONTAP-NAS-CSI storage class.
++
+image:a-w-n_use_case_deploy_app-06.png[WordPress Configuration]
++
 
+NOTE: Do not select Enable public IP access. Doing so will create a service of type NodePort which will not be accessible from an on-premises Anthos deployment.
+
++
+. Once you have clicked the *Deploy* button, you will get a page providing application details, you can refresh this page, or login to your cluster using the CLI to check the status of the deployment.
++
+image:a-w-n_use_case_deploy_app-05.png[Application Details]
++
+. The CLI can be used to check the status of the application as it is being deployed by running the command to fetch pod info in our application namespace: `kubectl get pods -n anthos-wp`
++
+image:a-w-n_use_case_deploy_app-04.png[Kubectl get pods]
++
+
+NOTE: Notice in this screenshot there is a deployer pod in an error state. This is normal to see. This pod is a helper pod used by the Google Cloud Console to deploy the application, and it self-terminates after the other pods have begun their initialization process.
+
++
+. After a few moments, verify that your application is running.
++
+image:a-w-n_use_case_deploy_app-03.png[Application Running]
 
 == Exposing the Application
 
+Once the application is deployed you have two methods by which you can choose to have it assigned a world reachable IP and exposed to the world.
+
 === Using the Google Cloud Console
 
+You can expose the application by using the Google Cloud Console and editing the yaml output for the services in a browser to set a publicly reachable IP. Please perform the following steps to complete this.
+
+. In the Google Cloud Console click on Services and Ingress in the left side menu.
++
+image:a-w-n_use_case_deploy_app-11.png[Services and Ingress]
++
+. Select the *wordpress-wordpress-svc* service by clicking on it. This will open a *Service details* screen, with an *Edit* button at the top. Click the *Edit* button.
++
+image:a-w-n_use_case_deploy_app-12.png[Edit Service Details]
++
+. This will open a page called *Editing Service details* where you can see the yaml for the service. Scroll down until you see `spec:` section and the `type:` value which is set to *ClusterIP*. Change that to *LoadBalancer* and save the edit by clicking the *Save* button.
++
+image:a-w-n_use_case_deploy_app-13.png[Type ClusterIP Value]
++
+image:a-w-n_use_case_deploy_app-14.png[Type LoadBalancer Value]
++
+. When you return to the *Service details* page, you will see that the `Type:` now lists *LoadBalancer* and the `External endpoints:` will list an assigned IP address from the MetalLB pool, and the port through which the application is accessible.
++
+image:a-w-n_use_case_deploy_app-15.png[Service Details Final]
+
 === Patching the Service with Kubectl
+
+You can expose the application by using the CLI and the 'kubectl patch' command to modify your deployment and set a publicly reachable IP. Please perform the following steps to complete this.
+
+. List the services associated to the pods in your namespace with the `kubectl get services -n anthos-wp` command.
++
+image:a-w-n_use_case_deploy_app-02.png[List Services]
++
+. Modify the service type from ClusterIP to type Loadbalancer using the following command: 'kubectl patch svc wordpress-wordpress-svc -p '{"spec": {"type": "LoadBalancer"}}' -n anthos-wp'. This new service type will be automatically assigned an available IP address from the MetalLB pool.
++
+image:a-w-n_use_case_deploy_app-01.png[Patch Service To Type LoadBalancer]
+
+== Visit the Application at the Exposed ExternalIP
+
+Now that you have the application exposed with a publicly reachable IP address, you can visit your wordpress instance using a browser.
+
+image:a-w-n_use_case_deploy_app-00.png[WordPress In Browser]
+
 
 link:a-w-n_videos_and_demos.html[Next: Videos and Demos]
