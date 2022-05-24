@@ -13,13 +13,13 @@ summary: To enable Trident integration with the NetApp ONTAP storage system you 
 :linkattrs:
 :imagesdir: ./../../media/
 
-To enable Trident integration with the NetApp ONTAP storage system, you must create a backend that enables communication with the storage system. We configure a basic backend in this solution, but if you are looking for more customized options, visit the documentation link:https://docs.netapp.com/us-en/trident/trident-use/ontap-nas.html[here^]
+To enable Trident integration with the NetApp ONTAP storage system via NFS, you must create a backend that enables communication with the storage system. We configure a basic backend in this solution, but if you are looking for more customized options, visit the documentation link:https://docs.netapp.com/us-en/trident/trident-use/ontap-nas.html[here^].
 
-=== Create an SVM in ONTAP
+== Create an SVM in ONTAP
 
 . Log into ONTAP System Manager and navigate to `Storage` -> `Storage VMs`, and click on `Add`.
 
-. Enter a name for the SVM, enable NFS or iSCSI protocol as needed. If enabling NFS, check the `Enable NFS Client Access` checkbox and add the subnets that your worker nodes are on in the export policy rules for allowing the volumes to be mounted as PVs in your workload clusters.
+. Enter a name for the SVM, enable NFS protocol, check the `Enable NFS Client Access` checkbox and add the subnets that your worker nodes are on in the export policy rules for allowing the volumes to be mounted as PVs in your workload clusters.
 +
 image::vtwn_image06.jpg[SVM Create with NFS]
 +
@@ -39,7 +39,7 @@ image::vtwn_image08.jpg[SVM aggregate allocation]
 ontap-01> vserver nfs modify -vserver tanzu_svm -mount-rootonly disabled
 ----
 
-=== Create Backends and StorageClasses
+== Create Backends and StorageClasses
 
 . For NetApp ONTAP systems serving NFS, create a backend config file on the jumphost with the backendName, managementLIF, dataLIF, svm, username, and password and other details.
 +
@@ -75,7 +75,7 @@ NOTE: It is a best practice to define the custom backendName value as a combinat
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: basic-csi
+  name: ontap-nfs
 provisioner: csi.trident.netapp.io
 parameters:
   backendType: "ontap-nas"
@@ -84,8 +84,8 @@ parameters:
 . Create the storage class by running the kubectl command.
 +
 ----
-[netapp-user@rhel7 trident-installer]$ kubectl create -f storage-class-basic.yaml
-storageclass.storage.k8s.io/basic-csi created
+[netapp-user@rhel7 trident-installer]$ kubectl create -f storage-class-nfs.yaml
+storageclass.storage.k8s.io/ontap-nfs created
 ----
 
 . With the storage class created, you must then create the first persistent volume claim (PVC). A sample PVC definition is given below. Ensure that the `storageClassName` field matches the name of the storage class just created. The PVC definition can be further customized as required depending upon the workload to be provisioned.
@@ -101,7 +101,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: basic-csi
+  storageClassName: ontap-nfs
 ----
 
 . Create the PVC by issuing the kubectl command. Creation can take some time depending on the size of the backing volume being created, so you can watch the process as it completes.
@@ -112,7 +112,7 @@ persistentvolumeclaim/basic created
 
 [netapp-user@rhel7 trident-installer]$ kubectl get pvc
 NAME    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-basic   Bound    pvc-b4370d37-0fa4-4c17-bd86-94f96c94b42d   1Gi        RWO            basic-csi      7s
+basic   Bound    pvc-b4370d37-0fa4-4c17-bd86-94f96c94b42d   1Gi        RWO            ontap-nfs      7s
 ----
 
 
