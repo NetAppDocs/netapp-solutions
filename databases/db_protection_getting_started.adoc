@@ -1,0 +1,163 @@
+---
+sidebar: sidebar
+permalink: databases/db_protection_getting_started.html
+keywords: Linux, RHEL Oracle19c, NFS, ONTAP
+summary: This page describes the Automated method for deploying Oracle Data Protection on NetApp ONTAP storage.
+---
+
+= Getting started
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+This solution has been designed to be run in an AWX/Tower environment.
+
+== AWX/Tower
+
+For AWX/Tower environments, you are guided through creating an inventory of your ONTAP cluster management and Oracle server (IPs and hostnames), creating credentials, configuring a project that pulls the Ansible code from NetApp Automation Github, and the Job Template that launches the automation.
+
+. The solution has been designed to run in a private cloud scenario (on-premise to on-premise), and hybrid cloud (on-premise to public cloud Cloud Volumes ONTAP [CVO])
+. Fill out the variables specific to your environment, and copy and paste them into the Extra Vars fields in your job template.
+. After the extra vars have been added to your job template, you can launch the automation.
+. The automation is set to be ran three phases (Setup, Replication Schedule for Oracle Binaries, Database, Logs, and Replication Schedule just for Logs), and a forth phase to recovering the database at a DR site.
+. For detailed instructions for obtaining the keys and tokens necessary for the CVO Data Protection visit link:automation/authentication_tokens.html[Gather Pre-requisites For CVO and Connector Deployments]
+
+== Requirements
+[role="tabbed-block"]
+====
+.[big]*On-Prem*  *|*
+--
+[width=100%, cols="3, 9",grid="all"]
+|===
+|Environment | Requirements
+
+.4+| *Ansible environment* |
+AWX/Tower
+| Ansible v.2.10 and higher
+| Python 3
+| Python libraries
+- netapp-lib
+- xmltodict
+- jmespath
+.3+| *ONTAP* |
+ONTAP version 9.8 +
+| Two data aggregates
+| NFS vlan and ifgrp created
+.5+| *Oracle server(s)* |
+RHEL 7/8 | Oracle Linux 7/8 | Network interfaces for NFS, public, and optional mgmt | Existing Oracle environment on source, and the equivalent Linux operating system at the destination (DR Site or Public Cloud)
+|===
+--
+.[big]*CVO*
+--
+[width=100%, cols="3, 9",grid="all"]
+|===
+|Environment | Requirements
+
+.4+| *Ansible environment* |
+AWX/Tower
+| Ansible v.2.10 and higher
+| Python 3
+| Python libraries
+- netapp-lib
+- xmltodict
+- jmespath
+.3+| *ONTAP* |
+ONTAP version 9.8 +
+| Two data aggregates
+| NFS vlan and ifgrp created
+.6+| *Oracle server(s)* |
+| RHEL 7/8
+| Oracle Linux 7/8
+| Network interfaces for NFS, public, and optional mgmt
+| Existing Oracle environment on source, and the equivalent Linux operating system at the destination (DR Site or Public Cloud)
+| Set appropriate swap space on the Oracle EC2 instance, by default some EC2 instances are deployed with 0 swap
+.3+| *Cloud Manager/AWS* |
+AWS Access/Secret Key
+| NetApp Cloud Manager Account | NetApp Cloud Manager Refresh Token | Add source intercluster lifs to AWS Security group
+|===
+--
+====
+== Automation Details
+
+[role="tabbed-block"]
+====
+.[big]*On-Prem*  *|*
+--
+This automated deployment is designed with a single Ansible playbook that consists of three separate roles. The roles are for ONTAP, Linux, and Oracle configurations.
+The following table describes which tasks are being automated.
+
+[width=100%, cols="3, 9",grid="all"]
+|===
+|Playbook | Tasks
+
+.5+|*ontap_setup* |
+Pre-check of the ONTAP environment
+| Creation of Intercluster LIFs on source cluster (OPTIONAL)
+| Creation of Intercluster LIFs on destination cluster (OPTIONAL)
+| Creation of Cluster and SVM Peering
+| Creation of destination SnapMirror and Initialization of designated Oracle volumes
+.4+|*ora_replication_cg* |
+Enable backup mode for each database in /etc/oratab
+| Snapshot taken of Oracle Binary and Database volumes
+| Snapmirror Updated
+| Turn off backup mode for each database in /etc/oratab
+.3+|*ora_replication_log* |
+Switch current log for each database in /etc/oratab
+| Snapshot taken of Oracle Log volume
+| Snapmirror Updated
+.5+|*ora_recovery* |
+Break SnapMirror
+| Enable NFS and create junction path for Oracle volumes on the destination
+| Configure DR Oracle Host
+| Mount and verify Oracle volumes
+| Recover and start Oracle database
+|===
+--
+.[big]*CVO*
+--
+This automated deployment is designed with a single Ansible playbook that consists of three separate roles. The roles are for ONTAP, Linux, and Oracle configurations.
+The following table describes which tasks are being automated.
+
+[width=100%, cols="4, 9",grid="all"]
+|===
+|Playbook | Tasks
+
+.7+|*cvo_setup* |
+Pre-check of the environment
+| AWS Configure/AWS Access Key ID/Secret Key/Default Region
+| Creation of AWS Role
+| Creation of NetApp Cloud Manager Connector instance in AWS
+| Creation of Cloud Volumes ONTAP (CVO) instance in AWS
+| Add On-Prem Source ONTAP Cluster to NetApp Cloud Manager
+| Creation of destination SnapMirror and Initialization of designated Oracle volumes
+.4+|*ora_replication_cg* |
+Enable backup mode for each database in /etc/oratab
+| Snapshot taken of Oracle Binary and Database volumes
+| Snapmirror Updated
+| Turn off backup mode for each database in /etc/oratab
+.3+|*ora_replication_log* |
+Switch current log for each database in /etc/oratab
+| Snapshot taken of Oracle Log volume
+| Snapmirror Updated
+.5+|*ora_recovery* |
+Break SnapMirror
+| Enable NFS and create junction path for Oracle volumes on the destination CVO
+| Configure DR Oracle Host
+| Mount and verify Oracle volumes
+| Recover and start Oracle database
+|===
+--
+====
+
+== Default parameters
+To simplify automation, we have preset many required Oracle parameters with default values. It is generally not necessary to change the default parameters for most deployments. A more advanced user can make changes to the default parameters with caution. The default parameters are located in each role folder under defaults directory.
+
+== License
+You should read license information as stated in the Github repository. By accessing, downloading, installing, or using the content in this repository, you agree the terms of the license laid out link:https://github.com/NetApp-Automation/na_oracle19c_deploy/blob/master/LICENSE.TXT[here^].
+
+Note that there are certain restrictions around producing and/or sharing any derivative works with the content in this repository. Please make sure you read the terms of the link:https://github.com/NetApp-Automation/na_oracle19c_deploy/blob/master/LICENSE.TXT[License^] before using the content. If you do not agree to all of the terms, do not access, download, or use the content in this repository.
+
+After you are ready, click link:db_protection_awx_automation.html[here for detailed AWX/Tower procedures].
