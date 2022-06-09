@@ -1,0 +1,181 @@
+---
+sidebar: sidebar
+permalink: ehc/azure/azure-native-dr-jetstream.html
+keywords: NetApp Solutions, microsoft azure, avs, azure, anf, azure netapp files, ontap, disaster recovery, dr
+summary:
+---
+
+= Disaster Recovery with ANF and JetStream
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+[.lead]
+When planning and starting protection for a large number of VMs (for example,  100+), use the Capacity Planning Tool (CPT) from the JetStream DR Automation Toolkit. Provide a list of VMs to be protected together with their RTO and recovery group preferences, and then run CPT.
+
+CPT performs the following functions:
+
+* Combining VMs into protection domains according to their RTO.
+* Defining the optimal number of DRVAs and their resources.
+* Estimating required replication bandwidth.
+* Identifying replication log volume characteristics (capacity, bandwidth, and so on).
+* Estimating required object storage capacity, and more.
+
+[NOTE]
+The number and content of domains prescribed depend upon various VM characteristics such as average IOPS, total capacity, priority (which defines failover order), RTO, and others.
+
+== Install JetStream DR in On-Premises Datacenter
+
+JetStream DR software consists of three major components: JetStream DR Management Server Virtual Appliance (MSA), DR Virtual Appliance (DRVA), and host components (I/O Filter packages). MSA is used to install and configure host components on the compute cluster and then to administer JetStream DR software. The following list provides a high-level description of the installation process:
+
+. Check prerequisites.
+. Run the Capacity Planning Tool for resource and configuration recommendations (optional but recommended for proof-of-concept trials).
+. Deploy the JetStream DR MSA to a vSphere host in the designated cluster.
+. Launch the MSA using its DNS name in a browser.
+. Register the vCenter server with the MSA.To perform the installation, complete the following detailed steps:
+
+. After JetStream DR MSA has been deployed and the vCenter Server has been registered, access the JetStream DR plug-in using the vSphere Web Client. This can be done by navigating to Datacenter > Configure > JetStream DR.
++
+image:vmware-dr-image8.png[Error: Missing Graphic Image]
+
+. From the JetStream DR interface, select the appropriate cluster.
++
+image:vmware-dr-image9.png[Error: Missing Graphic Image]
+
+. Configure the cluster with the I/O filter package.
++
+image:vmware-dr-image10.png[Error: Missing Graphic Image]
+
+. Add Azure Blob Storage located at the recovery site.
+. Deploy a DR Virtual Appliance (DRVA) from the Appliances tab.
+
+[NOTE]
+DRVAs can be automatically created by CPT,  but for POC trials we recommend configuring and running the DR cycle manually (start protection > failover > failback).
+
+The JetStream DRVA is a virtual appliance that facilitates key functions in the data replication process. A protected cluster must contain at least one DRVA, and typically one DRVA is configured per host. Each DRVA can manage multiple protected domains.
+
+image:vmware-dr-image11.png[Error: Missing Graphic Image]
+
+In this example, four DRVA’s were created for 80 virtual machines.
+
+. Create replication log volumes for each DRVA using VMDK from the datastores available or independent shared iSCSI storage pools.
+. From the Protected Domains tab,  create the required number of protected domains using information about the Azure Blob Storage site, DRVA instance, and replication log. A protected domain defines a specific VM or set of VMs within the cluster that are protected together and assigned a priority order for failover/failback operations.
++
+image:vmware-dr-image12.png[Error: Missing Graphic Image]
+
+. Select VMs you want to protect and start VM protection of the protected domain. This begins data replication to the designated Blob Store.
+
+[NOTE]
+Verify that the same protection mode is used for all VMs in a protected domain.
+
+[NOTE]
+Write- Back(VMDK) mode can offer higher performance.
+
+image:vmware-dr-image13.png[Error: Missing Graphic Image]
+
+Verify that replication log volumes are placed on high performance storage.
+
+[NOTE]
+Failover run books can be configured to group the VMs (called Recovery Group), set boot order sequence, and modify the CPU/memory settings along with IP configurations.
+
+== Install JetStream DR for AVS in an Azure VMware Solution private cloud using the Run command
+
+A best practice for a recovery site (AVS) is to create a three-node pilot-light cluster in advance. This allows the recovery site infrastructure to be preconfigured, including the following items:
+
+* Destination networking segments, firewalls, services like DHCP and DNS, and so on.
+* Installation of JetStream DR for AVS
+* Configuration of ANF volumes as datastores, and moreJetStream DR supports near-zero RTO mode for mission- critical domains. For these domains, destination storage should be preinstalled. ANF is a recommended storage type in this case.
+
+[NOTE]
+Network configuration including segment creation should be configured on the AVS cluster to match on-premises requirements.
+
+Depending on the SLA and RTO requirements, continuous failover or regular (standard) failover mode can be used. For near-zero RTO, continuous rehydration should be started at the recovery site.
+
+To install JetStream DR for AVS on an Azure VMware Solution private cloud, complete the following steps:
+
+. From the Azure portal, go to the Azure VMware solution, select the private cloud,  and select Run command > Packages > JSDR.Configuration.
++
+[NOTE]
+The default CloudAdmin user in Azure VMware Solution doesn't have sufficient privileges to install JetStream DR for AVS. Azure VMware Solution enables simplified and automated installation of JetStream DR by invoking the Azure VMware Solution Run command for JetStream DR.
+
++
+The following screenshot shows installation using a DHCP-based IP address.
++
+image:vmware-dr-image14.png[Error: Missing Graphic Image]
+
+. After JetStream DR for AVS installation is complete, refresh the browser. To access the JetStream DR UI, go to SDDC Datacenter > Configure > JetStream DR.
++
+image:vmware-dr-image15.png[Error: Missing Graphic Image]
+
+. From the JetStream DR interface, add the Azure Blob Storage account that was used to protect the on-premises cluster as a storage site and then run the Scan Domains option.
++
+image:vmware-dr-image16.png[Error: Missing Graphic Image]
+
+. After the protected domains are imported, deploy DRVA appliances. In this example, continuous rehydration is started manually from the recovery site using the JetStream DR UI.
++
+[NOTE]
+These steps can also be automated using CPT created plans.
+
+. Create replication log volumes using available vSAN or ANF datastores.
+. Import the protected domains and configure the Recovery VA to use the ANF datastore for VM placements.
++
+image:vmware-dr-image17.png[Error: Missing Graphic Image]
++
+[NOTE]
+Make sure that DHCP is enabled on the selected segment and enough IPs are available. Dynamic IPs are temporarily used while domains are recovering. Each recovering VM (including continuous rehydration) requires an individual dynamic IP. After recovery is complete, the IP is released and can be reused.
+
+. Select the appropriate failover option (continuous failover or failover). In this example, continuous rehydration (continuous failover) is selected.
++
+image:vmware-dr-image18.png[Error: Missing Graphic Image]
+
+== Performing Failover / Failback
+
+. After a disaster occurs in the protected cluster of the on-premises environment (partial or full failure), trigger the failover.
++
+[NOTE]
+CPT can be used to execute the failover plan to recover the VMs from Azure Blob Storage into the AVS cluster recovery site.
+
++
+[NOTE]
+After failover (for continuous or standard rehydration) when the protected VMs have been started in AVS, protection is automatically resumed and JetStream DR continues to replicate their data into the appropriate/original containers in Azure Blob Storage.
+
++
+image:vmware-dr-image19.png[Error: Missing Graphic Image]
++
+image:vmware-dr-image20.png[Error: Missing Graphic Image]
+
++
+The task bar shows progress of failover activities.
+
+. When the task is complete, access the recovered VMs and business continues as normal.
++
+image:vmware-dr-image21.png[Error: Missing Graphic Image]
++
+After the primary site is up and running again, failback can be performed. VM protection is resumed and data consistency should be checked.
+
+. Restore the on-premises environment. Depending upon the type of disaster incident, it might be necessary to restore and/or verify the configuration of the protected cluster. If necessary, JetStream DR software might need to be reinstalled.
++
+[NOTE]
+Note: The `recovery_utility_prepare_failback` script provided in the Automation Toolkit can be used to help clean the original protected site of any obsolete VMs, domain information, and so on.
+
+. Access the restored on-premises environment, go to the Jetstream DR UI, and select the appropriate protected domain. After the protected site is ready for failback, select the Failback option in the UI.
++
+image:vmware-dr-image22.png[Error: Missing Graphic Image]
+
+[NOTE]
+The CPT generated failback plan can also be used to initiate the return of the VMs and their data from the object store back to the original VMware environment.
+
+[NOTE]
+Specify the maximum delay after pausing VMs in the recovery site and restarting in the protected site. This time includes completing replication after stopping failover VMs, the time to clean recovery site,  and the time to recreate VMs in protected site. The NetApp recommended value is 10 minutes.
+
+Complete the failback process, and then confirm the resumption of VM protection and data consistency.
+
+== Ransomeware Recovery
+
+Recovering from ransomware can be a daunting task. Specifically, it can be hard for IT organizations to determine the safe point of return and,  once determined, how to ensure that recovered workloads are safeguarded from the attacks reoccurring (from sleeping malware or through vulnerable applications).
+
+JetStream DR for AVS together with Azure NetApp Files datastores can address these concerns by allowing organizations to recover from available points in time, so that workloads are recovered to a functional, isolated network if required. Recovery allows applications to function and communicate with each other while not exposing them to north- south traffic, thereby giving security teams a safe place to perform forensics and other necessary remediation.
+
+image:vmware-dr-image23.png[Error: Missing Graphic Image]
