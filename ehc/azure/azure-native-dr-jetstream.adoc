@@ -13,6 +13,33 @@ summary:
 :imagesdir: ./../../media/
 
 [.lead]
+Disaster recovery to cloud is a resilient and cost-effective way of protecting the workloads against site outages and data corruption events (for example,  ransomware). Using the VMware VAIO framework, on-premises VMware workloads can be replicated to Azure Blob storage and recovered,  enabling minimal or close to no data loss and near-zero RTO.
+
+JetStream DR can be used to seamlessly recover the workloads replicated from on-premises to AVS and specifically to Azure NetApp Files. It enables cost-effective disaster recovery by using minimal resources at the DR site and cost-effective cloud storage. JetStream DR automates recovery to ANF datastores via Azure Blob Storage. JetStream DR recovers independent VMs or groups of related VMs into recovery site infrastructure according to network mapping and provides point-in-time recovery for ransomware protection.
+
+This document provides an understanding of the JetStream DR principles of operations and its main components.
+
+.Solution deployment overview
+[%collapsible]
+=====
+. Install JetStream DR software in the on-premises data center.
+.. Download the JetStream DR software bundle from Azure Marketplace (ZIP) and deploy the JetStream DR MSA (OVA) in the designated cluster.
+.. Configure the cluster with the I/O filter package (install JetStream VIB).
+.. Provision Azure Blob (Azure Storage Account) in the same region as the DR AVS cluster.
+.. Deploy DRVA appliances and assign replication log volumes (VMDK from existing datastore or shared iSCSI storage).
+.. Create protected domains (groups of related VMs) and assign DRVAs and Azure Blob Storage/ANF.
+.. Start protection.
+. Install JetStream DR software in the Azure VMware Solution private cloud.
+.. Use the Run command to install and configure JetStream DR.
+.. Add the same Azure Blob container and discover domains using the Scan Domains option.
+.. Deploy required DRVA appliances.
+.. Create replication log volumes using available vSAN or ANF datastores.
+.. Import protected domains and configure RocVA (recovery VA) to use ANF datastore for VM placements.
+.. Select the appropriate failover option and start continuous rehydration for near-zero RTO domains or VMs.
+. During a disaster event, trigger failover to Azure NetApp Files datastores in the designated AVS DR site.
+. Invoke failback to the protected site after the protected site has been recovered.Before starting, make sure that the prerequisites are met as indicated in this https://docs.microsoft.com/en-us/azure/azure-vmware/deploy-disaster-recovery-using-jetstream[link^] and also run the Bandwidth Testing Tool (BWT) provided by JetStream Software to evaluate the potential performance of Azure Blob storage and its replication bandwidth when used with JetStream DR software. After the pre-requisites, including connectivity, are in place, set up and subscribe to JetStream DR for AVS from the https://portal.azure.com/[Azure Marketplace^]. After the software bundle is downloaded, proceed with the installation process described above.
+=====
+
 When planning and starting protection for a large number of VMs (for example,  100+), use the Capacity Planning Tool (CPT) from the JetStream DR Automation Toolkit. Provide a list of VMs to be protected together with their RTO and recovery group preferences, and then run CPT.
 
 CPT performs the following functions:

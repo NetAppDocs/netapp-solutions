@@ -19,7 +19,9 @@ summary:
 //
 
 [.lead]
-NFS datastore support was introduced with ESXi version 3 in on-premises deployments,  which greatly extended vSphere’s storage capabilities. Since then,  running vSphere on NFS is a widely adopted option for virtualization deployments on-premises because it offers strong performance and stability. If you have significant network-attached storage (NAS) in an on-premises datacenter, you should consider deploying an Azure VMware solution SDDC in Azure with Azure NetApp File datastores to overcome capacity and performance challenges.
+NFS datastore support was introduced with ESXi version 3 in on-premises deployments, which greatly extended vSphere’s storage capabilities.
+
+Running vSphere on NFS is a widely adopted option for virtualization deployments on-premises because it offers strong performance and stability. If you have significant network-attached storage (NAS) in an on-premises datacenter, you should consider deploying an Azure VMware solution SDDC in Azure with Azure NetApp File datastores to overcome capacity and performance challenges.
 
 Azure NetApp Files is built on industry-leading, highly available NetApp ONTAP data management software. Microsoft Azure services are grouped into three categories: foundational, mainstream, and specialized. Azure NetApp Files is in the specialized category and is backed by hardware already deployed in many regions. With built-in high-availability (HA), Azure NetApp Files protects your data from most outages and offers you an industry-leading SLA of https://azure.microsoft.com/support/legal/sla/netapp/v1_1/[99.99%^] uptime.
 
@@ -39,7 +41,7 @@ Contact Azure and NetApp Solution Architects for planning and sizing of storage 
 
 == Detailed architecture
 
-From a high-level perspective, this archirecture describes how to achieve hybrid- cloud connectivity and app portability across on-premises environments and Azure. It also describes using Azure NetApp Files as a native NFS datastore and as an in-guest storage option for guest virtual machines hosted on the Azure VMware solution.
+From a high-level perspective, this architecture describes how to achieve hybrid-cloud connectivity and app portability across on-premises environments and Azure. It also describes using Azure NetApp Files as a native NFS datastore and as an in-guest storage option for guest virtual machines hosted on the Azure VMware solution.
 
 image:vmware-dr-image1.png[Error: Missing Graphic Image]
 
@@ -59,9 +61,7 @@ To run RVtools,  complete the following steps:
 [NOTE]
 Guest VMs used with in-guest storage must be calculated separately;  however,  Azure NetApp Files can easily cover the additional storage capacity, thus keeping the overall TCO low.
 
-== Getting Started
-
-=== Deploy and configure Azure VMware Solution
+== Deploying and configuring Azure VMware Solution
 
 Like on-premises, planning an Azure VMware solution is critical for a successful production- ready environment for creating virtual machines and migration.
 
@@ -71,7 +71,7 @@ The setup process can be broken down into three parts:
 
 * Register the resource provider and create a private cloud.
 * Connect to a new or existing ExpressRoute virtual network gateway.
-* Validate network connectivity and access the private cloud.Refer to this https://docs.netapp.com/us-en/netapp-solutions/ehc/azure/azure-avs.html[link^] for a step-by-step walkthrough of the Azure VMware solution SDDC provisioning process.
+* Validate network connectivity and access the private cloud. Refer to this link:azure-avs.html[link^] for a step-by-step walkthrough of the Azure VMware solution SDDC provisioning process.
 
 == Configure Azure NetApp Files with Azure VMware Solution
 
@@ -85,8 +85,10 @@ This feature is currently in public preview.
 
 To attach an Azure NetApp File volume as the VMware datastore of an Azure VMware Solution private cloud, make sure the following prerequisites are met.
 
-=== Prerequisites
-
+==================================================
+.Prerequisites
+[%collapsible]
+====
 . Use az login and validate the subscription is registered to CloudSanExperience feature in the Microsoft.AVS namespace.
 
 ....
@@ -139,9 +141,13 @@ az extension update --name vmware
 ....
 az extension add --name vmware
 ....
+====
+==================================================
 
-=== Create and mount Azure NetApp Files volumes
-
+==================================================
+.Create and mount Azure NetApp Files volumes
+[%collapsible]
+====
 . Log into the Azure Portal and access Azure NetApp Files. Verify access to the Azure NetApp Files service and register the Azure NetApp Files Resource Provider by using the `az provider register` `--namespace Microsoft.NetApp –wait` command. After registration, create a NetApp account. Refer to this https://docs.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-create-netapp-account[link^] for detailed steps.
 
 image:vmware-dr-image2.png[Error: Missing Graphic Image]
@@ -163,9 +169,13 @@ a|* NFSv3 is supported for datastores on Azure NetApp Files.
 image:vmware-dr-image4.png[Error: Missing Graphic Image]
 
 To learn about Azure NetApp Files volume performance by size or quota, see https://docs.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-performance-considerations[Performance considerations for Azure NetApp Files^].
+====
+==================================================
 
-== Add Azure NetApp files datastore to private cloud
-
+==================================================
+.Add Azure NetApp files datastore to private cloud
+[%collapsible]
+====
 To add an Azure NetApp files datastore to a private cloud, complete the following steps:
 
 . After the required features are registered, attach an NFS datastore to the Azure VMware Solution private cloud cluster by running the appropriate command.
@@ -221,6 +231,8 @@ C:\Users\niyaz>az vmware datastore list --resource-group anfavsval2 --cluster Cl
 . After the necessary connectivity is in place, the volumes are mounted as a datastore.
 
 image:vmware-dr-image5.png[Error: Missing Graphic Image]
+====
+==================================================
 
 == Sizing and performance optimization
 
@@ -286,12 +298,17 @@ a|* Volume reshaping and dynamic service level capability allow you to optimize 
 * During public preview, VAAI is not enabled.
 |===
 
-== Migration
+== Workloads
 
+.Migration
+[%collapsible]
+=====
 One of the most common use cases is migration. Use VMware HCX or vMotion to move on-premises VMs. Alternatively, you can use Rivermeadow to migrate VMs to Azure NetApp Files datastores.
+=====
 
-== Data protection
-
+.Data Protection
+[%collapsible]
+=====
 Backing up VMs and quickly recovering them are among the great strengths of ANF datastores. Use Snapshot copies to make quick copies of your VM or datastore without affecting performance, and then send them to Azure storage for longer-term data protection or to a secondary region using cross region replication for disaster recovery purposes. This approach minimizes storage space and network bandwidth by only storing changed information.
 
 Use Azure NetApp Files Snapshot copies for general protection,  and use application tools to protect transactional data such as SQL Server or Oracle residing on the guest VMs. These Snapshot copies are different from VMware (consistency) snapshots and are suitable for longer term protection.
@@ -299,8 +316,10 @@ Use Azure NetApp Files Snapshot copies for general protection,  and use applicat
 [NOTE]
 With ANF datastores,  the Restore to New Volume option can be used to clone an entire datastore volume, and the restored volume can be mounted as another datastore to hosts within AVS SDDC. After a datastore is mounted, VMs inside it can be registered, reconfigured, and customized as if they were individually cloned VMs.
 
-=== Cloud Backup for Virtual Machines
-
+==================================================
+.Cloud Backup for Virtual Machines
+[%collapsible]
+======
 Cloud Backup for Virtual Machines provides a vSphere web client GUI on vCenter to protect Azure VMware Solution virtual machines and Azure NetApp files datastores via backup policies. These policies can define schedule, retention, and other capabilities.  The Cloud Backup for Virtual Machine functionality can be deployed by using the Run command.
 
 The setup and protection policies can be installed by completing the following steps:
@@ -315,28 +334,17 @@ The setup and protection policies can be installed by completing the following s
 With Azure NetApp Files Snapshot technology, backups and restores are very fast.
 
 image:vmware-dr-image7.png[Error: Missing Graphic Image]
+======
+==================================================
 
-== Disaster Recovery with Azure NetApp Files, JetStream DR, and Azure VMware Solution
-
+==================================================
+.Disaster Recovery with Azure NetApp Files, JetStream DR, and Azure VMware Solution
+[%collapsible]
+======
 Disaster recovery to cloud is a resilient and cost-effective way of protecting the workloads against site outages and data corruption events (for example,  ransomware). Using the VMware VAIO framework, on-premises VMware workloads can be replicated to Azure Blob storage and recovered,  enabling minimal or close to no data loss and near-zero RTO. JetStream DR can be used to seamlessly recover the workloads replicated from on-premises to AVS and specifically to Azure NetApp Files. It enables cost-effective disaster recovery by using minimal resources at the DR site and cost-effective cloud storage. JetStream DR automates recovery to ANF datastores via Azure Blob Storage. JetStream DR recovers independent VMs or groups of related VMs into recovery site infrastructure according to network mapping and provides point-in-time recovery for ransomware protection.
 
-This document provides an understanding of the JetStream DR principles of operations and its main components.
+link:azure-native-dr-jetstream.html[DR solution with ANF, JetStream and AVS].
+======
+==================================================
 
-=== High level steps
-
-. Install JetStream DR software in the on-premises data center.
-.. Download the JetStream DR software bundle from Azure Marketplace (ZIP) and deploy the JetStream DR MSA (OVA) in the designated cluster.
-.. Configure the cluster with the I/O filter package (install JetStream VIB).
-.. Provision Azure Blob (Azure Storage Account) in the same region as the DR AVS cluster.
-.. Deploy DRVA appliances and assign replication log volumes (VMDK from existing datastore or shared iSCSI storage).
-.. Create protected domains (groups of related VMs) and assign DRVAs and Azure Blob Storage/ANF.
-.. Start protection.
-. Install JetStream DR software in the Azure VMware Solution private cloud.
-.. Use the Run command to install and configure JetStream DR.
-.. Add the same Azure Blob container and discover domains using the Scan Domains option.
-.. Deploy required DRVA appliances.
-.. Create replication log volumes using available vSAN or ANF datastores.
-.. Import protected domains and configure RocVA (recovery VA) to use ANF datastore for VM placements.
-.. Select the appropriate failover option and start continuous rehydration for near-zero RTO domains or VMs.
-. During a disaster event, trigger failover to Azure NetApp Files datastores in the designated AVS DR site.
-. Invoke failback to the protected site after the protected site has been recovered.Before starting, make sure that the prerequisites are met as indicated in this https://docs.microsoft.com/en-us/azure/azure-vmware/deploy-disaster-recovery-using-jetstream[link^] and also run the Bandwidth Testing Tool (BWT) provided by JetStream Software to evaluate the potential performance of Azure Blob storage and its replication bandwidth when used with JetStream DR software. After the pre-requisites, including connectivity, are in place, set up and subscribe to JetStream DR for AVS from the https://portal.azure.com/[Azure Marketplace^]. After the software bundle is downloaded, proceed with the installation process described above.
+=====
