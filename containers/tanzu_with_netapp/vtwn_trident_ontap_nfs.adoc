@@ -17,19 +17,19 @@ To enable Trident integration with the NetApp ONTAP storage system via NFS, you 
 
 == Create an SVM in ONTAP
 
-. Log into ONTAP System Manager and navigate to `Storage` -> `Storage VMs`, and click on `Add`.
+. Log into ONTAP System Manager, navigate to Storage > Storage VMs, and click Add.
 
-. Enter a name for the SVM, enable NFS protocol, check the `Allow NFS Client Access` checkbox and add the subnets that your worker nodes are on in the export policy rules for allowing the volumes to be mounted as PVs in your workload clusters.
+. Enter a name for the SVM, enable the NFS protocol, check the Allow NFS Client Access checkbox, and add the subnets that your worker nodes are on in the export policy rules for allowing the volumes to be mounted as PVs in your workload clusters.
 +
 image::vtwn_image06.jpg[SVM Create with NFS]
 +
-NOTE: If you are using NAT'ed deployment of user clusters or workload clusters with NSX-T, you need to add the Egress subnet [in case of TKGS] or the Floating IP subnet [in case of TKGI] to the export policy rules.
+NOTE: If you are using NAT'ed deployment of user clusters or workload clusters with NSX-T, you need to add the Egress subnet (in the case of TKGS0 or the Floating IP subnet (in the case of TKGI) to the export policy rules.
 
-. Provide the details for data LIFs and the details for SVM administration account, then click on Save.
+. Provide the details for data LIFs and the details for SVM administration account, and then click Save.
 +
 image::vtwn_image07.jpg[SVM Data LIFs and SVM administration]
 
-. Next step is to assign the aggregates to SVM. Navigate to `Storage` -> `Storage VMs`, click on the ellipsis next to the newly created SVM and then click `Edit`. Check the `Limit volume creation to preferred local tiers` checkbox and attach the required aggregates to it.
+. Assign the aggregates to an SVM. Navigate to Storage > Storage VMs, click the ellipsis next to the newly created SVM and then click Edit. Check the Limit Volume Creation to Preferred Local Tiers checkbox and attach the required aggregates to it.
 +
 image::vtwn_image08.jpg[SVM aggregate allocation]
 
@@ -39,9 +39,9 @@ image::vtwn_image08.jpg[SVM aggregate allocation]
 ontap-01> vserver nfs modify -vserver tanzu_svm -mount-rootonly disabled
 ----
 
-== Create Backends and StorageClasses
+== Create backends and StorageClasses
 
-. For NetApp ONTAP systems serving NFS, create a backend config file on the jumphost with the backendName, managementLIF, dataLIF, svm, username, and password and other details.
+. For NetApp ONTAP systems serving NFS, create a backend config file on the jumphost with the backendName, managementLIF, dataLIF, svm, username, password, and other details.
 +
 ----
 {
@@ -58,7 +58,7 @@ ontap-01> vserver nfs modify -vserver tanzu_svm -mount-rootonly disabled
 +
 NOTE: It is a best practice to define the custom backendName value as a combination of the storageDriverName and the dataLIF that is serving NFS for easy identification.
 
-. Create the Trident backend by running the below command.
+. Create the Trident backend by running the following command.
 +
 ----
 [netapp-user@rhel7]$ ./tridentctl -n trident create backend -f backend-ontap-nas.json
@@ -69,7 +69,7 @@ NOTE: It is a best practice to define the custom backendName value as a combinat
 +-------------------------+----------------+--------------------------------------+--------+---------+
 ----
 
-. With the backend created, you must next create a storage class. The below sample storage class definition higlights the required and basic fields, the parameter `backendType` should reflect the storage driver from the newly created Trident backend.
+. With the backend created, you must next create a storage class. The following sample storage class definition highlights the required and basic fields. The parameter `backendType` should reflect the storage driver from the newly created Trident backend.
 +
 ----
 apiVersion: storage.k8s.io/v1
@@ -88,7 +88,7 @@ parameters:
 storageclass.storage.k8s.io/ontap-nfs created
 ----
 
-. With the storage class created, you must then create the first persistent volume claim (PVC). A sample PVC definition is given below. Ensure that the `storageClassName` field matches the name of the storage class just created. The PVC definition can be further customized as required depending upon the workload to be provisioned.
+. With the storage class created, you must then create the first persistent volume claim (PVC). A sample PVC definition is given below. Make sure that the `storageClassName` field matches the name of the storage class just created. The PVC definition can be further customized as required depending upon the workload to be provisioned.
 +
 ----
 kind: PersistentVolumeClaim
@@ -114,6 +114,5 @@ persistentvolumeclaim/basic created
 NAME    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
 basic   Bound    pvc-b4370d37-0fa4-4c17-bd86-94f96c94b42d   1Gi        RWO            ontap-nfs      7s
 ----
-
 
 link:vtwn_videos_and_demos.html[Next: Videos and demos: VMware Tanzu with NetApp.]
