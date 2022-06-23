@@ -310,8 +310,8 @@ Other best practices to consider:
 
 image:vsphere_ontap_image2.png[Error: Missing Graphic Image]
 
+[[nfs]]
 == NFS
-// tag::nfs[]
 vSphere allows customers to use enterprise-class NFS arrays to provide concurrent access to datastores to all the nodes in an ESXi cluster. As mentioned in the datastore section, there are some ease of use and storage efficiency visibility benefits when using NFS with vSphere.
 
 The following best practices are recommended when using ONTAP NFS with vSphere:
@@ -319,7 +319,7 @@ The following best practices are recommended when using ONTAP NFS with vSphere:
 * Use a single logical interface (LIF) for each SVM on each node in the ONTAP cluster. Past recommendations of a LIF per datastore are no longer necessary. While direct access (LIF and datastore on same node) is best, don’t worry about indirect access because the performance effect is generally minimal (microseconds).
 * VMware has supported NFSv3 since VMware Infrastructure 3. vSphere 6.0 added support for NFSv4.1, which enables some advanced capabilities such as Kerberos security. Where NFSv3 uses client-side locking, NFSv4.1 uses server-side locking. Although an ONTAP volume can be exported through both protocols, ESXi can only mount through one protocol. This single protocol mount does not preclude other ESXi hosts from mounting the same datastore through a different version. Make sure to specify the protocol version to use when mounting so that all hosts use the same version and, therefore, the same locking style.  Do not mix NFS versions across hosts. If possible, use host profiles to check compliancy.
 ** Because there is no automatic datastore conversion between NFSv3 and NFSv4.1, create a new NFSv4.1 datastore and use Storage vMotion to migrate VMs to the new datastore.
-** At the time that this report was written, NetApp is continuing to work with VMware to resolve problems with NFSv4.1 datastores and storage failover. We expect to resolve these issues shortly.
+** Please refer to the NFS v4.1 Interoperability table notes in the https://mysupport.netapp.com/matrix/[NetApp Interoperability Matrix tool^] for specific ESXi patch levels required for support.
 * NFS export policies are used to control access by vSphere hosts. You can use one policy with multiple volumes (datastores). With NFSv3, ESXi uses the sys (UNIX) security style and requires the root mount option to execute VMs. In ONTAP, this option is referred to as superuser, and when the superuser option is used, it is not necessary to specify the anonymous user ID.  Note that export policy rules with different values for `-anon` and `-allow-suid` can cause SVM discovery problems with the ONTAP tools. Here’s a sample policy:
 ** Access Protocol: nfs3
 ** Client Match Spec: 192.168.42.21
@@ -387,7 +387,7 @@ The following table lists NFS versions and supported features.
 |No
 |No (ESXi 6.5 and later supports through session trunking; ONTAP supports through pNFS)
 |===
-// end::nfs[]
+
 == FlexGroup
 
 ONTAP 9.8 adds support for FlexGroup datastores in vSphere, along with the ONTAP tools for VMware vSphere 9.8 release. FlexGroup simplifies the creation of large datastores and automatically creates a number of constituent volumes to get maximum performance from an ONTAP system. Use FlexGroup with vSphere for a single, scalable vSphere datastore with the power of a full ONTAP cluster.
