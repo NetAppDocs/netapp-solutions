@@ -1,0 +1,84 @@
+---
+sidebar: sidebar
+permalink: databases/aws_ora_fsx_ec2_migration.html
+summary: This section provides details on factors to be considered when migrating Oracle database from on-premises to AWS EC2 instance and FSx storage.
+keywords: HA, DR, database, Oracle, RDS, AWS, SnapCenter
+---
+
+= Database migration from on-prem to public cloud
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:table-stripes: odd
+:imagesdir: ./../media/
+
+link:aws_ora_fsx_ec2_mgmt.html[Previous: Database management.]
+
+Database migration is a challenging endeavor by any means. Migrating an Oracle database from on-premises to the cloud is no exception.
+
+The following sections provide key factors to consider when migrating Oracle databases to the AWS public cloud with the AWS EC2 compute and FSx storage platform.
+
+== ONTAP storage is available on-premises
+
+If the on-premises Oracle database is sitting on an ONTAP storage array, then it is easier to set up replication for database migration using the NetApp SnapCenter UI tool.
+
+. Build a target compute EC2 instance that matches the on-premises instance.
+
+. Provision matching, equally sized database volumes from FSx console.
+
+. Mount the FSx database volumes to the EC2 instance.
+
+. Set up SnapMirror replication between the on-premises database volumes to the target FSx database volumes. The initial sync might take some time to move the primary source data, but any following incremental updates are much quicker.
+
+. At the time of switchover, shut down the primary application to stop all transactions. From SnapCenter, run a log backup to flush the remaining transactions to the target.
+
+. Break up the mirrored volumes, run Oracle recovery at the target, and bring up the database for service.
+
+. Point applications to the Oracle database in the cloud.
+
+== ONTAP storage is not available on premises
+
+If the on-premises Oracle database is hosted on third-party storage other than ONTAP, database migration is based on the restore of a Oracle database backup copy. You must play the archive log to make it current before switching over.
+
+AWS S3 can be used as a staging storage area for database move and migration. See the following high level steps for this method:
+
+. Provision a new, matching EC2 instance that is comparable with the on-premises instance.
+
+. Provision equal database volumes from FSx storage and mount the volumes to the EC2 instance.
+
+. Create a disk-level Oracle backup copy.
+
+. Move the backup copy to AWS S3 storage.
+
+. Recreate the Oracle control file and restore and recover the database by pulling data and the archive log from S3 storage.
+
+. Sync the target Oracle database with the on-premises source database.
+
+. At switchover, shut down the application and source Oracle database. Copy the last few archive logs and apply them to the target Oracle database to bring it up to date.
+
+. Start up the target database for user access.
+
+. Redirect application to the target database to complete the switchover.
+
+== Consolidate Oracle databases in AWS with Oracle multitenancy CDB/PDB architecture
+
+. Create CDB in the AWS public cloud.
+
+. If the on-premises database is also deployed in CDB/PDB multitenancy, unplug the PDB to be migrated.
+
+. Transfer metadata as well as underlined Oracle data files to the target CDB instance.
+
+. Validate compatibility with Oracle validation procedures.
+
+. If compatibility validation passes, plug the unplugged PDB into the target CDB container.
+
+. Update the data dictionary if required.
+
+. Back up and open the migrated PDB for access.
+
+[NOTE]
+
+PDB unplug and plug-in requires application downtime that should be taken into consideration during migration planning.
+
+Again, the NetApp automation team provides a migration toolkit that can facilitate Oracle database migration from on-premises to the AWS cloud. Check the NetApp public GitHub site for the latest database migration tools.
