@@ -1,0 +1,399 @@
+---
+sidebar: sidebar
+permalink: databases/aws_ora_fsx_ec2_procedures.html
+summary: This section describes the deployment procedures of deploying Oracle RDS custom database with FSx storage.
+keywords: AWS, Oracle, RDS, HA, DR, database
+---
+
+= Step-by-Step Oracle Deployment Procedures on AWS EC2/FSx
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:table-stripes: odd
+:imagesdir: ./../media/
+
+link:aws_ora_fsx_ec2_factors.html[Previous: Solution architecture.]
+
+== Deploy an EC2 Linux instance for Oracle via EC2 console
+
+If you are new to AWS, you first need to set up an AWS environment. The documentation tab at the AWS website landing page provides EC2 instruction links on how to deploy a Linux EC2 instance that can be used to host your Oracle database via the AWS EC2 console. The following section is a summary of these steps. For details, see the linked AWS EC2-specific documentation.
+
+=== Setting up your AWS EC2 environment
+
+You must create an AWS account to provision the necessary resources to run your Oracle environment on the EC2 and FSx service. The following AWS documentation provides the necessary details:
+
+* link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/get-set-up-for-amazon-ec2.html[Set up to use Amazon EC2^]
+
+Key topics:
+
+* Sign up for AWS.
+* Create a key pair.
+* Create a security group.
+
+=== Enabling multiple availability zones in AWS account attributes
+
+For an Oracle high availability configuration as demonstrated in the architecture diagram, you must enable at least four availability zones in a region. The multiple availability zones can also be situated in different regions to meet the required distances for disaster recovery.
+
+image:aws_ora_fsx_ec2_inst_01.PNG[Error: Missing Graphic Image]
+
+=== Creating and connecting to an EC2 instance for hosting Oracle database
+
+See the tutorial link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html[Get started with Amazon EC2 Linux instances^] for step-by-step deployment procedures and best practices.
+
+Key topics:
+
+* Overview.
+* Prerequisites.
+* Step 1: Launch an instance.
+* Step 2: Connect to your instance.
+* Step 3: Clean up your instance.
+
+The following screen shots demonstrate the deployment of an m5-type Linux instance with the EC2 console for running Oracle.
+
+. From the EC2 dashboard, click the yellow Launch Instance button to start the EC2 instance deployment workflow.
++
+image:aws_ora_fsx_ec2_inst_02.PNG[Error: Missing Graphic Image]
+
+. In Step 1, select "Red Hat Enterprise Linux 8 (HVM), SSD Volume Type - ami-0b0af3577fe5e3532 (64-bit x86) / ami-01fc429821bf1f4b4 (64-bit Arm)."
++
+image:aws_ora_fsx_ec2_inst_03.PNG[Error: Missing Graphic Image]
+
+. In Step 2, select an m5 instance type with the appropriate CPU and memory allocation based on your Oracle database workload. Click "Next: Configure Instance Details."
++
+image:aws_ora_fsx_ec2_inst_04.PNG[Error: Missing Graphic Image]
+
+. In Step 3, choose the VPC and subnet where the instance should be placed and enable public IP assignment. Click "Next: Add Storage."
++
+image:aws_ora_fsx_ec2_inst_05.PNG[Error: Missing Graphic Image]
+
+. In Step 4, allocate enough space for the root disk. You may need the space to add a swap. By default, EC2 instance assign zero swap space, which is not optimal for running Oracle.
++
+image:aws_ora_fsx_ec2_inst_06.PNG[Error: Missing Graphic Image]
+
+. In Step 5, add a tag for instance identification if needed.
++
+image:aws_ora_fsx_ec2_inst_07.PNG[Error: Missing Graphic Image]
+
+. In Step 6, select an existing security group or create a new one with the desired inbound and outbound policy for the instance.
++
+image:aws_ora_fsx_ec2_inst_08.PNG[Error: Missing Graphic Image]
+
+. In Step 7, review the instance configuration summary, and click Launch to start instance deployment. You are prompted to create a key pair or select a key pair for access to the instance.
++
+image:aws_ora_fsx_ec2_inst_09.PNG[Error: Missing Graphic Image]
+image:aws_ora_fsx_ec2_inst_09_1.PNG[Error: Missing Graphic Image]
+
+. Log into EC2 instance using an SSH key pair. Make changes to your key name and instance IP address as appropriate.
++
+[source, cli]
+ssh -i ora-db1v2.pem ec2-user@54.80.114.77
+
+You need to create two EC2 instances as primary and standby Oracle servers in their designated availability zone as demonstrated in the architecture diagram.
+
+== Provision FSx for ONTAP file systems for Oracle database storage
+
+EC2 instance deployment allocates an EBS root volume for the OS. FSx for ONTAP file systems provides Oracle database storage volumes, including the Oracle binary, data, and log volumes. The FSx storage NFS volumes can be either provisioned from the AWS FSx console or from Oracle installation, and configuration automation that allocates the volumes as the user configures in a automation parameter file.
+
+=== Creating FSx for ONTAP file systems
+
+Referred to this documentation https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-file-systems.html[Managing FSx for ONTAP file systems^] for creating FSx for ONTAP file systems.
+
+Key considerations:
+
+* SSD storage capacity. Minimum 1024 GiB, maximum 192 TiB.
+* Provisioned SSD IOPS. Based on workload requirements, a maximum of 80,000 SSD IOPS per file system.
+* Throughput capacity.
+* Set administrator fsxadmin/vsadmin password. Required for FSx configuration automation.
+* Backup and maintenance. Disable automatic daily backups; database storage backup is executed through SnapCenter scheduling.
+* Retrieve the SVM management IP address as well as protocol-specific access addresses from SVM details page. Required for FSx configuration automation.
++
+image:aws_rds_custom_deploy_fsx_01.PNG[Error: Missing Graphic Image]
+
+See the following step-by-step procedures for setting up either a primary or standby HA FSx cluster.
+
+. From the FSx console, click Create File System to start the FSx provision workflow.
++
+image:aws_ora_fsx_ec2_stor_01.PNG[Error: Missing Graphic Image]
+
+. Select Amazon FSx for NetApp ONTAP. Then click Next.
++
+image:aws_ora_fsx_ec2_stor_02.PNG[Error: Missing Graphic Image]
+
+. Select Standard Create and, in File System Details, name your file system, Multi-AZ HA. Based on your database workload, choose either Automatic or User-Provisioned IOPS up to 80,000 SSD IOPS. FSx storage comes with up to 2TiB NVMe caching at the backend that can deliver even higher measured IOPS.
++
+image:aws_ora_fsx_ec2_stor_03.PNG[Error: Missing Graphic Image]
+
+. In the Network & Security section, select the VPC, security group, and subnets. These should be created before FSx deployment. Based on the role of the FSx cluster (primary or standby), place the FSx storage nodes in the appropriate zones.
++
+image:aws_ora_fsx_ec2_stor_04.PNG[Error: Missing Graphic Image]
+
+. In the Security & Encryption section, accept the default, and enter the fsxadmin password.
++
+image:aws_ora_fsx_ec2_stor_05.PNG[Error: Missing Graphic Image]
+
+. Enter the SVM name and the vsadmin password.
++
+image:aws_ora_fsx_ec2_stor_06.PNG[Error: Missing Graphic Image]
+
+. Leave the volume configuration blank; you do not need to create a volume at this point.
++
+image:aws_ora_fsx_ec2_stor_07.PNG[Error: Missing Graphic Image]
+
+. Review the Summary page, and click Create File System to complete FSx file system provision.
++
+image:aws_ora_fsx_ec2_stor_08.PNG[Error: Missing Graphic Image]
+
+=== Provisioning of database volumes for Oracle database
+
+See link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-volumes.html[Managing FSx for ONTAP volumes - creating a volume^] for details.
+
+Key considerations:
+
+* Sizing the database volumes appropriately.
+* Disabling capacity pool tiering policy for performance configuration.
+* Enabling Oracle dNFS for NFS storage volumes.
+* Setting up multipath for iSCSI storage volumes.
+
+==== Create database volume from FSx console
+
+From the AWS FSx console, you can create three volumes for Oracle database file storage: one for the Oracle binary, one for the Oracle data, and one for the Oracle log. Make sure that volume naming matches the Oracle host name (defined in the hosts file in the automation toolkit) for proper identification. In this example, we use db1 as the EC2 Oracle host name instead of a typical IP-address-based host name for an EC2 instance.
+
+image:aws_ora_fsx_ec2_stor_09.PNG[Error: Missing Graphic Image]
+image:aws_ora_fsx_ec2_stor_10.PNG[Error: Missing Graphic Image]
+image:aws_ora_fsx_ec2_stor_11.PNG[Error: Missing Graphic Image]
+
+[NOTE]
+Creating iSCSI LUNs is not currently supported by the FSx console. For iSCSI LUNs deployment for Oracle, the volumes and LUNs can be created by using automation for ONTAP with the NetApp Automation Toolkit.
+
+== Install and configure Oracle on an EC2 instance with FSx database volumes
+
+The NetApp automation team provide an automation kit to run Oracle installation and configuration on EC2 instances according to best practices. The current version of the automation kit supports Oracle 19c on NFS with the default RU patch 19.8. The automation kit can be easily adapted for other RU patches if needed.
+
+=== Prepare a Ansible controller to run automation
+
+Follow the instruction in the section "<<Creating and connecting to an EC2 instance for hosting Oracle database>>" to provision a small EC2 Linux instance to run the Ansible controller. Rather than using RedHat, Amazon Linux t2.large with 2vCPU and 8G RAM should be sufficient.
+
+=== Retrieve NetApp Oracle deployment automation toolkit
+
+Log into the EC2 Ansible controller instance provisioned from step 1 as ec2-user and from the ec2-user home directory, execute the `git clone` command to clone a copy of the automation code.
+
+[source, cli]
+git clone https://github.com/NetApp-Automation/na_oracle19c_deploy.git
+
+[source, cli]
+git clone https://github.com/NetApp-Automation/na_rds_fsx_oranfs_config.git
+
+=== Execute automated Oracle 19c deployment using automation toolkit
+
+See these detailed instruction link:https://docs.netapp.com/us-en/netapp-solutions/databases/cli_automation.html[CLI deployment Oracle 19c Database^] to deploy Oracle 19c with CLI automation. There is a small change in command syntax for playbook execution because you are using an SSH key pair instead of a password for host access authentication. The following list is a high level summary:
+
+. By default, an EC2 instance uses an SSH key pair for access authentication. From Ansible controller automation root directories `/home/ec2-user/na_oracle19c_deploy`, and `/home/ec2-user/na_rds_fsx_oranfs_config`, make a copy of the SSH key `accesststkey.pem` for the Oracle host deployed in the step "<<Creating and connecting to an EC2 instance for hosting Oracle database>>."
+
+. Log into the EC2 instance DB host as ec2-user, and install the python3 library.
++
+[source, cli]
+sudo yum install python3
+
+. Create a 16G swap space from the root disk drive. By default, an EC2 instance creates zero swap space. Follow this AWS documentation: link:https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^].
+
+. Return to the Ansible controller (`cd /home/ec2-user/na_rds_fsx_oranfs_config`), and execute the preclone playbook with the appropriate requirements and `linux_config` tags.
++
+[source, cli]
+ansible-playbook -i hosts rds_preclone_config.yml -u ec2-user --private-key accesststkey.pem -e @vars/fsx_vars.yml -t requirements_config
++
+[source, cli]
+ansible-playbook -i hosts rds_preclone_config.yml -u ec2-user --private-key accesststkey.pem -e @vars/fsx_vars.yml -t linux_config
+
+. Switch to the `/home/ec2-user/na_oracle19c_deploy-master` directory, read the README file, and populate the global `vars.yml` file with the relevant global parameters.
+
+. Populate the `host_name.yml` file with the relevant parameters in the `host_vars` directory.
+
+. Execute the playbook for Linux, and press Enter when prompted for the vsadmin password.
++
+[source, cli]
+ansible-playbook -i hosts all_playbook.yml -u ec2-user --private-key accesststkey.pem -t linux_config -e @vars/vars.yml
+
+. Execute the playbook for Oracle, and press enter when prompted for the vsadmin password.
++
+[source, cli]
+ansible-playbook -i hosts all_playbook.yml -u ec2-user --private-key accesststkey.pem -t oracle_config -e @vars/vars.yml
+
+Change the permission bit on the SSH key file to 400 if needed. Change the Oracle host (`ansible_host` in the `host_vars` file) IP address to your EC2 instance public address.
+
+== Setting up SnapMirror between primary and standby FSx HA cluster
+
+For high availability and disaster recovery, you can set up SnapMirror replication between the primary and standby FSx storage cluster. Unlike other cloud storage services, FSx enables a user to control and manage storage replication at a desired frequency and replication throughput. It also enables users to test HA/DR without any effect on availability.
+
+The following steps show how to set up replication between a primary and standby FSx storage cluster.
+
+. Setup primary and standby cluster peering. Log into the primary cluster as the fsxadmin user and execute the following command. This reciprocal create process executes the create command on both the primary cluster and the standby cluster. Replace `standby_cluster_name` with the appropriate name for your environment.
++
+[source, cli]
+cluster peer create -peer-addrs standby_cluster_name,inter_cluster_ip_address -username fsxadmin -initial-allowed-vserver-peers *
+
+. Set up vServer peering between the primary and standby cluster. Log into the primary cluster as the vsadmin user and execute the following command. Replace `primary_vserver_name`, `standby_vserver_name`, `standby_cluster_name` with the appropriate names for your environment.
++
+[source, cli]
+vserver peer create -vserver primary_vserver_name -peer-vserver standby_vserver_name -peer-cluster standby_cluster_name -applications snapmirror
+
+. Verify that the cluster and vserver peerings are set up correctly.
++
+image:aws_ora_fsx_ec2_stor_14.PNG[Error: Missing Graphic Image]
+
+. Create target NFS volumes at the standby FSx cluster for each source volume at the primary FSx cluster. Replace the volume name as appropriate for your environment.
++
+[source, cli]
+vol create -volume dr_db1_bin -aggregate aggr1 -size 50G -state online -policy default -type DP
++
+[source, cli]
+vol create -volume dr_db1_data -aggregate aggr1 -size 500G -state online -policy default -type DP
++
+[source, cli]
+vol create -volume dr_db1_log -aggregate aggr1 -size 250G -state online -policy default -type DP
+
+. You can also create iSCSI volumes and LUNs for the Oracle binary, Oracle data, and the Oracle log if the iSCSI protocol is employed for data access. Leave approximately 10% free space in the volumes for snapshots.
++
+[source, cli]
+vol create -volume dr_db1_bin -aggregate aggr1 -size 50G -state online -policy default -unix-permissions ---rwxr-xr-x -type RW
++
+[source, cli]
+lun create -path /vol/dr_db1_bin/dr_db1_bin_01 -size 45G -ostype linux
++
+[source, cli]
+vol create -volume dr_db1_data -aggregate aggr1 -size 500G -state online -policy default -unix-permissions ---rwxr-xr-x -type RW
++
+[source, cli]
+lun create -path /vol/dr_db1_data/dr_db1_data_01 -size 100G -ostype linux
++
+[source, cli]
+lun create -path /vol/dr_db1_data/dr_db1_data_02 -size 100G -ostype linux
++
+[source, cli]
+lun create -path /vol/dr_db1_data/dr_db1_data_03 -size 100G -ostype linux
++
+[source, cli]
+lun create -path /vol/dr_db1_data/dr_db1_data_04 -size 100G -ostype linux
++
+vol create -volume dr_db1_log -aggregate aggr1 -size 250G -state online -policy default -unix-permissions ---rwxr-xr-x -type RW
++
+[source, cli]
+lun create -path /vol/dr_db1_log/dr_db1_log_01 -size 45G -ostype linux
++
+[source, cli]
+lun create -path /vol/dr_db1_log/dr_db1_log_02 -size 45G -ostype linux
++
+[source, cli]
+lun create -path /vol/dr_db1_log/dr_db1_log_03 -size 45G -ostype linux
++
+[source, cli]
+lun create -path /vol/dr_db1_log/dr_db1_log_04 -size 45G -ostype linux
+
+. For iSCSI LUNs, create mapping for the Oracle host initiator for each LUN, using the binary LUN as an example. Replace the igroup with an appropriate name for your environment, and increment the lun-id for each additional LUN.
++
+[source, cli]
+lun mapping create -path /vol/dr_db1_bin/dr_db1_bin_01 -igroup ip-10-0-1-136 -lun-id 0
++
+[source, cli]
+lun mapping create -path /vol/dr_db1_data/dr_db1_data_01 -igroup ip-10-0-1-136 -lun-id 1
+
+. Create a SnapMirror relationship between the primary and standby database volumes. Replace the appropriate SVM name for your environment.s
++
+[source, cli]
+snapmirror create -source-path svm_FSxOraSource:db1_bin -destination-path svm_FSxOraTarget:dr_db1_bin -vserver svm_FSxOraTarget -throttle unlimited -identity-preserve false -policy MirrorAllSnapshots -type DP
++
+[source, cli]
+snapmirror create -source-path svm_FSxOraSource:db1_data -destination-path svm_FSxOraTarget:dr_db1_data -vserver svm_FSxOraTarget -throttle unlimited -identity-preserve false -policy MirrorAllSnapshots -type DP
++
+[source, cli]
+snapmirror create -source-path svm_FSxOraSource:db1_log -destination-path svm_FSxOraTarget:dr_db1_log -vserver svm_FSxOraTarget -throttle unlimited -identity-preserve false -policy MirrorAllSnapshots -type DP
+
+This SnapMirror setup can be automated with a NetApp Automation Toolkit for NFS database volumes. The toolkit is available for download from the NetApp public GitHub site.
+
+[source, cli]
+git clone https://github.com/NetApp-Automation/na_ora_hadr_failover_resync.git
+
+Read the README instructions carefully before attempting setup and failover testing.
+
+[NOTE]
+Replicating the Oracle binary from the primary to a standby cluster might have Oracle license implications. Contact your Oracle license representative for clarification. The alternative is to have Oracle installed and configured at the time of recovery and failover.
+
+== SnapCenter Deployment
+
+=== SnapCenter installation
+
+Follow link:https://docs.netapp.com/ocsc-41/index.jsp?topic=%2Fcom.netapp.doc.ocsc-isg%2FGUID-D3F2FBA8-8EE7-4820-A445-BC1E5C0AF374.html[Installing the SnapCenter Server^] to install SnapCenter server. This documentation covers how to install a standalone SnapCenter server. A SaaS version of SnapCenter is in beta review and could be available shortly. Check with your NetApp representative for availability if needed.
+
+=== Configure SnapCenter plugin for EC2 Oracle host
+
+. After automated SnapCenter installation, log into SnapCenter as an administrative user for the Window host on which the SnapCenter server is installed.
++
+image:aws_rds_custom_deploy_snp_01.PNG[Error: Missing Graphic Image]
+
+. From the left-side menu, click Settings, and then Credential and New to add ec2-user credentials for SnapCenter plugin installation.
++
+image:aws_rds_custom_deploy_snp_02.PNG[Error: Missing Graphic Image]
+
+. Reset the ec2-user password and enable password SSH authentication by editing the `/etc/ssh/sshd_config` file on the EC2 instance host.
+
+. Verify that the "Use sudo privileges" checkbox is selected. You just reset the ec2-user password in the previous step.
++
+image:aws_rds_custom_deploy_snp_03.PNG[Error: Missing Graphic Image]
+
+. Add the SnapCenter server name and the IP address to the EC2 instance host file for name resolution.
++
+----
+[ec2-user@ip-10-0-0-151 ~]$ sudo vi /etc/hosts
+[ec2-user@ip-10-0-0-151 ~]$ cat /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+10.0.1.233  rdscustomvalsc.rdscustomval.com rdscustomvalsc
+----
+
+. On the SnapCenter server Windows host, add the EC2 instance host IP address to the Windows host file `C:\Windows\System32\drivers\etc\hosts`.
++
+----
+10.0.0.151		ip-10-0-0-151.ec2.internal
+----
+
+. In the left-side menu, select Hosts > Managed Hosts, and then click Add to add the EC2 instance host to SnapCenter.
++
+image:aws_rds_custom_deploy_snp_04.PNG[Error: Missing Graphic Image]
++
+Check Oracle Database, and, before you submit, click More Options.
++
+image:aws_rds_custom_deploy_snp_05.PNG[Error: Missing Graphic Image]
++
+Check Skip Preinstall Checks. Confirm Skipping Preinstall Checks, and then click Submit After Save.
++
+image:aws_rds_custom_deploy_snp_06.PNG[Error: Missing Graphic Image]
++
+You are prompted with Confirm Fingerprint, and then click Confirm and Submit.
++
+image:aws_rds_custom_deploy_snp_07.PNG[Error: Missing Graphic Image]
++
+After successful plugin configuration, the managed host's overall status show as Running.
++
+image:aws_rds_custom_deploy_snp_08.PNG[Error: Missing Graphic Image]
+
+=== Configure backup policy for Oracle database
+
+Refer to this section link:https://docs.netapp.com/us-en/netapp-solutions/databases/hybrid_dbops_snapcenter_getting_started_onprem.html#7-setup-database-backup-policy-in-snapcenter[Setup database backup policy in SnapCenter^] for details on configuring the Oracle database backup policy.
+
+Generally you need create a policy for the full snapshot Oracle database backup and a policy for the Oracle archive-log-only snapshot backup.
+
+[NOTE]
+
+You can enable Oracle archive log pruning in the backup policy to control log-archive space. Check "Update SnapMirror after creating a local Snapshot copy" in "Select secondary replication option" as you need to replicate to a standby location for HA or DR.
+
+=== Configure Oracle database backup and scheduling
+
+Database backup in SnapCenter is user configurable and can be set up either individually or as a group in a resource group. The backup interval depends on the RTO and RPO objectives. NetApp recommends that you run a full database backup every few hours and archive the log backup at a higher frequency such as 10-15 mins for quick recovery.
+
+Refer to the Oracle section of link:https://docs.netapp.com/us-en/netapp-solutions/databases/hybrid_dbops_snapcenter_getting_started_onprem.html#8-implement-backup-policy-to-protect-database[Implement backup policy to protect database^] for a detailed step-by-step processes for implementing the backup policy created in the section <<Configure backup policy for Oracle database>> and for backup job scheduling.
+
+The following image provides an example of the resources groups that are set up to back up an Oracle database.
+
+image:aws_rds_custom_deploy_snp_09.PNG[Error: Missing Graphic Image]
+
+link:aws_ora_fsx_ec2_mgmt.html[Next: Database management.]
