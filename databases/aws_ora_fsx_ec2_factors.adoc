@@ -1,0 +1,81 @@
+---
+sidebar: sidebar
+permalink: databases/aws_ora_fsx_ec2_factors.html
+summary: This section provides details on factors to be considered when deploy Oracle database on AWS EC2 instance and FSx storage.
+keywords: HA, DR, database, Oracle, RDS, AWS, SnapCenter
+---
+
+= Factors to consider for Oracle database deployment
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:table-stripes: odd
+:imagesdir: ./../media/
+
+link:aws_ora_fsx_ec2_architecture.html[Previous: Solution architecture.]
+
+A public cloud provides many choices for compute and storage, and using the correct type of compute instance and storage engine is a good place to start for database deployment. You should also select compute and storage configurations that are optimized for Oracle databases.
+
+The following sections describe the key considerations when deploying Oracle database in an AWS public cloud on an EC2 instance with FSx storage.
+
+== VM performance
+
+Selecting the right VM size is important for optimal performance of a relational database in a public cloud. For better performance, NetApp recommends using an EC2 M5 Series instance for Oracle deployment, which is optimized for database workloads. The same instance type is also used to power a RDS instance for Oracle by AWS.
+
+* Choose the correct vCPU and RAM combination based on workload characteristics.
+* Add swap space to a VM. The default EC2 instance deployment does not create a swap space, which is not optimal for a database.
+
+== Storage layout and settings
+
+NetApp recommends the following storage layout:
+
+* For NFS storage, the recommended volume layout is three volumes: one for the Oracle binary; one for Oracle data and a duplicate control file; and one for the Oracle active log, archived log, and control file.
++
+image:aws_ora_fsx_ec2_stor_12.PNG[Error: Missing Graphic Image]
+
+* For iSCSI storage, the recommended volume layout is three volumes: one for the Oracle binary; one for Oracle data and a duplicate control file; and one for the Oracle active log, archived log, and control file. However, each data and log volume ideally should contain four LUNs. The LUNs are ideally balanced on the HA cluster nodes.
++
+image:aws_ora_fsx_ec2_stor_13.PNG[Error: Missing Graphic Image]
+
+* For storage IOPS and throughput, you can choose the threshold for provisioned IOPS and throughput for the FSx storage cluster, and these parameters can be adjusted on the fly anytime the workload changes.
+
+** The auto IOPS setting is three IOPS per GiB of allocated storage capacity or user defined storage up to 80,000.
+
+** The throughput level is incremented as follow: 128, 256, 512, 1024, 2045 MBps.
+
+Review the link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/performance.html[Amazon FSx for NetApp ONTAP performance^] documentation when sizing throughput and IOPS.
+
+== NFS configuration
+
+Linux, the most common operating system, includes native NFS capabilities. Oracle offers the direct NFS (dNFS) client natively integrated into Oracle. Oracle has supported NFSv3 for over 20 years, and NFSv4 is supported with Oracle 12.1.0.2 and later. Automated Oracle deployment using the NetApp automation toolkit automatically configures dNFS on NFSv3.
+
+Other factors to consider:
+
+* TCP slot tables are the NFS equivalent of host-bus-adapter (HBA) queue depth. These tables control the number of NFS operations that can be outstanding at any one time. The default value is usually 16, which is far too low for optimum performance. The opposite problem occurs on newer Linux kernels, which can automatically increase the TCP slot table limit to a level that saturates the NFS server with requests.
++
+For optimum performance and to prevent performance problems, adjust the kernel parameters that control the TCP slot tables to 128.
++
+[source, cli]
+sysctl -a | grep tcp.*.slot_table
+
+* The following table provides recommended NFS mount options for Linux NFSv3 - single instance.
++
+image:aws_ora_fsx_ec2_nfs_01.PNG[Error: Missing Graphic Image]
+
+[NOTE]
+Before using dNFS, verify that the patches described in Oracle Doc 1495104.1 are installed. Starting with Oracle 12c, DNFS includes support for NFSv3, NFSv4, and NFSv4.1. NetApp support policies cover v3 and v4 for all clients, but, at the time of writing, NFSv4.1 is not supported for use with Oracle dNFS.
+
+== High availability
+
+As indicated in the solution architecture, HA is built on storage-level replication. Therefore, the startup and availability of Oracle is contingent on how quickly the compute and storage can be brought up and recovered. See the following key factors:
+
+* Have a standby compute instance ready and synced up with the primary through Ansible parallel update to both hosts.
+
+* Replicate the binary volume from the primary for standby purposes so that you do not need to install Oracle at the last minute and figure out what needs to be installed and patched.
+
+* Replication frequency dictates how fast the Oracle database can be recovered to make service available. There is a trade off between the replication frequency and storage consumption.
+
+* Leverage automation to make recovery and switch over to standby quick and free of human error. NetApp provides an automation toolkit for this purpose.
+
+link:aws_ora_fsx_ec2_procedures.html[Next: Deployment procedures.]
