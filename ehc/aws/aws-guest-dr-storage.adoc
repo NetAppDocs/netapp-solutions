@@ -1,0 +1,94 @@
+---
+sidebar: sidebar
+permalink: ehc/aws/aws-guest-dr-storage.html
+keywords: on premises, on prem, cloud storage, Amazon FSx, Network interface, vm datastore
+summary: NetApp AFF A-Series systems deliver a high-performance storage infrastructure with flexible data management options that are cloud enabled to meet a wide variety of enterprise scenarios. In this solution, we used an ONTAP AFF A300 as our primary on-premises storage system.
+---
+
+= Storage
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-07-20 15:53:45.421205
+//
+
+link:aws-guest-dr-networking.html[Previous: Networking.]
+
+NetApp AFF A-Series systems deliver a high-performance storage infrastructure with flexible data management options that are cloud enabled to meet a wide variety of enterprise scenarios. In this solution, we used an ONTAP AFF A300 as our primary on-premises storage system.
+
+NetApp ONTAP together with ONTAP Tools for VMware and SnapCenter were used in the solution to provide comprehensive management and application backup capabilities that are tightly integrated with VMware vSphere.
+
+== On-premises
+
+We used ONTAP storage for the VMware datastores that hosted the virtual machines and their VMDK files. VMware supports multiple storage protocols for connected datastores, and, in this solution, we used NFS volumes for datastores on the ESXi hosts. However, ONTAP storage systems support all protocols supported by VMware.
+
+The following figure depicts VMware storage options.
+
+image:dr-vmc-aws-image7.png[Error: Missing Graphic Image]
+
+ONTAP volumes were used for both iSCSI and NFS guest-connected storage for our application VMs. We used the following storage protocols for application data:
+
+* NFS volumes for guest connected Oracle database files.
+* iSCSI LUNs for guest connected Microsoft SQL Server databases and transaction logs.
+
+|===
+|Operating system |Database type |Storage protocol |Volume description
+
+|Windows Server 2019
+|SQL Server 2019
+|iSCSI
+|Database files
+|
+|
+|iSCSI
+|Log files
+|Oracle Linux 8.5
+|Oracle 19c
+|NFS
+|Oracle binary
+|
+|
+|NFS
+|Oracle data
+|
+|
+|NFS
+|Oracle recovery files
+|===
+
+We also used ONTAP storage for the primary Veeam backup repository as well as for a backup target for the SnapCenter database backups.
+
+* SMB share for the Veeam backup repository.
+* SMB share as a target for the SnapCenter database backups.
+
+== Cloud storage
+
+This solution includes VMware Cloud on AWS for hosting virtual machines that are restored as a part of the failover process. As of this writing,  VMware supports vSAN storage for the datastores that host the VMs and VMDKs.
+
+FSX for ONTAP is used as the secondary storage for application data that is mirrored using SnapCenter and SyncMirror. As a part of the failover process, the FSx for ONTAP cluster is converted to primary storage, and the database applications can resume normal function running on the FSx storage cluster.
+
+=== Amazon FSx for NetApp ONTAP setup
+
+To deploy AWS FSx for NetApp ONTAP using Cloud Manager, follow the instructions at https://docs.netapp.com/us-en/cloud-manager-fsx-ontap/start/task-getting-started-fsx.html[this link^].
+
+After FSx ONTAP is deployed, drag and drop the on-premises ONTAP instances into FSx ONTAP to start replication setup of volumes.
+
+The following figure depicts our FSx ONTAP environment.
+
+image:dr-vmc-aws-image8.png[Error: Missing Graphic Image]
+
+=== Network interfaces created
+
+FSx for NetApp ONTAP has network interfaces preconfigured and ready to use for iSCSI, NFS, SMB, and inter-cluster networks.
+
+=== VM datastore storage
+
+The VMware Cloud SDDC comes with two VSAN datastores named `vsandatastore` and `workloaddatastore`. We used `vsandatastore` to host management VMs with access restricted to cloudadmin credential. For workloads, we used `workloaddatastore`.
+
+link:aws-guest-dr-compute.html[Next: Compute.]

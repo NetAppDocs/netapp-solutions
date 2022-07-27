@@ -1,0 +1,55 @@
+---
+sidebar: sidebar
+permalink: ehc/aws/aws-guest-dr-cloud-backup-tools.html
+keywords: deployment, backup tools, snapcenter server, Veeam server,
+summary: To conduct a failover of our application VMs and database volumes to VMware Cloud Volume services running in AWS, it was necessary to install and configure a running instance of both SnapCenter Server and Veeam Backup and Replication Server. After failover is complete, these tools must also be configured to resume normal backup operations until a failback to the on-premises datacenter is planned and executed.
+---
+
+= Cloud Backup Tools
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-07-20 15:53:45.429201
+//
+
+link:aws-guest-dr-compute.html[Previous: Compute.]
+
+To conduct a failover of our application VMs and database volumes to VMware Cloud Volume services running in AWS, it was necessary to install and configure a running instance of both SnapCenter Server and Veeam Backup and Replication Server. After failover is complete, these tools must also be configured to resume normal backup operations until a failback to the on-premises datacenter is planned and executed.
+
+== Deployment of backup tools
+
+SnapCenter server and Veeam Backup & Replication server can be installed in the VMware Cloud SDDC or they can be installed on EC2 instances residing in a VPC with network connectivity to the VMware Cloud environment.
+
+=== SnapCenter Server
+
+SnapCenter software is available from the NetApp support site and can be installed on Microsoft Windows systems that reside either in a Domain or Workgroup. A detailed planning guide and installation instructions can be found at the link:https://docs.netapp.com/us-en/snapcenter/install/install_workflow.html[NetApp documentation center^].
+
+The SnapCenter software can be found at https://mysupport.netappc.com[this link^].
+
+=== Veeam Backup & Replication server
+
+You can install the Veeam Backup & Replication server on a Windows server in VMware Cloud on AWS or on an EC2 instance. For detailed implementation guidance, see the https://www.veeam.com/documentation-guides-datasheets.html[Veeam Help Center Technical Documentation^].
+
+== Backup tools and configuration
+
+After they are installed, SnapCenter and Veeam Backup & Replication must be configured to perform the necessary tasks to restore data to VMware Cloud on AWS.
+
+=== SnapCenter configuration
+
+To restore application data that has been mirrored to FSx ONTAP, you must first perform a full restore of the on-premises SnapCenter database. After this process is complete, communication with the VMs is reestablished and application backups can now resume using FSx ONTAP as primary storage.
+
+For a list of steps to be completed on the SnapCenter Server residing in AWS, see the section link:aws-guest-dr-cloud-backup-config.html#deploy-secondary-windows-snapcenter-server[Deploy Secondary Windows SnapCenter Server].
+
+=== Veeam Backup & Replication configuration
+
+To restore virtual machines that have been backed up to Amazon S3 storage, the Veeam Server must be installed on a Windows server and configured to communicate with VMware Cloud, FSx ONTAP, and the S3 bucket that contains the original backup repository. It must also have a new backup repository configured on FSx ONTAP to conduct new backups of the VMs once they are restored.
+
+For a complete list of steps required to complete failover of the application VMs, see the section link:aws-guest-dr-cloud-backup-config.html#deploy-secondary-veeam-backup-&-replication-server[Deploy Secondary Veeam Backup & Replication Server].
+
+link:aws-guest-dr-overview.html[Next: Overview - Disaster recovery.]

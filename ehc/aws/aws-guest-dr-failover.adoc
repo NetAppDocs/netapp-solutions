@@ -1,0 +1,75 @@
+---
+sidebar: sidebar
+permalink: ehc/aws/aws-guest-dr-failover.html
+keywords: Disaster, primary site, SnapCenter, database, restore process,
+summary: For a disaster that occurs at the primary on-premises datacenter, our scenario includes failover to a secondary site residing on Amazon Web Services infrastructure using VMware Cloud on AWS. We assume that the virtual machines and our on-premises ONTAP cluster are no longer accessible. In addition, both the SnapCenter and Veeam virtual machines are no longer accessible and must be rebuilt at our secondary site.
+---
+
+= Failover
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-07-20 15:53:45.498357
+//
+
+link:aws-guest-dr-snapcenter-db-backup.html[Previous: SnapCenter database backup for disaster recovery.]
+
+== Disaster occurs at primary site
+
+For a disaster that occurs at the primary on-premises datacenter, our scenario includes failover to a secondary site residing on Amazon Web Services infrastructure using VMware Cloud on AWS. We assume that the virtual machines and our on-premises ONTAP cluster are no longer accessible. In addition, both the SnapCenter and Veeam virtual machines are no longer accessible and must be rebuilt at our secondary site.
+
+This section address failover of our infrastructure to the cloud, and we cover the following topics:
+
+* SnapCenter database restore. After a new SnapCenter server has been established, restore the MySQL database and configuration files and toggle the database into disaster recovery mode in order to allow the secondary FSx storage to become the primary storage device.
+* Restore the application virtual machines using Veeam Backup & Replication. Connect the S3 storage that contains the VM backups, import the backups, and restore them to VMware Cloud on AWS.
+* Restore the SQL Server application data using SnapCenter.
+* Restore the Oracle application data using SnapCenter.
+
+== SnapCenter database restore process
+
+SnapCenter supports disaster recovery scenarios by allowing the backup and restore of its MySQL database and configuration files. This allows an administrator to maintain regular backups of the SnapCenter database at the on-premises datacenter and later restore that database to a secondary SnapCenter database.
+
+To access the SnapCenter backup files on the remote SnapCenter server, complete the following steps:
+
+. Break the SnapMirror relationship from the FSx cluster,  which makes the volume read/write.
+. Create a CIFS server (if necessary) and create a CIFS share pointing to the junction path of the cloned volume.
+. Use xcopy to copy the backup files to a local directory on the secondary SnapCenter system.
+. Install SnapCenter v4.6.
+. Ensure that SnapCenter server has the same FQDN as the original server. This is required for the db restore to be successful.
+
+To start the restore process, complete the following steps:
+
+. Navigate to the Swagger API web page for the secondary SnapCenter server and follow the previous instructions to obtain an authorization token.
+. Navigate to the Disaster Recovery section of the Swagger page, select `/4.6/disasterrecovery/server/restore`, and click Try it Out.
++
+image:dr-vmc-aws-image48.png[Error: Missing Graphic Image]
+
+. Paste in your authorization token and, in the SmDRResterRequest section, paste in the name of the backup and the local directory on the secondary SnapCenter server.
++
+image:dr-vmc-aws-image49.png[Error: Missing Graphic Image]
+
+. Select the Execute button to start the restore process.
+. From SnapCenter, navigate to the Monitor section to view the progress of the restore job.
++
+image:dr-vmc-aws-image50.png[Error: Missing Graphic Image]
++
+image:dr-vmc-aws-image51.png[Error: Missing Graphic Image]
+
+. To enable SQL Server restores from secondary storage,  you must toggle the SnapCenter database into Disaster Recovery mode. This is performed as a separate operation and initiated on the Swagger API web page.
+.. Navigate to the Disaster Recovery section and click `/4.6/disasterrecovery/storage`.
+.. Paste in the user authorization token.
+.. In the SmSetDisasterRecoverySettingsRequest section, change `EnableDisasterRecover` to `true`.
+.. Click Execute to enable disaster recovery mode for SQL Server.
++
+image:dr-vmc-aws-image52.png[Error: Missing Graphic Image]
++
+[NOTE]
+See comments regarding additional procedures.
+
+link:aws-guest-dr-restore-veeam-full.html[Next: Restore application VMs with Veeam full restore.]
