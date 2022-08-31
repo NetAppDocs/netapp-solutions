@@ -17,14 +17,41 @@ link:azure_ora_nfile_architecture.html[Previous: Solution architecture.]
 
 A public cloud provides many choices for compute and storage, and using the correct type of compute instance and storage engine is a good place to start for database deployment. You should also select compute and storage configurations that are optimized for Oracle databases.
 
-The following sections describe the key considerations when deploying Oracle database in an AWS public cloud on an EC2 instance with FSx storage.
+The following sections describe the key considerations when deploying Oracle database in Azure public cloud on an Azure virtual machine instance with Azure NetApp Files storage.
 
-== VM performance
+== VM type and sizing
 
-Selecting the right VM size is important for optimal performance of a relational database in a public cloud. For better performance, NetApp recommends using an EC2 M5 Series instance for Oracle deployment, which is optimized for database workloads. The same instance type is also used to power a RDS instance for Oracle by AWS.
+Selecting the right VM type and size is important for optimal performance of a relational database in a public cloud. Azure virtual machine provide varieties of compute instances that can be used to host Oracle database workload. Referred to this Microsoft documentation link:https://docs.microsoft.com/en-us/azure/virtual-machines/sizes[Sizes for virtual machines in Azure^] for different type of Azure virtual machines and their sizing. In general, NetApp recommends using a General Purpose Azure virtual machine for small and medium sized Oracle database deployment. For larger Oracle database deployment, a memory optimized Azure virtual machine fits the bill. With bigger available RAM, a larger Oracle SGA or smart flash cache can be configured to reduce the physical IO which in turn improve database performance. Azure NetApp Files works as NFS mount attached to Azure virtual machine, which could offers higher throughput and could outperform storage optimized virtual machine with local storage. Other factors to consider including the following:
 
-* Choose the correct vCPU and RAM combination based on workload characteristics.
-* Add swap space to a VM. The default EC2 instance deployment does not create a swap space, which is not optimal for a database.
+* Choose the correct vCPU and RAM combination based on workload characteristics. As the RAM size increases on the VM, so is the number of vCPU cores. There should be a balance at some point as the Oracle license fees are charged on the number of vCPU cores.
+* Add swap space to a VM. The default Azure virtual machine deployment does not create a swap space, which is not optimal for a database.
+
+== Azure NetApp Files performance
+
+Azure NetApp Files volumes are allocated from a capacity pool the customer has to provision in his Azure NetApp Files storage account. Each capacity pool is assigned:
+
+* To a service level that defines the overall performance capability.
+* The initially provisioned storage capacity or tiering for that capacity pool. A quality of service (QoS) level that defines the overall maximum throughput per provisioned space.
+
+The service level and initially provisioned storage capacity determines the performance level for a particular Oracle database volume.
+
+=== Service Levels for Azure NetApp Files
+
+Azure NetApp Files supports three service levels: Ultra, Premium, and Standard.
+• Ultra storage. This tier provides up to 128MiB/s of throughput per 1TiB of volume quota assigned.
+• Premium storage. This tier provides up to 64MiB/s of throughput per 1TiB of volume quota assigned.
+• Standard storage. This tier provides up to 16MiB/s of throughput per 1TiB of volume quota assigned.
+
+=== Capacity tiering and quality of service
+
+Each of the desired service levels has an associated cost per provisioned capacity and includes a quality of service (QoS) level that defines the overall maximum throughput per provisioned space.
+
+For example, a 10TiB provisioned single capacity pool with premium service level will provide an overall available throughput for all volumes in this capacity pool of 10x 64MBps, so 640MBps, or 40,000 (16K) IOPs or 80,000 (8K) IOPs.
+
+The minimum capacity pool size is 4TiB. You can change the size of a capacity pool in 1-TiB increments in response to changes of your workload requirements.
+
+=== Calculate the service level at a volume level
+
 
 == Storage layout and settings
 
