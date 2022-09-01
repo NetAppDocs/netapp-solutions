@@ -35,47 +35,58 @@ Azure NetApp Files volumes are allocated from a capacity pool the customer has t
 
 The service level and initially provisioned storage capacity determines the performance level for a particular Oracle database volume.
 
-=== Service Levels for Azure NetApp Files
+=== 1. Service Levels for Azure NetApp Files
 
 Azure NetApp Files supports three service levels: Ultra, Premium, and Standard.
-• Ultra storage. This tier provides up to 128MiB/s of throughput per 1TiB of volume quota assigned.
-• Premium storage. This tier provides up to 64MiB/s of throughput per 1TiB of volume quota assigned.
-• Standard storage. This tier provides up to 16MiB/s of throughput per 1TiB of volume quota assigned.
 
-=== Capacity tiering and quality of service
+* Ultra storage. This tier provides up to 128MiB/s of throughput per 1TiB of volume quota assigned.
+* Premium storage. This tier provides up to 64MiB/s of throughput per 1TiB of volume quota assigned.
+* Standard storage. This tier provides up to 16MiB/s of throughput per 1TiB of volume quota assigned.
+
+=== 2. Capacity tiering and quality of service
 
 Each of the desired service levels has an associated cost per provisioned capacity and includes a quality of service (QoS) level that defines the overall maximum throughput per provisioned space.
 
 For example, a 10TiB provisioned single capacity pool with premium service level will provide an overall available throughput for all volumes in this capacity pool of 10x 64MBps, so 640MBps, or 40,000 (16K) IOPs or 80,000 (8K) IOPs.
 
-The minimum capacity pool size is 4TiB. You can change the size of a capacity pool in 1-TiB increments in response to changes of your workload requirements.
+The minimum capacity pool size is 4TiB. You can change the size of a capacity pool in 1-TiB increments in response to changes of your workload requirements to manage storage needs and costs.
 
-=== Calculate the service level at a volume level
+=== 3. Calculate the service level at a database volume
 
+The throughput limit for an Oracle database volume is determined by the combination of the following factors: The service level of the capacity pool to which the volume belongs
+and The quota assigned to the volume.
+
+The following diagram shows how the throughput limit for an Oracle database volume is calculated.
+
+image:db_ora_azure_anf_factors_01.PNG[Error: Missing Graphic Image]
+
+In example 1, a volume from a capacity pool with the Premium storage tier that is assigned 2TiB of quota will be assigned a throughput limit of 128MiB/s (2TiB * 64MiBps). This scenario applies regardless of the capacity pool size or the actual volume consumption.
+
+In example 2, a volume from a capacity pool with the Premium storage tier that is assigned 100GiB of quota will be assigned a throughput limit of 6.25MiBps (0.09765625TiB * 64MiBps). This scenario applies regardless of the capacity pool size or the actual volume consumption.
+
+Please note that the minimum volume size is 100GiB.
 
 == Storage layout and settings
 
 NetApp recommends the following storage layout:
 
-* For NFS storage, the recommended volume layout is three volumes: one for the Oracle binary; one for Oracle data and a duplicate control file; and one for the Oracle active log, archived log, and control file.
+* For small databases, using single volume layout for all Oracle files.
 +
-image:aws_ora_fsx_ec2_stor_12.PNG[Error: Missing Graphic Image]
+image:db_ora_azure_anf_factors_02.PNG[Error: Missing Graphic Image]
 
-* For iSCSI storage, the recommended volume layout is three volumes: one for the Oracle binary; one for Oracle data and a duplicate control file; and one for the Oracle active log, archived log, and control file. However, each data and log volume ideally should contain four LUNs. The LUNs are ideally balanced on the HA cluster nodes.
+* For large databases, the recommended volume layout is multiple volumes: one for Oracle data and a duplicate control file; and one for the Oracle active log, archived log, and control file. It is highly recommended to allocate a volume for the Oracle binary instead of local drive so that database can be relocated to a new host and quickly restored.
 +
-image:aws_ora_fsx_ec2_stor_13.PNG[Error: Missing Graphic Image]
-
-* For storage IOPS and throughput, you can choose the threshold for provisioned IOPS and throughput for the FSx storage cluster, and these parameters can be adjusted on the fly anytime the workload changes.
-
-** The auto IOPS setting is three IOPS per GiB of allocated storage capacity or user defined storage up to 80,000.
-
-** The throughput level is incremented as follow: 128, 256, 512, 1024, 2045 MBps.
-
-Review the link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/performance.html[Amazon FSx for NetApp ONTAP performance^] documentation when sizing throughput and IOPS.
+image:db_ora_azure_anf_factors_03.PNG[Error: Missing Graphic Image]
 
 == NFS configuration
 
-Linux, the most common operating system, includes native NFS capabilities. Oracle offers the direct NFS (dNFS) client natively integrated into Oracle. Oracle has supported NFSv3 for over 20 years, and NFSv4 is supported with Oracle 12.1.0.2 and later. Automated Oracle deployment using the NetApp automation toolkit automatically configures dNFS on NFSv3.
+Linux, the most common operating system, includes native NFS capabilities. Oracle offers the direct NFS (dNFS) client natively integrated into Oracle. Oracle dNFS bypasses OS cache and enable parallel processing to improve database performance. Oracle has supported NFSv3 for over 20 years, and NFSv4 is supported with Oracle 12.1.0.2 and later.
+
+By using dNFS (available since Oracle 11g), an Oracle database running on an Azure Virtual Machine can drive significantly more I/O than the native NFS client. Automated Oracle deployment using the NetApp automation toolkit automatically configures dNFS on NFSv3.
+
+Following diagram demonstrates slob benchmark on Azure NetApp Files with Oracle dNFS.
+
+image:db_ora_azure_anf_factors_04.PNG[Error: Missing Graphic Image]
 
 Other factors to consider:
 
@@ -92,17 +103,5 @@ image:aws_ora_fsx_ec2_nfs_01.PNG[Error: Missing Graphic Image]
 
 [NOTE]
 Before using dNFS, verify that the patches described in Oracle Doc 1495104.1 are installed. Starting with Oracle 12c, DNFS includes support for NFSv3, NFSv4, and NFSv4.1. NetApp support policies cover v3 and v4 for all clients, but, at the time of writing, NFSv4.1 is not supported for use with Oracle dNFS.
-
-== High availability
-
-As indicated in the solution architecture, HA is built on storage-level replication. Therefore, the startup and availability of Oracle is contingent on how quickly the compute and storage can be brought up and recovered. See the following key factors:
-
-* Have a standby compute instance ready and synced up with the primary through Ansible parallel update to both hosts.
-
-* Replicate the binary volume from the primary for standby purposes so that you do not need to install Oracle at the last minute and figure out what needs to be installed and patched.
-
-* Replication frequency dictates how fast the Oracle database can be recovered to make service available. There is a trade off between the replication frequency and storage consumption.
-
-* Leverage automation to make recovery and switch over to standby quick and free of human error. NetApp provides an automation toolkit for this purpose.
 
 link:azure_ora_nfile_procedures.html[Next: Deployment procedures.]
