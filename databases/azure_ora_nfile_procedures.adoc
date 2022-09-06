@@ -5,7 +5,7 @@ summary: This section describes the deployment procedures of deploying Oracle RD
 keywords: AWS, Oracle, RDS, HA, DR, database
 ---
 
-= Step-by-Step Oracle Deployment Procedures on AWS EC2/FSx
+= Step-by-Step Oracle Deployment Procedures on Azure VM and Azure NetApp Files (ANF)
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -15,24 +15,90 @@ keywords: AWS, Oracle, RDS, HA, DR, database
 
 link:azure_ora_nfile_factors.html[Previous: Factors to consider.]
 
-== Deploy an EC2 Linux instance for Oracle via EC2 console
+== Deploy an Azure VM with ANF for Oracle via Azure portal console
 
-If you are new to AWS, you first need to set up an AWS environment. The documentation tab at the AWS website landing page provides EC2 instruction links on how to deploy a Linux EC2 instance that can be used to host your Oracle database via the AWS EC2 console. The following section is a summary of these steps. For details, see the linked AWS EC2-specific documentation.
+If you are new to Azure, you first need to set up an Azure account environment. This includes to sign up your organization to use Azure Active Directory. The following section is a summary of these steps. For details, see the linked Azure specific documentation.
 
-=== Setting up your AWS EC2 environment
+=== Sign up your organization to use Azure Active Directory
 
-You must create an AWS account to provision the necessary resources to run your Oracle environment on the EC2 and FSx service. The following AWS documentation provides the necessary details:
+If your organization are already using some of web based Microsoft service like Office 365, you most likely already had signed up for Azure Active Directory. The following Azure documentation provides the necessary details if you have not:
 
-* link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/get-set-up-for-amazon-ec2.html[Set up to use Amazon EC2^]
+* link:https://docs.microsoft.com/en-us/azure/active-directory/fundamentals/sign-up-organization[Sign up your organization to use Azure Active Directory^]
 
 Key topics:
 
-* Sign up for AWS.
-* Create a key pair.
-* Create a security group.
+* Create a directory
+* Add a custom domain name
+* Associate an Azure subscription
 
-=== Enabling multiple availability zones in AWS account attributes
+=== Use Azure subscription to scale and manage the environment
 
-For an Oracle high availability configuration as demonstrated in the architecture diagram, you must enable at least four availability zones in a region. The multiple availability zones can also be situated in different regions to meet the required distances for disaster recovery.
+Azure charges for the services it offers to organizations. Each organization is given an Azure AD Tenant, can create Azure Accounts, and can create different subscriptions for the use of different services. These terminologies are defined below:
 
-image:aws_ora_fsx_ec2_inst_01.PNG[Error: Missing Graphic Image]
+* Organization — Any business entity or individual that plans to use Azure resources. An organization is identified by one or more domain names.
+
+* Tenant — A specific instance of Azure AD, identified and authorized using a Tenant ID. After Azure registration, organizations are given the Azure AD Tenant. Azure AD is a single platform that allows you to manage accounts, users, groups and permissions.
+
+* Accounts — Azure AD Tenant stores all accounts created to utilize Azure’s offerings.
+
+Key points:
+
+* An organization can have many tenants.
+* Each tenant can have many subscriptions.
+* Each tenant can have many accounts.
+* Accounts can use multiple subscriptions.
+* Azure AD Tenant determines which account can use which subscription.
+* Azure resources must be tied to a subscription for billing purposes.
+
+=== Create and consume Azure resources
+
+After your Azure environment is setup and an account is created and associated to a subscription, you can login to Azure portal with the account to create necessary resources to run Oracle.
+
+==== 1. Create a virtual network or VNet
+
+Azure Virtual Network (VNet) is the fundamental building block for your private network in Azure. VNet enables many types of Azure resources, such as Azure Virtual Machines (VM), to securely communicate with each other, the internet, and on-premises networks. Before Provisioning a Azure virtual machine, a VNet, where VM is deployed into, needs to be configured first.
+
+Follow this documentation link:https://docs.microsoft.com/en-us/azure/virtual-network/quick-create-portal[Create a virtual network using the Azure portal^] to create a VNet.
+
+==== 2. Create a NetApp storage account and a capacity pool for ANF
+
+In this deployment scenario, an Azure VM OS is provisioned using regular Azure storage but ANF volumes are provisioned to run Oracle database via NFS. First, you need to create a NetApp storage account and a capacity pool to host the storage volumes.
+
+Follow this documentation link:https://docs.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-quickstart-set-up-account-create-volumes?tabs=azure-portal[Set up Azure NetApp Files and create an NFS volume^] to setup ANF capacity pool.
+
+==== 3. Provision database volumes for Oracle
+
+You will need to create three NFS volumes off ANF capacity pool for Oracle binary, data, and log volumes respectively.
+
+. From Azure console, under the list of Azure services, click on Azure NetApp Files to open volume creation workflow. If you have more than one ANF storage accounts, click on the account that you intend to provision volumes from.
++
+image:db_ora_azure_anf_vols_00.PNG[Error: Missing Graphic Image]
+
+. Under NetApp storage account, click on Volumes, then Add volume to create Oracle volumes.
++
+image:db_ora_azure_anf_vols_01_1.PNG[Error: Missing Graphic Image]
+image:db_ora_azure_anf_vols_01.PNG[Error: Missing Graphic Image]
+
+. As a good practice, identify Oracle volumes with VM host name as a prefix and follow by mount point on the host such as u01 for Oracle binary, u02 for Oracle data, and u03 for Oracle log. Choose the same VNet for the volume as the VM. Then, click "Next: Protocol>".
++
+image:db_ora_azure_anf_vols_02.PNG[Error: Missing Graphic Image]
+
+. Choose NFS protocol, add Oracle host IP address to the allowed client and remove the default policy that allow all IP addresses 0.0.0.0/0. Then, click "Next: Tags>".
++
+image:db_ora_azure_anf_vols_03.PNG[Error: Missing Graphic Image]
+
+. Add a volume tag if desired. Then, click "Review + Create>".
++
+image:db_ora_azure_anf_vols_04.PNG[Error: Missing Graphic Image]
+
+. If validation passes, click "Create" button to create the volume.
++
+image:db_ora_azure_anf_vols_05.PNG[Error: Missing Graphic Image]
+
+==== 4. Provision Azure virtual machine for Oracle
+
+image:aws_ora_fsx_ec2_inst_01.PNG[Error: Missing Graphic Image
+
+== Install and configure Oracle on Azure virtual machine with ANF
+
+== Setup backup tool for app consistent snapshot for Oracle
