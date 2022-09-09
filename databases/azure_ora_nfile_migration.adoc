@@ -5,7 +5,7 @@ summary: This section provides details on how to migrate Oracle database from on
 keywords: database, Oracle, Azure, ANF, Azure NetApp Files, migration
 ---
 
-= Database migration from on-prem to public cloud
+= Database migration from on-premises to Azure cloud
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -15,70 +15,147 @@ keywords: database, Oracle, Azure, ANF, Azure NetApp Files, migration
 
 link:azure_ora_nfile_protection.html[Previous: Database protection.]
 
-Database migration is a challenging endeavor by any means. Migrating an Oracle database from on-premises to the cloud is no exception.
+Since Oracle announcement to phase out the single instance database, many organizations have converted single instance Oracle database into multitenant container database. This enables easy relocation of a subset of a container database called PDB to cloud with maximum availability option, which minimize the downtime during the migration.
 
-The following sections provide key factors to consider when migrating Oracle databases to the AWS public cloud with the AWS EC2 compute and FSx storage platform.
+However, if you still have single instance of Oracle database, it can first be converted into a multitenant container database in place before PDB relocation can be attempted.
 
-== ONTAP storage is available on-premises
+The following sections provide details for migration of on-premises Oracle database to Azure cloud in either scenarios.
 
-If the on-premises Oracle database is sitting on an ONTAP storage array, then it is easier to set up replication for database migration using the NetApp SnapCenter UI tool.
+== Converting a single instance non CDB to a PDB in a multitenant CDB
 
-. Build a target compute EC2 instance that matches the on-premises instance.
+If you are still sitting on single instance Oracle database, it needs to be converted to multitenant container database whether migrating to cloud or not. Oracle will stop supporting single instance database at some point.
 
-. Provision matching, equally sized database volumes from FSx console.
+Following are procedures to plug a single instance database into a container database as a pluggable database or PDB.
 
-. Mount the FSx database volumes to the EC2 instance.
+. Build a shell container database on the same host as the single instance database in a separate ORACLE_HOME.
 
-. Set up SnapMirror replication between the on-premises database volumes to the target FSx database volumes. The initial sync might take some time to move the primary source data, but any following incremental updates are much quicker.
+. Shutdown single instance database and restart open read only
 
-. At the time of switchover, shut down the primary application to stop all transactions. From SnapCenter, run a log backup to flush the remaining transactions to the target.
+. Run DBMS_PDB.DESCRIBE procedure to generate database metadata
++
+[source, cli]
+BEGIN
+  DBMS_PDB.DESCRIBE(
+    pdb_descr_file => '/home/oracle/ncdb.xml');
+END;
+/
 
-. Break up the mirrored volumes, run Oracle recovery at the target, and bring up the database for service.
+. Shutdown single instance database
 
-. Point applications to the Oracle database in the cloud.
+. Startup the container database
 
-== ONTAP storage is not available on premises
+. Run the DBMS_PDB.CHECK_PLUG_COMPATIBILITY function to determine whether the non-CDB is compatible with the CDB.
++
+[source, cli]
+SET SERVEROUTPUT ON
+DECLARE
+  compatible CONSTANT VARCHAR2(3) :=
+    CASE DBMS_PDB.CHECK_PLUG_COMPATIBILITY(
+           pdb_descr_file => '/disk1/oracle/ncdb.xml',
+           pdb_name       => 'NCDB')
+    WHEN TRUE THEN 'YES'
+    ELSE 'NO'
+END;
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(compatible);
+END;
+/
++
+If the output is YES, then the non-CDB is compatible, and you can continue with the next step.
++
+If the output is NO, then the non-CDB is not compatible, and you can check the PDB_PLUG_IN_VIOLATIONS view to see why it is not compatible. All violations must be corrected before you continue. For example, any version or patch mismatches should be resolved by running an upgrade or the opatch utility. After correcting the violations, run DBMS_PDB.CHECK_PLUG_COMPATIBILITY again to ensure that the non-CDB is compatible with the CDB.
 
-If the on-premises Oracle database is hosted on third-party storage other than ONTAP, database migration is based on the restore of a Oracle database backup copy. You must play the archive log to make it current before switching over.
+. Plug in the single instance non-CDB
++
+[source, cli]
+CREATE PLUGGABLE DATABASE ncdb USING '/home/oracle/ncdb.xml'
+  COPY
+  FILE_NAME_CONVERT = ('/disk1/oracle/dbs/', '/disk2/oracle/ncdb/')
+;
++
 
-AWS S3 can be used as a staging storage area for database move and migration. See the following high level steps for this method:
+[NOTE]
+If there is no sufficient space on the host, NOCOPY option may be used to create the PDB. In that case, single instance non CDB will not be useable after plugin as a PDB, because the original data files has been used for the PDB. Make sure make a backup before the conversion so that there is something to fall back if anything goes wrong.
 
-. Provision a new, matching EC2 instance that is comparable with the on-premises instance.
+. Start with PDB upgrade after conversion if the version between source single instance non CDB and target CDB are different. For the same version conversion, this step can be bypassed.
++
+[source, cli]
+sqlplus / as sysdba;
++
+[source, cli]
+alter session set container=ncdb;
++
+[source, cli]
+alter pluggable database open upgrade;
+exit;
++
+[source, cli]
+dbupgrade -c ncdb -l /home/oracle
++
+Review the upgrade log file in /home/oracle directory.
 
-. Provision equal database volumes from FSx storage and mount the volumes to the EC2 instance.
+. Open the pluggable database, check pdb plugin violations, and recompile the invalid objects.
++
+[source, cli]
+alter pluggable database ncdb open;
++
+[source, cli]
+alter session set container=ncdb;
+select message from pdb_plug_in_violations where type like '%ERR%' and status <> 'RESOLVED';
++
+[source, cli]
+$ORACLE_HOME/perl/bin/perl $ORACLE_HOME/rdbms/admin/catcon.pl -n 1 -c 'ncdb' -e -b utlrp -d $ORACLE_HOME/rdbms/admin utlrp.sql
 
-. Create a disk-level Oracle backup copy.
+. Now, execute noncdb_to_pdb.sql to update data dictionary
++
+[source, cli]
+sqlplus / as sysdba
++
+[source, cli]
+alter session set container=ncdb;
+@$ORACLE_HOME/rdbms/admin/noncdb_to_pdb.sql;
++
+shutdown and restart the container DB, ncdb will be take out of restricted mode.
 
-. Move the backup copy to AWS S3 storage.
+== Migrate on-premises Oracle databases to Azure with PDB relocation
 
-. Recreate the Oracle control file and restore and recover the database by pulling data and the archive log from S3 storage.
+Oracle PDB relocation with maximum availability option utilize PDB hot clone technology that allows the source PDB availability while PDB is being copied over to target.
 
-. Sync the target Oracle database with the on-premises source database.
+At the switching over, sessions and connections are redirected target PDB automatically. Thus, the down time is minimized regardless the size of PDB to be relocated.
 
-. At switchover, shut down the application and source Oracle database. Copy the last few archive logs and apply them to the target Oracle database to bring it up to date.
+NetApp provides an Ansible based toolkit that automate migration procedure.
 
-. Start up the target database for user access.
+. Create a CDB in the Azure public cloud on Azure VM with the same version and patch level.
 
-. Redirect application to the target database to complete the switchover.
+. From Ansible controller, clone a copy of automation toolkit.
++
+[source, cli]
+git clone https://github.com/NetApp-Automation/na_ora_aws_migration.git
 
-== Consolidate Oracle databases in AWS with Oracle multitenancy CDB/PDB architecture
+. Read the instruction in README file.
 
-. Create CDB in the AWS public cloud.
+. Configure the Ansible host variable files for both source and target Oracle servers and DB server hosts configuration file for name resolution.
 
-. If the on-premises database is also deployed in CDB/PDB multitenancy, unplug the PDB to be migrated.
+. Install Ansible controller prerequisites on Ansible controller.
++
+[source, cli]
+ansible-playbook -i hosts requirements.yml
+ansible-galaxy collection install -r collections/requirements.yml --force
 
-. Transfer metadata as well as underlined Oracle data files to the target CDB instance.
+. Execute pre-migration tasks against on-prem server.
++
+[source, cli]
+ansible-playbook -i hosts ora_pdb_relocate.yml -u admin -k -K -t ora_pdb_relo_onprem
++
 
-. Validate compatibility with Oracle validation procedures.
+[NOTE]
+Admin user is management user on on-premises Oracle server host with sudo privileges and is authenticated using password.
 
-. If compatibility validation passes, plug the unplugged PDB into the target CDB container.
-
-. Update the data dictionary if required.
-
-. Back up and open the migrated PDB for access.
+. Execute Oracle PDB relocation from on-premises to target Azure Oracle host.
++
+[source, cli]
+ansible-playbook -i hosts ora_pdb_relocate.yml -u azureuser --private-key db1.pem -t ora_pdb_relo_primary
 
 [NOTE]
 
-PDB unplug and plug-in requires application downtime that should be taken into consideration during migration planning.
-
-Again, the NetApp automation team provides a migration toolkit that can facilitate Oracle database migration from on-premises to the AWS cloud. Check the NetApp public GitHub site for the latest database migration tools.
+Ansible controller can be located either on-premises or Azure cloud. The controller needs connectivity to on-premises Oracle server host and Azure Oracle VM host. The Oracle database port such as 1521 is open between on-premises Oracle server host and Azure Oracle VM host.
