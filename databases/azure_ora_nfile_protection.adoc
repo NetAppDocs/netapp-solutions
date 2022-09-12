@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
 permalink: databases/azure_ora_nfile_protection.html
-summary: This section describes the deployment procedures of deploying Oracle RDS custom database with FSx storage.
-keywords: AWS, Oracle, RDS, HA, DR, database
+summary: This section describes how to protect your Oracle database with azacsnap tool and snapshot backup, restore and snapshots tiering to Azure blob.
+keywords: Oracle, Azure, database, backup, restore
 ---
 
-= Step-by-Step Oracle Deployment Procedures on AWS EC2/FSx
+= Protect your Oracle database in Azure cloud
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -15,24 +15,104 @@ keywords: AWS, Oracle, RDS, HA, DR, database
 
 link:azure_ora_nfile_procedures.html[Previous: Deployment procedures.]
 
-== Deploy an EC2 Linux instance for Oracle via EC2 console
+== Backup Oracle database with snapshot using AzAcSnap tool
 
-If you are new to AWS, you first need to set up an AWS environment. The documentation tab at the AWS website landing page provides EC2 instruction links on how to deploy a Linux EC2 instance that can be used to host your Oracle database via the AWS EC2 console. The following section is a summary of these steps. For details, see the linked AWS EC2-specific documentation.
+Azure Application Consistent Snapshot tool (AzAcSnap) is a command-line tool that enables data protection for third-party databases by handling all the orchestration required to put them into an application consistent state before taking a storage snapshot, after which it returns them to an operational state.
 
-=== Setting up your AWS EC2 environment
+In the case of Oracle, it's a matter of putting database in backup mode and take a snapshot, then take Oracle database out of backup mode.
 
-You must create an AWS account to provision the necessary resources to run your Oracle environment on the EC2 and FSx service. The following AWS documentation provides the necessary details:
+=== Backup data and log volumes
 
-* link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/get-set-up-for-amazon-ec2.html[Set up to use Amazon EC2^]
+The backup can be setup on the database server host with simple shell script that execute the snapshot command. Then, the script can be scheduled to run from crontab.
 
-Key topics:
+Generally, the frequency of backup depends on the desired RTO/RPO. Frequent snapshot consumes more storage space. There is a trade off between frequency of backup and space consumption.
 
-* Sign up for AWS.
-* Create a key pair.
-* Create a security group.
+Data volume normally consumes more storage space than log volume. Therefore, you can take snapshots on data volumes like every few hours and more frequent snapshots on log volumes like every 15 or 30 minutes.
 
-=== Enabling multiple availability zones in AWS account attributes
+Following are examples of backup scripts and scheduling.
 
-For an Oracle high availability configuration as demonstrated in the architecture diagram, you must enable at least four availability zones in a region. The multiple availability zones can also be situated in different regions to meet the required distances for disaster recovery.
+For data volumes snapshot:
+[source, cli]
+ # /bin/sh
+cd /home/azacsnap/bin
+. ~/.bash_profile
+azacsnap -c backup --volume data --prefix acao-ora01-data --retention 7 >> /home/azacsnap/logs/snap_data_`date +"%Y-%m%d-%H%M%S"`.log 2>&1
+azacsnap -c backup --volume other --prefix acao-ora01-log --retention 7 >> /home/azacsnap/logs/snap_log_`date +"%Y-%m%d-%H%M%S"`.log 2>&1
 
-image:aws_ora_fsx_ec2_inst_01.PNG[Error: Missing Graphic Image]
+For log volumes snapshot:
+[source, cli]
+ # /bin/sh
+cd /home/azacsnap/bin
+. ~/.bash_profile
+azacsnap -c backup --volume other --prefix acao-ora01-log --retention 7 >> /home/azacsnap/logs/snap_log_`date +"%Y-%m%d-%H%M%S"`.log 2>&1
+
+Crontab schedule:
+15,30,45 * * * * /home/azacsnap/snap_log.sh
+0 */2 * * * /home/azacsnap/snap_data.sh
+
+[NOTE]
+
+When setting up the backup azacsnap.json configuration file, add all data volumes including binary volume to dataVolume and add all log volumes to otherVolume.
+
+=== Validate the snapshots
+
+Go to azure portal, Azure NetApp Files/volumes screen to check if the snapshots have been successfully created.
+
+image:db_ora_azure_anf_snap_01.PNG[Error: Missing Graphic Image]
+image:db_ora_azure_anf_snap_02.PNG[Error: Missing Graphic Image]
+
+=== Snapshot backup tiering to Azure Blob
+
+Configure snapshots backup tiering to Azure Blob.
+
+image:db_ora_azure_snap_01.PNG[Error: Missing Graphic Image]
+
+=== Oracle restore and recovery from local backup
+
+One of key benefits of snapshots backup is that it coexists with source database volumes and can be rolled backup almost instantly.
+
+The following demonstrate how to restore and recover an Oracle database from Azure dashboard and CLI on the Oracle host.
+
+. Create a test table in the database to be restored
+[oracle@acao-ora01 ~]$ sqlplus / as sysdba
++
+SQL*Plus: Release 19.0.0.0.0 - Production on Mon Sep 12 19:02:35 2022
+Version 19.8.0.0.0
++
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
++
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.8.0.0.0
++
+SQL> create table testsnapshot(
+     id integer,
+     event varchar(100),
+     dt timestamp);
++
+Table created.
++
+SQL> insert into testsnapshot values(1,'insert a data marker to validate snapshot restore',sysdate);
++
+1 row created.
++
+SQL> commit;
++
+Commit complete.
++
+SQL> select * from testsnapshot;
+
+        ID
+----------
+EVENT
+--------------------------------------------------------------------------------
+DT
+---------------------------------------------------------------------------
+         1
+insert a data marker to validate snapshot restore
+12-SEP-22 07.07.35.000000 PM
+
+
+
+=== Oracle restore and recovery from Azure Blob
