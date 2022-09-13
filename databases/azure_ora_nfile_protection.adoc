@@ -36,15 +36,15 @@ For data volumes snapshot:
  # /bin/sh
 cd /home/azacsnap/bin
 . ~/.bash_profile
-azacsnap -c backup --volume data --prefix acao-ora01-data --retention 7 >> /home/azacsnap/logs/snap_data_`date +"%Y-%m%d-%H%M%S"`.log 2>&1
-azacsnap -c backup --volume other --prefix acao-ora01-log --retention 7 >> /home/azacsnap/logs/snap_log_`date +"%Y-%m%d-%H%M%S"`.log 2>&1
+azacsnap -c backup --volume data --prefix acao-ora01-data --retention 36
+azacsnap -c backup --volume other --prefix acao-ora01-log --retention 288
 
 For log volumes snapshot:
 [source, cli]
  # /bin/sh
 cd /home/azacsnap/bin
 . ~/.bash_profile
-azacsnap -c backup --volume other --prefix acao-ora01-log --retention 7 >> /home/azacsnap/logs/snap_log_`date +"%Y-%m%d-%H%M%S"`.log 2>&1
+azacsnap -c backup --volume other --prefix acao-ora01-log --retention 288
 
 Crontab schedule:
 15,30,45 * * * * /home/azacsnap/snap_log.sh
@@ -69,7 +69,7 @@ image:db_ora_azure_snap_01.PNG[Error: Missing Graphic Image]
 
 === Oracle restore and recovery from local backup
 
-One of key benefits of snapshots backup is that it coexists with source database volumes and can be rolled backup almost instantly.
+One of key benefits of snapshots backup is that it coexists with source database volumes and can be rolled back almost instantly.
 
 The following demonstrate how to restore and recover an Oracle database from Azure dashboard and CLI on the Oracle host.
 
@@ -103,7 +103,7 @@ Commit complete.
 +
 SQL> select * from testsnapshot;
 
-        ID
+ ID
 ----------
 EVENT
 --------------------------------------------------------------------------------
@@ -113,6 +113,146 @@ DT
 insert a data marker to validate snapshot restore
 12-SEP-22 07.07.35.000000 PM
 
+. Now drop the table after snapshots backups
++
+[oracle@acao-ora01 ~]$ sqlplus / as sysdba
++
+SQL*Plus: Release 19.0.0.0.0 - Production on Tue Sep 13 14:20:22 2022
+Version 19.8.0.0.0
++
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
++
 
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.8.0.0.0
++
+SQL> drop table testsnapshot;
++
+Table dropped.
++
+SQL> select * from testsnapshot;
+select * from testsnapshot
+              *
+ERROR at line 1:
+ORA-00942: table or view does not exist
++
+
+SQL> shutdown immediate;
+Database closed.
+Database dismounted.
+ORACLE instance shut down.
+SQL> exit
+Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.8.0.0.0
+
+. From Azure NetApp Files dashboard, restore log volume to last available snapshot, choose "Revert volume".
++
+image:db_ora_azure_anf_restore_01.PNG[Error: Missing Graphic Image]
+
+. Confirm revert volume and click on "Revert" to complete the volume reversion to latest available backup.
++
+image:db_ora_azure_anf_restore_02.PNG[Error: Missing Graphic Image]
+
+. Repeat the same for data volume, ensure the backup contains the table to be recovered.
++
+image:db_ora_azure_anf_restore_03.PNG[Error: Missing Graphic Image]
+
+. Again confirm the volume reversion, then click on "Revert" button.
++
+image:db_ora_azure_anf_restore_04.PNG[Error: Missing Graphic Image]
+
+. Resync control files if you have multiple copies of control files and replace old control file with latest copy available.
++
+[oracle@acao-ora01 ~]$ mv /u02/oradata/ORATST/control01.ctl /u02/oradata/ORATST/control01.ctl.bk
+[oracle@acao-ora01 ~]$ cp /u03/orareco/ORATST/control02.ctl /u02/oradata/ORATST/control01.ctl
+
+. Login to Oracle server VM and run database recovery via sqlplus.
++
+[oracle@acao-ora01 ~]$ sqlplus / as sysdba
++
+SQL*Plus: Release 19.0.0.0.0 - Production on Tue Sep 13 15:10:17 2022
+Version 19.8.0.0.0
++
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
++
+Connected to an idle instance.
++
+SQL> startup mount;
+ORACLE instance started.
++
+Total System Global Area 6442448984 bytes
+Fixed Size                  8910936 bytes
+Variable Size            1090519040 bytes
+Database Buffers         5335154688 bytes
+Redo Buffers                7864320 bytes
+Database mounted.
+SQL> recover database using backup controlfile until cancel;
+ORA-00279: change 3188523 generated at 09/13/2022 10:00:09 needed for thread 1
+ORA-00289: suggestion :
+/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_43__22rnjq9q_.arc
+ORA-00280: change 3188523 for thread 1 is in sequence #43
++
+
+Specify log: {<RET>=suggested | filename | AUTO | CANCEL}
++
+ORA-00279: change 3188862 generated at 09/13/2022 10:01:20 needed for thread 1
+ORA-00289: suggestion :
+/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_44__29f2lgb5_.arc
+ORA-00280: change 3188862 for thread 1 is in sequence #44
+ORA-00278: log file
+'/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_43__22rnjq9q_.arc' no longer
+needed for this recovery
++
+
+Specify log: {<RET>=suggested | filename | AUTO | CANCEL}
++
+ORA-00279: change 3193117 generated at 09/13/2022 12:00:08 needed for thread 1
+ORA-00289: suggestion :
+/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_45__29h6qqyw_.arc
+ORA-00280: change 3193117 for thread 1 is in sequence #45
+ORA-00278: log file
+'/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_44__29f2lgb5_.arc' no longer
+needed for this recovery
++
+
+Specify log: {<RET>=suggested | filename | AUTO | CANCEL}
++
+ORA-00279: change 3193440 generated at 09/13/2022 12:01:20 needed for thread 1
+ORA-00289: suggestion :
+/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_46_%u_.arc
+ORA-00280: change 3193440 for thread 1 is in sequence #46
+ORA-00278: log file
+'/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_45__29h6qqyw_.arc' no longer
+needed for this recovery
++
+
+Specify log: {<RET>=suggested | filename | AUTO | CANCEL}
+cancel
+Media recovery cancelled.
+SQL> alter database open resetlogs;
++
+Database altered.
++
+SQL> select * from testsnapshot;
+
+  ID
+----------
+EVENT
+--------------------------------------------------------------------------------
+DT
+---------------------------------------------------------------------------
+         1
+insert a data marker to validate snapshot restore
+12-SEP-22 07.07.35.000000 PM
++
+
+SQL> select systimestamp from dual;
+
+ SYSTIMESTAMP
+---------------------------------------------------------------------------
+13-SEP-22 03.28.52.646977 PM +00:00
+
+This demonstrates that the dropped table has been recovered using local snapshot backups.
 
 === Oracle restore and recovery from Azure Blob
