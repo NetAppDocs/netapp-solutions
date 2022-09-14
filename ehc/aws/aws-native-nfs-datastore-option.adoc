@@ -26,7 +26,7 @@ To start, deploy an additional VPC in the same region and availability zone wher
 Deploy FSx for ONTAP in the same Availably Zone as VMware Cloud on AWS SDDC.
 
 [NOTE]
-You cannot deploy FSx for ONTAP in the Connected VPC. Instead, you must deploy it in another VPC that you own and then connect the VPC to a VMware Managed Transit Gateway (vTGW) via SDDC groups.
+You cannot deploy FSx for ONTAP in the Connected VPC. Instead, you must deploy it in a new designated VPC and then connect the VPC to a VMware Managed Transit Gateway (vTGW) via SDDC groups.
 
 .Step 1: Create Amazon FSx for ONTAP in a designated VPC
 [%collapsible]
@@ -47,7 +47,7 @@ image:fsx-nfs-image4.png[Error: Missing Graphic Image]
 . In the *Networking* section for Virtual Private Cloud (VPC), choose the appropriate VPC and preferred subnets along with the route table. In this case, Demo- FSxforONTAP-VPC is selected from the dropdown menu.
 +
 [NOTE]
-Make sure this is a separate VPC and not the connected VPC.
+Make sure this is a new designated VPC and not the connected VPC.
 +
 [NOTE]
 By default, FSx for ONTAP uses `198.19.0.0/16` as the default endpoint IP address range for the file system. Make sure that the Endpoint IP address range does not conflict with the VMC on the AWS infrastructure. If you are unsure, use a non- overlapping range with no conflicts.
@@ -61,17 +61,18 @@ image:fsx-nfs-image6.png[Error: Missing Graphic Image]
 . In the *Default Storage Virtual Machine Configuration* section, specify the name of the SVM.
 +
 [NOTE]
-During GA, four NFS datastores are supported.
+As of GA, four NFS datastores are supported.
 +
 image:fsx-nfs-image7.png[Error: Missing Graphic Image]
 
 . In the *Default Volume Configuration* section, specify the volume name and size required for datastore and click *Next*. This should be an NFSv3 volume. For *Storage Efficiency*, choose *Enabled* to turn on the ONTAP storage efficiency features (compression, deduplication, and compaction). After creation, use the shell to modify the volume parameters as follows:
 +
+[%autowidth.stretch]
 |===
 |Setting |Configuration
 
 |Volume guarantee
-|None (thin provisioned)
+|None (thin provisioned); Default setting is none
 |fractional_reserve
 |0%
 |snap_reserve
@@ -180,10 +181,10 @@ image:fsx-nfs-image22.png[Error: Missing Graphic Image]
 =====
 
 
-.Step 5: Configure routing (AWS, VPC, and SDDC) and security groups
+.Step 5: Configure routing (AWS VPC and SDDC) and security groups
 [%collapsible]
 =====
-. In the AWS Console, create the route back to the SDDC by locating the VPC in the VPC service page and select the main route table for the VPC.
+. In the AWS Console, create the route back to the SDDC by locating the VPC in the VPC service page and select the *main* route table for the VPC.
 . Browse to the route table in the lower panel and click *Edit routes*.
 +
 image:fsx-nfs-image23.png[Error: Missing Graphic Image]
@@ -198,17 +199,14 @@ image:fsx-nfs-image25.png[Error: Missing Graphic Image]
 +
 [NOTE]
 Update the inbound rule with the CIDR block of the SDDC infrastructure.
-
-. Optionally, for guest-attached storage on the AWS FSx for ONTAP volume, allow bidirectional traffic firewall rules for access to AWS FSx for ONTAP from guest VMs. Follow the detailed steps for compute gateway firewall rules for SDDC workload connectivity.
 +
 [NOTE]
 Verify that the VPC (where FSx for ONTAP resides) route table is updated to avoid connectivity issues.
 +
 [NOTE]
 Update the security group to accept NFS traffic.
-+
 
-image:fsx-nfs-image26.png[Error: Missing Graphic Image]
+This is the final step in preparing the connectivity to the appropriate SDDC. With the file system configured, routes added, and security groups updated, it’s time to mount the datastores.
 =====
 
 .Step 6: Attach NFS volume as a datastore to SDDC cluster
@@ -222,6 +220,9 @@ image:fsx-nfs-image27.png[Error: Missing Graphic Image]
 
 . Click *ATTACH DATASTORE* and fill in the required values.
 +
+NOTE: NFS server address is the NFS IP address which can be found under the FSx > Storage virtual machines tab > Endpoints within AWS console.
++
+
 image:fsx-nfs-image28.png[Error: Missing Graphic Image]
 
 . Click *ATTACH DATASTORE* to attach the datastore to the cluster.
