@@ -26,9 +26,9 @@ To start, deploy an additional VPC in the same region and availability zone wher
 Deploy FSx for ONTAP in the same Availably Zone as VMware Cloud on AWS SDDC.
 
 [NOTE]
-You cannot deploy FSx for ONTAP in the Connected VPC. Instead, you must deploy it in a new designated VPC and then connect the VPC to a VMware Managed Transit Gateway (vTGW) via SDDC groups.
+You cannot deploy FSx for ONTAP in the Connected VPC. Instead, you must deploy it in a new, designated VPC and then connect the VPC to a VMware Managed Transit Gateway (vTGW) via SDDC groups.
 
-.Step 1: Create Amazon FSx for ONTAP in a designated VPC
+.Step 1: Create Amazon FSx for ONTAP in a new, designated VPC
 [%collapsible]
 =====
 To create and mount the Amazon FSx for NetApp ONTAP file system, complete the following steps:
@@ -43,14 +43,17 @@ image:fsx-nfs-image2.png[Error: Missing Graphic Image]
 image:fsx-nfs-image3.png[Error: Missing Graphic Image]
 +
 image:fsx-nfs-image4.png[Error: Missing Graphic Image]
++
+[NOTE]
+The datastore sizes vary quite a bit from customer to customer. Although the recommended number of virtual machines per NFS datastore is subjective, many factors determine the optimum number of VMs that can be placed on each datastore. Although most administrators only consider capacity, the amount of concurrent I/O being sent to the VMDKs is one of the most important factors for overall performance. Use performance statistics from on-premises to size the datastore volumes accordingly.
 
 . In the *Networking* section for Virtual Private Cloud (VPC), choose the appropriate VPC and preferred subnets along with the route table. In this case, Demo- FSxforONTAP-VPC is selected from the dropdown menu.
 +
 [NOTE]
-Make sure this is a new designated VPC and not the connected VPC.
+Make sure this is a new, designated VPC and not the connected VPC.
 +
 [NOTE]
-By default, FSx for ONTAP uses `198.19.0.0/16` as the default endpoint IP address range for the file system. Make sure that the Endpoint IP address range does not conflict with the VMC on the AWS infrastructure. If you are unsure, use a non- overlapping range with no conflicts.
+By default, FSx for ONTAP uses 198.19.0.0/16 as the default endpoint IP address range for the file system. Make sure that the Endpoint IP address range does not conflict with the VMC on the AWS SDDC, associated VPC subnets and on-premises infrastructure. If you are unsure, use a non-overlapping range with no conflicts.
 +
 image:fsx-nfs-image5.png[Error: Missing Graphic Image]
 
@@ -65,35 +68,43 @@ As of GA, four NFS datastores are supported.
 +
 image:fsx-nfs-image7.png[Error: Missing Graphic Image]
 
-. In the *Default Volume Configuration* section, specify the volume name and size required for datastore and click *Next*. This should be an NFSv3 volume. For *Storage Efficiency*, choose *Enabled* to turn on the ONTAP storage efficiency features (compression, deduplication, and compaction). After creation, use the shell to modify the volume parameters as follows:
+. In the *Default Volume Configuration* section, specify the volume name and size required for datastore and click *Next*. This should be an NFSv3 volume. For *Storage Efficiency*, choose *Enabled* to turn on the ONTAP storage efficiency features (compression, deduplication, and compaction). After creation, use the shell to modify the volume parameters using *_volume modify_* as follows:
 +
 [%autowidth.stretch]
 |===
-|Setting |Configuration
+| Setting | Configuration
 
-|Volume guarantee
-|None (thin provisioned); Default setting is none
-|fractional_reserve
-|0%
-|snap_reserve
-|0%
-|Autosize
-|On
-|Storage efficiency
-|Enabled
-|Autodelete
-|volume / oldest_first
-|Volume Tiering Policy
-|Snapshot only
-|try_first
-|Autogrow
-|Snapshot policy
-|None
+| Volume guarantee (Space Guarantee Style) | None (thin provisioned) – set by default
+| fractional_reserve (fractional-reserve) | 0% – set by default
+| snap_reserve (percent-snapshot-space) | 0%
+| Autosize (autosize-mode) | grow_shrink
+| Storage efficiency | Enabled – set by default
+| Autodelete | volume / oldest_first
+| Volume Tiering Policy | Snapshot only – set by default
+| try_first | Autogrow
+| Snapshot policy | None
 |===
++
+Use the following SSH command to create and modify volumes:
++
+*Command to create new datastore volume from shell:*
++
+  volume create -vserver FSxONTAPDatastoreSVM -volume DemoDS002 -aggregate aggr1 -size 1024GB -state online -tiering-policy snapshot-only -percent-snapshot-space 0 -autosize-mode grow -snapshot-policy none -junction-path /DemoDS002
++
+*Note:* The volumes created via shell will take few minutes to show up in the AWS Console.
++
+*Command to modify volume parameters which are not set by default:*
++
+  volume modify -vserver FSxONTAPDatastoreSVM -volume DemoDS002 -fractional-reserve 0
+  volume modify -vserver FSxONTAPDatastoreSVM -volume DemoDS002 -space-mgmt-try-first vol_grow
+  volume modify -vserver FSxONTAPDatastoreSVM -volume DemoDS002 -autosize-mode grow
 +
 image:fsx-nfs-image8.png[Error: Missing Graphic Image]
 +
 image:fsx-nfs-image9.png[Error: Missing Graphic Image]
++
+[NOTE]
+During initial migration scenario, the default snapshot policy can cause datastore capacity full issues. To overcome it, modify the snapshot policy to suit the needs.
 
 . Review the file system configuration shown on the *Create File System* page.
 . Click *Create File System*.
@@ -103,7 +114,7 @@ image:fsx-nfs-image10.png[Error: Missing Graphic Image]
 image:fsx-nfs-image11.png[Error: Missing Graphic Image]
 +
 [NOTE]
-Repeat the previous steps to create more file systems and the datastore volumes according to the capacity and performance requirements.
+Repeat the previous steps to create more storage virtual machines or file systems and the datastore volumes according to the capacity and performance requirements.
 
 To learn about Amazon FSx for ONTAP performance, see https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/performance.html[Amazon FSx for NetApp ONTAP performance^].
 =====
@@ -185,6 +196,7 @@ image:fsx-nfs-image22.png[Error: Missing Graphic Image]
 [%collapsible]
 =====
 . In the AWS Console, create the route back to the SDDC by locating the VPC in the VPC service page and select the *main* route table for the VPC.
+
 . Browse to the route table in the lower panel and click *Edit routes*.
 +
 image:fsx-nfs-image23.png[Error: Missing Graphic Image]
@@ -193,12 +205,11 @@ image:fsx-nfs-image23.png[Error: Missing Graphic Image]
 +
 image:fsx-nfs-image24.png[Error: Missing Graphic Image]
 
-. Verify that the security group in the associated VPC is updated with the correct inbound rules for the SDDC Group CIDR.
+. Next step is to verify that the security group in the associated VPC is updated with the correct inbound rules for the SDDC Group CIDR.
+
+. Update the inbound rule with the CIDR block of the SDDC infrastructure.
 +
 image:fsx-nfs-image25.png[Error: Missing Graphic Image]
-+
-[NOTE]
-Update the inbound rule with the CIDR block of the SDDC infrastructure.
 +
 [NOTE]
 Verify that the VPC (where FSx for ONTAP resides) route table is updated to avoid connectivity issues.
@@ -206,7 +217,7 @@ Verify that the VPC (where FSx for ONTAP resides) route table is updated to avoi
 [NOTE]
 Update the security group to accept NFS traffic.
 
-This is the final step in preparing the connectivity to the appropriate SDDC. With the file system configured, routes added, and security groups updated, it’s time to mount the datastores.
+This is the final step in preparing the connectivity to the appropriate SDDC. With the file system configured, routes added, and security groups updated, it’s time to mount the datastore(s).
 =====
 
 .Step 6: Attach NFS volume as a datastore to SDDC cluster
