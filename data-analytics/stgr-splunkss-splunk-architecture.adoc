@@ -1,0 +1,408 @@
+---
+sidebar: sidebar
+permalink: data-analytics/stgr-splunkss-splunk-architecture.html
+keywords: definitions, distributed deployments, data flow, software requirements, design
+summary: This page describes the Splunk architecture, including key definitions, Splunk distributed deployments, Splunk SmartStore, data flow, hardware and software requirements, single and multisite requirements, and so on.
+---
+
+= Splunk architecture
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-07-27 16:41:18.432688
+//
+
+link:stgr-splunkss-flexible-storagegrid-features-for-splunk-smartstore.html[Previous: Flexible StorageGRID features for Splunk SmartStore.]
+
+== Key definitions
+
+The next two tables list the Splunk and NetApp components used in the distributed Splunk deployment.
+
+This table lists the Splunk hardware components for the distributed Splunk Enterprise configuration.
+
+|===
+|Splunk component |Task
+
+|Indexer
+|Repository for Splunk Enterprise data
+|Universal forwarder
+|Responsible for ingesting data and forwarding data to the indexers
+|Search head
+|The user front end used to search data in indexers
+|Cluster master
+|Manages the Splunk installation of indexers and search heads
+|Monitoring Console
+|Centralized monitoring tool used across the entire deployment
+|License master
+|License master handles Splunk Enterprise licensing
+|Deployment server
+|Updates configurations and distributes apps to processing component
+|Storage component
+|Task
+|NetApp AFF
+|All-flash storage used to manage hot tier data. Also known as local storage.
+|NetApp StorageGRID
+|S3 object storage used to manage warm tier data. Used by SmartStore to move data between the hot and warm tier. Also known as remote storage.
+|===
+
+This table lists the components in the Splunk storage architecture.
+
+|===
+|Splunk component |Task |Responsible component
+
+|SmartStore
+|Provides indexers with the ability to tier data from local storage to object storage.
+|Splunk
+|Hot
+|The landing spot where universal forwarders place newly written data. Storage is writable, and data is searchable. This data tier is typically composed of SSDs or fast HDDs.
+|ONTAP
+|Cache Manager
+|Manages local cache of indexed data, fetches warm data from remote storage when a search occurs, and evicts least frequently used data from the cache.
+|SmartStore
+|Warm
+|Data is rolled logically to the bucket, renamed to the warm tier first from the hot tier. Data within this tier is protected and, like the hot tier, can be composed of larger capacity SSDs or HDDs. Both incremental and full backups are supported using common data protection solutions.
+|StorageGRID
+|===
+
+== Splunk distributed deployments
+
+To support larger environments in which data originates on many machines, you need to process large volumes of data. If many users need to search the data, you can scale the deployment by distributing Splunk Enterprise instances across multiple machines. This is known as a distributed deployment.
+
+In a typical distributed deployment, each Splunk Enterprise instance performs a specialized task and resides on one of three processing tiers corresponding to the main processing functions.
+
+The following table lists the Splunk Enterprise processing tiers.
+
+|===
+|Tier |Component |Description
+
+|Data input
+|Forwarder
+|A forwarder consumes data and then forwards the data to a group of indexers.
+|Indexing
+|Indexer
+|An indexer indexes incoming data that it usually receives from a group of forwarders. The indexer transforms the data into events and stores the events in an index. The indexer also searches the indexed data in response to search requests from a search head.
+|Search management
+|Search head
+|A search head serves as a central resource for searching. The search heads in a cluster are interchangeable and have access to the same searches, dashboards, knowledge objects, and so on, from any member of the search head cluster.
+|===
+
+The following table lists the important components used in a distributed Splunk Enterprise environment.
+
+|===
+|Component |Description |Responsibility
+
+|Index cluster master
+|Coordinates activities and updates of an indexer cluster
+|Index management
+|Index cluster
+|Group of Splunk Enterprise indexers that are configured to replicate data with each other
+|Indexing
+|Search head deployer
+|Handles deployment and updates to the cluster master
+|Search head management
+|Search head cluster
+|Group of search heads that serves as a central resource for searching
+|Search management
+|Load Balancers
+|Used by clustered components to handle increasing demand by search heads, indexers and S3 target to distribute load across clustered components.
+|Load Management for clustered components
+|===
+
+See the following benefits of Splunk Enterprise distributed deployments:
+
+* Access diverse or dispersed data sources
+* Provide functionality to handle the data needs for enterprises of any size and complexity
+* Achieve high availability and ensure disaster recovery with data replication and multisite deployment
+
+== Splunk SmartStore
+
+SmartStore is an indexer capability that enables remote object stores such as Amazon S3 to store indexed data.  As a deployment's data volume increases, demand for storage typically outpaces demand for compute resources.  SmartStore allows you to manage your indexer storage and compute resources cost-effectively by scaling those resources separately.
+
+SmartStore introduces a remote storage tier and a cache manager. These features allow data to reside either locally on indexers or on the remote storage tier. The cache manager manages data movement between the indexer and the remote storage tier, which is configured on the indexer.
+
+With SmartStore, you can reduce the indexer storage footprint to a minimum and choose I/O-optimized compute resources. Most data resides on the remote storage. The indexer maintains a local cache that contains a minimal amount of data: hot buckets, copies of warm buckets participating in active or recent searches, and bucket metadata.
+
+== Splunk SmartStore data flow
+
+When data incoming from various sources reaches the indexers, data is indexed and saved locally in a hot bucket. The indexer also replicates the hot bucket data to target indexers. So far, the data flow is identical to the data flow for non-SmartStore indexes.
+
+When the hot bucket rolls to warm, the data flow diverges. The source indexer copies the warm bucket to the remote object store (remote storage tier) while leaving the existing copy in its cache, because searches tend to run across recently indexed data. However, the target indexers delete their copies because the remote store provides high availability without maintaining multiple local copies. The master copy of the bucket now resides in the remote store.
+
+The following image shows the Splunk SmartStore data flow.
+
+image:stgr-splunkss-image5.png[Error: Missing Graphic Image]
+
+The cache manager on the indexer is central to the SmartStore data flow. It fetches copies of buckets from the remote store as necessary to handle search requests. It also evicts older or less searched copies of buckets from the cache, because the likelihood of their participating in searches decreases over time.
+
+The cache manager’s job is to optimize the use of the available cache while ensuring that searches have immediate access to the buckets they need.
+
+== Software requirements
+
+The table below lists the software components that are required to implement the solution. The software components that are used in any implementation of the solution might vary based on customer requirements.
+
+|===
+|Product family |Product name |Product version |Operating system
+
+|NetApp StorageGRID
+|StorageGRID object storage
+|11.6
+|n/a
+|CentOS
+|CentOS
+|8.1
+|CentOS 7.x
+|Splunk Enterprise
+|Splunk Enterprise with SmartStore
+|8.0.3
+|CentOS 7.x
+|===
+
+== Single and multisite requirements
+
+In an Enterprise Splunk environment (medium and large deployments) where data originates on many machines and where many users need to search the data, you can scale your deployment by distributing Splunk Enterprise instances across single and multiple sites.
+
+See the following benefits of Splunk Enterprise distributed deployments:
+
+* Access diverse or dispersed data sources
+* Provide functionality to handle the data needs for enterprises of any size and complexity
+* Achieve high availability and ensure disaster recovery with data replication and multisite deployment
+
+The following table lists the components used in a distributed Splunk Enterprise environment.
+
+|===
+|Component |Description |Responsibility
+
+|Index cluster master
+|Coordinates activities and updates of an indexer cluster
+|Index management
+|Index cluster
+|Group of Splunk Enterprise indexers that are configured to replicate each other’s data
+|Indexing
+|Search head deployer
+|Handles deployment and updates to the cluster master
+|Search head management
+|Search head cluster
+|Group of search heads that serves as a central resource for searching
+|Search management
+|Load balancers
+|Used by clustered components to handle increasing demand by search heads, indexers and S3 target to distribute load across clustered components.
+|Load management for clustered components
+|===
+
+This figure depicts an example of a single-site distributed deployment.
+
+image:stgr-splunkss-image6.png[Error: Missing Graphic Image]
+
+This figure depicts an example of a multisite distributed deployment.
+
+image:stgr-splunkss-image7.png[Error: Missing Graphic Image]
+
+== Hardware requirements
+
+The following tables list the minimum number of hardware components that are required to implement the solution. The hardware components that are used in specific implementations of the solution might vary based on customer requirements.
+
+[NOTE]
+Regardless of whether you have deployed Splunk SmartStore and StorageGRID in a single site or in multiple sites,  all systems are managed from the StorageGRID GRID Manager in a single pane of glass. See the section “Simple Management with Grid Manager” for more details.
+
+This table lists the hardware used for a single site.
+
+|===
+|Hardware |Quantity |Disk |Usable capacity |Note
+
+|StorageGRID SG1000
+|1
+|n/a
+|n/a
+|Admin node and load balancer
+|StorageGRID SG6060
+|4
+|x48, 8TB (NL-SAS HDD)
+|1PB
+|Remote storage
+|===
+
+This table lists the hardware used for a multisite configuration (per site).
+
+|===
+|Hardware |Quantity |Disk |Usable capacity |Note
+
+|StorageGRID SG1000
+|2
+|n/a
+|n/a
+|Admin node and Load balancer
+|StorageGRID SG6060
+|4
+|x48, 8TB (NL-SAS HDD)
+|1PB
+|Remote storage
+|===
+
+=== NetApp StorageGRID Load Balancer: SG1000
+
+Object storage requires the use of a load balancer to present the cloud storage namespace. StorageGRID supports third- party load balancers from leading vendors like F5 and Citrix, but many customers choose the enterprise-grade StorageGRID balancer for simplicity, resiliency, and high performance. The StorageGRID load balancer is available as a VM, container,  or purpose-built appliance.
+
+The StorageGRID SG1000 facilitates the use of high availability (HA) groups and intelligent load balancing for S3 data-path connections. No other on-prem object storage system provides a customized load balancer.
+
+The SG1000 appliance provides the following features:
+
+* A load balancer and, optionally, admin node functions for a StorageGRID system
+* The StorageGRID Appliance Installer to simplify node deployment and configuration
+* Simplified configuration of S3 endpoints and SSL
+* Dedicated bandwidth (versus sharing a third-party load balancer with other applications)
+* Up to 4 x 100Gbps aggregate Ethernet bandwidth
+
+The following image shows the SG1000 Gateway Services appliance.
+
+image:stgr-splunkss-image8.png[Error: Missing Graphic Image]
+
+=== SG6060
+
+The StorageGRID SG6060 appliance includes a compute controller (SG6060) and a storage controller shelf (E-Series E2860) that contains two storage controllers and 60 drives. This appliance provides the following features:
+
+* Scale up to 400PB in a single namespace.
+* Up to 4x 25Gbps aggregate Ethernet bandwidth.
+* Includes the StorageGRID Appliance Installer to simplify node deployment and configuration.
+* Each SG6060 appliance can have one or two additional expansion shelves for a total of 180 drives.
+* Two E-Series E2800 controllers (duplex configuration) to provide storage controller failover support.
+* Five-drawer drive shelf that holds sixty 3.5-inch drives (two solid-state drives, and 58 NL-SAS drives).
+
+The following image shows the SG6060 appliance.
+
+image:stgr-splunkss-image9.png[Error: Missing Graphic Image]
+
+== Splunk design
+
+The following table lists the Splunk configuration for a single site.
+
+|===
+|Splunk component |Task |Quantity |Cores |Memory |OS
+
+|Universal forwarder
+|Responsible for ingesting data and forwarding data to the indexers
+|4
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Indexer
+|Manages the user data
+|10
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Search head
+|User front end searches data in indexers
+|3
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Search head deployer
+|Handles updates for search head clusters
+|1
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Cluster master
+|Manages the Splunk installation and indexers
+|1
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Monitoring Console and license master
+|Performs centralized monitoring of the entire Splunk deployment and manages Splunk licenses
+
+|1
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|===
+
+The following tables describe the Splunk configuration for multisite configurations.
+
+This table lists the Splunk configuration for a multisite configuration (site A).
+
+|===
+|Splunk component |Task |Quantity |Cores |Memory |OS
+
+|Universal forwarder
+|Responsible for ingesting data and forwarding data to the indexers.
+|4
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Indexer
+|Manages the user data
+|10
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Search head
+|User front end searches data in indexers
+|3
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Search head deployer
+|Handles updates for search head clusters
+|1
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Cluster master
+|Manages the Splunk installation and indexers
+|1
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Monitoring Console and license master
+|Performs centralized monitoring of the entire Splunk deployment and manages Splunk licenses.
+|1
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|===
+
+This table lists the Splunk configuration for a multisite configuration (site B).
+
+|===
+|Splunk component |Task |Quantity |Cores |Memory |OS
+
+|Universal forwarder
+|Responsible for ingesting data and forwarding data to the indexers
+|4
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Indexer
+|Manages the user data
+|10
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Search head
+|User front end searches data in indexers
+|3
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Cluster master
+|Manages the Splunk installation and indexers
+|1
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|Monitoring Console and license master
+|Performs centralized monitoring of the entire Splunk deployment and manages Splunk licenses
+|1
+|16 Cores
+|32GB RAM
+|CentOS 8.1
+|===
+
+link:stgr-splunkss-single-site-smartstore-performance.html[Next: Single-site SmartStore performance.]

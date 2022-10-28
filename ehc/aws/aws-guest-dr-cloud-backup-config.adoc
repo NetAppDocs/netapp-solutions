@@ -1,0 +1,64 @@
+---
+sidebar: sidebar
+permalink: ehc/aws/aws-guest-dr-cloud-backup-config.html
+keywords: secondary, windows, snapcenter server, veeam server
+summary: To conduct a failover of application VMs and database volumes to VMware Cloud Volume services running in AWS, you must install and configure a running instance of both SnapCenter Server and Veeam Backup and Replication Server. After the failover is complete, you must also configure these tools to resume normal backup operations until a failback to the on-premises datacenter is planned and executed.
+---
+
+= Cloud backup tools and configuration
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-07-20 15:53:45.476706
+//
+
+link:aws-guest-dr-config-veeam.html[Previous: Deploy and configure Veeam Backup Server.]
+
+To conduct a failover of application VMs and database volumes to VMware Cloud Volume services running in AWS, you must install and configure a running instance of both SnapCenter Server and Veeam Backup and Replication Server. After the failover is complete, you must also configure these tools to resume normal backup operations until a failback to the on-premises datacenter is planned and executed.
+
+== Deploy secondary Windows SnapCenter Server
+
+SnapCenter Server is deployed in the VMware Cloud SDDC or installed on an EC2 instance residing in a VPC with network connectivity to the VMware Cloud environment.
+
+SnapCenter software is available from the NetApp support site and can be installed on Microsoft Windows systems that reside either in a domain or workgroup. A detailed planning guide and installation instructions can be found at the https://docs.netapp.com/us-en/snapcenter/install/install_workflow.html[NetApp documentation center^].
+
+You can find the SnapCenter software at https://mysupport.netapp.com[this link^].
+
+== Configure secondary Windows SnapCenter Server
+
+To perform a restore of application data mirrored to FSx ONTAP, you must first perform a full restore of the on-premises SnapCenter database. After this process is complete, communication with the VMs is reestablished and application backups can now resume using FSx ONTAP as the primary storage.
+
+To achieve this, you must complete the following items on the SnapCenter Server:
+
+. Configure the computer name to be identical to the original on-premises SnapCenter Server.
+. Configure networking to communicate with VMware Cloud and the FSx ONTAP instance.
+. Complete the procedure to restore the SnapCenter database.
+. Confirm that SnapCenter is in Disaster Recovery mode to make sure that FSx is now the primary storage for backups.
+. Confirm that communication is reestablished with the restored virtual machines.
+
+For more information on completing these steps, see to section link:aws-guest-dr-failover.html#snapcenter-database-restore-process["SnapCenter database Restore Process"].
+
+== Deploy secondary Veeam Backup & Replication server
+
+You can install the Veeam Backup & Replication server on a Windows server in the VMware Cloud on AWS or on an EC2 instance. For detailed implementation guidance, see the https://www.veeam.com/documentation-guides-datasheets.html[Veeam Help Center Technical Documentation^].
+
+== Configure secondary Veeam Backup & Replication server
+
+To perform a restore of virtual machines that have been backed up to Amazon S3 storage, you must install the Veeam Server on a Windows server and configure it to communicate with VMware Cloud, FSx ONTAP, and the S3 bucket that contains the original backup repository. It must also have a new backup repository configured on FSx ONTAP to conduct new backups of the VMs after they are restored.
+
+To perform this process, the following items must be completed:
+
+. Configure networking to communicate with VMware Cloud, FSx ONTAP, and the S3 bucket containing the original backup repository.
+. Configure an SMB share on FSx ONTAP to be a new backup repository.
+. Mount the original S3 bucket that was used as part of the scale-out backup repository on premises.
+. After restoring the VM, establish new backup jobs to protect SQL and Oracle VMs.
+
+For more information on restoring VMs using Veeam, see the section link:aws-guest-dr-restore-veeam-full.html["Restore Application VMs with Veeam Full Restore"].
+
+link:aws-guest-dr-snapcenter-db-backup.html[Next: SnapCenter database backup for disaster recovery.]

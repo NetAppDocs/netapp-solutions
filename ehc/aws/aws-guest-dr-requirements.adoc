@@ -1,0 +1,297 @@
+---
+sidebar: sidebar
+permalink: ehc/aws/aws-guest-dr-requirements.html
+keywords: adminstrative, ESXi hosts, VMware vCenter, nsx, MS SQL, oracle, Veeam, cloud, aws, Amazon FSx, vmc
+summary: This section details the requirements to access and configure on-premises resources, VMware Cloud, and Amazon FSx ONTAP.
+---
+
+= Requirements
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-07-20 15:53:45.366724
+//
+
+link:aws-guest-dr-overview.html[Previous: Overview - AWS guest-connected storage disaster recovery.]
+
+This section details the requirements to access and configure on-premises resources, VMware Cloud, and Amazon FSx ONTAP.
+
+== Skills and knowledge
+
+The following skills and information are required to access Cloud Volumes Service for AWS:
+
+* Access to and knowledge of your VMware and ONTAP on-premises environment.
+* Access to and knowledge of VMware Cloud and AWS.
+* Access to and knowledge of AWS and Amazon FSx ONTAP.
+* Knowledge of your SDDC and AWS resources.
+* Knowledge of the network connectivity between your on-premises and cloud resources.
+* Working knowledge of disaster recovery scenarios.
+* Working knowledge of applications deployed on VMware.
+
+== Administrative
+
+Whether interacting with resources on-premises or in the cloud, users and administrators must have the ability and entitlements to provision those resources where they need them when they need according to their entitlements. The interaction of your roles and permissions for your on-premises systems, including ONTAP and VMware, and your cloud resources, including VMware Cloud and AWS, is paramount for a successful hybrid cloud deployment.
+
+The following administrative tasks must be in place to construct a DR solution with VMware and ONTAP on-premises and VMware Cloud on AWS and FSx ONTAP.
+
+* Roles and accounts enabling provisioning of the following:
+** ONTAP storage resources
+** VMware VMs, datastores, and so on
+** AWS VPC and security groups
+* Provisioning of on-premises VMware environment and ONTAP
+* VMware Cloud environment
+* An Amazon for FSx for ONTAP file system
+* Connectivity between your on-premises environment and AWS
+* Connectivity for your AWS VPC
+
+== On-premises
+
+The VMware virtual environment includes licensing of ESXi hosts, VMware vCenter Server, NSX networking, and other components, as can be seen in the following figure. All are licensed differently, and it is important to understand how the underlying components consume the available licensed capacity.
+
+image:dr-vmc-aws-image2.png[Error: Missing Graphic Image]
+
+=== ESXi hosts
+
+Compute hosts in a VMware environment are deployed with ESXi. When licensed with vSphere at various capacity tiers, virtual machines can take advantage of the physical CPUs on each host and applicable entitled features.
+
+=== VMware vCenter
+
+Managing ESXi hosts and storage is one of the many capabilities made available to the VMware administrator with vCenter Server. As of VMware vCenter 7.0, there are three editions of VMware vCenter available, depending on the license:
+
+* vCenter Server Essentials
+* vCenter Server Foundation
+* vCenter Server Standard
+
+=== VMware NSX
+
+VMware NSX provides administrators with the flexibility required to enable advanced features. Features are enabled depending upon the version of NSX-T Edition that is licensed:
+
+* Professional
+* Advanced
+* Enterprise Plus
+* Remote Office/Branch Office
+
+=== NetApp ONTAP
+
+Licensing with NetApp ONTAP refers to how administrators gain access to various capabilities and features within NetApp storage. A license is a record of one or more software entitlements. Installing license keys, also known as license codes, enables you to use certain features or services on your storage system. For instance, ONTAP supports all major industry-standard client protocols (NFS, SMB, FC, FCoE, iSCSI, and NVMe/FC) through licensing.
+
+Data ONTAP feature licenses are issued as packages, each of which contains multiple features or a single feature. A package requires a license key, and installing the key enables you to access all features in the package.
+
+License types are as follows:
+
+* *Node-locked license.* Installing a node-locked license entitles a node to the licensed functionality. For the cluster to use the licensed functionality, at least one node must be licensed for the functionality.
+* *Master/site license.* A master or site license is not tied to a specific system serial number. When you install a site license, all the nodes in the cluster are entitled to the licensed functionality.
+* *Demo/temporary license.* A demo or temporary license expires after a certain time. This license enables you to try certain software functionality without purchasing an entitlement.
+* *Capacity license (ONTAP Select and FabricPool only).* An ONTAP Select instance is licensed according to the amount of data that the user wants to manage. Starting with ONTAP 9.4, FabricPool requires a capacity license to be used with a third-party storage tier (for example, AWS).
+
+=== NetApp SnapCenter
+
+SnapCenter requires several licenses to enable data protection operations. The type of SnapCenter licenses you install depends on your storage environment and the features that you want to use. The SnapCenter Standard license protects applications, databases, files systems, and virtual machines. Before you add a storage system to SnapCenter, you must install one or more SnapCenter licenses.
+
+To enable the protection of applications, databases, file systems, and virtual machines, you must have either a Standard controller-based license installed on your FAS or AFF storage system or a Standard capacity-based license installed on your ONTAP Select and Cloud Volumes ONTAP platforms.
+
+See the following SnapCenter Backup prerequisites for this solution:
+
+* A volume and SMB share created on the on-premises ONTAP system to locate the backed- up database and configuration files.
+* A SnapMirror relationship between the on-premises ONTAP system and FSx or CVO in the AWS account. Used for transporting the snapshot containing the backed up SnapCenter database and configuration files.
+* Windows Server installed in the cloud account, either on an EC2 instance or on a VM in the VMware Cloud SDDC.
+* SnapCenter installed on the Windows EC2 instance or VM in VMware Cloud.
+
+=== MS SQL
+
+As part of this solution validation, we use MS SQL to demonstrate disaster recovery.
+
+For more information regarding best practices with MS SQL and NetApp ONTAP, follow https://www.netapp.com/media/8585-tr4590.pdf[this link^].
+
+=== Oracle
+
+As part of this solution validation, we use ORACLE to demonstrate disaster recovery. For more information regarding best practices with ORACLE and NetApp ONTAP, follow https://www.netapp.com/media/8744-tr3633.pdf[this link^].
+
+=== Veeam
+
+As part of this solution validation, we use Veeam to demonstrate disaster recovery. For more information regarding best practices with Veeam and NetApp ONTAP, follow https://www.veeam.com/wp-netapp-configuration-best-practices-guide.html[this link^].
+
+== Cloud
+
+=== AWS
+
+You must be able to perform the following tasks:
+
+* Deploy and configure domain services.
+* Deploy FSx ONTAP per application requirements in a given VPC.
+* Configure VMware Cloud on the AWS Compute gateway to allow for traffic from FSx ONTAP.
+* Configure an AWS security group to allow communication between the VMware Cloud on AWS subnets to the AWS VPC subnets where FSx ONTAP service is deployed.
+
+=== VMware Cloud
+
+You must be able to perform the following tasks:
+
+* Configure the VMware Cloud on AWS SDDC.
+
+=== Cloud Manager account verification
+
+You must be able to deploy resources with NetApp Cloud Manager. To verify that you can, complete the following tasks:
+
+* https://docs.netapp.com/us-en/cloud-manager-setup-admin/task-signing-up.html[Sign up for Cloud Central^] if you haven’t already.
+* https://docs.netapp.com/us-en/cloud-manager-setup-admin/task-logging-in.html[Log into Cloud Manager^].
+* https://docs.netapp.com/us-en/cloud-manager-setup-admin/task-setting-up-netapp-accounts.html[Set up Workspaces and Users^].
+* https://docs.netapp.com/us-en/cloud-manager-setup-admin/concept-connectors.html[Create a connector^].
+
+=== Amazon FSx for NetApp ONTAP
+
+You must be able to perform the following task after you have an AWS account:
+
+* Create an IAM administrative user capable of provisioning Amazon FSx for the NetApp ONTAP file system.
+
+== Configuration prerequisites
+
+Given the varying topologies that customers have, this section focuses on the ports necessary to enable communication from on-premises to cloud resources.
+
+=== Required ports and firewall considerations
+
+The following tables describe the ports that must be enabled throughout your infrastructure.
+
+For a more comprehensive list of required ports for Veeam Backup & Replication software, follow https://helpcenter.veeam.com/docs/backup/vsphere/used_ports.html?zoom_highlight=port+requirements&ver=110[this link^].
+
+For a more comprehensive list of port requirements for SnapCenter, follow https://docs.netapp.com/ocsc-41/index.jsp?topic=%2Fcom.netapp.doc.ocsc-isg%2FGUID-6B5E4464-FE9A-4D2A-B526-E6F4298C9550.html[this link^].
+
+The following table lists the Veeam port requirements for Microsoft Windows Server.
+
+|===
+|From |To |Protocol |Port |Notes
+
+|Backup server
+|Microsoft Windows server
+|TCP
+|445
+|Port required for deploying Veeam Backup & Replication components.
+|Backup proxy
+|
+|TCP
+|6160
+|Default port used by the Veeam Installer Service.
+|Backup repository
+|
+|TCP
+|2500 to 3500
+|Default range of ports used as data transmission channels and for collecting log files.
+|Mount server
+|
+|TCP
+|6162
+|Default port used by the Veeam Data Mover.
+|===
+
+[NOTE]
+For every TCP connection that a job uses, one port from this range is assigned.
+
+The following table lists the Veeam port requirements for Linux Server.
+
+|===
+|From |To |Protocol |Port |Notes
+
+|Backup server
+|Linux server
+|TCP
+|22
+|Port used as a control channel from the console to the target Linux host.
+
+|
+|
+|TCP
+|6162
+|Default port used by the Veeam Data Mover.
+|
+|
+|TCP
+|2500 to 3500
+|Default range of ports used as data transmission channels and for collecting log files.
+|===
+
+[NOTE]
+For every TCP connection that a job uses, one port from this range is assigned.
+
+The following table lists the Veeam Backup Server port requirements.
+
+|===
+|From |To |Protocol |Port |Notes
+
+|Backup server
+|vCenter Server
+|HTTPS, TCP
+|443
+|Default port used for connections to vCenter Server. Port used as a control channel from the console to the target Linux host.
+|
+|Microsoft SQL Server hosting the Veeam Backup & Replication configuration database
+|TCP
+|1443
+|Port used for communication with Microsoft SQL Server on which the Veeam Backup & Replication configuration database is deployed (if you use a Microsoft SQL Server default instance).
+|
+|DNS Server with name resolution of all backup servers
+|TCP
+|3389
+|Port used for communication with the DNS Server
+|===
+
+[NOTE]
+If you use vCloud Director, make sure to open port 443 on underlying vCenter Servers.
+
+The following table lists Veeam Backup Proxy port requirements.
+
+|===
+|From |To |Protocol |Port |Notes
+
+|Backup server
+|Backup proxy
+|TCP
+|6210
+|Default port used by the Veeam Backup VSS Integration Service for taking a VSS snapshot during the SMB file share backup.
+|Backup proxy
+|vCenter Server
+|TCP
+|1443
+|Default VMware web service port that can be customized in vCenter settings.
+|===
+
+The following table lists SnapCenter port requirements.
+
+|===
+|Port Type |Protocol |Port |Notes
+
+|SnapCenter management port
+|HTTPS
+|8146
+|This port is used for communication between the SnapCenter client (the SnapCenter user) and the SnapCenter Server. Also used for communication from the plug-in hosts to the SnapCenter Server.
+|SnapCenter SMCore communication port
+|HTTPS
+|8043
+|This port is used for communication between the SnapCenter Server and the hosts where the SnapCenter plug-ins are installed.
+|Windows plug-in hosts, installation
+|TCP
+|135, 445
+|These ports are used for communication between the SnapCenter Server and the host where the plug-in is being installed. The ports can be closed after installation. In addition, Windows Instrumentation Services searches ports 49152 through 65535, which must be open.
+|Linux plug-in hosts, installation
+|SSH
+|22
+|These ports are used for communication between the SnapCenter Server and the host where the plug-in is being installed. The ports are used by SnapCenter to copy plug-in package binaries to Linux plug-in hosts.
+|SnapCenter Plug-ins Package for Windows / Linux
+|HTTPS
+|8145
+|This port is used for communication between SMCore and hosts where the SnapCenter plug-ins are installed.
+|VMware vSphere vCenter Server port
+|HTTPS
+|443
+|This port is used for communication between the SnapCenter Plug-in for Vmware vSphere and vCenter server.
+|SnapCenter Plug-in for Vmware vSphere port
+|HTTPS
+|8144
+|This port is used for communication from the vCenter vSphere web client and from the SnapCenter Server.
+|===
+
+link:aws-guest-dr-networking.html[Next: Networking.]

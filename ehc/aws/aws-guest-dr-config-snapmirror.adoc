@@ -1,0 +1,176 @@
+---
+sidebar: sidebar
+permalink: ehc/aws/aws-guest-dr-config-snapmirror.html
+keywords: Intercluster logical interfaces, cluster peering, SVM peering, snapshot retention policy, destination volumes, SnapMirror relationships
+summary: SnapCenter can update SnapMirror relationships within the primary storage system (primary > mirror) and to secondary storage systems (primary > vault) for the purpose of long-term archiving and retention. To do so, you must establish and initialize a data replication relationship between a destination volume and a source volume using SnapMirror.
+---
+
+= Configure SnapMirror relationships and retention schedules
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-07-20 15:53:45.442316
+//
+
+link:aws-guest-dr-snapcenter-overview.html[Previous: Overview - Disaster recovery.]
+
+SnapCenter can update SnapMirror relationships within the primary storage system (primary > mirror) and to secondary storage systems (primary > vault) for the purpose of long-term archiving and retention. To do so, you must establish and initialize a data replication relationship between a destination volume and a source volume using SnapMirror.
+
+The source and destination ONTAP systems must be in networks that are peered using Amazon VPC peering, a transit gateway, AWS Direct Connect, or an AWS VPN.
+
+The following steps are required for setting up SnapMirror relationships between an on-premises ONTAP system and FSx ONTAP:
+
+* Record the source and destination intercluster logical interfaces.
+* Establish cluster peering between ONTAP and FSx.
+* Establish an SVM peering relationship.
+* Create a snapshot retention policy.
+* Create the destination volume in FSx.
+* Create the SnapMirror relationships between source and destination volumes.
+* Initialize SnapMirror relationships.
+
+Refer to the https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/ONTAPGuide.pdf[FSx for ONTAP – ONTAP User Guide^] for more information on creating SnapMirror relationships with FSx.
+
+== Record the source and destination Intercluster logical interfaces
+
+For the source ONTAP system residing on-premises, you can retrieve the inter-cluster LIF information from System Manager or from the CLI.
+
+. In ONTAP System Manager, navigate to the Network Overview page and retrieve the IP addresses of Type: Intercluster that are configured to communicate with the AWS VPC where FSx is installed.
++
+image:dr-vmc-aws-image10.png[Error: Missing Graphic Image]
+
+. To retrieve the Intercluster IP addresses for FSx, log into the CLI and run the following command:
++
+....
+FSx-Dest::> network interface show -role intercluster
+....
++
+image:dr-vmc-aws-image11.png[Error: Missing Graphic Image]
+
+== Establish cluster peering between ONTAP and FSx
+
+To establish cluster peering between ONTAP clusters, a unique passphrase entered at the initiating ONTAP cluster must be confirmed in the other peer cluster.
+
+. Set up peering on the destination FSx cluster using the `cluster peer create` command. When prompted, enter a unique passphrase that is used later on the source cluster to finalize the creation process.
++
+....
+FSx-Dest::> cluster peer create -address-family ipv4 -peer-addrs source_intercluster_1, source_intercluster_2
+Enter the passphrase:
+Confirm the passphrase:
+....
+
+. At the source cluster,  you can establish the cluster peer relationship using either ONTAP System Manager or the CLI.  From ONTAP System Manager,  navigate to Protection > Overview and select Peer Cluster.
++
+image:dr-vmc-aws-image12.png[Error: Missing Graphic Image]
+
+. In the Peer Cluster dialog box, fill out the required information:
+.. Enter the passphrase that was used to establish the peer cluster relationship on the destination FSx cluster.
+.. Select `Yes` to establish an encrypted relationship.
+.. Enter the intercluster LIF IP address(es) of the destination FSx cluster.
+.. Click Initiate Cluster Peering to finalize the process.
++
+image:dr-vmc-aws-image13.png[Error: Missing Graphic Image]
+
+. Verify the status of the cluster peer relationship from the FSx cluster with the following command:
++
+....
+FSx-Dest::> cluster peer show
+....
++
+image:dr-vmc-aws-image14.png[Error: Missing Graphic Image]
+
+== Establish SVM peering relationship
+
+The next step is to set up an SVM relationship between the destination and source storage virtual machines that contain the volumes that will be in SnapMirror relationships.
+
+. From the source FSx cluster, use the following command from the CLI to create the SVM peer relationship:
++
+....
+FSx-Dest::> vserver peer create -vserver DestSVM -peer-vserver Backup -peer-cluster OnPremSourceSVM -applications snapmirror
+....
+
+. From the source ONTAP cluster, accept the peering relationship with either ONTAP System Manager or the CLI.
+. From ONTAP System Manager, go to Protection > Overview and select Peer Storage VMs under Storage VM Peers.
++
+image:dr-vmc-aws-image15.png[Error: Missing Graphic Image]
+
+. In the Peer Storage VM’s dialog box, fill out the required fields:
++
+** The source storage VM
+** The destination cluster
+** The destination storage VM
++
+image:dr-vmc-aws-image16.png[Error: Missing Graphic Image]
+
+. Click Peer Storage VMs to complete the SVM peering process.
+
+== Create a snapshot retention policy
+
+SnapCenter manages retention schedules for backups that exist as snapshot copies on the primary storage system. This is established when creating a policy in SnapCenter. SnapCenter does not manage retention policies for backups that are retained on secondary storage systems. These policies are managed separately through a SnapMirror policy created on the secondary FSx cluster and associated with the destination volumes that are in a SnapMirror relationship with the source volume.
+
+When creating a SnapCenter policy, you have the option to specify a secondary policy label that is added to the SnapMirror label of each snapshot generated when a SnapCenter backup is taken.
+
+[NOTE]
+On the secondary storage, these labels are matched to policy rules associated with the destination volume for the purpose of enforcing retention of snapshots.
+
+The following example shows a SnapMirror label that is present on all snapshots generated as part of a policy used for daily backups of our SQL Server database and log volumes.
+
+image:dr-vmc-aws-image17.png[Error: Missing Graphic Image]
+
+For more information on creating SnapCenter policies for a SQL Server database, see the https://docs.netapp.com/us-en/snapcenter/protect-scsql/task_create_backup_policies_for_sql_server_databases.html[SnapCenter documentation^].
+
+You must first create a SnapMirror policy with rules that dictate the number of snapshot copies to retain.
+
+. Create the SnapMirror Policy on the FSx cluster.
++
+....
+FSx-Dest::> snapmirror policy create -vserver DestSVM -policy PolicyName -type mirror-vault -restart always
+....
+
+. Add rules to the policy with SnapMirror labels that match the secondary policy labels specified in the SnapCenter policies.
++
+....
+FSx-Dest::> snapmirror policy add-rule -vserver DestSVM -policy PolicyName -snapmirror-label SnapMirrorLabelName -keep #ofSnapshotsToRetain
+....
++
+The following script provides an example of a rule that could be added to a policy:
++
+....
+FSx-Dest::> snapmirror policy add-rule -vserver sql_svm_dest -policy Async_SnapCenter_SQL -snapmirror-label sql-ondemand -keep 15
+....
++
+[NOTE]
+Create additional rules for each SnapMirror label and the number of snapshots to be retained (retention period).
+
+== Create destination volumes
+
+To create a destination volume on FSx that will be the recipient of snapshot copies from our source volumes, run the following command on FSx ONTAP:
+
+....
+FSx-Dest::> volume create -vserver DestSVM -volume DestVolName -aggregate DestAggrName -size VolSize -type DP
+....
+
+== Create the SnapMirror relationships between source and destination volumes
+
+To create a SnapMirror relationship between a source and destination volume, run the following command on FSx ONTAP:
+
+....
+FSx-Dest::> snapmirror create -source-path OnPremSourceSVM:OnPremSourceVol -destination-path DestSVM:DestVol -type XDP -policy PolicyName
+....
+
+== Initialize the SnapMirror relationships
+
+Initialize the SnapMirror relationship. This process initiates a new snapshot generated from the source volume and copies it to the destination volume.
+
+To create a volume, run the following command on FSx ONTAP:
+
+....
+FSx-Dest::> volume create -vserver DestSVM -volume DestVolName -aggregate DestAggrName -size VolSize -type DP
+....
+
+link:aws-guest-dr-config-snapcenter.html[Next: Deploy and configure Windows SnapCenter Server on premises.]
