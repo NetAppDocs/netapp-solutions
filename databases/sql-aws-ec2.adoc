@@ -119,7 +119,9 @@ a|* For optimal storage performance, provision file-system capacity to 1.5x time
 |===
 ====
 
-== Setup for SQL Server Operations to Perform Backup, Restore and Clone
+== Setting up for SQL Server Operations to Perform Backup, Restore and Clone with SnapCenter
+
+In order to perform SQL server operations with SnapCenter, you must first create volumnes and LUNs for SQL server.
 
 .Create volumes and LUNs for SQL Server
 [%collapsible]
@@ -271,19 +273,18 @@ Format-Volume -DriveLetter G -FileSystem NTFS -AllocationUnitSize 65536
 You can automate volume and LUN creation using the PowerShell script from Appendix C. LUNs can also be created using SnapCenter.
 ====
 
-.Backup, restore, and clone with SnapCenter
-[%collapsible]
-====
+Once the volumes and LUNs are defined, you need to set up SnapCenter to be able to perform the database operations.
+
 .SnapCenter overview
 [%collapsible]
-=====
+====
 
 NetApp SnapCenter is next-generation data protection software for tier-1 enterprise applications. SnapCenter, with its single-pane-of-glass management interface, automates and simplifies the manual, complex, and time-consuming processes associated with the backup, recovery, and cloning of multiple databases and other application workloads. SnapCenter leverages NetApp technologies, including NetApp Snapshots, NetApp SnapMirror, SnapRestore, and NetApp FlexClone. This integration allows IT organizations to scale their storage infrastructure, meet increasingly stringent SLA commitments, and improve the productivity of administrators across the enterprise.
-=====
+====
 
 .SnapCenter Server requirements
 [%collapsible]
-=====
+====
 The following table lists the minimum requirements for installing the SnapCenter Server and plug-in on Microsoft Windows Server.
 
 [%autowidth.stretch]
@@ -310,21 +311,21 @@ a|* .NET 4.5.2 or later
 |===
 
 For version compatibility, see the https://mysupport.netapp.com/matrix/[NetApp Interoperability Matrix Tool^].
-=====
+====
 
 .Database storage layout
 [%collapsible]
-=====
+====
 The following figure depicts some considerations for creating the Microsoft SQL Server database storage layout when backing up with SnapCenter.
 
 image:sql-awsec2-image13.png[Error: Missing Graphic Image]
 
 In addition to the performance benefit of segregating the user database layout into different volumes, the database also significantly affects the time required to back up and restore. Having separate volumes for data and log files significantly improves the restore time as compared to a volume hosting multiple user data files. Similarly, user databases with a high I/O intensive application are prone to an increase in the backup time. A more detailed explanation about backup and restore practices is provided later in this document. 
-=====
+====
 
 .Installation and setup for SnapCenter
 [%collapsible]
-=====
+====
 Follow the https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^] and https://docs.netapp.com/us-en/snapcenter/protect-scsql/task_add_hosts_and_install_snapcenter_plug_ins_package_for_windows.html[Installing SnapCenter Plug-in for Microsoft SQL Server^] to install and setup SnapCenter.
 
 After Installing SnapCenter, complete the following steps to set it up.
@@ -372,11 +373,13 @@ image:sql-awsec2-image17.png[Error: Missing Graphic Image]
 If the LUNs have already been provisioned, you can select the mount point to represent the host log directory.
 
 image:sql-awsec2-image18.png[Error: Missing Graphic Image]
-=====
+====
+
+Now you are ready to perform backup, restore and clone operations for SQL Server.
 
 .Backup database with SnapCenter
 [%collapsible]
-=====
+====
 After placing the database and log files on the FSx ONTAP LUNs, SnapCenter can be used to back up the databases. The following processes are used to create a full backup.
 
 [%autowidth.stretch]
@@ -415,11 +418,11 @@ image:sql-awsec2-image23.png[Error: Missing Graphic Image]
 a|* Backup the transaction log backup from SnapCenter so that during the restoration process, SnapCenter can read all the backup files and restore in sequence automatically.
 * If third party products are used for backup, select Copy backup in SnapCenter to avoid log sequence issues, and test the restore functionality before rolling into production.
 |===
-=====
+====
 
 .Restore database with SnapCenter
 [%collapsible]
-=====
+====
 One of the major benefits of using FSx ONTAP with SQL Server on EC2 is its ability to perform fast and granular restore at each database level rather than performing an entire restore from the snapshot workflow using the AWS console.
 
 Complete the following steps to restore an individual database to a specific point in time or up to the minute with SnapCenter.
@@ -433,11 +436,11 @@ image:sql-awsec2-image24.png[Error: Missing Graphic Image]
 . Select *Monitor* to verify that the restore process is successful.
 +
 image:sql-awsec2-image25.png[Error: Missing Graphic Image]
-=====
+====
 
 .Considerations for an instance with a large number of small-to-large size databases
 [%collapsible]
-=====
+====
 SnapCenter can back up a large number of sizeable databases in an instance or group of instances within a resource group. The size of a database is not the major factor in backup time. The duration of a backup can vary depending on number of LUNs per volume, the load on Microsoft SQL Server, the total number of databases per instance, and,  specifically, the I/O bandwidth and usage. While configuring the policy to back up databases from an instance or resource group, NetApp recommends that you restrict the maximum database backed up per Snapshot copy to 100 per host. Make sure the total number of Snapshot copies does not exceed the 1,023-copy limit. NetApp strongly recommendations that you schedule a backup during an off-peak time, so the backup process does not affect the applications with a minor wait time.
 
 NetApp also recommends that you limit the backup jobs running in parallel by grouping the number of databases instead of creating multiple jobs for each database or instance. For optimal performance of the backup duration, reduce the number of backup jobs to a number that can back up around 1,000 or fewer databases at a time.
@@ -466,11 +469,11 @@ a|* Do not include the tempdb database in a backup because the data it contains 
 * When restoring databases, make sure that sufficient space is available on the volume.
 * Create a separate policy to manage and back up system databases at least once a week.
 |===
-=====
+====
 
 .Cloning databases with SnapCenter
 [%collapsible]
-=====
+====
 To restore a database onto another location on a dev or test environment or to create a copy for business analysis purposes, the NetApp best practice is to leverage the cloning methodology to create a copy of the database on the same instance or an alternate instance.
 
 The cloning of databases that are 500GB on an iSCSI disk hosted on a FSx for ONTAP environment typically takes less than five minutes. After cloning is complete, the user can then perform all the required read/write operation on the cloned database. Most of the time, consume based on disk scanning (diskpart). The NetApp cloning procedure typically take less than 2 minutes regardless of the size of the databases.
@@ -481,18 +484,18 @@ SnapCenter allows you to mount the clone copy on the required disk to maintain t
 
 .Clone databases to the new database name in the same instance
 [%collapsible]
-======
+=====
 The following steps can be used to clone databases to the new database name in the same SQL server instance running on EC2:
 
 . Select Resources and then the database that need to be cloned.
 . Select the backup name that you would like to clone and select Clone.
 . Follow the clone instructions from the backup windows to finish the clone process.
 . Select Monitor to make sure that cloning is completed.
-======
+=====
 
 .Clone databases into the new SQL Server instance running on EC2
 [%collapsible]
-======
+=====
 The following step are used to clone databases to the new SQL server instance running on EC2:
 
 . Create a new SQL Server on EC2 in the same VPC.
@@ -508,7 +511,6 @@ image:sql-awsec2-image26.png[Error: Missing Graphic Image]
 . Select Monitor to make sure that cloning is completed.
 +
 image:sql-awsec2-image27.png[Error: Missing Graphic Image]
-======
 =====
 ====
 
