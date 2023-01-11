@@ -20,51 +20,58 @@ summary: This page describes the best practices for implementing a NetApp ONTAP 
 
 == vSphere datastore and protocol features
 
-Five protocols are used to connect VMware vSphere to datastores on a system running ONTAP software:
+Seven protocols are used to connect VMware vSphere to datastores on a system running ONTAP software:
 
-* FC
+* FCP
 * FCoE
 * NVMe/FC
+* NVMe/TCP
 * iSCSI
-* NFS
+* NFS v3
+* NFS v4.1
 
-FC, FCoE, NVMe/FC, and iSCSI are block protocols that use the vSphere Virtual Machine File System (VMFS) to store VMs inside ONTAP LUNs or namespaces that are contained in an ONTAP volume. Note that, starting from vSphere 7.0, VMware no longer supports software FCoE in production environments. NFS is a file protocol that places VMs into datastores (which are simply ONTAP volumes) without the need for VMFS. SMB, iSCSI, or NFS can also be used directly from a guest OS to ONTAP.
+FCP, FCoE, NVMe/FC, NVMe/TCP, and iSCSI are block protocols that use the vSphere Virtual Machine File System (VMFS) to store VMs inside ONTAP LUNs or NVMe namespaces that are contained in an ONTAP FlexVol volume. Note that, starting from vSphere 7.0, VMware no longer supports software FCoE in production environments. NFS is a file protocol that places VMs into datastores (which are simply ONTAP volumes) without the need for VMFS. SMB (CIFS), iSCSI, NVMe/TCP, or NFS can also be used directly from a guest OS to ONTAP.
 
-The following tables presents vSphere supported traditional datastore features with ONTAP. This information does not apply to vVols datastores, but it does generally applies to vSphere 6.x and 7.x releases using supported ONTAP releases. You can also consult https://www.vmware.com/support/pubs/[VMware Configuration Maximums^] for specific vSphere releases to confirm specific limits.
+The following tables presents vSphere supported traditional datastore features with ONTAP. This information does not apply to vVols datastores, but it does generally applies to vSphere 6.x and later releases using supported ONTAP releases. You can also consult https://www.vmware.com/support/pubs/[VMware Configuration Maximums^] for specific vSphere releases to confirm specific limits.
 
 |===
-|Capability/Feature |FC/FCoE |iSCSI |NFS
+|Capability/Feature |FC/FCoE |iSCSI |NVMe-oF |NFS
 
 |Format
 |VMFS or raw device mapping (RDM)
 |VMFS or RDM
+|VMFS
 |N/A
 |Maximum number of datastores or LUNs
-|256 targets/HBA
-|256 targets
+|1024 LUNs per host
+|1024 LUNs per server
+|256 Namespeces per server
 |256 mounts
 Default NFS. MaxVolumes is 8. Use ONTAP tools for VMware vSphere to increase to 256.
 |Maximum datastore size
 |64TB
 |64TB
+|64TB
 |100TB FlexVol volume or greater with FlexGroup volume
-|Maximum datastore file size (for VMDKs using vSphere version 5.5 and VMFS 5 or later)
+|Maximum datastore file size
 |62TB
 |62TB
-|16TB
-62TB is the maximum size supported by vSphere.
+|62TB
+|16TB or 62TB with ONTAP 9.12.1RC1 and later with large files enabled
 |Optimal queue depth per LUN or file system
 |64
 |64
-|N/A
+|Autonegotiated
+|Refer to NFS.MaxQueueDepth in https://docs.netapp.com/us-en/netapp-solutions/virtualization/vsphere_ontap_recommended_esxi_host_and_other_ontap_settings.html[Recommended ESXi host and other ONTAP settings^]
 |===
 
 The following table lists supported VMware storage-related functionalities.
 
 |===
-|Capacity/Feature |FC/FCoE |iSCSI |NFS
+|Capacity/Feature |FC/FCoE |iSCSI |NVMe-oF |NFS
 
 |vMotion
+|Yes
 |Yes
 |Yes
 |Yes
@@ -72,7 +79,9 @@ The following table lists supported VMware storage-related functionalities.
 |Yes
 |Yes
 |Yes
+|Yes
 |VMware HA
+|Yes
 |Yes
 |Yes
 |Yes
@@ -80,23 +89,29 @@ The following table lists supported VMware storage-related functionalities.
 |Yes
 |Yes
 |Yes
+|Yes
 |VMware vStorage APIs for Data Protection (VADP)–enabled backup software
+|Yes
 |Yes
 |Yes
 |Yes
 |Microsoft Cluster Service (MSCS) or failover clustering within a VM
 |Yes
 |Yes*
+|Yes*
 |Not supported
 |Fault Tolerance
+|Yes
 |Yes
 |Yes
 |Yes
 |Site Recovery Manager
 |Yes
 |Yes
-|Yes
+|No**
+|V3 only**
 |Thin-provisioned VMs (virtual disks)
+|Yes
 |Yes
 |Yes
 |Yes
@@ -104,17 +119,17 @@ This setting is the default for all VMs on NFS when not using VAAI.
 |VMware native multipathing
 |Yes
 |Yes
+|Yes, using the new High Performance Plugin (HPP)
 |N/A
 |===
-
-*NetApp recommends using in-guest iSCSI for Microsoft clusters rather than multi- writer enabled VMDKs in a VMFS datastore. This approach is fully supported by Microsoft and VMware, offers great flexibility with ONTAP (SnapMirror to ONTAP systems on-premises or in the cloud), is easy to configure and automate, and can be protected with SnapCenter. vSphere 7 adds a new clustered VMDK option. This is different from multi-writer enabled VMDKs but requires a datastore presented via the FC protocol, which has clustered VMDK support enabled. Other restrictions apply. See VMware’s https://docs.vmware.com/en/VMware-vSphere/7.0/vsphere-esxi-vcenter-server-70-setup-wsfc.pdf[Setup for Windows Server Failover Clustering^] documentation for configuration guidelines.
 
 The following table lists supported ONTAP storage management features.
 
 |===
-|Capability/Feature |FC/FCoE |iSCSI |NFS
+|Capability/Feature |FC/FCoE |iSCSI |NVMe-oF |NFS
 
 |Data deduplication
+|Savings in the array
 |Savings in the array
 |Savings in the array
 |Savings in the datastore
@@ -122,54 +137,69 @@ The following table lists supported ONTAP storage management features.
 |Datastore or RDM
 |Datastore or RDM
 |Datastore
+|Datastore
 |Resize datastore
+|Grow only
 |Grow only
 |Grow only
 |Grow, autogrow, and shrink
 |SnapCenter plug-ins for Windows, Linux applications (in guest)
 |Yes
 |Yes
+|No
 |Yes
 |Monitoring and host configuration using ONTAP tools for VMware vSphere
 |Yes
 |Yes
+|No
 |Yes
 |Provisioning using ONTAP tools for VMware vSphere
 |Yes
 |Yes
+|No
 |Yes
 |===
 
 The following table lists supported backup features.
 
 |===
-|Capability/Feature |FC/FCoE |iSCSI |NFS
+|Capability/Feature |FC/FCoE |iSCSI |NVMe-oF |NFS
 
 |ONTAP Snapshot copies
+|Yes
 |Yes
 |Yes
 |Yes
 |SRM supported by replicated backups
 |Yes
 |Yes
-|Yes
+|No**
+|V3 only**
 |Volume SnapMirror
+|Yes
 |Yes
 |Yes
 |Yes
 |VMDK image access
 |VADP-enabled backup software
 |VADP-enabled backup software
+|VADP-enabled backup software
 |VADP-enabled backup software, vSphere Client, and vSphere Web Client datastore browser
 |VMDK file-level access
+|VADP-enabled backup software, Windows only
 |VADP-enabled backup software, Windows only
 |VADP-enabled backup software, Windows only
 |VADP-enabled backup software and third-party applications
 |NDMP granularity
 |Datastore
 |Datastore
+|Datastore
 |Datastore or VM
 |===
+
+*NetApp recommends using in-guest iSCSI for Microsoft clusters rather than multi- writer enabled VMDKs in a VMFS datastore. This approach is fully supported by Microsoft and VMware, offers great flexibility with ONTAP (SnapMirror to ONTAP systems on-premises or in the cloud), is easy to configure and automate, and can be protected with SnapCenter. vSphere 7 adds a new clustered VMDK option. This is different from multi-writer enabled VMDKs but requires a datastore presented via the FC protocol, which has clustered VMDK support enabled. Other restrictions apply. See VMware’s https://docs.vmware.com/en/VMware-vSphere/7.0/vsphere-esxi-vcenter-server-70-setup-wsfc.pdf[Setup for Windows Server Failover Clustering^] documentation for configuration guidelines.
+
+**Datastores using NVMe-oF and NFS v4.1 require vSphere replication. Array-based replication is not supported by SRM.
 
 == Selecting a storage protocol
 
@@ -379,13 +409,13 @@ The following table lists NFS versions and supported features.
 |No
 |Hardware acceleration (VAAI)
 |Yes
-|Yes (vSphere 6.5 and later, NetApp VAAI Plug-in 1.1.2)
+|Yes
 |Kerberos authentication
 |No
 |Yes (enhanced with vSphere 6.5 and later to support AES, krb5i)
 |Multipathing support
 |No
-|No (ESXi 6.5 and later supports through session trunking; ONTAP supports through pNFS)
+|ESXi 7.0U3f and later support session trunking with ONTAP 9.12.1RC1 and later
 |===
 
 == FlexGroup
