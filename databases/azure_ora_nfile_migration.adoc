@@ -15,23 +15,23 @@ keywords: database, Oracle, Azure, ANF, Azure NetApp Files, migration
 
 link:azure_ora_nfile_protection.html[Previous: Database protection.]
 
-Since Oracle announcement to phase out the single instance database, many organizations have converted single instance Oracle database into multitenant container database. This enables easy relocation of a subset of a container database called PDB to cloud with maximum availability option, which minimize the downtime during the migration.
+As a result of the Oracle decision to phase out single-instance databases, many organizations have converted single-instance Oracle databases to multitenant container databases. This enables the easy relocation of a subset of container databases called PDB to cloud with the maximum availability option, which minimize downtime during migration.
 
-However, if you still have single instance of Oracle database, it can first be converted into a multitenant container database in place before PDB relocation can be attempted.
+However, if you still have a single instance of a Oracle database, it can first be converted into a multitenant container database in place before attempting PDB relocation.
 
-The following sections provide details for migration of on-premises Oracle database to Azure cloud in either scenarios.
+The following sections provide details for the migration of on-premises Oracle databases to Azure cloud in either scenarios.
 
-== Converting a single instance non CDB to a PDB in a multitenant CDB
+== Converting a single instance non-CDB to a PDB in a multitenant CDB
 
-If you are still sitting on single instance Oracle database, it needs to be converted to multitenant container database whether migrating to cloud or not. Oracle will stop supporting single instance database at some point.
+If you still have a single-instance Oracle database, it must be converted into a multitenant container database whether you wish to migrate it to the cloud or not, because Oracle will stop supporting single-instance databases some time soon.
 
-Following are procedures to plug a single instance database into a container database as a pluggable database or PDB.
+The following procedures plug a single instance database into a container database as a pluggable database or PDB.
 
-. Build a shell container database on the same host as the single instance database in a separate ORACLE_HOME.
+. Build a shell container database on the same host as the single-instance database in a separate `ORACLE_HOME`.
 
-. Shutdown single instance database and restart open read only
+. Shut down the single instance database and restart it in read-only mode.
 
-. Run DBMS_PDB.DESCRIBE procedure to generate database metadata
+. Run the `DBMS_PDB.DESCRIBE` procedure to generate the database metadata.
 +
 [source, cli]
 BEGIN
@@ -40,11 +40,11 @@ BEGIN
 END;
 /
 
-. Shutdown single instance database
+. Shut down the single-instance database.
 
-. Startup the container database
+. Start up the container database.
 
-. Run the DBMS_PDB.CHECK_PLUG_COMPATIBILITY function to determine whether the non-CDB is compatible with the CDB.
+. Run the `DBMS_PDB.CHECK_PLUG_COMPATIBILITY` function to determine whether the non-CDB is compatible with the CDB.
 +
 [source, cli]
 SET SERVEROUTPUT ON
@@ -63,9 +63,9 @@ END;
 +
 If the output is YES, then the non-CDB is compatible, and you can continue with the next step.
 +
-If the output is NO, then the non-CDB is not compatible, and you can check the PDB_PLUG_IN_VIOLATIONS view to see why it is not compatible. All violations must be corrected before you continue. For example, any version or patch mismatches should be resolved by running an upgrade or the opatch utility. After correcting the violations, run DBMS_PDB.CHECK_PLUG_COMPATIBILITY again to ensure that the non-CDB is compatible with the CDB.
+If the output is NO, then the non-CDB is not compatible, and you can check the `PDB_PLUG_IN_VIOLATIONS` view to see why it is not compatible. All violations must be corrected before you continue. For example, any version or patch mismatches should be resolved by running an upgrade or the opatch utility. After correcting the violations, run `DBMS_PDB.CHECK_PLUG_COMPATIBILITY` again to ensure that the non-CDB is compatible with the CDB.
 
-. Plug in the single instance non-CDB
+. Plug in the single instance non-CDB.
 +
 [source, cli]
 CREATE PLUGGABLE DATABASE ncdb USING '/home/oracle/ncdb.xml'
@@ -75,9 +75,9 @@ CREATE PLUGGABLE DATABASE ncdb USING '/home/oracle/ncdb.xml'
 +
 
 [NOTE]
-If there is no sufficient space on the host, NOCOPY option may be used to create the PDB. In that case, single instance non CDB will not be useable after plugin as a PDB, because the original data files has been used for the PDB. Make sure make a backup before the conversion so that there is something to fall back if anything goes wrong.
+If there is not sufficient space on the host, the `NOCOPY` option can be used to create the PDB. In that case, a single-instance non-CDB is not useable after plug in as a PDB because the original data files has been used for the PDB. Make sure to create a backup before the conversion so that there is something to fall back on if anything goes wrong.
 
-. Start with PDB upgrade after conversion if the version between source single instance non CDB and target CDB are different. For the same version conversion, this step can be bypassed.
+. Start with PDB upgrade after conversion if the version between the source single-instance non-CDB and the target CDB are different. For the same-version conversion, this step can be skipped.
 +
 [source, cli]
 sqlplus / as sysdba;
@@ -92,9 +92,9 @@ exit;
 [source, cli]
 dbupgrade -c ncdb -l /home/oracle
 +
-Review the upgrade log file in /home/oracle directory.
+Review the upgrade log file in the `/home/oracle` directory.
 
-. Open the pluggable database, check pdb plugin violations, and recompile the invalid objects.
+. Open the pluggable database, check for pdb plug-in violations, and recompile the invalid objects.
 +
 [source, cli]
 alter pluggable database ncdb open;
@@ -106,7 +106,7 @@ select message from pdb_plug_in_violations where type like '%ERR%' and status <>
 [source, cli]
 $ORACLE_HOME/perl/bin/perl $ORACLE_HOME/rdbms/admin/catcon.pl -n 1 -c 'ncdb' -e -b utlrp -d $ORACLE_HOME/rdbms/admin utlrp.sql
 
-. Now, execute noncdb_to_pdb.sql to update data dictionary
+. Execute `noncdb_to_pdb.sql` to update the data dictionary.
 +
 [source, cli]
 sqlplus / as sysdba
@@ -115,51 +115,47 @@ sqlplus / as sysdba
 alter session set container=ncdb;
 @$ORACLE_HOME/rdbms/admin/noncdb_to_pdb.sql;
 +
-shutdown and restart the container DB, ncdb will be take out of restricted mode.
+Shut down and restart the container DB. The ncdb is taken out of restricted mode.
 
 == Migrate on-premises Oracle databases to Azure with PDB relocation
 
-Oracle PDB relocation with maximum availability option utilize PDB hot clone technology that allows the source PDB availability while PDB is being copied over to target.
+Oracle PDB relocation with the maximum-availability option uses PDB hot-clone technology, which enables source PDB availability while the PDB is being copied over to the target. Upon switchover, sessions and connections are redirected to the target PDB automatically. Thus, down time is minimized independent of the size of the PDB being relocated. NetApp provides an Ansible-based toolkit that automates the migration procedure.
 
-At the switching over, sessions and connections are redirected target PDB automatically. Thus, the down time is minimized regardless the size of PDB to be relocated.
+. Create a CDB in the Azure public cloud on an Azure VM with the same version and patch level.
 
-NetApp provides an Ansible based toolkit that automate migration procedure.
-
-. Create a CDB in the Azure public cloud on Azure VM with the same version and patch level.
-
-. From Ansible controller, clone a copy of automation toolkit.
+. From the Ansible controller, clone a copy of the automation toolkit.
 +
 [source, cli]
 git clone https://github.com/NetApp-Automation/na_ora_aws_migration.git
 
-. Read the instruction in README file.
+. Read the instruction in the README file.
 
-. Configure the Ansible host variable files for both source and target Oracle servers and DB server hosts configuration file for name resolution.
+. Configure the Ansible host variable files for both the source and target Oracle servers and the DB server host's configuration file for name resolution.
 
-. Install Ansible controller prerequisites on Ansible controller.
+. Install the Ansible controller prerequisites on Ansible controller.
 +
 [source, cli]
 ansible-playbook -i hosts requirements.yml
 ansible-galaxy collection install -r collections/requirements.yml --force
 
-. Execute pre-migration tasks against on-prem server.
+. Execute any pre-migration tasks against the on-premises server.
 +
 [source, cli]
 ansible-playbook -i hosts ora_pdb_relocate.yml -u admin -k -K -t ora_pdb_relo_onprem
 +
 
 [NOTE]
-Admin user is management user on on-premises Oracle server host with sudo privileges and is authenticated using password.
+The admin user is the management user on the on-premises Oracle server host with sudo privileges. The admin user is authenticated with a password.
 
-. Execute Oracle PDB relocation from on-premises to target Azure Oracle host.
+. Execute Oracle PDB relocation from on-premises to the target Azure Oracle host.
 +
 [source, cli]
 ansible-playbook -i hosts ora_pdb_relocate.yml -u azureuser --private-key db1.pem -t ora_pdb_relo_primary
 
 [NOTE]
 
-Ansible controller can be located either on-premises or Azure cloud. The controller needs connectivity to on-premises Oracle server host and Azure Oracle VM host. The Oracle database port such as 1521 is open between on-premises Oracle server host and Azure Oracle VM host.
+The Ansible controller can be located either on-premises or in the Azure cloud. The controller needs connectivity to the on-premises Oracle server host and the Azure Oracle VM host. The Oracle database port (such as 1521) is open between the on-premises Oracle server host and the Azure Oracle VM host.
 
-== Additional Oracle database migration options consideration
+== Additional Oracle database migration options
 
-Please refer to Microsoft documentation for additional migration options: link:https://learn.microsoft.com/en-us/azure/architecture/example-scenario/oracle-migrate/oracle-migration-overview[Oracle database migration decision process^]
+Please see the Microsoft documentation for additional migration options: link:https://learn.microsoft.com/en-us/azure/architecture/example-scenario/oracle-migrate/oracle-migration-overview[Oracle database migration decision process^].

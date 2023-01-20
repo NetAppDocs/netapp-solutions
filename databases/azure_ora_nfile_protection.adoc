@@ -17,21 +17,21 @@ link:azure_ora_nfile_procedures.html[Previous: Deployment procedures.]
 
 == Backup Oracle database with snapshot using AzAcSnap tool
 
-Azure Application Consistent Snapshot tool (AzAcSnap) is a command-line tool that enables data protection for third-party databases by handling all the orchestration required to put them into an application consistent state before taking a storage snapshot, after which it returns them to an operational state.
+The Azure Application-Consistent Snapshot tool (AzAcSnap) is a command-line tool that enables data protection for third-party databases by handling all the orchestration required to put them into an application-consistent state before taking a storage snapshot, after which it returns the databases to an operational state.
 
-In the case of Oracle, it's a matter of putting database in backup mode and take a snapshot, then take Oracle database out of backup mode.
+In the case of Oracle, you put the database in backup mode to take a snapshot and then take the database out of backup mode.
 
 === Backup data and log volumes
 
-The backup can be setup on the database server host with simple shell script that execute the snapshot command. Then, the script can be scheduled to run from crontab.
+The backup can be set up on the database server host with simple shell script that executes the snapshot command. Then, the script can be scheduled to run from crontab.
 
-Generally, the frequency of backup depends on the desired RTO/RPO. Frequent snapshot consumes more storage space. There is a trade off between frequency of backup and space consumption.
+Generally, the frequency of backup depends on the desired RTO and RPO. Frequent snapshot creation consumes more storage space. There is a trade off between the frequency of backup and space consumption.
 
-Data volume normally consumes more storage space than log volume. Therefore, you can take snapshots on data volumes like every few hours and more frequent snapshots on log volumes like every 15 or 30 minutes.
+Data volumes typically consume more storage space than log volumes. Therefore, you can take snapshots on data volumes every few hours and more frequent snapshots on log volumes every 15 to 30 minutes.
 
-Following are examples of backup scripts and scheduling.
+See the following examples of backup scripts and scheduling.
 
-For data volumes snapshot:
+For data volume snapshots:
 [source, cli]
  # /bin/sh
 cd /home/azacsnap/bin
@@ -39,7 +39,7 @@ cd /home/azacsnap/bin
 azacsnap -c backup --volume data --prefix acao-ora01-data --retention 36
 azacsnap -c backup --volume other --prefix acao-ora01-log --retention 250
 
-For log volumes snapshot:
+For log volume snapshots:
 [source, cli]
  # /bin/sh
 cd /home/azacsnap/bin
@@ -52,24 +52,24 @@ Crontab schedule:
 
 [NOTE]
 
-When setting up the backup azacsnap.json configuration file, add all data volumes including binary volume to dataVolume and add all log volumes to otherVolume. The maximum retention of snapshots is 250 copies.
+When setting up the backup `azacsnap.json` configuration file, add all data volumes, including the binary volume, to `dataVolume` and all log volumes to `otherVolume`. The maximum retention of snapshots is 250 copies.
 
 === Validate the snapshots
 
-Go to azure portal, Azure NetApp Files/volumes screen to check if the snapshots have been successfully created.
+Go to the Azure portal > Azure NetApp Files/volumes to check if the snapshots have been successfully created.
 
 image:db_ora_azure_anf_snap_01.PNG[Error: Missing Graphic Image]
 image:db_ora_azure_anf_snap_02.PNG[Error: Missing Graphic Image]
 
 == Oracle restore and recovery from local backup
 
-One of key benefits of snapshots backup is that it coexists with source database volumes and the primary database volumes can be rolled back almost instantly.
+One of key benefits of snapshot backup is that it coexists with source database volumes, and the primary database volumes can be rolled back almost instantly.
 
 === Restore and recovery of Oracle on the primary server
 
-The following demonstrate how to restore and recover an Oracle database from Azure dashboard and CLI on the same Oracle host.
+The following example demonstrates how to restore and recover an Oracle database from the Azure dashboard and CLI on the same Oracle host.
 
-. Create a test table in the database to be restored
+. Create a test table in the database to be restored.
 [oracle@acao-ora01 ~]$ sqlplus / as sysdba
 +
 SQL*Plus: Release 19.0.0.0.0 - Production on Mon Sep 12 19:02:35 2022
@@ -109,7 +109,7 @@ DT
 insert a data marker to validate snapshot restore
 12-SEP-22 07.07.35.000000 PM
 
-. Now drop the table after snapshots backups
+. Drop the table after the snapshot backups.
 +
 [oracle@acao-ora01 ~]$ sqlplus / as sysdba
 +
@@ -142,28 +142,28 @@ SQL> exit
 Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
 Version 19.8.0.0.0
 
-. From Azure NetApp Files dashboard, restore log volume to last available snapshot, choose "Revert volume".
+. From the Azure NetApp Files dashboard, restore the log volume to the last available snapshot. Choose *Revert volume*.
 +
-image:db_ora_azure_anf_restore_01.PNG[Error: Missing Graphic Image]
+image:db_ora_azure_anf_restore_01.PNG[THis screenshot shows the method of snapshot reversion for volumes in the ANF dashboard.]
 
-. Confirm revert volume and click on "Revert" to complete the volume reversion to latest available backup.
+. Confirm revert volume and click *Revert* to complete the volume reversion to the latest available backup.
 +
-image:db_ora_azure_anf_restore_02.PNG[Error: Missing Graphic Image]
+image:db_ora_azure_anf_restore_02.PNG[The "Are you sure you want to do this?" page for snapshot reversion.]
 
-. Repeat the same for data volume, ensure the backup contains the table to be recovered.
+. Repeat the same steps for the data volume, and make sure that the backup contains the table to be recovered.
 +
-image:db_ora_azure_anf_restore_03.PNG[Error: Missing Graphic Image]
+image:db_ora_azure_anf_restore_03.PNG[THis screenshot shows the method of snapshot reversion for data volumes in the ANF dashboard.]
 
-. Again confirm the volume reversion, then click on "Revert" button.
+. Again confirm the volume reversion, and click "Revert."
 +
-image:db_ora_azure_anf_restore_04.PNG[Error: Missing Graphic Image]
+image:db_ora_azure_anf_restore_04.PNG[The "Are you sure you want to do this?" page for data volume snapshot reversion.]
 
-. Resync control files if you have multiple copies of control files and replace old control file with latest copy available.
+. Resync the control files if you have multiple copies of them, and replace the old control file with the latest copy available.
 +
 [oracle@acao-ora01 ~]$ mv /u02/oradata/ORATST/control01.ctl /u02/oradata/ORATST/control01.ctl.bk
 [oracle@acao-ora01 ~]$ cp /u03/orareco/ORATST/control02.ctl /u02/oradata/ORATST/control01.ctl
 
-. Login to Oracle server VM and run database recovery via sqlplus.
+. Log into the Oracle server VM and run database recovery with sqlplus.
 +
 [oracle@acao-ora01 ~]$ sqlplus / as sysdba
 +
@@ -249,6 +249,6 @@ SQL> select systimestamp from dual;
 ---------------------------------------------------------------------------
 13-SEP-22 03.28.52.646977 PM +00:00
 
-This demonstrates that the dropped table has been recovered using local snapshot backups.
+This screen demonstrates that the dropped table has been recovered using local snapshot backups.
 
 link:azure_ora_nfile_migration.html[Next: Database migration.]
