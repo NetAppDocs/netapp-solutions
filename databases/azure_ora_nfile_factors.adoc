@@ -1,0 +1,110 @@
+---
+sidebar: sidebar
+permalink: databases/azure_ora_nfile_factors.html
+summary: This section provides details on factors to be considered when deploy Oracle database on Azure virtual machine and Azure NetApp Files storage.
+keywords: database, Oracle, Azure, Azure NetApp Files
+---
+
+= Factors to consider for Oracle database deployment
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:table-stripes: odd
+:imagesdir: ./../media/
+
+link:azure_ora_nfile_architecture.html[Previous: Solution architecture.]
+
+A public cloud provides many choices for compute and storage, and using the correct type of compute instance and storage engine is a good place to start for database deployment. You should also select compute and storage configurations that are optimized for Oracle databases.
+
+The following sections describe the key considerations when deploying an Oracle database in the Azure public cloud on an Azure virtual machine instance with Azure NetApp Files storage.
+
+== VM type and sizing
+
+Selecting the right VM type and size is important for optimal performance of a relational database in a public cloud. An Azure virtual machine provides a variety of compute instances that can be used to host Oracle database workloads. See the Microsoft documentation link:https://docs.microsoft.com/en-us/azure/virtual-machines/sizes[Sizes for virtual machines in Azure^] for different types of Azure virtual machines and their sizing. In general, NetApp recommends using a general-purpose Azure virtual machine for the deployment of small- and medium-sized Oracle databases. For the deployment of larger Oracle databases, a memory-optimized Azure VM is appropriate. With more available RAM, a larger Oracle SGA or smart flash cache can be configured to reduce the physical I/O, which in turn improves database performance.
+
+Azure NetApp Files works as an NFS mount attached to an Azure virtual machine, which offers higher throughput and overcomes the storage-optimized VM throughput limit with local storage. Therefore, running Oracle on Azure NetApp Files could reduce the licensable Oracle CPU core count and licensing costs. See link:https://www.netapp.com/media/17105-tr4780.pdf[TR-4780: Oracle Databases on Microsoft Azure^], Section 7 - How Does Oracle Licensing Work?
+
+Other factors to consider include the following:
+
+* Choose the correct vCPU and RAM combination based on workload characteristics. As the RAM size increases on the VM, so does the number of vCPU cores. There should be a balance at some point as the Oracle license fees are charged on the number of vCPU cores.
+* Add swap space to a VM. The default Azure VM deployment does not create a swap space, which is not optimal for a database.
+
+== Azure NetApp Files performance
+
+Azure NetApp Files volumes are allocated from a capacity pool the customer must provision in their Azure NetApp Files storage account. Each capacity pool is assigned as follows:
+
+* To a service level that defines the overall performance capability.
+* The initially provisioned storage capacity or tiering for that capacity pool. A quality of service (QoS) level that defines the overall maximum throughput per provisioned space.
+
+The service level and initially provisioned storage capacity determines the performance level for a particular Oracle database volume.
+
+=== 1. Service Levels for Azure NetApp Files
+
+Azure NetApp Files supports three service levels: Ultra, Premium, and Standard.
+
+* *Ultra storage.* This tier provides up to 128MiBps of throughput per 1TiB of volume quota assigned.
+* *Premium storage.* This tier provides up to 64MiBps of throughput per 1TiB of volume quota assigned.
+* *Standard storage.* This tier provides up to 16MiBps of throughput per 1TiB of volume quota assigned.
+
+=== 2. Capacity pool and quality of service
+
+Each of the desired service levels has an associated cost for provisioned capacity and includes a quality-of-service (QoS) level that defines the overall maximum throughput for provisioned space.
+
+For example, a 10TiB-provisioned single-capacity pool with the premium service level provides an overall available throughput for all volumes in this capacity pool of 10x 64MBps, so 640MBps with 40,000 (16K) IOPs or 80,000 (8K) IOPs.
+
+The minimum capacity pool size is 4TiB. You can change the size of a capacity pool in 1TiB increments in response to changes in your workload requirements to manage storage needs and costs.
+
+=== 3. Calculate the service level at a database volume
+
+The throughput limit for an Oracle database volume is determined by a combination of the following factors: The service level of the capacity pool to which the volume belongs and The quota assigned to the volume.
+
+The following diagram shows how the throughput limit for an Oracle database volume is calculated.
+
+image:db_ora_azure_anf_factors_01.PNG[This image depicts the equation applied to the three capacity tiers to determine the gross throughput.]
+
+In example 1, a volume from a capacity pool with the Premium storage tier that is assigned 2TiB of quota is assigned a throughput limit of 128MiBps (2TiB * 64MiBps). This scenario applies regardless of the capacity pool size or the actual volume consumption.
+
+In example 2, a volume from a capacity pool with the Premium storage tier that is assigned 100GiB of quota is assigned a throughput limit of 6.25MiBps (0.09765625TiB * 64MiBps). This scenario applies regardless of the capacity pool size or the actual volume consumption.
+
+Please note that the minimum volume size is 100GiB.
+
+== Storage layout and settings
+
+NetApp recommends the following storage layout:
+
+* For small databases, using single volume layout for all Oracle files.
++
+image:db_ora_azure_anf_factors_02.PNG[This image depicts three databases (DB1 - DB2 - and DB3) that each contain datafiles - redo logs - archive logs - and control files all within a single capacity pool.]
+
+* For large databases, the recommended volume layout is multiple volumes: one for Oracle data and a duplicate control file and one for the Oracle active log, archived log, and control file. NetApp highly recommends allocating a volume for the Oracle binary instead of the local drive so that the database can be relocated to a new host and quickly restored.
++
+image:db_ora_azure_anf_factors_03.PNG[This image depicts two databases with two volumes each. The first volume contains datafiles - whereas the second volume of each database contains redo logs - archive logs - and control files. All within a single capacity pool.]
+
+== NFS configuration
+
+Linux, the most common operating system, includes native NFS capabilities. Oracle offers a direct NFS (dNFS) client natively integrated into Oracle. Oracle dNFS bypasses the OS cache and enables parallel processing to improve database performance. Oracle has supported NFSv3 for over 20 years, and NFSv4 is supported with Oracle 12.1.0.2 and later.
+
+By using dNFS (available since Oracle 11g), an Oracle database running on an Azure Virtual Machine can drive significantly more I/O than the native NFS client. Automated Oracle deployment using the NetApp automation toolkit automatically configures dNFS on NFSv3.
+
+The following diagram demonstrates the SLOB benchmark on Azure NetApp Files with Oracle dNFS.
+
+image:db_ora_azure_anf_factors_04.PNG[This graph dramatically demonstrates that dNFS improves the DB sequential file latency (ms) over KNFS.]
+
+Other factors to consider:
+
+* TCP slot tables are the NFS equivalent of host-bus-adapter (HBA) queue depth. These tables control the number of NFS operations that can be outstanding at any one time. The default value is usually 16, which is far too low for optimum performance. The opposite problem occurs on newer Linux kernels, which can automatically increase the TCP slot table limit to a level that saturates the NFS server with requests.
++
+For optimum performance and to prevent performance problems, adjust the kernel parameters that control TCP slot tables to 128.
++
+[source, cli]
+sysctl -a | grep tcp.*.slot_table
+
+* The following table provides recommended NFS mount options for a single instance of Linux NFSv3.
++
+image:aws_ora_fsx_ec2_nfs_01.PNG[This table shows the detailed NFS mount options for the following file types - control files - data files - redo logs - ORACLE_HOME - and ORACLE_BASE.]
+
+[NOTE]
+Before using dNFS, verify that the patches described in Oracle Doc 1495104.1 are installed. Starting with Oracle 12c, DNFS includes support for NFSv3, NFSv4, and NFSv4.1. NetApp support policies cover v3 and v4 for all clients, but, at the time of writing, NFSv4.1 is not supported for use with Oracle dNFS.
+
+link:azure_ora_nfile_procedures.html[Next: Deployment procedures.]
