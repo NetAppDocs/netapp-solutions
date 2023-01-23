@@ -1,0 +1,684 @@
+---
+sidebar: sidebar
+permalink: databases/sql-aws-ec2.html
+keywords: microsoft SQL server, AWS, EC2, FSx ONTAP
+summary:
+---
+
+= TR-4923: SQL Server on AWS EC2 using Amazon FSx for NetApp ONTAP
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-11-29 10:54:13.740223
+//
+
+[.lead]
+Authors: Pat Sinthusan and Niyaz Mohamed, NetApp
+
+== Introduction
+
+Many companies that would like to migrate applications from on-premises to the cloud find that the effort is hindered by the differences in capabilities offered by on-premises storage systems and cloud storage services. That gap has made migrating enterprise applications such as Microsoft SQL Server much more problematic. In particular, gaps in the services needed to run an enterprise application such as robust snapshots, storage efficiency capabilities, high availability, reliability, and consistent performance have forced customers to make design tradeoffs or forgo application migration. With FSx for NetApp ONTAP, customers no longer need to compromise. FSx for NetApp ONTAP is a native (1st party) AWS service sold, supported, billed, and fully managed by AWS. It uses the power of NetApp ONTAP to provide the same enterprise grade storage and data management capabilities NetApp has provided on-premises for three decades in AWS as a managed service.
+
+With SQL Server on EC2 instances, database administrators can access and customize their database environment and the underlying operating system. A SQL Server on EC2 instance in combination with https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[AWS FSx ONTAP^] to store the database files, enables high performance, data management, and a simple and easy migration path using block-level replication. Therefore, you can run your complex database on AWS VPC with an easy lift-and-shift approach, fewer clicks, and no schema conversions.
+ 
+== Benefits of using Amazon FSx for NetApp ONTAP with SQL Server
+
+Amazon FSx for NetApp ONTAP is the ideal file storage for SQL Server deployments in AWS. Benefits include the following:
+
+* Consistent high performance and throughput with low latency
+* Intelligent caching with NVMe cache to improve performance
+* Flexible sizing so that you can increase or shrink capacity, throughput, and IOPs on the fly
+* Efficient on-premises-to-AWS block replication
+* The use of iSCSI, a well-known protocol for the database environment
+* Storage efficiency features like thin provisioning and zero-footprint clones
+* Backup time reduction from hours to mins, thereby reducing the RTO
+* Granular backup and recovery of SQL databases with the intuitive NetApp SnapCenter UI
+* The ability to perform multiple test migrations before actual migration
+* Shorter downtime during migration and overcoming migration challenges with file-level or I/O-level copy
+* Reducing MTTR by finding the root cause after a major release or patch update
+
+Deploying SQL Server databases on FSx ONTAP with the iSCSI protocol, as is commonly used on-premises, provides an ideal database storage environment with superior performance, storage efficiency, and data-management capabilities. Using multiple iSCSI sessions, assuming a 5% working set size, fitting a Flash Cache delivers over 100K IOPs with the FSx ONTAP service. This configuration provides complete control over performance for the most demanding applications. SQL Server running on smaller EC2 instances connected to FSx for ONTAP can perform the same as SQL Server running on a much larger EC2 instance, because only network bandwidth limits are applied against FSx for ONTAP. Reducing the size of instances also reduces the compute cost, which provides a TCO-optimised deployment. The combination of SQL using iSCSI, SMB3.0 with multichannel, continuous availability shares on FSx for ONTAP provides great advantages for SQL workloads.
+
+== Before you begin
+
+The combination of Amazon FSx for NetApp ONTAP and SQL Server on EC2 instance enables the creation of enterprise-level database storage designs that can meet todays most demanding application requirements. To optimize both technologies, it is vital to understand SQL Server I/O patterns and characteristics. A well-designed storage layout for a SQL Server database supports the performance of SQL Server and the management of the SQL Server infrastructure. A good storage layout also allows the initial deployment to be successful and the environment to grow smoothly over time as your business grows.
+
+=== Prerequisites
+
+Before you complete the steps in this document, you should have the following prerequisites:
+
+* An AWS account
+* Appropriate IAM roles to provision EC2 and FSx for ONTAP
+* A Windows Active Directory domain on EC2
+* All SQL Server nodes must be able to communicate with each other
+* Make sure DNS resolution works and host names can be resolved. If not, use host file entry.
+* General knowledge of SQL Server installation
+
+Also, please refer to the NetApp Best Practices for SQL Server environments to ensure the best storage configuration.
+
+.Best practice configurations for SQL Server environments on EC2
+[%collapsible]
+====
+With FSx ONTAP, procuring storage is the easiest task and can be performed by updating the file system. This simple process enables dynamic cost and performance optimization as needed, it helps to balance the SQL workload, and it is also a great enabler for thin provisioning. FSx ONTAP thin provisioning is designed to present more logical storage to EC2 instances running SQL Server than what is provisioned in the file system. Instead of allocating space upfront, storage space is dynamically allocated to each volume or LUN as data is written. In most configurations, free space is also released back when data in the volume or LUN is deleted (and is not being held by any Snapshot copies). The following table provides configuration settings for dynamically allocating storage.
+
+[%autowidth.stretch]
+|===
+| Setting | Configuration
+
+| Volume guarantee
+| None (set by default)
+| LUN reservation
+| Enabled
+| fractional_reserve
+| 0% (set by default)
+| snap_reserve
+| 0%
+| Autodelete
+| volume / oldest_first
+| Autosize
+| On
+| try_first
+| Autogrow
+| Volume tiering policy
+| Snapshot only
+| Snapshot policy 
+| None
+|===
+
+With this configuration, the total size of the volumes can be greater than the actual storage available in the file system. If the LUNs or Snapshot copies require more space than is available in the volume, the volumes automatically grow, taking more space from the containing file system. Autogrow allows FSx ONTAP to automatically increase the size of the volume up to a maximum size that you predetermine. There must be space available in the containing file system to support the automatic growth of the volume. Therefore, with autogrow enabled, you should monitor the free space in the containing filesystem and update the file system when needed.
+
+Along with this, set the https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/What_does_the_LUN_option_space_alloc_do%3F[space-allocation^] option on LUN to enabled so that FSx ONTAP notifies the EC2 host when the volume has run out of space and the LUN in the volume cannot accept writes. Also, this option enables FSx for ONTAP to reclaim space automatically when the SQL Server on EC2 host deletes data. The space-allocation option is set to disabled by default.
+
+[NOTE]
+If a space-reserved LUN is created in a none-guaranteed volume, then the LUN behaves the same as a non-space-reserved LUN. This is because a none-guaranteed volume has no space to allocate to the LUN; the volume itself can only allocate space as it is written to due to its none guarantee.
+
+With this configuration, FSx ONTAP administrators can generally size the volume so that they must manage and monitor the used space in the LUN on the host side and in the file system.
+
+[NOTE]
+NetApp recommends using a separate file system for SQL server workloads. If the file system is used for multiple applications, monitor the space usage of both the file system and volumes within the file system to make sure that volumes are not competing for available space.
+
+[NOTE]
+Snapshot copies used to create FlexClone volumes are not deleted by the autodelete option.
+
+[NOTE]
+Overcommitment of storage must be carefully considered and managed for a mission-critical application such as SQL server for which even a minimal outage cannot be tolerated. In such a case, it is best to monitor storage consumption trends to determine how much, if any, overcommitment is acceptable.
+
+[%autowidth.stretch]
+|===
+|Best Practices
+
+a|* For optimal storage performance, provision file-system capacity to 1.5x times the size of total database usage.
+* Appropriate monitoring accompanied by an effective action plan is required when using thin provisioning to avoid application downtime.
+* Make sure to set Cloudwatch and other monitoring tool alerts so that people are contacted with enough time to react as storage is filled.
+|===
+====
+
+== Configure Storage for SQL Server and deploy Snapcenter for Backup, Restore and clone operations
+
+In order to perform SQL server operations with SnapCenter, you must first create volumes and LUNs for SQL server.
+
+.Create volumes and LUNs for SQL Server
+[%collapsible]
+====
+To create volumes and LUNs for SQL Server, complete the following steps:
+
+. Open the Amazon FSx console at https://console.aws.amazon.com/fsx/
+
+. Create an Amazon FSx for the NetApp ONTAP file system using the Standard Create option under Creation Method. This allows you to define FSxadmin and vsadmin credentials.
++
+image:sql-awsec2-image1.png[Error: Missing Graphic Image]
+
+. Specify the password for fsxadmin.
++
+image:sql-awsec2-image2.png[Error: Missing Graphic Image]
+
+. Specify the password for SVMs.
++
+image:sql-awsec2-image3.png[Error: Missing Graphic Image]
+
+. Create volumes by following the step listed in https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-volumes.html[Creating a volume on FSx for NetApp ONTAP^].
++
+[%autowidth.stretch]
+|===
+|Best practices
+a|* Disable storage Snapshot copy schedules and retention policies. Instead, use NetApp SnapCenter to coordinate Snapshot copies of the SQL Server data and log volumes.
+* Configure databases on individual LUNs on separate volumes to leverage fast and granular restore functionality.
+* Place user data files (.mdf) on separate volumes because they are random read/write workloads. It is common to create transaction log backups more frequently than database backups. For this reason, place transaction log files (.ldf) on a separate volume from the data files so that independent backup schedules can be created for each. This separation also isolates the sequential write I/O of the log files from the random read/write I/O of data files and significantly improves SQL Server performance.
+* Tempdb is a system database used by Microsoft SQL Server as a temporary workspace, especially for I/O intensive DBCC CHECKDB operations. Therefore, place this database on a dedicated volume. In large environments in which volume count is a challenge, you can consolidate tempdb into fewer volumes and store it in the same volume as other system databases after careful planning. Data protection for tempdb is not a high priority because this database is recreated every time Microsoft SQL Server is restarted. 
+|===
+
+. Use the following SSH command to create volumes:
++
+....
+Vol create -vserver svm001 -volume vol_awssqlprod01_data -aggregate aggr1 -size 800GB -state online -tiering-policy snapshot-only -percent-snapshot-space 0 -autosize-mode grow -snapshot-policy none -security-style ntfs -aggregate aggr1
+volume modify -vserver svm001 -volume vol_awssqlprod01_data -fractional-reserve 0
+volume modify -vserver svm001 -volume vol_awssqlprod01_data -space-mgmt-try-first vol_grow
+volume snapshot autodelete modify -vserver svm001 -volume vol_awssqlprod01_data -delete-order oldest_first
+....
+
+. Start the iSCSI service with PowerShell using elevated privileges in Windows Servers.
++
+....
+Start-service -Name msiscsi 
+Set-Service -Name msiscsi -StartupType Automatic
+....
+
+. Install Multipath-IO with PowerShell using elevated privileges in Windows Servers.
++
+....
+ Install-WindowsFeature -name Multipath-IO -Restart
+....
+
+. Find the Windows initiator Name with PowerShell using elevated privileges in Windows Servers.
++
+....
+Get-InitiatorPort | select NodeAddress
+....
++
+image:sql-awsec2-image4.png[Error: Missing Graphic Image]
+
+. Connect to Storage virtual machines (SVM) using putty and create an iGroup.
++
+....
+igroup create -igroup igrp_ws2019sql1 -protocol iscsi -ostype windows -initiator iqn.1991-05.com.microsoft:ws2019-sql1.contoso.net
+....
+
+. Use the following SSH command to create LUNs:
++
+....
+lun create -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -size 700GB -ostype windows_2008 -space-reserve enabled -space-allocation enabled lun create -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -size 100GB -ostype windows_2008 -space-reserve enabled -space-allocation enabled 
+....
++
+image:sql-awsec2-image5.png[Error: Missing Graphic Image]
+
+. To achieve I/O alignment with the OS partitioning scheme, use windows_2008 as the recommended LUN type. Refer https://docs.netapp.com/us-en/ontap/san-admin/io-misalignments-properly-aligned-luns-concept.html[here^] for additional information.
+
+. Use the following SSH command to the map igroup to the LUNs that you just created.
++
+....
+lun show
+lun map -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -igroup igrp_awssqlprod01lun map -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -igroup igrp_awssqlprod01
+....
++
+image:sql-awsec2-image6.png[Error: Missing Graphic Image]
+
+. For a shared disk that uses the Windows Failover Cluster, run an SSH command to map the same LUN to the igroup that belong to all servers that participate in the Windows Failover Cluster.
+
+. Connect Windows Server to an SVM with an iSCSI target. Find the target IP address from AWS Portal.
++
+image:sql-awsec2-image7.png[Error: Missing Graphic Image]
+
+. From Server Manager and the Tools menu,  select the iSCSI Initiator. Select the Discovery tab and then select Discover Portal. Supply the iSCSI IP address from previous step and select Advanced. From Local Adapter, select Microsoft iSCSI Initiator. From Initiator IP, select the IP of the server. Then select OK to close all windows.
++
+image:sql-awsec2-image8.png[Error: Missing Graphic Image]
+
+. Repeat step 12 for the second iSCSI IP from the SVM.
+
+. Select the *Targets* tab,  select *Connect*,  and select *Enable muti-path*.
++
+image:sql-awsec2-image9.png[Error: Missing Graphic Image]
+
+. For best performance, add more sessions; NetApp recommends creating five iSCSI sessions. Select *Properties *> *Add session *> *Advanced* and repeat step 12.
++
+....
+$TargetPortals = ('10.2.1.167', '10.2.2.12')
+foreach ($TargetPortal in $TargetPortals) {New-IscsiTargetPortal -TargetPortalAddress $TargetPortal}
+....
++
+image:sql-awsec2-image10.png[Error: Missing Graphic Image]
++
+[%autowidth.stretch]
+|===
+|Best Practices
+
+a|* Configure five iSCSI sessions per target interface for optimal performance.
+* Configure a round-robin policy for the best overall iSCSI performance.
+* Make sure that the allocation unit size is set to 64K for partitions when formatting the LUNs
+|===
+
+. Run the following PowerShell command to make sure that the iSCSI session is persisted.
++
+....
+$targets = Get-IscsiTarget
+foreach ($target in $targets)
+{
+Connect-IscsiTarget -IsMultipathEnabled $true -NodeAddress $target.NodeAddress -IsPersistent $true
+}
+....
++
+image:sql-awsec2-image11.png[Error: Missing Graphic Image]
+
+. Initialize disks with the following PowerShell command.
++
+....
+$disks = Get-Disk | where PartitionStyle -eq raw
+foreach ($disk in $disks) {Initialize-Disk $disk.Number}
+....
++
+image:sql-awsec2-image12.png[Error: Missing Graphic Image]
+
+. Run the Create Partition and Format Disk commands with PowerShell.
++
+....
+New-Partition -DiskNumber 1 -DriveLetter F -UseMaximumSize
+Format-Volume -DriveLetter F -FileSystem NTFS -AllocationUnitSize 65536
+New-Partition -DiskNumber 2 -DriveLetter G -UseMaximumSize
+Format-Volume -DriveLetter G -FileSystem NTFS -AllocationUnitSize 65536
+....
+
+You can automate volume and LUN creation using the PowerShell script from Appendix B. LUNs can also be created using SnapCenter.
+====
+
+Once the volumes and LUNs are defined, you need to set up SnapCenter to be able to perform the database operations.
+
+.SnapCenter overview
+[%collapsible]
+====
+
+NetApp SnapCenter is next-generation data protection software for tier-1 enterprise applications. SnapCenter, with its single-pane-of-glass management interface, automates and simplifies the manual, complex, and time-consuming processes associated with the backup, recovery, and cloning of multiple databases and other application workloads. SnapCenter leverages NetApp technologies, including NetApp Snapshots, NetApp SnapMirror, SnapRestore, and NetApp FlexClone. This integration allows IT organizations to scale their storage infrastructure, meet increasingly stringent SLA commitments, and improve the productivity of administrators across the enterprise.
+====
+
+.SnapCenter Server requirements
+[%collapsible]
+====
+The following table lists the minimum requirements for installing the SnapCenter Server and plug-in on Microsoft Windows Server.
+
+[%autowidth.stretch]
+|===
+|Components |Requirement
+
+a|Minimum CPU count
+a|Four cores/vCPUs
+a|Memory 
+a|Minimum: 8GB
+Recommended: 32GB
+a|Storage space
+a|Minimum space for installation: 10GB
+Minimum space for repository: 10GB
+|Supported operating system
+a|* Windows Server 2012
+* Windows Server 2012 R2
+* Windows Server 2016
+* Windows Server 2019
+|Software packages
+a|* .NET 4.5.2 or later
+* Windows Management Framework (WMF) 4.0 or later
+* PowerShell 4.0 or later
+|===
+
+For detailed information, refer to Space and sizing requirements (https://docs.netapp.com/us-en/snapcenter/install/reference_space_and_sizing_requirements.html)
+
+For version compatibility, see the https://mysupport.netapp.com/matrix/[NetApp Interoperability Matrix Tool^].
+====
+
+.Database storage layout
+[%collapsible]
+====
+The following figure depicts some considerations for creating the Microsoft SQL Server database storage layout when backing up with SnapCenter.
+
+image:sql-awsec2-image13.png[Error: Missing Graphic Image]
+
+[%autowidth.stretch]
+|===
+|Best practices
+
+a|* Place databases with I/O-intensive queries or with large database size (say 500GB or more) on a separate volume for faster recovery. This volume should also be backed up by separate jobs.
+* Consolidate small-to-medium size databases that are less critical or have fewer I/O requirements to a single volume. Backing up a large number of databases residing in the same volume leads to fewer Snapshot copies that need to be maintained. It is also a best practice to consolidate Microsoft SQL Server instances to use the same volumes to control the number of backup Snapshot copies taken.
+* Create separate LUNs to store full text-related files and file-streaming related files.
+* Assign separate LUNs per host to store Microsoft SQL Server log backups.
+* System databases that store database server metadata configuration and job details are not updated frequently. Place system databases/tempdb in separate drives or LUNs. Do not place system databases in the same volume as the user databases. User databases have a different backup policy, and the frequency of user database backup is not same for system databases.
+* For Microsoft SQL Server Availability Group setup, place the data and log files for replicas in an identical folder structure on all nodes.
+|===
+
+In addition to the performance benefit of segregating the user database layout into different volumes, the database also significantly affects the time required to back up and restore. Having separate volumes for data and log files significantly improves the restore time as compared to a volume hosting multiple user data files. Similarly, user databases with a high I/O intensive application are prone to an increase in the backup time. A more detailed explanation about backup and restore practices is provided later in this document. 
+
+NOTE: Starting with SQL Server 2012 (11.x), system databases (Master, Model, MSDB, and TempDB), and Database Engine user databases can be installed with an SMB file server as a storage option. This applies to both stand-alone SQL Server and SQL Server failover cluster installations. This enables you to use FSx for ONTAP with all its performance and data management capabilities, including volume capacity, performance scalability, and data protection features, which SQL Server can take advantage of. Shares used by the application servers must be configured with the continuously available property set and the volume should be created with NTFS security style. NetApp Snapcenter cannot be used with databases placed on SMB shares from FSx for ONTAP.
+
+NOTE: For SQL Server databases that do not use SnapCenter to perform backups, Microsoft recommends placing the data and log files on separate drives. For applications that simultaneously update and request data, the log file is write intensive, and the data file (depending on your application) is read/write intensive. For data retrieval, the log file is not needed. Therefore, requests for data can be satisfied from the data file placed on its own drive.
+
+NOTE: When you create a new database, Microsoft recommends specifying separate drives for the data and logs. To move files after the database is created, the database must be taken offline. For more Microsoft recommendations, see Place Data and Log Files on Separate Drives.
+====
+
+.Installation and setup for SnapCenter
+[%collapsible]
+====
+Follow the https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^] and https://docs.netapp.com/us-en/snapcenter/protect-scsql/task_add_hosts_and_install_snapcenter_plug_ins_package_for_windows.html[Installing SnapCenter Plug-in for Microsoft SQL Server^] to install and setup SnapCenter.
+
+After Installing SnapCenter, complete the following steps to set it up.
+
+. To set up credentials, select *Settings* > *New* and then enter the credential information.
++
+image:sql-awsec2-image14.png[Error: Missing Graphic Image]
+
+. Add the storage system by selecting Storage Systems > New and the provide the appropriate FSx for ONTAP storage information.
++
+image:sql-awsec2-image15.png[Error: Missing Graphic Image]
+
+. Add hosts by selecting *Hosts* > *Add*, and then provide the host information. SnapCenter automatically installs the Windows and SQL Server plug-in. This process might take some time.
++
+image:sql-awsec2-image16.png[Error: Missing Graphic Image]
+
+After all Plug-ins are installed, you must configure the log directory. This is the location where the transaction log backup resides. You can configure the log directory by selecting the host and then select configure the log directory.
+
+[NOTE]
+SnapCenter uses a host log directory to store transaction log backup data. This is at the host and instance level. Each SQL Server host used by SnapCenter must have a host log directory configured to perform log backups. SnapCenter has a database repository, so metadata related to backup, restore, or cloning operations is stored in a central database repository.
+
+The size of the host log directory is calculated as follows:
+
+Size of host log directory = ((system database size + (maximum DB LDF size × daily log change rate %)) × (Snapshot copy retention) ÷ (1 – LUN overhead space %)
+
+The host log directory sizing formula assumes the following:
+
+* A system database backup that does not include the tempdb database
+* A 10% LUN overhead spacePlace the host log directory on a dedicated volume or LUN. The amount of data in the host log directory depends on the size of the backups and the number of days that backups are retained. 
+
+image:sql-awsec2-image17.png[Error: Missing Graphic Image]
+
+If the LUNs have already been provisioned, you can select the mount point to represent the host log directory.
+
+image:sql-awsec2-image18.png[Error: Missing Graphic Image]
+====
+
+Now you are ready to perform backup, restore and clone operations for SQL Server.
+
+.Backup database with SnapCenter
+[%collapsible]
+====
+After placing the database and log files on the FSx ONTAP LUNs, SnapCenter can be used to back up the databases. The following processes are used to create a full backup.
+
+[%autowidth.stretch]
+|===
+|Best Practices
+
+a|* In SnapCenter terms, RPO can be identified as the backup frequency, for example, how frequently you want to schedule the backup so that you can reduce the loss of data to up to few minutes. SnapCenter allows you to schedule backups as frequently as every five minutes. However, there might be a few instances in which a backup might not complete within five minutes during peak transaction times or when the rate of change of data is more in the given time. A best practice is to schedule frequent transaction log backups instead of full backups.
+* There are numerous approaches to handle the RPO and RTO. One alternative to this backup approach is to have separate backup policies for data and logs with different intervals. For example, from SnapCenter, schedule log backups in 15-minute intervals and data backups in 6-hour intervals.
+* Use a resource group for a backup configuration for Snapshot optimization and the number of jobs to be managed.
+|===
+
+. Select *Resources*, and then select *Microsoft SQL Server *on the drop-down menu on the top left. Select *Refresh Resources*.
++
+image:sql-awsec2-image19.png[Error: Missing Graphic Image]
+
+. Select the database to be backed up, then select *Next* and (*+*) to add the policy if one has not been created. Follow the *New SQL Server Backup Policy* to create a new policy.
++
+image:sql-awsec2-image20.png[Error: Missing Graphic Image]
+
+. Select the verification server if necessary. This server is the server that SnapCenter runs DBCC CHECKDB after a full backup has been created. Click *Next* for notification, and then select *Summary* to review. After reviewing, click *Finish*.
++
+image:sql-awsec2-image21.png[Error: Missing Graphic Image]
+
+. Click *Back up Now* to test the backup. In the pop- up windows, select *Backup*.
++
+image:sql-awsec2-image22.png[Error: Missing Graphic Image]
+
+. Select *Monitor* to verify that the backup has been completed.
++
+image:sql-awsec2-image23.png[Error: Missing Graphic Image]
+
+[%autowidth.stretch]
+|===
+|Best Practices
+
+a|* Backup the transaction log backup from SnapCenter so that during the restoration process, SnapCenter can read all the backup files and restore in sequence automatically.
+* If third party products are used for backup, select Copy backup in SnapCenter to avoid log sequence issues, and test the restore functionality before rolling into production.
+|===
+====
+
+.Restore database with SnapCenter
+[%collapsible]
+====
+One of the major benefits of using FSx ONTAP with SQL Server on EC2 is its ability to perform fast and granular restore at each database level.
+
+Complete the following steps to restore an individual database to a specific point in time or up to the minute with SnapCenter.
+
+. Select Resources and then select the database that you would like to restore.
++
+image:sql-awsec2-image24.png[Error: Missing Graphic Image]
+
+. Select the backup name that the database needs to be restored from and then select restore.
+. Follow the *Restore* pop-up windows to restore the database.
+. Select *Monitor* to verify that the restore process is successful.
++
+image:sql-awsec2-image25.png[Error: Missing Graphic Image]
+====
+
+.Considerations for an instance with a large number of small-to-large size databases
+[%collapsible]
+====
+SnapCenter can back up a large number of sizeable databases in an instance or group of instances within a resource group. The size of a database is not the major factor in backup time. The duration of a backup can vary depending on number of LUNs per volume, the load on Microsoft SQL Server, the total number of databases per instance, and,  specifically, the I/O bandwidth and usage. While configuring the policy to back up databases from an instance or resource group, NetApp recommends that you restrict the maximum database backed up per Snapshot copy to 100 per host. Make sure the total number of Snapshot copies does not exceed the 1,023-copy limit.
+
+NetApp also recommends that you limit the backup jobs running in parallel by grouping the number of databases instead of creating multiple jobs for each database or instance. For optimal performance of the backup duration, reduce the number of backup jobs to a number that can back up around 100 or fewer databases at a time.
+
+As previously mentioned, I/O usage is an important factor in the backup process. The backup process must wait to quiesce until all the I/O operations on a database are complete. Databases with highly intensive I/O operations should be deferred to another backup time or should be isolated from other backup jobs to avoid affecting other resources within the same resource group that are to be backed up. 
+
+For an environment that has six Microsoft SQL Server hosts hosting 200 databases per instance, assuming four LUNs per host and one LUN per volume created, set the full backup policy with the maximum databases backed up per Snapshot copy to 100. Two hundred databases on each instance are laid out as 200 data files distributed equally on two LUNs, and 200 log files are distributed equally on two LUNs, which is 100 files per LUN per volume. 
+
+Schedule three backup jobs by creating three resource groups, each grouping two instances that include a total of 400 databases.
+
+Running all three backup jobs in parallel backs up 1,200 databases simultaneously. Depending on the load on the server and I/O usage, the start and end time on each instance can vary. In this instance, a total of 24 Snapshot copies are created.
+
+In addition to the full backup, NetApp recommends that you configure a transaction log backup for critical databases. Make sure that the database property is set to full recovery model.
+
+[%autowidth.stretch]
+|===
+|Best practices
+
+a|* Do not include the tempdb database in a backup because the data it contains is temporary. Place tempdb on a LUN or an SMB share that is in a storage system volume in which Snapshot copies will not be created.
+* A Microsoft SQL Server instance with a high I/O intensive application should be isolated in a different backup job to reduce the overall backup time for other resources.
+* Limit the set of databases to be simultaneously backed up to approximately 100 and stagger the remaining set of database backups to avoid a simultaneous process.
+* Use the Microsoft SQL Server instance name in the resource group instead of multiple databases because whenever new databases are created in Microsoft SQL Server instance, SnapCenter automatically considers a new database for backup.
+* If you change the database configuration, such as changing the database recovery model to the full recovery model, perform a backup immediately to allow up-to-the-minute restore operations.
+* SnapCenter cannot restore transaction log backups created outside of SnapCenter.
+* When cloning FlexVol volumes, make sure that you have sufficient space for the clone metadata.
+* When restoring databases, make sure that sufficient space is available on the volume.
+* Create a separate policy to manage and back up system databases at least once a week.
+|===
+====
+
+.Cloning databases with SnapCenter
+[%collapsible]
+====
+To restore a database onto another location on a dev or test environment or to create a copy for business analysis purposes, the NetApp best practice is to leverage the cloning methodology to create a copy of the database on the same instance or an alternate instance.
+
+The cloning of databases that are 500GB on an iSCSI disk hosted on a FSx for ONTAP environment typically takes less than five minutes. After cloning is complete, the user can then perform all the required read/write operation on the cloned database. Most of the time is consumed for disk scanning (diskpart). The NetApp cloning procedure typically take less than 2 minutes regardless of the size of the databases.
+
+The cloning of a database can be performed with the dual method: you can create a clone from the latest backup or you can use clone life-cycle management through which the latest copy can be made available on the secondary instance.
+
+SnapCenter allows you to mount the clone copy on the required disk to maintain the format of the folder structure on the secondary instance and continue to schedule backup jobs.
+
+.Clone databases to the new database name in the same instance
+[%collapsible]
+=====
+The following steps can be used to clone databases to the new database name in the same SQL server instance running on EC2:
+
+. Select Resources and then the database that need to be cloned.
+. Select the backup name that you would like to clone and select Clone.
+. Follow the clone instructions from the backup windows to finish the clone process.
+. Select Monitor to make sure that cloning is completed.
+=====
+
+.Clone databases into the new SQL Server instance running on EC2
+[%collapsible]
+=====
+The following step are used to clone databases to the new SQL server instance running on EC2:
+
+. Create a new SQL Server on EC2 in the same VPC.
+. Enable the iSCSI protocol and MPIO, and then setup the iSCSI connection to FSx for ONTAP by following step 3 and 4 in the section “Create volumes and LUNs for SQL Server.”
+. Add a new SQL Server on EC2 into SnapCenter by follow step 3 in the section “Installing and setup for SnapCenter.”
+. Select Resource > View Instance, and then select Refresh Resource.
+. Select Resources, and then the database that you would like to clone.
+. Select the backup name that you would like to clone, and then select Clone.
++
+image:sql-awsec2-image26.png[Error: Missing Graphic Image]
+
+. Follow the Clone from Backup instructions by providing the new SQL Server instance on EC2 and instance name to finish the clone process.
+. Select Monitor to make sure that cloning is completed.
++
+image:sql-awsec2-image27.png[Error: Missing Graphic Image]
+=====
+====
+
+== Appendices
+
+.Appendix A: YAML file for use in Cloud Formation Template
+[%collapsible]
+====
+The following .yaml file can be used with the Cloud Formation Template in AWS Console.
+
+* https://github.com/NetApp-Automation/fsxn-iscsisetup-cft[https://github.com/NetApp-Automation/fsxn-iscsisetup-cft^]
+
+To automate ISCSI LUN creation and NetApp SnapCenter installation with PowerShell, clone the repo from https://github.com/NetApp-Automation/fsxn-iscsisetup-ps[this GitHub link^].
+====
+
+.Appendix B: Powershell scripts for provisioning volumes and LUNs
+[%collapsible]
+====
+The following script is used to provision volumes and LUNs and also to set up iSCSI based on the instruction provided above. There are two PowerShell scripts:
+
+* `_EnableMPIO.ps1`
+
+....
+Function Install_MPIO_ssh {
+    $hostname = $env:COMPUTERNAME
+    $hostname = $hostname.Replace('-','_')
+    
+    #Add schedule action for the next step
+    $path = Get-Location
+    $path = $path.Path + '\2_CreateDisks.ps1'
+    $arg = '-NoProfile -WindowStyle Hidden -File ' +$path
+    $schAction = New-ScheduledTaskAction -Execute "Powershell.exe" -Argument $arg
+    $schTrigger = New-ScheduledTaskTrigger -AtStartup
+    $schPrincipal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $return = Register-ScheduledTask -Action $schAction -Trigger $schTrigger -TaskName "Create Vols and LUNs" -Description "Scheduled Task to run configuration Script At Startup" -Principal $schPrincipal
+    #Install -Module Posh-SSH
+    Write-host 'Enable MPIO and SSH for PowerShell' -ForegroundColor Yellow
+    $return = Find-PackageProvider -Name 'Nuget' -ForceBootstrap -IncludeDependencies
+    $return = Find-Module PoSH-SSH | Install-Module -Force
+    #Install Multipath-IO with PowerShell using elevated privileges in Windows Servers
+    Write-host 'Enable MPIO' -ForegroundColor Yellow
+    $return = Install-WindowsFeature -name Multipath-IO -Restart
+}
+Install_MPIO_ssh
+Remove-Item -Path $MyInvocation.MyCommand.Source
+....
+
+* `_CreateDisks.ps1`
+
+....
+#Enable MPIO and Start iSCSI Service
+Function PrepISCSI {
+    $return = Enable-MSDSMAutomaticClaim -BusType iSCSI
+    #Start iSCSI service with PowerShell using elevated privileges in Windows Servers 
+    $return = Start-service -Name msiscsi 
+    $return = Set-Service -Name msiscsi -StartupType Automatic
+}
+Function Create_igroup_vols_luns ($fsxN){
+    $hostname = $env:COMPUTERNAME
+    $hostname = $hostname.Replace('-','_')
+    $volsluns = @()
+    for ($i = 1;$i -lt 10;$i++){
+        if ($i -eq 9){
+            $volsluns +=(@{volname=('v_'+$hostname+'_log');volsize=$fsxN.logvolsize;lunname=('l_'+$hostname+'_log');lunsize=$fsxN.loglunsize})
+        } else {
+            $volsluns +=(@{volname=('v_'+$hostname+'_data'+[string]$i);volsize=$fsxN.datavolsize;lunname=('l_'+$hostname+'_data'+[string]$i);lunsize=$fsxN.datalunsize})
+        }
+    }
+    $secStringPassword = ConvertTo-SecureString $fsxN.password -AsPlainText -Force
+    $credObject = New-Object System.Management.Automation.PSCredential ($fsxN.login, $secStringPassword)
+    $igroup = 'igrp_'+$hostname
+    #Connect to FSx N filesystem
+    $session = New-SSHSession -ComputerName $fsxN.svmip -Credential $credObject -AcceptKey:$true
+    #Create igroup
+    Write-host 'Creating igroup' -ForegroundColor Yellow
+    #Find Windows initiator Name with PowerShell using elevated privileges in Windows Servers
+    $initport = Get-InitiatorPort | select -ExpandProperty NodeAddress
+    $sshcmd = 'igroup create -igroup ' + $igroup + ' -protocol iscsi -ostype windows -initiator ' + $initport
+    $ret = Invoke-SSHCommand -Command $sshcmd -SSHSession $session
+    #Create vols 
+    Write-host 'Creating Volumes' -ForegroundColor Yellow
+    foreach ($vollun in $volsluns){
+        $sshcmd = 'vol create ' + $vollun.volname + ' -aggregate aggr1 -size ' + $vollun.volsize #+ ' -vserver ' + $vserver
+        $return = Invoke-SSHCommand -Command $sshcmd -SSHSession $session
+    }
+    #Create LUNs and mapped LUN to igroup
+    Write-host 'Creating LUNs and map to igroup' -ForegroundColor Yellow
+    foreach ($vollun in $volsluns){
+        $sshcmd = "lun create -path /vol/" + $vollun.volname + "/" + $vollun.lunname + " -size " + $vollun.lunsize + " -ostype Windows_2008 " #-vserver " +$vserver
+        $return = Invoke-SSHCommand -Command $sshcmd -SSHSession $session
+        #map all luns to igroup
+        $sshcmd = "lun map -path /vol/" + $vollun.volname + "/" + $vollun.lunname + " -igroup " + $igroup
+        $return = Invoke-SSHCommand -Command $sshcmd -SSHSession $session
+    }
+}
+Function Connect_iSCSI_to_SVM ($TargetPortals){
+    Write-host 'Online, Initialize and format disks' -ForegroundColor Yellow
+    #Connect Windows Server to svm with iSCSI target.
+    foreach ($TargetPortal in $TargetPortals) {
+        New-IscsiTargetPortal -TargetPortalAddress $TargetPortal
+        for ($i = 1; $i -lt 5; $i++){
+            $return = Connect-IscsiTarget -IsMultipathEnabled $true -IsPersistent $true -NodeAddress (Get-iscsiTarget | select -ExpandProperty NodeAddress)
+        }
+    }
+}
+Function Create_Partition_Format_Disks{
+        
+    #Create Partion and format disk
+    $disks = Get-Disk | where PartitionStyle -eq raw
+    foreach ($disk in $disks) {
+        $return = Initialize-Disk $disk.Number 
+        $partition = New-Partition -DiskNumber $disk.Number -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem NTFS -AllocationUnitSize 65536 -Confirm:$false -Force
+        #$return = Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -AllocationUnitSize 65536
+    }
+}
+Function UnregisterTask {
+    Unregister-ScheduledTask -TaskName "Create Vols and LUNs" -Confirm:$false
+}
+Start-Sleep -s 30
+$fsxN = @{svmip ='198.19.255.153';login = 'vsadmin';password='net@pp11';datavolsize='10GB';datalunsize='8GB';logvolsize='8GB';loglunsize='6GB'}
+$TargetPortals = ('10.2.1.167', '10.2.2.12') 
+PrepISCSI
+Create_igroup_vols_luns $fsxN
+Connect_iSCSI_to_SVM $TargetPortals
+Create_Partition_Format_Disks
+UnregisterTask
+Remove-Item -Path $MyInvocation.MyCommand.Source
+....
+
+Run the file `EnableMPIO.ps1` first and the second script executes automatically after the server has been rebooted. These PowerShell scripts can be removed after they have been executed due to credential access to the SVM.
+====
+
+== Where to find additional information
+
+* Amazon FSx for NetApp ONTAP
++
+https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html^]
+
+* Getting Started with FSx for NetApp ONTAP
++
+https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/getting-started.html[https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/getting-started.html^]
+
+* Overview of the SnapCenter interface
++
+https://www.youtube.com/watch?v=lVEBF4kV6Ag&t=0s[https://www.youtube.com/watch?v=lVEBF4kV6Ag&t=0s^]
+
+* Tour through SnapCenter navigation pane options
++
+https://www.youtube.com/watch?v=_lDKt-koySQ[https://www.youtube.com/watch?v=_lDKt-koySQ^]
+
+* Setup SnapCenter 4.0 for SQL Server plug-in
++
+https://www.youtube.com/watch?v=MopbUFSdHKE[https://www.youtube.com/watch?v=MopbUFSdHKE^]
+
+* How to back up and restore databases using SnapCenter with SQL Server plug-in
++
+https://www.youtube.com/watch?v=K343qPD5_Ys[https://www.youtube.com/watch?v=K343qPD5_Ys^]
+
+* How to clone a database using SnapCenter with SQL Server plug-in
++
+https://www.youtube.com/watch?v=ogEc4DkGv1E[https://www.youtube.com/watch?v=ogEc4DkGv1E^]
