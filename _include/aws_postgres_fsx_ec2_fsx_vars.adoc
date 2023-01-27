@@ -1,0 +1,224 @@
+
+
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2021-02-16 10:32:05.121542
+//
+=== VARS
+++++
+<style>
+div {
+position: relative;
+}
+div button {
+position: absolute;
+top: 0;
+right: 0;
+}
+button {
+  transition-duration: 0.4s;
+  background-color: white;
+  color: #1563a3;
+  border: 2px solid #1563a3;
+}
+button:hover {
+  background-color: #1563a3;
+  color: white;
+}
+#more_storage_vlans {
+  display: block;
+}
+#more_storage_vlans_button {
+  display: none;
+}
+#more_nfs_volumes {
+  display: block;
+}
+#more_nfs_volumes_button {
+  display: none;
+}
+</style>
+<div class="listingblock"><div class="content"><div><button id="copy-button" onclick="CopyClassText()">Copy</button></div><pre><code><div class="CopyMeClass" id="CopyMeID">
+#######################################################################
+###### Oracle 19c deployment global user configuration variables ######
+######  Consolidate all variables from ontap, linux and oracle   ######
+#######################################################################
+
+###########################################
+### Ontap env specific config variables ###
+###########################################
+
+#Inventory group name
+#Default inventory group name - 'ontap'
+#Change only if you are changing the group name either in inventory/hosts file or in inventory groups in case of AWX/Tower
+hosts_group: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>ontap</i></span>
+
+#CA_signed_certificates (ONLY CHANGE to 'true' IF YOU ARE USING CA SIGNED CERTIFICATES)
+ca_signed_certs: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>false</i></span>
+
+#Names of the Nodes in the ONTAP Cluster
+nodes:
+ - <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>AFF-01</i></span>
+ - <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>AFF-02</i></span>
+
+
+#Storage VLANs
+#Add additional rows for vlans as necessary
+storage_vlans:
+   - {vlan_id: &quot;<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>203</i></span>&quot;, name: &quot;<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>infra_NFS</i></span>&quot;, protocol: &quot;<span <div contenteditable="true"/><i>NFS</i></span>&quot;}
+<a id="more_storage_vlans" href="javascript:storagevlandropdown();">More Storage VLANs</a><div id="select_more_storage_vlans"></div><a id="more_storage_vlans_button" href="javascript:addstoragevlans();">Enter Storage VLANs details</a><div id="extra_storage_vlans"></div>
+
+#Details of the Data Aggregates that need to be created
+#If Aggregate creation takes longer, subsequent tasks of creating volumes may fail.
+#There should be enough disks already zeroed in the cluster, otherwise aggregate create will zero the disks and will take long time
+data_aggregates:
+  - {aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr01_node01</i></span>}
+  - {aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr01_node02</i></span>}
+
+#SVM name
+svm_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>ora_svm</i></span>
+
+
+# SVM Management LIF Details
+svm_mgmt_details:
+  - {address: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.91.100</i></span>, netmask: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>255.255.255.0</i></span>, home_port: <span <div contenteditable="true"/><i>e0M</i></span>}
+
+# NFS storage parameters when data_protocol set to NFS. Volume named after Oracle hosts name identified by mount point as follow for oracle DB server 1. Each mount point dedicates to a particular Oracle files: u01 - Oracle binary, u02 - Oracle data, u03 - Oracle redo. Add additional volumes by click on "More NFS volumes" and also add the volumes list to corresponding host_vars as host_datastores_nfs variable. For multiple DB server deployment, additional volumes sets needs to be added for additional DB server. Input variable "{{groups.oracle[1]}}_u01", "{{groups.oracle[1]}}_u02", and "{{groups.oracle[1]}}_u03" as vol_name for second DB server. Place volumes for multiple DB servers alternatingly between controllers for balanced IO performance, e.g. DB server 1 on controller node1, DB server 2 on controller node2 etc. Make sure match lif address with controller node.
+volumes_nfs:
+  - {vol_name: &quot<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>{{groups.oracle[0]}}_u01</i></span>&quot, aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr01_node01</i></span>, lif: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.200</i></span>, size: <span <div contenteditable="true"/><i>25</i></span>}
+  - {vol_name: &quot<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>{{groups.oracle[0]}}_u02</i></span>&quot, aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr01_node01</i></span>, lif: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.200</i></span>, size: <span <div contenteditable="true"/><i>25</i></span>}
+  - {vol_name: &quot<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>{{groups.oracle[0]}}_u03</i></span>&quot, aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr01_node01</i></span>, lif: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.200</i></span>, size: <span <div contenteditable="true"/><i>25</i></span>}
+<a id="more_nfs_volumes" href="javascript:nfsvolumesdropdown();">More NFS volumes</a><div id="select_more_nfs_volumes"></div><a id="more_nfs_volumes_button" href="javascript:addnfsvolumes();">Enter NFS volumes' details</a><div id="extra_nfs_volumes"></div>
+
+#NFS LIFs IP address and netmask
+nfs_lifs_details:
+  - address: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.200</i></span> #for node-1
+    netmask: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>255.255.255.0</i></span>
+  - address: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.201</i></span> #for node-2
+    netmask: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>255.255.255.0</i></span>
+
+#NFS client match
+client_match: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.0/24</i></span>
+
+###########################################
+### Linux env specific config variables ###
+###########################################
+
+#NFS Mount points for Oracle DB volumes
+mount_points:
+  - <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>/u01</i></span>
+  - <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>/u02</i></span>
+  - <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>/u03</i></span>
+
+# Up to 75% of node memory size divided by 2mb. Consider how many databases to be hosted on the node and how much ram to be allocated to each DB.
+# Leave it blank if hugepage is not configured on the host.
+hugepages_nr: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>1234</i></span>
+
+# RedHat subscription username and password
+redhat_sub_username: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>xxx</i></span>
+redhat_sub_password: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>xxx</i></span>
+
+####################################################
+### DB env specific install and config variables ###
+####################################################
+
+db_domain: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>your.domain.com</i></span>
+
+# Set initial password for all required Oracle passwords. Change them after installation.
+initial_pwd_all: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>netapp123</i></span>
+
+</div></code></pre></div></div>
+<script>
+function CopyClassText(){
+  	var textToCopy = document.getElementById("CopyMeID");
+  	var currentRange;
+  	if(document.getSelection().rangeCount > 0)
+  	{
+  		currentRange = document.getSelection().getRangeAt(0);
+  		window.getSelection().removeRange(currentRange);
+  	}
+  	else
+  	{
+  		currentRange = false;
+  	}
+  	var CopyRange = document.createRange();
+  	CopyRange.selectNode(textToCopy);
+  	window.getSelection().addRange(CopyRange);
+    document.getElementById("more_storage_vlans").style.display = "none";
+    document.getElementById("more_nfs_volumes").style.display = "none";
+    var command = document.execCommand("copy");
+      if (command)
+      {
+          document.getElementById("copy-button").innerHTML = "Copied!";
+          setTimeout(revert_copy, 3000);
+      }
+  	window.getSelection().removeRange(CopyRange);
+  	if(currentRange)
+  	{
+  		window.getSelection().addRange(currentRange);
+  	}
+}
+function revert_copy() {
+      document.getElementById("copy-button").innerHTML = "Copy";
+      document.getElementById("more_storage_vlans").style.display = "block";
+      document.getElementById("more_nfs_volumes").style.display = "block";
+}
+function storagevlandropdown() {
+    document.getElementById("more_storage_vlans").style.display = "none";
+	document.getElementById("more_storage_vlans_button").style.display = "block";
+    var x=1;
+    var myHTML = '';
+    var buildup = '';
+    var wrapper = document.getElementById("select_more_storage_vlans");
+    while (x < 10) {
+      buildup += '<option value="' + x + '">' + x + '</option>';
+  	  x++;
+    }
+    myHTML += '<a id="more_storage_vlans_info">How many extra VLANs do you wish to add?</a><select name="number_of_extra_storage_vlans" id="number_of_extra_storage_vlans">' + buildup + '</select>';
+    wrapper.innerHTML = myHTML;
+}
+function addstoragevlans() {
+    var y = document.getElementById("number_of_extra_storage_vlans").value;
+    var j=0;
+    var myHTML = '';
+    var wrapper = document.getElementById("extra_storage_vlans");
+    while (j < y) {
+    	j++;
+        myHTML += '   - {vlan_id: &quot;<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>203</i></span>&quot;, name: &quot;<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>infra_NFS</i></span>&quot;, protocol: &quot;<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>NFS</i></span>&quot;}<br>';
+    }
+	wrapper.innerHTML = myHTML;
+	document.getElementById("select_more_storage_vlans").style.display = "none";
+	document.getElementById("more_storage_vlans_button").style.display = "none";
+}
+function nfsvolumesdropdown() {
+    document.getElementById("more_nfs_volumes").style.display = "none";
+	document.getElementById("more_nfs_volumes_button").style.display = "block";
+    var x=1;
+    var myHTML = '';
+    var buildup = '';
+    var wrapper = document.getElementById("select_more_nfs_volumes");
+    while (x < 100) {
+      buildup += '<option value="' + x + '">' + x + '</option>';
+  	  x++;
+    }
+    myHTML += '<a id="more_nfs_volumes_info">How many extra NFS volumes do you wish to add?</a><select name="number_of_extra_nfs_volumes" id="number_of_extra_nfs_volumes">' + buildup + '</select>';
+    wrapper.innerHTML = myHTML;
+}
+function addnfsvolumes() {
+    var y = document.getElementById("number_of_extra_nfs_volumes").value;
+    var j=0;
+    var myHTML = '';
+    var wrapper = document.getElementById("extra_nfs_volumes");
+    while (j < y) {
+    	j++;
+        myHTML += '  - {vol_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>rtpora04_u01</i></span>, aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr01_node02</i></span>, lif: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.201</i></span>, size: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>25</i></span>}<br>';
+    }
+	wrapper.innerHTML = myHTML;
+	document.getElementById("select_more_nfs_volumes").style.display = "none";
+	document.getElementById("more_nfs_volumes_button").style.display = "none";
+}
+
+</script>
+++++
