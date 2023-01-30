@@ -33,6 +33,7 @@ This solution addresses the following use cases:
 
 * Production grade HA/DR deployment for PostgreSQL in AWS public cloud 
 * Test and validate PostgreSQL workload in AWS public cloud
+* Test and validate HA/DR strategy based on NetApp SnapMirror replication technology
 
 == Audience
 // Who is this solution directed at?  DevOps engineer, IT specialist, DB administrator, etc.
@@ -42,6 +43,8 @@ This solution is intended for the:
 
 * DBA, who is interested in how to deploy PostgreSQL with HA/DR in AWS public cloud
 * Database Solution Architect, who is interested in testing PostgreSQL workload in AWS public cloud
+* Storage admin, who is interested in deploying and managing the PostgreSQL deployed to AWS FSx storage
+* Application owner, who is interested in standing up PostgreSQL environment in AWS FSx/EC2 
 
 == Solution Test / Validation Environment
 // Identify the environment in which the solution was tested / validated.
@@ -191,6 +194,8 @@ include::../_include/aws_postgres_fsx_ec2_fsx_vars.adoc[]
 .PostgreSQL Deployment and HA/DR setup
 [%collapsible]
 =====
+Following tasks deploy PostgreSQL DB server service and initialize database at primary site on primary EC2 DB server host. Then, it sets up a standby primary EC2 DB server host at standby site. Finally, it sets up DB volumes replication from primary site FSx cluster to standby site FSx cluster for disaster recovery in the event of a failure.  
+
 . Create db vols on primary fsx cluster and setup postgresql on primary EC2 instance host
 [source, cli]
 ansible-playbook -i hosts postgresql_deploy.yml -u ec2-user --private-key psql_01p.pem -e @vars/fsx_vars.yml
@@ -206,24 +211,52 @@ ansible-playbook -i hosts fsx_replication_setup.yml -e @vars/fsx_vars.yml
 . Consolidate single step PostgreSQL deployment and HA/DR setup
 [source, cli]
 ansible-playbook -i hosts postgresql_hadr_setup.yml -u ec2-user -e @vars/fsx_vars.yml
+
+For setting up a standby PostgreSQL DB host at either primary or standby sites, comment out all other servers in hosts file [dr_postgresql] section and then execute postgresql_standby_setup.yml playbook with respective target host such as psql_01ps (standby EC2 compute instance at primary site). Make sure a host parameters file such as psql_01ps.yml is configured under host_vars directory. 
+
+  [dr_postgresql] --   
+  #psql_01s ansible_ssh_private_key_file=psql_01s.pem
+  psql_01ps ansible_ssh_private_key_file=psql_01ps.pem  
+  #psql_01ss ansible_ssh_private_key_file=psql_01ss.pem
+  
+[source, cli]
+ ansible-playbook -i hosts postgresql_standby_setup.yml -u ec2-user --private-key psql_01ps.pem -e @vars/fsx_vars.yml
 =====
 
 .PostgreSQL Database Snapshot Backup and Replication to Standby Site
 [%collapsible]
 =====
-tbd
+PostgreSQL database snapshot backup and replication to standby site can be controlled and executed on Ansible controller with user defined interval. It was validated, the interval can be as low as 5 minutes as tested. It means, in the case of failure at the primary site, there is potential data loss up to 5 minutes when failure took place right before the next scheduled snapshot backup.
+
+*/15 * * * * /home/admin/na_postgresql_aws_deploy_hadr/data_log_snap.sh
+
 =====
 
 .Failover to Standby Site for DR
 [%collapsible]
 =====
-tbd
+For testing the PostgreSQL HA/DR system as a DR exercise, execute failover and PostgreSQL database recovery on primary standby EC2 DB instance on standby site by executing following playbook. In an actually DR scenario, execute the same for an actually failover to DR site.  
+
+[source, cli]
+ansible-playbook -i hosts postgresql_failover.yml -u ec2-user --private-key psql_01s.pem -e @vars/fsx_vars.yml 
+
 =====
 
 .Resync Replicated DB volumes after Failover Test
 [%collapsible]
 =====
-tbd
+Run resync after failover test to re-establish database volumes SnapMirror replication
+
+[source, cli]
+ansible-playbook -i hosts postgresql_standby_resync.yml -u ec2-user --private-key psql_01s.pem -e @vars/fsx_vars.yml
+
+=====
+
+.Failover from primary EC2 DB server to standby EC2 DB server due to EC2 compute instance failure 
+[%collapsible]
+=====
+It is recommended to run manual failover or use well established OS cluster ware that may require license.
+
 =====
 
 
