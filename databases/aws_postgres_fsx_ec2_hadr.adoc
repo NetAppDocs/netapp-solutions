@@ -25,15 +25,17 @@ Author(s): Allen Cao,  Niyaz Mohamed,  NetApp
 // Describe WHAT problem this solution addresses.  What are the use cases(s) and how does it solve a problem?
 // Use a bulleted list and keep it brief!
 
-PostgreSQL is one of widely used open source database. It ranked at number four among the top ten most popular database engines by link:https://db-engines.com/en/ranking[DB-engines racking^]. The PostgreSQL popularity derives from license free model as it is open sourced database engine while not lacking sophisticated features. However, because it is open sourced, there is lacking of documentation on production grade database deployment in the area of high availability and disaster recovery (HA/DR) particularly in public cloud. It can be complicated endeavor trying to setup typical PostgreSQL HA/DR with hot/warm standby, streaming replication etc. It can be difficulty to test the HA/DR environment by promoting standby site, then switch back to primary. There are well documented performance issues on the primary while you maintain a streaming hot standby for read workload.   
+PostgreSQL is one of widely used open source databases. It ranked at number four among the top ten most popular database engines by link:https://db-engines.com/en/ranking[DB-engines racking^]. On one hand, the PostgreSQL derives its popularity from its license free open source model while not lacking sophisticated features. On the other hand, because it is open sourced, there is shortage of detailed guidance on production grade database deployment in the area of high availability and disaster recovery (HA/DR) particularly in public cloud. In general, it can be a complicated endeavor trying to setup typical PostgreSQL HA/DR with hot/warm standby, streaming replication etc. It can be difficulty, disruptive to production when testing the HA/DR environment by promoting standby site, then switching back to primary. There are well documented performance issues on the primary when you deploy read workload on streaming hot standby.  
 
-This solution is built on well known, proven, popular NetApp SnapMirror storage level replication technology available in AWS native FSX ONTAP cloud storage for PostgreSQL HA/DR. It is simple to implement with automation toolkit provided by NetApp Solutions team. It provides similar PostgreSQL application level HA/DR functionalities while eliminating the complexity, performance drag on the primary site of the application level streaming based HA/DR solution. The solution can be easily deployed and tested without any impact to active primary site. 
+In this documentation, we will demonstrate how you can do away with application level PostgreSQL streaming HA/DR solution and build a PostgreSQL HA/DR solution based on AWS FSx ONTAP storage for database files and EC2 compute instances as PostgreSQL DB servers. The solution creates a simpler and comparable system and delivers equivalent results as compared with traditional PostgreSQL application level streaming replication for HA/DR.  
+
+The solution is built on mature, proven, popular NetApp SnapMirror storage level replication technology available in AWS native FSX ONTAP cloud storage for PostgreSQL HA/DR. It is simple to implement with automation toolkit provided by NetApp Solutions team. It provides similar functionalities while eliminating the complexity, performance drag on the primary site with the application level streaming based HA/DR solution. The solution can be easily deployed and tested without any impact to active primary site. 
 
 This solution addresses the following use cases:
 
 * Production grade HA/DR deployment for PostgreSQL in AWS public cloud 
 * Test and validate PostgreSQL workload in AWS public cloud
-* Test and validate HA/DR strategy based on NetApp SnapMirror replication technology
+* Test and validate PostgreSQL HA/DR strategy based on NetApp SnapMirror replication technology
 
 == Audience
 // Who is this solution directed at?  DevOps engineer, IT specialist, DB administrator, etc.
@@ -41,7 +43,7 @@ This solution addresses the following use cases:
 
 This solution is intended for the:
 
-* DBA, who is interested in how to deploy PostgreSQL with HA/DR in AWS public cloud
+* DBA, who is interested in deploying PostgreSQL with HA/DR in AWS public cloud
 * Database Solution Architect, who is interested in testing PostgreSQL workload in AWS public cloud
 * Storage admin, who is interested in deploying and managing the PostgreSQL deployed to AWS FSx storage
 * Application owner, who is interested in standing up PostgreSQL environment in AWS FSx/EC2 
@@ -54,7 +56,7 @@ This solution is intended for the:
 // * Software / hardware and version / release levels or model numbers
 // * Specific configuration that might be unique to a lab / test environment
 
-The testing and validation of this solution was performed in AWS FSx and EC2 environment that may or may not match the final deployment environment. For more information, please refer to the section key Factors for Deployment Consideration in following sections.
+The testing and validation of this solution was performed in AWS FSx and EC2 environment that may or may not match the final deployment environment. For more information, please refer to "<<Key Factors for Deployment Consideration>>" in following sections.
 
 .Architecture
 [%collapsible]
@@ -88,6 +90,9 @@ image::aws_postgres_fsx_ec2_architecture.PNG[Solution Architecture Diagram]
 [%collapsible]
 =====
 // Identify anything that might differ in a production environment that was different in a lab environment or assumptions that were made
+
+* PostgreSQL database backup, restore, and recovery
+  PostgreSQL database supports a number of backup methods, such as logical backup using pg_dump, physical online backup with pg_basebackup or lower level OS    backup command, and storage level consistent snapshot. This solution utilizes NetApp consistent group snapshots for PostgreSQL database data and wal volumes backup, restore, and recovery at standby site. The NetApp consistent group volumes snapshots ensure the IOs are sequenced as they are written to storage and ensure the integrity of database data.      
 
 * EC2 Compute Instances
   In the tests and validations, we have used AWS EC2 t2.xlarge instance type as PostgreSQL database compute instance. It is recommended that in actual deployment, M5 type EC2 instance should be used as compute instance for PostgreSQL as it is optimized for database workload. 
@@ -262,5 +267,6 @@ It is recommended to run manual failover or use well established OS cluster ware
 == Additional Information
 // Include references to other documentation (internal or external), videos, demos, blogs, etc. that support the solution.
 
-* link:somewhere.html[Description of the document]
-* link:somewhere-else.html[Description of another document]
+* link:https://aws.amazon.com/fsx/netapp-ontap/[Amazon FSx for NetApp ONTAP^]
+* link:https://aws.amazon.com/pm/ec2/?trk=36c6da98-7b20-48fa-8225-4784bced9843&sc_channel=ps&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2&ef_id=Cj0KCQiA54KfBhCKARIsAJzSrdqwQrghn6I71jiWzSeaT9Uh1-vY-VfhJixF-xnv5rWwn2S7RqZOTQ0aAh7eEALw_wcB:G:s&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2[Amazon EC2^]
+* link:https://review.docs.netapp.com/us-en/netapp-solutions_ajc_psql_aws/automation/automation_introduction.html[NetApp Solution Automation^]
