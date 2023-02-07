@@ -92,22 +92,22 @@ image::aws_postgres_fsx_ec2_architecture.PNG[Solution Architecture Diagram]
 // Identify anything that might differ in a production environment that was different in a lab environment or assumptions that were made
 
 * PostgreSQL database backup, restore, and recovery
-  PostgreSQL database supports a number of backup methods, such as logical backup using pg_dump, physical online backup with pg_basebackup or lower level OS    backup command, and storage level consistent snapshot. This solution utilizes NetApp consistent group snapshots for PostgreSQL database data and wal volumes backup, restore, and recovery at standby site. The NetApp consistent group volumes snapshots ensure the IOs are sequenced as they are written to storage and ensure the integrity of database data.      
+  PostgreSQL database supports a number of backup methods, such as logical backup using pg_dump, physical online backup with pg_basebackup or lower level OS    backup command, and storage level consistent snapshot. This solution utilizes NetApp consistent group snapshots for PostgreSQL database data and wal volumes backup, restore, and recovery at standby site. The NetApp consistent group volumes snapshots ensure the IOs are sequenced as they are written to storage and ensure the integrity of database data files.      
 
 * EC2 Compute Instances
-  In the tests and validations, we have used AWS EC2 t2.xlarge instance type as PostgreSQL database compute instance. It is recommended that in actual deployment, M5 type EC2 instance should be used as compute instance for PostgreSQL as it is optimized for database workload. 
+  In the tests and validations, we used AWS EC2 t2.xlarge instance type as PostgreSQL database compute instance. It is recommended that in actual deployment, M5 type EC2 instance should be used as compute instance for PostgreSQL as it is optimized for database workload. The standby compute instance should always be deployed in the same zone as the passive (standby) file system as deployed for the FSx HA cluster. 
 
-* FSx Storage HA Clusters
-  In the tests and validations, we have deployed FSx HA cluster in a single AWS availability zone. For production deployment, it is recommended to deploy a FSx HA pair in two different availability zones and disaster recovery standby HA pair for business continuity can be setup in different regions if certain physical distance between primary and standby is a requirement. 
+* FSx Storage HA Clusters Single or Multi Zones Deployment
+  In the tests and validations, we deployed FSx HA cluster in a single AWS availability zone. For production deployment, it is recommended to deploy a FSx HA pair in two different availability zones and disaster recovery standby HA pair for business continuity can be setup in a different regions if certain physical distance between primary and standby is a requirement. FSx HA cluster is alway provisioned in a HA pair, which are sync mirrored in a pair of active/passive file systems to provide storage level redundancy. 
 
 * PostgreSQL Data and Log Placement
   Typical PostgreSQL deployment share the same root directory or volumes for data and log files. In our tests and validations, we have separated PostgreSQL data and logs into two separate volumes for performance. A soft link is used in data directory to point to logs directory or volume, which hosts PostgreSQL WAL logs and archived WAL logs.
 
 * PostgreSQL service startup delay timer 
-  The solution utilizes the NFS mounted volumes to store PostgreSQL database file and WAL logs files. During database host reboot, PostgreSQL service may try to start while the volume is not mounted. This will result in database service startup failure. A 10-15 seconds timer delay is needed for the PostgreSQL database to start correctly.
+  The solution utilizes the NFS mounted volumes to store PostgreSQL database file and WAL logs files. During database host reboot, PostgreSQL service may try to start while the volume is not mounted. This will result in database service startup failure. A 10-15 seconds timer delay is needed for the PostgreSQL database to start up correctly.
 
 * RPO/RTO for Business Continuity
-  FSx data replication from primary to standby for DR is based on ASYNC, which means RPO will depends on the frequency of SnapShot backup and SnapMirror replication. Higher frequency of SnapShot/SnapMirror reduce RPO thus the potential data loss in the event of disaster at the expense of incremental storage cost. It had been validated that SnapShot/SnapMirror replication can be implemented as low as 5 minutes interval and PostgreSQL can generally recovered at DR standby site within under a minute.
+  FSx data replication from primary to standby for DR is based on ASYNC, which means RPO will depends on the frequency of SnapShot backup and SnapMirror replication. Higher frequency of SnapShot/SnapMirror reduce RPO thus the potential data loss in the event of disaster at the expense of incremental storage cost. It had been validated that SnapShot/SnapMirror replication can be implemented as low as 5 minutes interval for RPO and PostgreSQL can generally recovered at DR standby site within under a minute for RTO.
 
 * Database backup 
   Once PostgreSQL database is implemented or migrated into AWS FSx storage from on-premisses data center, the data is auto sync mirrored in FSx HA pair for protection. The data protection is further hardened with a replicated standby site in case of a disaster. For longer term backup retention or data protection, it is recommended to use PostgreSQL built-in pg_basebackup utility to run full database backup that can be shipped to S3 blob storage.    
@@ -151,7 +151,7 @@ video::aws_postgres_fsx_ec2_deploy_hadr.mp4[]
 [source, cli]
 git clone https://github.com/NetApp-Automation/na_postgresql_aws_deploy_hadr.git
 
-. From toolkit root directory, execute prerequisites playbooks to install required collections and libs.
+. From toolkit root directory, execute prerequisites playbooks to install required collections and libs for Ansible controller.
 +
 [source, cli] 
 ansible-playbook -i hosts requirements.yml
@@ -213,7 +213,7 @@ ansible-playbook -i hosts postgresql_standby_setup.yml -u ec2-user --private-key
 [source, cli]
 ansible-playbook -i hosts fsx_replication_setup.yml -e @vars/fsx_vars.yml
 
-. Consolidate single step PostgreSQL deployment and HA/DR setup
+. Consolidate above into single step PostgreSQL deployment and HA/DR setup
 [source, cli]
 ansible-playbook -i hosts postgresql_hadr_setup.yml -u ec2-user -e @vars/fsx_vars.yml
 
