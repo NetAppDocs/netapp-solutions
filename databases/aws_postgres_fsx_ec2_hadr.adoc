@@ -12,16 +12,17 @@ summary: The solution provides overview and details for PostgreSQL database depl
 :linkattrs:
 :imagesdir: ./../media/
 
-[.lead]
 Allen Cao, Niyaz Mohamed, NetApp
+
+[.lead]
 
 == Purpose
 
-PostgreSQL is a widely used open-source database that is ranked number four among the top ten most popular database engines by link:https://db-engines.com/en/ranking[DB-Engines^]. On the one hand, the PostgreSQL derives its popularity from its license-free, open-source model while still possessing sophisticated features. On the other hand, because it is open sourced, there is shortage of detailed guidance on production-grade database deployment in the area of high availability and disaster recovery (HA/DR) particularly in the public cloud. In general, it can be difficult to set up a typical PostgreSQL HA/DR system with hot and warm standby, streaming replication, and so on. Testing the HA/DR environment by promoting the standby site and then switching back to the primary can be disruptive to production. There are well documented performance issues on the primary when you deploy read workloads on streaming hot standby.  
+PostgreSQL is a widely used open-source database that is ranked number four among the top ten most popular database engines by link:https://db-engines.com/en/ranking[DB-Engines^]. On the one hand, the PostgreSQL derives its popularity from its license-free, open-source model while still possessing sophisticated features. On the other hand, because it is open sourced, there is shortage of detailed guidance on production-grade database deployment in the area of high availability and disaster recovery (HA/DR) particularly in the public cloud. In general, it can be difficult to set up a typical PostgreSQL HA/DR system with hot and warm standby, streaming replication, and so on. Testing the HA/DR environment by promoting the standby site and then switching back to the primary can be disruptive to production. There are well documented performance issues on the primary when read workloads are deployed on streaming hot standby.
 
 In this documentation, we demonstrate how you can do away with an application-level PostgreSQL streaming HA/DR solution and build a PostgreSQL HA/DR solution based on AWS FSx ONTAP storage for database files and EC2 compute instances, such as PostgreSQL DB servers. The solution creates a simpler and comparable system and delivers equivalent results when compared with traditional PostgreSQL application-level streaming replication for HA/DR.  
 
-The solution is built on mature, proven, popular NetApp SnapMirror storage-level replication technology available in AWS native FSX ONTAP cloud storage for PostgreSQL HA/DR. It is simple to implement with an automation toolkit provided by the NetApp Solutions team. It provides similar functionality while eliminating the complexity and performance drag on the primary site with the application level streaming based HA/DR solution. The solution can be easily deployed and tested without any impact to active primary site. 
+This solution is built on proven and mature NetApp SnapMirror storage-level replication technology that is available in AWS-native FSX ONTAP cloud storage for PostgreSQL HA/DR. It is simple to implement with an automation toolkit provided by the NetApp Solutions team. It provides similar functionality while eliminating the complexity and performance drag on the primary site with the application-level streaming-based HA/DR solution. The solution can be easily deployed and tested without affecting the active primary site. 
 
 This solution addresses the following use cases:
 
@@ -31,35 +32,23 @@ This solution addresses the following use cases:
 
 == Audience
 
-This solution is intended for the:
+This solution is intended for the following people:
 
-* DBA, who is interested in deploying PostgreSQL with HA/DR in AWS public cloud
-* Database Solution Architect, who is interested in testing PostgreSQL workload in AWS public cloud
-* Storage admin, who is interested in deploying and managing the PostgreSQL deployed to AWS FSx storage
-* Application owner, who is interested in standing up PostgreSQL environment in AWS FSx/EC2 
+* The DBA who is interested in deploying PostgreSQL with HA/DR in the AWS public cloud.
+* The database solution architect who is interested in testing PostgreSQL workloads in the AWS public cloud.
+* The storage administrator who is interested in deploying and managing PostgreSQL instances deployed to AWS FSx storage.
+* The application owner who is interested in standing up a PostgreSQL environment in AWS FSx/EC2.
 
-== Solution Test / Validation Environment
-// Identify the environment in which the solution was tested / validated.
+== Solution test and validation environment
 
-// Things to consider including here are:
-// * Architecture diagram
-// * Software / hardware and version / release levels or model numbers
-// * Specific configuration that might be unique to a lab / test environment
+The testing and validation of this solution was performed in an AWS FSx and EC2 environment that might not match the final deployment environment. For more information, see the section "<<Key Factors for Deployment Consideration>>".
 
-The testing and validation of this solution was performed in AWS FSx and EC2 environment that may or may not match the final deployment environment. For more information, please refer to "<<Key Factors for Deployment Consideration>>" in following sections.
+=== Architecture
 
-.Architecture
-[%collapsible]
-=====
+image::aws_postgres_fsx_ec2_architecture.PNG[This image provides a detailed picture of the organization of the PostgreSQL hybrid cloud solution, including the on-premises side and the AWS site.]
 
-image::aws_postgres_fsx_ec2_architecture.PNG[Solution Architecture Diagram]
-=====
 
-.Hardware / Software Components
-[%collapsible]
-=====
-// Identify the hardware and software components along with the appropriate hardware level or software versions
-// Use the 3rd column if there is a related link that can be provided for more information
+=== Hardware and software components
 
 [%autowidth.stretch]
 |===
@@ -74,15 +63,10 @@ image::aws_postgres_fsx_ec2_architecture.PNG[Solution Architecture Diagram]
 | PostgreSQL | Version 14.5 | Automation will pull the latest available version of PostgreSQL from postgresql.ora yum repo  
 | Ansible | Version 2.10.3 | Prerequisites for required collections and libs installed with requirements playbook  
 |===
-=====
 
-.Key Factors for Deployment Consideration
-[%collapsible]
-=====
-// Identify anything that might differ in a production environment that was different in a lab environment or assumptions that were made
+=== Key factors for deployment consideration
 
-* PostgreSQL database backup, restore, and recovery
-  PostgreSQL database supports a number of backup methods, such as logical backup using pg_dump, physical online backup with pg_basebackup or lower level OS    backup command, and storage level consistent snapshot. This solution utilizes NetApp consistent group snapshots for PostgreSQL database data and wal volumes backup, restore, and recovery at standby site. The NetApp consistent group volumes snapshots ensure the IOs are sequenced as they are written to storage and ensure the integrity of database data files.      
+* *PostgreSQL database backup, restore, and recovery.* PostgreSQL database supports a number of backup methods, such as logical backup using pg_dump, physical online backup with pg_basebackup or lower level OS backup command, and storage level consistent snapshot. This solution utilizes NetApp consistent group snapshots for PostgreSQL database data and wal volumes backup, restore, and recovery at standby site. The NetApp consistent group volumes snapshots ensure the IOs are sequenced as they are written to storage and ensure the integrity of database data files.      
 
 * EC2 Compute Instances
   In the tests and validations, we used AWS EC2 t2.xlarge instance type as PostgreSQL database compute instance. It is recommended that in actual deployment, M5 type EC2 instance should be used as compute instance for PostgreSQL as it is optimized for database workload. The standby compute instance should always be deployed in the same zone as the passive (standby) file system as deployed for the FSx HA cluster. 
