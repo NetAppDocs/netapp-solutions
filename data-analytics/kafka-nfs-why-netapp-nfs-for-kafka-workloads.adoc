@@ -1,0 +1,253 @@
+---
+sidebar: sidebar
+permalink: data-analytics/kafka-nfs-why-netapp-nfs-for-kafka-workloads.html
+keywords: cpu utilization, broker recovery, architecture, testing methodology, observation, das, nfs
+summary: "Now that there is a solution for the silly rename issue in NFS storage with Kafka, you can create robust deployments that leverage NetApp ONTAP storage for your Kafka workload. Not only does this significantly reduce operational overhead, it also brings the following benefits to your Kafka clusters."
+---
+
+= Why NetApp NFS for Kafka workloads?
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2023-01-30 15:54:43.128119
+//
+
+link:kafka-nfs-functional-validation-silly-rename-fix.html[Previous: Functional validation - Silly rename fix.]
+
+[.lead]
+Now that there is a solution for the silly rename issue in NFS storage with Kafka, you can create robust deployments that leverage NetApp ONTAP storage for your Kafka workload. Not only does this significantly reduce operational overhead, it also brings the following benefits to your Kafka clusters:
+
+* *Reduced CPU utilization on Kafka brokers.* Using disaggregated NetApp ONTAP storage separates disk I/O operations from the broker and thus reduces its CPU footprint.
+* *Faster broker recovery-time.* Since disaggregated NetApp ONTAP storage is shared across Kafka broker nodes, a new compute instance can replace a bad broker at any point in a fraction of the time compared to conventional Kafka deployments without rebuilding the data.
+* *Storage efficiency.* As the storage layer of the application is now provisioned through NetApp ONTAP, customers can avail all the benefits of storage efficiency that comes with ONTAP, such as in-line data compression, deduplication, and compaction.
+
+These benefits were tested and validated in test cases that we discuss in detail in this section.
+
+== Reduced CPU utilization on Kafka broker
+
+We discovered that overall CPU utilization is lower than its DAS counterpart when we ran similar workloads on two sperate Kafka clusters that were identical in their technical specifications but differed in their storage technologies. Not only is the overall CPU utilization lower when Kafka cluster is using ONTAP storage, but the increase in the CPU utilization demonstrated a gentler gradient than in a DAS-based Kafka cluster.
+
+=== Architectural setup
+
+The following table shows the environmental configuration used to demonstrate reduced CPU utilization.
+
+|===
+|Platform component |Environment configuration
+
+|Kafka 3.2.3
+Benchmarking tool: OpenMessaging
+a|* 3 x zookeepers – t2.small
+* 3 x broker servers – i3en.2xlarge
+* 1 x Grafana – c5n.2xlarge
+* 4 x Producer/Consumer -- c5n.2xlarge
+|Operating system on all nodes
+|RHEL 8.7 or later
+|NetApp Cloud Volumes ONTAP instance
+|Single Node Instance – M5.2xLarge
+|===
+
+=== Benchmarking tool
+
+The benchmarking tool used in this test case is the https://openmessaging.cloud/[OpenMessaging^] framework. OpenMessaging is vendor-neutral and language-independent; it provides industry guidelines for finance, e-commerce, IoT, and big-data; and it helps develop messaging and streaming applications across heterogeneous systems and platforms. The following figure depicts the interaction of OpenMessaging clients with a Kafka cluster.
+
+image:kafka-nfs-image8.png["This image depicts the interaction of OpenMessaging clients with a Kafka cluster."]
+
+* *Compute.* We used a three-node Kafka cluster with a three-node zookeeper ensemble running on dedicated servers. Each broker had two NFSv4.1 mount points to a single volume on the NetApp CVO instance through a dedicated LIF.
+* *Monitoring.* We used two nodes for a Prometheus-Grafana combination. For generating workloads, we have a separate three-node cluster that can produce to and consume from this Kafka cluster.
+* *Storage.* We used a single-node NetApp Cloud volumes ONTAP instance with six 250GB GP2 AWS-EBS volumes mounted on the instance. These volumes were then exposed to the Kafka cluster as six NFSv4.1 volumes through dedicated LIFs.
+* *Configuration.* The two configurable elements in this test case were Kafka brokers and OpenMessaging workloads.
+** *Broker config.* The following specifications were selected for the Kafka brokers. We used replication factor of 3 for all measurements, as is highlighted below.
+
+image:kafka-nfs-image9.png["This image depicts the specifications selected for the Kafka brokers."]
+
+** *OpenMessaging benchmark (OMB) workload config.* The following specifications were provided. We specified a target producer rate, highlighted below.
+
+image:kafka-nfs-image10.png["This image depicts the specifications selected for the OpenMessaging benchmark workload configuration."]
+
+=== Methodology of testing
+
+. Two similar clusters were created, each having its own set of benchmarking cluster swarms.
++
+** *Cluster 1.* NFS-based Kafka cluster.
+** *Cluster 2.* DAS-based Kafka cluster.
+
+. Using an OpenMessaging command, similar workloads were triggered on each cluster.
++
+....
+sudo bin/benchmark --drivers driver-kafka/kafka-group-all.yaml workloads/1-topic-100-partitions-1kb.yaml
+....
+
+. The produce rate configuration was increased in four iterations, and CPU utilization was recorded with Grafana. The produce rate was set to the following levels:
++
+** 10,000
+** 40,000
+** 80,000
+** 100,000
+
+=== Observation
+
+There are two primary benefits of using NetApp NFS storage with Kafka:
+
+* *You can reduce CPU usage by almost one-third.* The overall CPU usage under similar workloads was lower for NFS compared to DAS SSDs; savings range from 5% for lower produce rates to 32% for higher produce rates.
+* *A three-fold reduction in CPU utilization drift at higher produce rates.* As expected, there was an upward drift for the increase in CPU utilization as the produce rates were increased. However, CPU utilization on Kafka brokers using DAS went up from 31% for the lower produce rate to 70% for the higher produce rate, a 39% increase. However, with an NFS storage backend, the CPU utilization went up from 26% to 38%, a 12% increase.
+
+image:kafka-nfs-image11.png["This graph depicts the behavior of a DAS-based cluster."]
+
+image:kafka-nfs-image12.png["This graph depicts the behavior of an NFS-based cluster."]
+
+Also, at 100,000 messages,  DAS shows more CPU utilization than an NFS cluster.
+
+image:kafka-nfs-image13.png["This graph depicts the behavior of a DAS-based cluster at 100,000 messages."]
+
+image:kafka-nfs-image14.png["This graph depicts the behavior of an NFS-based cluster at 100,000 messages."]
+
+== Faster broker recovery
+
+We discovered that Kafka brokers recover faster when they are using shared NetApp NFS storage. When a broker crashes in a Kafka cluster, this broker can be replaced by a healthy broker with a same broker ID. Upon performing this test case, we found that, in the case of a DAS-based Kafka cluster, the cluster rebuilds the data on a newly added healthy broker, which is time consuming. In the case of a NetApp NFS-based Kafka cluster, the replacing broker continues to read data from the previous log directory and recovers much faster.
+
+=== Architectural setup
+
+The following table shows the environmental configuration for a Kafka cluster using NAS.
+
+|===
+|Platform component |Environment configuration
+
+|Kafka 3.2.3
+a|* 3 x zookeepers – t2.small
+* 3 x broker servers – i3en.2xlarge
+* 1 x Grafana – c5n.2xlarge
+* 4 x producer/consumer -- c5n.2xlarge
+* 1 x backup Kafka node – i3en.2xlarge
+|Operating system on all nodes
+|RHEL8.7 or later
+|NetApp Cloud Volumes ONTAP instance
+|Single-node instance – M5.2xLarge
+|===
+
+The following figure depicts the architecture of an NAS-based Kafka cluster.
+
+image:kafka-nfs-image8.png["This figure depicts the architecture of an NAS-based Kafka cluster."]
+
+* *Compute.* A three-node Kafka cluster with a three-node zookeeper ensemble running on dedicated servers. Each broker has two NFS mount points to a single volume on the NetApp CVO instance via a dedicated LIF.
+* *Monitoring.* Two nodes for a Prometheus-Grafana combination. For generating workloads, we use a separate three-node cluster that can produce and consume to this Kafka cluster. 
+* *Storage.* A single-node NetApp Cloud volumes ONTAP instance with six 250GB GP2 AWS-EBS volumes mounted on the instance. These volumes are then exposed to the Kafka cluster as six NFS volume through dedicated LIFs.
+* *Broker configuration.* The one configurable element in this test case are Kafka brokers. The following specifications were selected for the Kafka brokers. The `replica.lag.time.mx.ms` is set to a high value because this determines how fast a particular node is taken out of the ISR list. When you switch between bad and healthy nodes, you don’t want that broker ID to be excluded from the ISR list.
+
+image:kafka-nfs-image15.png["This image shows the specifications chosen for the Kafka brokers."]
+
+=== Methodology of testing
+
+. Two similar clusters were created:
++
+** An EC2-based confluent cluster.
+** A NetApp NFS-based confluent cluster.
+
+. One standby Kafka node was created with a configuration identical to the nodes from the original Kafka cluster.
+. On each of the clusters, a sample topic was created, and approximately 110GB of data was populated on each of the brokers.
+
+** *EC2-based cluster.* A Kafka broker data directory is mapped on `/mnt/data-2` (In the following figure, Broker-1 of cluster1 [left terminal]).
+** *NetApp NFS-based cluster.* A Kafka broker data directory is mounted on NFS point `/mnt/data` (In the following figure, Broker-1 of cluster2 [right terminal]).
++
+image:kafka-nfs-image16.png[This image shows two terminal screens.]
+
+. In each of the clusters, Broker-1 was terminated to trigger a failed broker recovery process.
+. After the broker was terminated, the broker IP address was assigned as a secondary IP to the standby broker. This was necessary because a broker in a Kafka cluster is identified by the following:
+
+** *IP address.* Assigned by reassigning the failed broker IP to the standby broker.
+** *Broker ID.* This was configured in the standby broker `server.properties`.
+
+. Upon IP assignment, the Kafka service was started on the standby broker.
+. After a while, the server logs were pulled to check the time taken to build data on the replacement node in the cluster.
+
+=== Observation
+
+Kafka broker recovery was almost nine times faster. The time it took to recover a failed broker node was found to be significantly faster when using NetApp NFS shared storage compared to using DAS SSDs in a Kafka cluster. For 1TB of topic data, the recovery time for a DAS-based cluster was 48 minutes, compared to less than 5 minutes for a NetApp-NFS based Kafka cluster.
+
+We observed that the EC2-based cluster took 10 minutes to rebuild the 110GB of data on the new broker node,  whereas the NFS- based cluster completed the recovery in 3 minutes. We also observed in the in logs that consumer offsets for the partitions for EC2 were 0, while,  on the NFS cluster, consumer offsets were picked up from the previous broker.
+
+....
+[2022-10-31 09:39:17,747] INFO [LogLoader partition=test-topic-51R3EWs-0000-55, dir=/mnt/kafka-data/broker2] Reloading from producer snapshot and rebuilding producer state from offset 583999 (kafka.log.UnifiedLog$)
+[2022-10-31 08:55:55,170] INFO [LogLoader partition=test-topic-qbVsEZg-0000-8, dir=/mnt/data-1] Loading producer state till offset 0 with message format version 2 (kafka.log.UnifiedLog$)
+....
+
+==== DAS-based cluster
+
+. The backup node started at 08:55:53,730.
++
+image:kafka-nfs-image17.png["This image show log output for a DAS-based cluster."]
+
+. The data rebuilding process ended at 09:05:24,860. Processing 110GB of data required approximately 10 minutes.
++
+image:kafka-nfs-image18.png["This image show log output for a DAS-based cluster."]
+
+==== NFS-based cluster
+
+. The backup node was started at 09:39:17,213. The starting log entry is highlighted below.
++
+image:kafka-nfs-image19.png["This image show log output for a NFS-based cluster."]
+
+. The data rebuild process ended at 09:42:29,115. Processing 110GB of data required approximately 3 minutes.
++
+image:kafka-nfs-image20.png["This image show log output for a NFS-based cluster."]
++
+The test was repeated for brokers containing around 1TB data, which took approximately 48 minutes for the DAS and 3 min for NFS. The results are depicted in the following graph.
++
+image:kafka-nfs-image21.png["This graph shows the Time taken for broker recovery depending on the amount of data loaded on the broker for either a DAS-based cluster or an NFS-based cluster."]
+
+== Storage efficiency
+
+Because the storage layer of the Kafka cluster was provisioned through NetApp ONTAP, we got all the storage efficiency capabilities of ONTAP. This was tested by generating a significant amount of data on a Kafka cluster with NFS storage provisioned on Cloud Volumes ONTAP. We could see that there was a significant space reduction due to ONTAP capabilities.
+
+=== Architectural setup
+
+The following table shows the environmental configuration for a Kafka cluster using NAS.
+
+|===
+|Platform component |Environment configuration
+
+|Kafka 3.2.3
+a|* 3 x zookeepers – t2.small
+* 3 x broker servers – i3en.2xlarge
+* 1 x Grafana – c5n.2xlarge
+* 4 x producer/consumer -- c5n.2xlarge
+* 
+|Operating system on all nodes
+|RHEL8.7 or later
+|NetApp Cloud Volumes ONTAP instance
+|Single node instance – M5.2xLarge
+|===
+
+The following figure depicts the architecture of an NAS-based Kafka cluster.
+
+image:kafka-nfs-image8.png["This figure depicts the architecture of an NAS-based Kafka cluster."]
+
+* *Compute.* We used a three-node Kafka cluster with a three-node zookeeper ensemble running on dedicated servers. Each broker had two NFS mount points to a single volume on the NetApp CVO instance via a dedicated LIF.
+* *Monitoring.* We used two nodes for a Prometheus-Grafana combination. For generating workloads, we used a separate three-node cluster that could produce and consume to this Kafka cluster.
+* *Storage.* We used a single-node NetApp Cloud Volumes ONTAP instance with six 250GB GP2 AWS-EBS volumes mounted on the instance. These volumes were then exposed to the Kafka cluster as six NFS volumes through dedicated LIFs.
+* *Configuration.* The configurable elements in this test case were the Kafka brokers.
+
+Compression was switched off on the producer’s end, thus enabling producers to generate high throughput. Storage efficiency was instead handled by the compute layer.
+
+=== Methodology of testing
+
+. A Kafka cluster was provisioned with the specifications mentioned above.
+. On the cluster, about 350GB data was produced using the OpenMessaging Benchmarking tool.
+. After the workload was completed, the storage efficiency statistics were collected using ONTAP System Manager and the CLI.
+
+=== Observation
+
+For data that was generated using the OMB tool, we saw space savings of ~33% with a storage efficiency ratio of 1.70:1. As seen in the following figures, the logical space used by the data produced was 420.3GB and the physical space used to hold the data was 281.7GB.
+
+image:kafka-nfs-image22.png["This image depicts space savings in VMDISK."]
+
+image:kafka-nfs-image23.png["Screenshot"]
+
+image:kafka-nfs-image24.png["Screenshot"]
+
+link:kafka-nfs-performance-overview-and-validation-in-aws.html[Next: Performance overview and validation in AWS.]
