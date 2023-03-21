@@ -18,7 +18,7 @@ Allen Cao, Niyaz Mohamed, NetApp
 
 == Purpose
 
-ASM - automatic storage management is a popular Oracle storage volume manager that is employed in many Oracle installations. Since Oracle version 11g, ASM has been packaged with grid infrastructure rather than database. As a result, in order to utilize Oracle ASM for storage management without RAC, Oracle grid infrastructure can be installed in a Standalone server, also known as Oracle Restart. It certainly adds more complexity in an otherwise simpler Oracle database deployment. However, as the name implies, when Oracle is deployed in Restart mode, it gains the capability to restart all failed Oracle services without user intervention. It achieves certain degree of high availability or HA functionality.
+ASM - automatic storage management is a popular Oracle storage volume manager that is employed in many Oracle installations. It is also the Oracle's recommended storage management solution. It provides an alternative to conventional volume managers and file systems. Since Oracle version 11g, ASM has been packaged with grid infrastructure rather than database. As a result, in order to utilize Oracle ASM for storage management without RAC, Oracle grid infrastructure can be installed in a Standalone server, also known as Oracle Restart. It certainly adds more complexity in an otherwise simpler Oracle database deployment. However, as the name implies, when Oracle is deployed in Restart mode, it gains the capability to restart all failed Oracle services or after a host reboot without user intervention. It achieves certain degree of high availability or HA functionality.
 
 In this documentation, we demonstrate how you can deploy Oracle database with iSCSI protocol and Oracle ASM in AWS FSx ONTAP storage and EC2 compute instances environment step by step. We will also demonstrate how you could use NetApp SnapCenter service through NetApp BlueXP console to backup, restore, and clone your Oracle database for DEV/TEST or any other use cases for storage efficient database operation in AWS public cloud.  
 
@@ -71,7 +71,9 @@ image::aws_ora_fsx_ec2_iscsi_asm_architecture.png["This image provides a detaile
 
 * *Oracle data and logs layout.* In our tests and validations, we have deployed two ASM disk groups for data and logs respectively. Within +DATA asm disk group, we provisioned 4 luns in a data volume. Within +LOGS asm disk group, we provisioned two luns in a logs volume. In general, multiple luns layout within a FSx ONTAP volume provides better performance. 
 
-* *iSCSI configuration.* The EC2 instance DB server connects to FSx storage via iSCSI protocol. EC2 instances generally deploy with a single network interface or ENI. The single NIC interface will carry both iSCSI and application traffic. It is important to gauge Oracle database peek IO throughput requirement by carefully analyzing Oracle AWR report in order to choose a right EC2 compute instance that meets both application and iSCSI traffic throughput requirement. NetApp also recommends to allocate 4 iSCSI connections to both FSx iSCSI endpoints with multipath properly configured.       
+* *iSCSI configuration.* The EC2 instance DB server connects to FSx storage via iSCSI protocol. EC2 instances generally deploy with a single network interface or ENI. The single NIC interface will carry both iSCSI and application traffic. It is important to gauge Oracle database peek IO throughput requirement by carefully analyzing Oracle AWR report in order to choose a right EC2 compute instance that meets both application and iSCSI traffic throughput requirement. NetApp also recommends to allocate 4 iSCSI connections to both FSx iSCSI endpoints with multipath properly configured.  
+
+* *Oracle ASM redundancy level to use for each Oracle ASM disk group that you create.* Since FSx already mirrors the storage on the FSx cluster level, you should use External Redundancy, which means that the option does not allow Oracle ASM to mirror the contents of the disk group.
 
 * *Database backup.* NetApp provides a SaaS version of SnapCenter software service for database backup, restore, and clone in cloud that is available via NetApp BlueXP console UI. It is recommended to implement such service to achieve fast (under a minute) SnapShot backup, quick (few minutes) database restore, and database clone.    
 
@@ -469,7 +471,7 @@ sudo mount -t xfs /dev/mapper/ora_01_biny_01p1 /u01
 chown oracle:oinstall /u01
 
 . Download and staging Oracle binary installation files to /tmp/archive directory
-  
+
 ====
 
 
