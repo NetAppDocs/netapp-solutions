@@ -43,7 +43,7 @@ The testing and validation of this solution was performed in an AWS FSx and EC2 
 
 === Architecture
 
-image::aws_ora_fsx_ec2_iscsi_asm_architecture.PNG["This image provides a detailed picture of the Oracle deployment configuration in AWS public cloud with iSCSI and ASM."]
+image::aws_ora_fsx_ec2_iscsi_asm_architecture.png["This image provides a detailed picture of the Oracle deployment configuration in AWS public cloud with iSCSI and ASM."]
 
 === Hardware and software components
 
@@ -55,9 +55,9 @@ image::aws_ora_fsx_ec2_iscsi_asm_architecture.PNG["This image provides a detaile
 
 3+^| *Software*
 | RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
-| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch on top of 19.3 base release 
-| Oracle Database | Version 19.18 | | Applied RU patch on top of 19.3 base release 
-| Oracle OPatch | Version 12.2.0.1.36 | Required for version 18 of RU patch
+| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch on top of 19.3 base release p34762026_190000_Linux-x86-64.zip
+| Oracle Database | Version 19.18 | | Applied RU patch on top of 19.3 base release p34765931_190000_Linux-x86-64.zip
+| Oracle OPatch | Version 12.2.0.1.36 | Required for version 18 of RU patch p6880880_190000_Linux-x86-64.zip
 | SnapCenter Service | Version |  
 |===
 
@@ -69,50 +69,134 @@ image::aws_ora_fsx_ec2_iscsi_asm_architecture.PNG["This image provides a detaile
 
 * *FSx storage cluster sizing.* A FSx ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GB/s throughput, and maximum 192 TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and storage limit (minimum 1,024 GiB) totally based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without any impact to application availability.   
 
-* *Oracle data and logs layout.* In our tests and validations, we have deployed two ASM disk groups for data and logs respectively. Within +DATA asm disk group, we provisioned 4 luns in a data volume. Within +LOGS asm disk group, we provisioned two luns in a logs volume. In general, multiple luns layout within a FSx ONTAP volume provides better performance.   
+* *Oracle data and logs layout.* In our tests and validations, we have deployed two ASM disk groups for data and logs respectively. Within +DATA asm disk group, we provisioned 4 luns in a data volume. Within +LOGS asm disk group, we provisioned two luns in a logs volume. In general, multiple luns layout within a FSx ONTAP volume provides better performance. 
+
+* *iSCSI configuration.* The EC2 instance DB server connects to FSx storage via iSCSI protocol. EC2 instances generally deploy with a single network interface or ENI. The single NIC interface will carry both iSCSI and application traffic. It is important to gauge Oracle database peek IO throughput requirement by carefully analyzing Oracle AWR report in order to choose a right EC2 compute instance that meets both application and iSCSI traffic throughput requirement. NetApp also recommends to allocate 4 iSCSI connections to both FSx iSCSI endpoints with multipath properly configured.       
 
 * *Database backup.* NetApp provides a SaaS version of SnapCenter software service for database backup, restore, and clone in cloud that is available via NetApp BlueXP console UI. It is recommended to implement such service to achieve fast (under a minute) SnapShot backup, quick (few minutes) database restore, and database clone.    
 
 == Solution Deployment
 
-The deployment of this solution can be completed automatically using the NetApp Ansible-based automation toolkit by following the detailed instructions outlined below.
+The following provides the outline and details of step by step deployment procedures. 
 
-. Read the instructions in the automation toolkit READme.md link:https://github.com/NetApp-Automation/na_postgresql_aws_deploy_hadr[na_postgresql_aws_deploy_hadr].
-
-. Watch the following video walk through.
-+
-video::aws_postgres_fsx_ec2_deploy_hadr.mp4[]
-
-. Configure the required parameters files (`hosts`, `host_vars/host_name.yml`, `fsx_vars.yml`) by entering user-specific parameters into the template in the relevant sections. Then use the copy button to copy files to the Ansible controller host.
-
-=== Prerequisites for automated deployment
+=== Prerequisites for deployment
+[%collapsible]
+====
 
 Deployment requires the following prerequisites.
 
 . An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
 
-. From the AWS EC2 console, you must deploy two EC2 Linux instances, one as the primary PostgreSQL DB server at the primary and one at the standby DR site. For compute redundancy at the primary and standby DR sites, deploy two additional EC2 Linux instances as standby PostgreSQL DB servers. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances] for more information.
+. From the AWS EC2 console, you need to deploy two EC2 Linux instances, one as the primary Oracle DB server and an optional alternative clone target DB server. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances] for more information.
 
-. From the AWS EC2 console, deploy two FSx ONTAP storage HA clusters to host the PostgreSQL database volumes. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems] for step-by-step instructions. 
+. From the AWS EC2 console, deploy a FSx ONTAP storage HA clusters to host the Oracle database volumes. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems] for step-by-step instructions.
 
-. Build a Centos Linux VM to host the Ansible controller. The Ansible controller can be located either on-premises or in the AWS cloud. If it is located on-premises, you must have SSH connectivity to the VPC, EC2 Linux instances, and FSx storage clusters. 
-
-. Set up the Ansible controller as described in the section "Set up the Ansible Control Node for CLI deployments on RHEL/CentOS" from the resource link:https://docs.netapp.com/us-en/netapp-solutions/automation/getting-started.html[Getting Started with NetApp solution automation]. 
-
-. Clone a copy of the automation toolkit from the public NetApp GitHub site.
+. The above step 2 and 3 can be setup using following Terraform automation toolkit, which will create an EC2 instance named ora_01 and a FSx file system named as fsx_01. Review the instruction carefully and change the variables to your environment specifics before execution.
 +
 [source, cli]
-git clone https://github.com/NetApp-Automation/na_postgresql_aws_deploy_hadr.git
+git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
 
-. From the toolkit root directory, execute the prerequisite playbooks to install the required collections and libraries for the Ansible controller.
+====
+
+=== EC2 instance kernel configuration
+[%collapsible]
+====
+With prerequisites provisioned, login into EC2 instance to configure linux kernel for Oracle installation.
+
+. From Oracle, download and install Oracle 19c preinstall RPM, which will satisfy most kernel configuration requirement
 +
-[source, cli] 
-ansible-playbook -i hosts requirements.yml
-+ 
 [source, cli]
-ansible-galaxy collection install -r collections/requirements.yml --force --force-with-deps
+yum install oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
 
-. Retrieve the required EC2 FSx instance parameters for the DB host variables file `host_vars/*` and the global variables file `fsx_vars.yml` configuration.
+. Download and install missing compat-libcap1 in Linux 8
++
+[source, cli]
+yum install compat-libcap1-1.10-7.el7.x86_64.rpm
+
+. From NetApp, download and install NetApp host utilities 
++
+[source, cli]
+yum install netapp_linux_unified_host_utilities-7-1.x86_64.rpm
+
+. Install open JDK version 1.8
++
+[source, cli]
+yum install java-1.8.0-openjdk.x86_64
+
+. Install iSCSI initiator utils
++
+[source, cli]
+yum install iscsi-initiator-utils
+
+. Install sg3_utils
++
+[source, cli]
+yum install sg3_utils
+
+. Install device-mapper-multipath
++
+[source, cli]
+yum install device-mapper-multipath
+
+. Disable transparent hugepages in current system
++
+[source, cli]
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+echo never > /sys/kernel/mm/transparent_hugepage/defrag
++
+Add following lines in /etc/rc.local to disable transparent_hugepage after reboot:
+  # Disable transparent hugepages
+          if test -f /sys/kernel/mm/transparent_hugepage/enabled; then
+            echo never > /sys/kernel/mm/transparent_hugepage/enabled
+          fi
+          if test -f /sys/kernel/mm/transparent_hugepage/defrag; then
+            echo never > /sys/kernel/mm/transparent_hugepage/defrag
+          fi
+
+. Disable selinux: change SELINUX=enforcing to SELINUX=disabled. You will need to reboot the host to make change effective.
++
+[source, cli]
+vi /etc/sysconfig/selinux
+
+. Add following lines to limit.conf to set file descriptor limit and stack size
++
+[source, cli]
+/etc/security/limits.conf
++
+  "*               hard    nofile          65536"
+  "*               soft    stack           10240"
+
+. Add swap space to EC2 instance by following this instruction: https://https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^] The exact amount of space to add depends on the size of RAM up to 16G.
+
+. Change node.session.timeo.replacement_timeout in iscsi.conf configuration file to 5 seconds
++
+[source, cli]
+vi /etc/iscsi/iscsid.conf
+
+. Enable and start iscsi service on the EC2 instance
++
+[source, cli]
+systemctl enable iscsid
+systemctl start iscsid
+
+. Retrieve iscsi initiator address to be used for database luns mapping
++
+[source, cli]
+cat /etc/iscsi/initiatorname.iscsi
+
+. Reboot EC2 instance 
+
+
+====
+
+=== Provision database volumes and luns
+
+=== Database storage configuration
+
+=== Oracle grid infrastructure installation
+
+=== Oracle database installation
+
 
 === Configure the hosts file
 
@@ -197,7 +281,13 @@ ansible-playbook -i hosts postgresql_standby_resync.yml -u ec2-user --private-ke
 
 NetApp recommends running manual failover or using well-established OS cluster-ware that might require a license.
 
-== Where to find additional information
+== Automated Deployment Option
+
+NetApp will release a fully automated solution deployment toolkit with Ansible to facilitate the implementation of the solution. Please check back for the availability of the toolkit. Once it is released, a link will be posted here.
+
+== Oracle Database Backup, Restore, and Clone with SnapCenter Service
+
+== Additional Information
 
 To learn more about the information that is described in this document, review the following documents and/or websites:
 
