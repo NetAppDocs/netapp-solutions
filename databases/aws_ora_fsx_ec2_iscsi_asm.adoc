@@ -18,7 +18,7 @@ Allen Cao, Niyaz Mohamed, NetApp
 
 == Purpose
 
-ASM - automatic storage management is a popular Oracle storage volume manager that is employed in many Oracle installations. Since Oracle version 11g, ASM has been packaged with grid infrastructure. As a result, in order to utilize Oracle ASM for storage management without RAC, Oracle grid infrastructure can be installed in a Standalone server, also known as Oracle Restart. It certainly adds more complexity in an otherwise simpler Oracle database deployment. However, as the name implies, when Oracle is deployed in Restart mode, it gains the capability to restart all failed Oracle services without user intervention. It achieve certain degree of high availability or HA functionality.
+ASM - automatic storage management is a popular Oracle storage volume manager that is employed in many Oracle installations. Since Oracle version 11g, ASM has been packaged with grid infrastructure rather than database. As a result, in order to utilize Oracle ASM for storage management without RAC, Oracle grid infrastructure can be installed in a Standalone server, also known as Oracle Restart. It certainly adds more complexity in an otherwise simpler Oracle database deployment. However, as the name implies, when Oracle is deployed in Restart mode, it gains the capability to restart all failed Oracle services without user intervention. It achieves certain degree of high availability or HA functionality.
 
 In this documentation, we demonstrate how you can deploy Oracle database with iSCSI protocol and Oracle ASM in AWS FSx ONTAP storage and EC2 compute instances environment step by step. We will also demonstrate how you could use NetApp SnapCenter service through NetApp BlueXP console to backup, restore, and clone your Oracle database for DEV/TEST or any other use cases for storage efficient database operation in AWS public cloud.  
 
@@ -43,39 +43,35 @@ The testing and validation of this solution was performed in an AWS FSx and EC2 
 
 === Architecture
 
-image::aws_ora_fsx_ec2_iscsi_asm_architecture.PNG["This image provides a detailed picture of the organization of the PostgreSQL hybrid cloud solution, including the on-premises side and the AWS site."]
+image::aws_ora_fsx_ec2_iscsi_asm_architecture.PNG["This image provides a detailed picture of the Oracle deployment configuration in AWS public cloud with iSCSI and ASM."]
 
 === Hardware and software components
 
 [%autowidth.stretch]
 |===
 3+^| *Hardware*
-| FSx ONTAP storage | Current version | Two FSx HA pairs in the same VPC and availability zone as primary and standby HA clusters
-| EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge as primary and standby compute instances
-| Ansible controller | on-prem Centos VM/4vCPU/8G | A VM to host Ansible automation controller either on-premise or in the cloud  
+| FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone
+| EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge EC2 instances, one as primary DB server and the other as clone DB server 
 
 3+^| *Software*
 | RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
-| Centos Linux | CentOS Linux release 8.2.2004 (Core) | Hosting Ansible controller deployed in on-premises lab
-| PostgreSQL | Version 14.5 | Automation pulls the latest available version of PostgreSQL from the postgresql.ora yum repo  
-| Ansible | Version 2.10.3 | Prerequisites for required collections and libraries installed with requirements playbook  
+| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch on top of 19.3 base release 
+| Oracle Database | Version 19.18 | | Applied RU patch on top of 19.3 base release 
+| Oracle OPatch | Version 12.2.0.1.36 | Required for version 18 of RU patch
+| SnapCenter Service | Version |  
 |===
 
 === Key factors for deployment consideration
 
-* *PostgreSQL database backup, restore, and recovery.* A PostgreSQL database supports a number of backup methods, such as a logical backup using pg_dump, a physical online backup with pg_basebackup or a lower-level OS backup command, and storage-level-consistent snapshots. This solution uses NetApp consistency-group snapshots for PostgreSQL database data and WAL volumes backup, restore, and recovery at the standby site. The NetApp consistency-group volume snapshots sequence I/O as it is written to storage and protect the integrity of database data files.
+* *EC2 compute instances.* In these tests and validations, we used the AWS EC2 t2.xlarge instance type for the Oracle database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workloads. You need to size the EC2 instance appropriately in terms of number of vCPU and RAM based on actual workload requirements.
 
-* *EC2 compute instances.* In these tests and validations, we used the AWS EC2 t2.xlarge instance type for the PostgreSQL database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for PostgreSQL in deployment because it is optimized for database workloads. The standby compute instance should always be deployed in the same zone as the passive (standby) file system deployed for the FSx HA cluster. 
+* *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi zones deployment further enhances high availability in the event of failure in a single AWS zone. 
 
-* *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. A disaster-recovery standby HA pair for business continuity can be set up in a different region if a specific distance is required between the primary and standby. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. 
+* *FSx storage cluster sizing.* A FSx ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GB/s throughput, and maximum 192 TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and storage limit (minimum 1,024 GiB) totally based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without any impact to application availability.   
 
-* *PostgreSQL data and log placement.* Typical PostgreSQL deployments share the same root directory or volumes for data and log files. In our tests and validations, we have separated PostgreSQL data and logs into two separate volumes for performance. A soft link is used in the data directory to point to the log directory or volume that hosts PostgreSQL WAL logs and archived WAL logs.
+* *Oracle data and logs layout.* In our tests and validations, we have deployed two ASM disk groups for data and logs respectively. Within +DATA asm disk group, we provisioned 4 luns in a data volume. Within +LOGS asm disk group, we provisioned two luns in a logs volume. In general, multiple luns layout within a FSx ONTAP volume provides better performance.   
 
-* *PostgreSQL service startup delay timer.* This solution uses NFS mounted volumes to store the PostgreSQL database file and WAL log files. During a database host reboot, PostgreSQL service might try to start while the volume is not mounted. This results in database service startup failure. A 10 to 15 seconds timer delay is needed for the PostgreSQL database to start up correctly.
-
-* *RPO/RTO for business continuity.* FSx data replication from primary to standby for DR is based on ASYNC, which means that the RPO depends on the frequency of Snapshot backups and SnapMirror replication. A higher frequency of Snapshot copy and SnapMirror replication reduces the RPO. Therefore, there is a balance between potential data loss in the event of a disaster and incremental storage cost. We have determined that Snapshot copy and SnapMirror replication can be implemented in as low as 5 minute intervals for RPO, and PostgreSQL can generally be recovered at the DR standby site in under a minute for the RTO.
-
-* *Database backup.* After a PostgreSQL database is implemented or migrated into AWS FSx storage from an on-premisses data center, the data is auto-sync mirrored in the FSx HA pair for protection. Data is further protected with a replicated standby site in case of a disaster. For longer-term backup retention or data protection, NetApp recommends using the built-in PostgreSQL pg_basebackup utility to run a full database backup that can be ported to S3 blob storage.
+* *Database backup.* NetApp provides a SaaS version of SnapCenter software service for database backup, restore, and clone in cloud that is available via NetApp BlueXP console UI. It is recommended to implement such service to achieve fast (under a minute) SnapShot backup, quick (few minutes) database restore, and database clone.    
 
 == Solution Deployment
 
