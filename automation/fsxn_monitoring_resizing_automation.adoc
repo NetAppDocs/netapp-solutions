@@ -1,0 +1,148 @@
+---
+sidebar: sidebar
+permalink: automation/fsxn_monitoring_resizing_automation.html
+keywords: AWS, FSX, FSxN, automation, FSxN monitoring, FSxN automation, FSxN resizing, resizing
+summary: This page describes the automation around monitoring AWS FSxN and auto-resizing based on threshold. 
+---
+
+= FSxN Monitoring and Auto-resizing using AWS Lambda Function
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+Author(s): Dhruv Tyagi, Niyaz Mohamed
+
+== Overview: Monitoring and auto-resizing FSxN Storage Capacity, Volumes and LUNs via AWS Lambda function
+
+FSx for NetApp ONTAP is a first party enterprise-grade cloud storage service available on AWS that provides highly reliable, scalable, high-performing and feature-rich file storage built on the popular NetApp ONTAP file system. 
+
+While it is easy to deploy and use FSxN, resizing the total storage capacoty, volume size or LUN size requires manual intervention. This document provides a step by step guide to create an automated setup that monitors FSxN at regular intervals, resizes when a user-specified threshold is breached and notifies the end-user of the resizing activity.   
+
+
+.Pre-requisites
+[%collapsible]
+=====
+Before you begin, ensure that the following prerequisites are met: 
+
+* FSxN is deployed
+* A Private Subnet with a NAT gateway to a public subnet with an internet gateway attached is required by the lambda function
+* The private subnet should also have connectivity to FSxN
+* "fsxadmin" password has been set for FSxN
+=====
+
+.High Level Architecture
+[%collapsible]
+=====
+* AWS Lambda Function makes API calls to FSxN for retrieving and updating the size of Storage Capacity, Volumes and LUNs. 
+* "fsxadmin" password stored as secure string in AWS SSM Parameter Store for added layer of security.
+* AWS SES (Simple Email Service) is used to notify end-users when a resizing event occurs.
+
+image:fsxn-monitoring-resizing-architecture.png[This image depicts the high-level architecture used in this solution.]
+=====
+
+== Solution Deployment
+
+Follow the series of steps to complete the deployment of this solution:
+
+.Step 1: Clone the git repository
+[%collapsible]
+=====
+. Clone the github repository on your local system:
++
+----
+git clone <repo-name-here>
+----
+=====
+
+.Step 2: Create SSM parameter for fsxadmin password
+[%collapsible]
+=====
+. Navigate to AWS Console > *Parameter Store* anc click on *Create Parameter*. 
++
+----
+Name: <Any name/path for storing fsxadmin password>
+Tier: Standard
+Type: SecureString
+KMS key source: My current account
+  KMS Key ID: <Use the default one selected>
+Value: <Enter the password for "fsxadmin" user configured on FSxN>
+----
++
+Click on *Create parameter*.
+=====
+
+.Step 3: Setup Email Service
+[%collapsible]
+=====
+. Navigate to AWS Console > *Simple Email Service (SES)* and click on *Create Identity*.
++
+----
+Identity type: Email address
+Email address: <Enter an email address to be used for sending resizing notifications> 
+----
++
+Click on *Create identity*
+=====
+
+.Step 4: Create and setup the AWS Lambda Function
+[%collapsible]
+=====
+. Navigate to AWS Console > *AWS Lambda* and click on *Create function* in the same region as FSxN
+
+. Use the default *Author from scratch* and update the following fields:
++
+----
+Function name: <Any name of your choice>
+Runtime: Python 3.9
+Architecture: x86_64
+Permissions: Select "Create a new role with basic Lambda permissions"
+Advanced Settings:
+  Enable VPC: Checked
+    VPC: <Choose either the same VPC as FSxN or a VPC that can access both FSxN and the internet via a private subnet>
+    Subnets: <Choose 2 private subnets which have NAT gateway attached pointing to public subnets with internet gateway and subnets that have internet access>
+    Security Group: <Choose a Security Group>
+----
++
+Click on *Create function*.
+
+. Scroll down to the *Layers* section of the newly created Lambda function and click on *Add a layer*.
+
+. Click on *create a new layer* under *Layer source*
+
+. Create 2 Layers - 1 for Requests and 1 for Paramiko and upload *Requests.zip* and *Paramiko.zip* files. Select *Python 3.9* as the compatible runtime and click on *Create*.
+
+. Navigate back to AWS Lambda *Add Layer* > *Custom Layers* and add the paramiko and requests layer one after the other.
+
+. Navigate to the *Configuration* tab of the Lambda function and click on *Edit* under *General Configuration*. Change the Timeout to *5 mins* and click Save.
+
+. Navigate to *Permissions* tab of the Lambda function and click on the role assigned. In the permissions tab of the role, click on *Add permissions* > *Create Inline policy*.
+.. Click on the JSON tab and paste the contents of the file policy.json from the github repo.
+.. Replace every occurrence of ${AWS::AccountId} with your accound ID and click on *Review Policy*
+.. Provide a Name for the policy and click on *Create policy*
+
+. Copy the contents of *fsxn_monitoring_resizing_lambda.py* from the git repo to *lambda_function.py* in the AWS Lambda function Code Source section.
+
+. Create a new file in the same level as lambda_function.py and name it *vars.py* and copy the contents of vars.py from the git repo to the lambda function vars.py file. Update the variable values in vars.py and click on *Deploy*
+
+. Click on *Test*, create an empty test event and run the test and check if the script is running properly.
+
+. Once tested successfully, navigate to *Configuration* > *Triggers* > *Add Trigger*.
++
+----
+Select a Source: EventBridge
+Rule: Create a new rule
+Rule name: <Enter any name>
+Rule type: Schedule expression
+Schedule expression: <Use "rate(1 day)" if you want the function to run daily or add your own cron expression>
+----
++
+Click on Add.
+=====
+
+== Conclusion
+
+We saw how easy it is to setup a monitoring solution that regularly monitors FSxN Storage Capacity, Volumes and LUNs and resizes them based on user-specified threshold and sends an email alert when resizing. This makes the process of using and monitoring FSxN seamless freeing up engineers to focus on business-critical activities whiile your storage grows automatically when you need it to.
+
