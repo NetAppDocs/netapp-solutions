@@ -19,7 +19,7 @@ Author(s): Dhruv Tyagi, Niyaz Mohamed
 
 FSx for NetApp ONTAP is a first party enterprise-grade cloud storage service available on AWS that provides highly reliable, scalable, high-performing and feature-rich file storage built on the popular NetApp ONTAP file system. 
 
-While it is easy to deploy and use FSxN, resizing the total storage capacoty, volume size or LUN size requires manual intervention. This document provides a step by step guide to create an automated setup that monitors FSxN at regular intervals, resizes when a user-specified threshold is breached and notifies the end-user of the resizing activity.   
+While it is easy to deploy and use FSxN, resizing the total storage capacity, volume size or LUN size requires manual intervention. This document provides a step by step guide to create an automated setup that monitors FSxN at regular intervals, resizes when a user-specified threshold is breached and notifies the end-user of the resizing activity.   
 
 
 .Pre-requisites
@@ -50,7 +50,7 @@ Follow the series of steps to complete the deployment of this solution:
 .Step 1: Clone the git repository
 [%collapsible]
 =====
-. Clone the github repository on your local system:
+. Clone the GitHub repository on your local system:
 +
 ----
 git clone <repo-name-here>
@@ -60,7 +60,7 @@ git clone <repo-name-here>
 .Step 2: Create SSM parameter for fsxadmin password
 [%collapsible]
 =====
-. Navigate to AWS Console > *Parameter Store* anc click on *Create Parameter*. 
+. Navigate to AWS Console > *Parameter Store* and click on *Create Parameter*. 
 +
 ----
 Name: <Any name/path for storing fsxadmin password>
@@ -72,6 +72,8 @@ Value: <Enter the password for "fsxadmin" user configured on FSxN>
 ----
 +
 Click on *Create parameter*.
+
+image:fsxn-monitoring-resizing-ssm-parameter.png[This image depicts the SSM parameter creation window on AWS console.]
 =====
 
 .Step 3: Setup Email Service
@@ -85,6 +87,8 @@ Email address: <Enter an email address to be used for sending resizing notificat
 ----
 +
 Click on *Create identity*
+
+image:fsxn-monitoring-resizing-ses.png[This image depicts the SES identity creation window on AWS console.]
 =====
 
 .Step 4: Create and setup the AWS Lambda Function
@@ -108,24 +112,38 @@ Advanced Settings:
 +
 Click on *Create function*.
 
+image:fsxn-monitoring-resizing-lambda-creation-1.png[This image depicts the Lambda creation window on AWS console.]
+
+image:fsxn-monitoring-resizing-lambda-creation-2.png[This image depicts the Lambda creation window on AWS console.]
+
 . Scroll down to the *Layers* section of the newly created Lambda function and click on *Add a layer*.
+
+image:fsxn-monitoring-resizing-add-layer-button.png[This image depicts the add layer button on AWS Lambda function console.]
 
 . Click on *create a new layer* under *Layer source*
 
 . Create 2 Layers - 1 for Requests and 1 for Paramiko and upload *Requests.zip* and *Paramiko.zip* files. Select *Python 3.9* as the compatible runtime and click on *Create*.
 
+image:fsxn-monitoring-resizing-create-layer-paramiko.png[This image depicts the Create New Layer window on AWS console.]
+
 . Navigate back to AWS Lambda *Add Layer* > *Custom Layers* and add the paramiko and requests layer one after the other.
+
+image:fsxn-monitoring-resizing-add-layer-window.png[This image depicts the add layer window on AWS Lambda function console.]
+
+image:fsxn-monitoring-resizing-layers-added.png[This image depicts the added layers on AWS Lambda function console.]
 
 . Navigate to the *Configuration* tab of the Lambda function and click on *Edit* under *General Configuration*. Change the Timeout to *5 mins* and click Save.
 
 . Navigate to *Permissions* tab of the Lambda function and click on the role assigned. In the permissions tab of the role, click on *Add permissions* > *Create Inline policy*.
-.. Click on the JSON tab and paste the contents of the file policy.json from the github repo.
-.. Replace every occurrence of ${AWS::AccountId} with your accound ID and click on *Review Policy*
+.. Click on the JSON tab and paste the contents of the file policy.json from the GitHub repo.
+.. Replace every occurrence of ${AWS::AccountId} with your account ID and click on *Review Policy*
 .. Provide a Name for the policy and click on *Create policy*
 
 . Copy the contents of *fsxn_monitoring_resizing_lambda.py* from the git repo to *lambda_function.py* in the AWS Lambda function Code Source section.
 
 . Create a new file in the same level as lambda_function.py and name it *vars.py* and copy the contents of vars.py from the git repo to the lambda function vars.py file. Update the variable values in vars.py and click on *Deploy*
+
+image:fsxn-monitoring-resizing-lambda-code.png[This image depicts the lambda code on AWS Lambda function console.]
 
 . Click on *Test*, create an empty test event and run the test and check if the script is running properly.
 
@@ -140,9 +158,11 @@ Schedule expression: <Use "rate(1 day)" if you want the function to run daily or
 ----
 +
 Click on Add.
+
+image:fsxn-monitoring-resizing-eventbridge.png[This image depicts the event bridge creation window on AWS Lambda function console.]
 =====
 
 == Conclusion
 
-We saw how easy it is to setup a monitoring solution that regularly monitors FSxN Storage Capacity, Volumes and LUNs and resizes them based on user-specified threshold and sends an email alert when resizing. This makes the process of using and monitoring FSxN seamless freeing up engineers to focus on business-critical activities whiile your storage grows automatically when you need it to.
+We saw how easy it is to setup a monitoring solution that regularly monitors FSxN Storage Capacity, Volumes and LUNs and resizes them based on user-specified threshold and sends an email alert when resizing. This makes the process of using and monitoring FSxN seamless freeing up engineers to focus on business-critical activities while your storage grows automatically when you need it to.
 
