@@ -100,8 +100,9 @@ git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
 
 === EC2 instance kernel configuration
 [%collapsible]
+
 ====
-With prerequisites provisioned, login into EC2 instance to configure linux kernel for Oracle installation.
+With prerequisites provisioned, login into EC2 instance as root user to configure linux kernel for Oracle installation.
 
 . From Oracle, download and install Oracle 19c preinstall RPM, which will satisfy most kernel configuration requirement
 +
@@ -166,7 +167,7 @@ vi /etc/sysconfig/selinux
   "*               hard    nofile          65536"
   "*               soft    stack           10240"
 
-. Add swap space to EC2 instance by following this instruction: https://https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^] The exact amount of space to add depends on the size of RAM up to 16G.
+. Add swap space to EC2 instance by following this instruction: link:https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^] The exact amount of space to add depends on the size of RAM up to 16G.
 
 . Change node.session.timeo.replacement_timeout in iscsi.conf configuration file to 5 seconds
 +
@@ -184,104 +185,301 @@ systemctl start iscsid
 [source, cli]
 cat /etc/iscsi/initiatorname.iscsi
 
-. Reboot EC2 instance 
+. Add asm group to be used for asm sysasm group
++
+[source, cli]
+groupadd asm
 
+. Modify oracle user to add asm as a secondary group ( oracle user should have been created after Oracle preinstall rpm installation)
++
+[source, cli]
+usermod -a -G asm oracle
+
+. Reboot EC2 instance 
 
 ====
 
-=== Provision database volumes and luns
+=== Provision and map database volumes and luns to EC2 instance host
+[%collapsible]
+
+====
+
+Provision three volumes from FSx console to host Oracle database binary, data, and logs files.
+
+. Login to FSx cluster via ssh as fsxadmin user
+
+. Execute this command to create a volume for Oracle binary
++ 
+[source, cli]
+vol create -volume ora_01_biny -aggregate aggr1 -size 50G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+
+. Execute this command to create a volume for Oracle data
++
+[source, cli]
+vol create -volume ora_01_data -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+
+. Execute this command to create a volume for Oracle logs
++ 
+[source, cli]
+vol create -volume ora_01_logs -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+
+. Create binary lun within database binary volume
++
+[source, cli]
+lun create -path /vol/ora_01_biny/ora_01_biny_01 -size 40G -ostype linux
+
+. Create data luns within database data volume
++
+[source, cli]
+lun create -path /vol/ora_01_data/ora_01_data_01 -size 20G -ostype linux
+lun create -path /vol/ora_01_data/ora_01_data_02 -size 20G -ostype linux
+lun create -path /vol/ora_01_data/ora_01_data_03 -size 20G -ostype linux
+lun create -path /vol/ora_01_data/ora_01_data_04 -size 20G -ostype linux
+
+. Create logs luns within database logs volume
++
+[source, cli]
+lun create -path /vol/ora_01_logs/ora_01_logs_01 -size 40G -ostype linux
+lun create -path /vol/ora_01_logs/ora_01_logs_02 -size 40G -ostype linux
+
+. Create igroup for EC2 instance with initiator retrieved from step 14 of EC2 kernel configuration above 
++
+[source, cli]
+igroup create -igroup ora_01 -protocol iscsi -ostype linux -initiator iqn.1994-05.com.redhat:f65fed7641c2
+
+. Map the luns to igroup created above. Increment lun id sequentially for each additional lun within a volume
++
+[source, cli]
+map -path /vol/ora_01_biny/ora_01_biny_01 -igroup ora_01 -vserver svm_ora -lun-id 0
+map -path /vol/ora_01_data/ora_01_data_01 -igroup ora_01 -vserver svm_ora -lun-id 1
+map -path /vol/ora_01_data/ora_01_data_02 -igroup ora_01 -vserver svm_ora -lun-id 2
+map -path /vol/ora_01_data/ora_01_data_03 -igroup ora_01 -vserver svm_ora -lun-id 3
+map -path /vol/ora_01_data/ora_01_data_04 -igroup ora_01 -vserver svm_ora -lun-id 4
+map -path /vol/ora_01_logs/ora_01_logs_01 -igroup ora_01 -vserver svm_ora -lun-id 5
+map -path /vol/ora_01_logs/ora_01_logs_02 -igroup ora_01 -vserver svm_ora -lun-id 6
+
+. Validate the luns mapping 
++
+[source, cli]
+mapping show
++
+This is expected return:
+FsxId02ad7bf3476b741df::> mapping show
+  (lun mapping show)
+Vserver    Path                                      Igroup   LUN ID  Protocol
+---------- ----------------------------------------  -------  ------  --------
+svm_ora    /vol/ora_01_biny/ora_01_biny_01           ora_01        0  iscsi
+svm_ora    /vol/ora_01_data/ora_01_data_01           ora_01        1  iscsi
+svm_ora    /vol/ora_01_data/ora_01_data_02           ora_01        2  iscsi
+svm_ora    /vol/ora_01_data/ora_01_data_03           ora_01        3  iscsi
+svm_ora    /vol/ora_01_data/ora_01_data_04           ora_01        4  iscsi
+svm_ora    /vol/ora_01_logs/ora_01_logs_01           ora_01        5  iscsi
+svm_ora    /vol/ora_01_logs/ora_01_logs_02           ora_01        6  iscsi
+
+====
 
 === Database storage configuration
+[%collapsible]
+
+====
+Now, import and setup FSx storage for Oracle grid infrastructure and database installation on EC2 instance host.
+
+. Login to EC2 instance via ssh as ec2-user, change to your ssh key and EC2 instance ip address
++
+[source, cli]
+ssh -i ora_01.pem ec2-user@172.30.15.58
+
+. Discover FSx iSCSI endpoints using either of SVM iSCSI ip addresses, change to your environment specific portal address.
++
+[source, cli]
+sudo iscsiadm iscsiadm --mode discovery --op update --type sendtargets --portal 172.30.15.51
+
+. Establish iSCSI sessions by logging in to each target
++
+[source, cli]
+sudo iscsiadm --mode node -l all
++
+Expected output from the command:
+[ec2-user@ip-172-30-15-58 ~]$ sudo iscsiadm --mode node -l all
+Logging in to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.51,3260]
+Logging in to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.13,3260]
+Login to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.51,3260] successful.
+Login to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.13,3260] successful.
+
+. View and validate a list of active iSCSI sessions:
++
+[source, cli]
+sudo iscsiadm --mode session
++ 
+and return the iSCSI sessions
+[ec2-user@ip-172-30-15-58 ~]$ sudo iscsiadm --mode session
+tcp: [1] 172.30.15.51:3260,1028 iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3 (non-flash)
+tcp: [2] 172.30.15.13:3260,1029 iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3 (non-flash)
+
+. Validate the luns are imported into the host
++
+[source, cli]
+sudo sanlun lun show
++
+and return a list of Oracle luns from FSx
+[ec2-user@ip-172-30-15-58 ~]$ sudo sanlun lun show
+controller(7mode/E-Series)/                                   device          host                  lun
+vserver(cDOT/FlashRay)        lun-pathname                    filename        adapter    protocol   size    product
++
+svm_ora                       /vol/ora_01_logs/ora_01_logs_02 /dev/sdn        host3      iSCSI      40g     cDOT
+svm_ora                       /vol/ora_01_logs/ora_01_logs_01 /dev/sdm        host3      iSCSI      40g     cDOT
+svm_ora                       /vol/ora_01_data/ora_01_data_03 /dev/sdk        host3      iSCSI      20g     cDOT
+svm_ora                       /vol/ora_01_data/ora_01_data_04 /dev/sdl        host3      iSCSI      20g     cDOT
+svm_ora                       /vol/ora_01_data/ora_01_data_01 /dev/sdi        host3      iSCSI      20g     cDOT
+svm_ora                       /vol/ora_01_data/ora_01_data_02 /dev/sdj        host3      iSCSI      20g     cDOT
+svm_ora                       /vol/ora_01_biny/ora_01_biny_01 /dev/sdh        host3      iSCSI      40g     cDOT
+svm_ora                       /vol/ora_01_logs/ora_01_logs_02 /dev/sdg        host2      iSCSI      40g     cDOT
+svm_ora                       /vol/ora_01_logs/ora_01_logs_01 /dev/sdf        host2      iSCSI      40g     cDOT
+svm_ora                       /vol/ora_01_data/ora_01_data_04 /dev/sde        host2      iSCSI      20g     cDOT
+svm_ora                       /vol/ora_01_data/ora_01_data_02 /dev/sdc        host2      iSCSI      20g     cDOT
+svm_ora                       /vol/ora_01_data/ora_01_data_03 /dev/sdd        host2      iSCSI      20g     cDOT
+svm_ora                       /vol/ora_01_data/ora_01_data_01 /dev/sdb        host2      iSCSI      20g     cDOT
+svm_ora                       /vol/ora_01_biny/ora_01_biny_01 /dev/sda        host2      iSCSI      40g     cDOT
+
+. Configure multipath.conf file with following default and blacklist entries
++
+[source, cli]
+sudo vi /etc/multipath.conf
++
+defaults {
+        find_multipaths yes
+        user_friendly_names yes
+}
++
+blacklist {
+        devnode "^(ram|raw|loop|fd|md|dm-|sr|scd|st)[0-9]*"
+        devnode "^hd[a-z]"
+        devnode "^cciss.*"
+}
+
+. Start multipath service
++
+[source, cli]
+sudo systemctl start multipathd
++ 
+now multipath devices appear in /dev/mapper directory
++
+[ec2-user@ip-172-30-15-58 ~]$ ls -l /dev/mapper
+total 0
+lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e68512d -> ../dm-0
+lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685141 -> ../dm-1
+lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685142 -> ../dm-2
+lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685143 -> ../dm-3
+lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685144 -> ../dm-4
+lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685145 -> ../dm-5
+lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685146 -> ../dm-6
+crw------- 1 root root 10, 236 Mar 21 18:19 control
+
+. Login to FSx cluster as fsxadmin user via ssh to retrieve serial-hex number for each lun start with 6c574xxx..., the HEX number start with 3600a0980, which is AWS vendor ID.
++
+[source, cli]
+lun show -fields serial-hex
++
+and return as follow:
++
+FsxId02ad7bf3476b741df::> lun show -fields serial-hex
+vserver path                            serial-hex
+------- ------------------------------- ------------------------
+svm_ora /vol/ora_01_biny/ora_01_biny_01 6c574235472455534e68512d
+svm_ora /vol/ora_01_data/ora_01_data_01 6c574235472455534e685141
+svm_ora /vol/ora_01_data/ora_01_data_02 6c574235472455534e685142
+svm_ora /vol/ora_01_data/ora_01_data_03 6c574235472455534e685143
+svm_ora /vol/ora_01_data/ora_01_data_04 6c574235472455534e685144
+svm_ora /vol/ora_01_logs/ora_01_logs_01 6c574235472455534e685145
+svm_ora /vol/ora_01_logs/ora_01_logs_02 6c574235472455534e685146
+7 entries were displayed.
+
+. Update /dev/multipath.conf file to add user friendly name for multipath device 
++
+[source, cli]
+sudo vi /etc/multipath.conf
++
+with following entries:
+multipaths {
+        multipath {
+                wwid            3600a09806c574235472455534e68512d
+                alias           ora_01_biny_01
+        }
+        multipath {
+                wwid            3600a09806c574235472455534e685141
+                alias           ora_01_data_01
+        }
+        multipath {
+                wwid            3600a09806c574235472455534e685142
+                alias           ora_01_data_02
+        }
+        multipath {
+                wwid            3600a09806c574235472455534e685143
+                alias           ora_01_data_03
+        }
+        multipath {
+                wwid            3600a09806c574235472455534e685144
+                alias           ora_01_data_04
+        }
+        multipath {
+                wwid            3600a09806c574235472455534e685145
+                alias           ora_01_logs_01
+        }
+        multipath {
+                wwid            3600a09806c574235472455534e685146
+                alias           ora_01_logs_02
+        }
+
+. Reboot multipath service to valiate the devices under /dev/mapper have changed to lun names as versus serial-hex ids.
++
+[source, cli]
+sudo systemctl restart multipathd
++
+check /dev/mapper to return as following:
++
+[ec2-user@ip-172-30-15-58 ~]$ ls -l /dev/mapper
+total 0
+crw------- 1 root root 10, 236 Mar 21 18:19 control
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_biny_01 -> ../dm-0
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_01 -> ../dm-1
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_02 -> ../dm-2
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_03 -> ../dm-3
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_04 -> ../dm-4
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_logs_01 -> ../dm-5
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_logs_02 -> ../dm-6
+
+. Partition the binary lun with single primary partition
++
+[source, cli]
+sudo fdisk /dev/mapper/ora_01_biny_01
+
+. Format partitioned binary lun with XFS file system
++
+[source, cli]
+sudo mkfs.xfs /dev/mapper/ora_01_biny_01p1
+
+. Mount the binary lun to /u01
++
+[source, cli]
+sudo mount -t xfs /dev/mapper/ora_01_biny_01p1 /u01
+
+. Change /u01 mount point ownership to oracle user and it's asssociated primary group
++
+[source, cli]
+chown oracle:oinstall /u01
+
+. Download and staging Oracle binary installation files to /tmp/archive directory
+  
+====
+
 
 === Oracle grid infrastructure installation
 
 === Oracle database installation
 
 
-=== Configure the hosts file
 
-Input the primary FSx ONTAP cluster management IP and EC2 instances hosts names into the hosts file.
-
-  # Primary FSx cluster management IP address
-  [fsx_ontap]  
-  172.30.15.33
-
-  # Primary PostgreSQL DB server at primary site where database is initialized at deployment time
-  [postgresql] 
-  psql_01p ansible_ssh_private_key_file=psql_01p.pem
-
-  # Primary PostgreSQL DB server at standby site where postgresql service is installed but disabled at deployment
-  # Standby DB server at primary site, to setup this server comment out other servers in [dr_postgresql]
-  # Standby DB server at standby site, to setup this server comment out other servers in [dr_postgresql]
-  [dr_postgresql] --   
-  psql_01s ansible_ssh_private_key_file=psql_01s.pem
-  #psql_01ps ansible_ssh_private_key_file=psql_01ps.pem  
-  #psql_01ss ansible_ssh_private_key_file=psql_01ss.pem
-
-=== Configure the host_name.yml file in the host_vars folder
-
-include::../_include/aws_postgres_fsx_ec2_host_vars.adoc[]
-
-=== Configure the global fsx_vars.yml file in the vars folder
-
-include::../_include/aws_postgres_fsx_ec2_fsx_vars.adoc[]
-
-=== PostgreSQL deployment and HA/DR setup
-
-The following tasks deploy the PostgreSQL DB server service and initialize the database at the primary site on the primary EC2 DB server host. A standby primary EC2 DB server host is then set up at the standby site. Finally, DB volume replication is set up from the primary-site FSx cluster to the standby-site FSx cluster for disaster recovery.  
-
-. Create DB volumes on the primary FSx cluster, and set up postgresql on the primary EC2 instance host.
-[source, cli]
-ansible-playbook -i hosts postgresql_deploy.yml -u ec2-user --private-key psql_01p.pem -e @vars/fsx_vars.yml
-
-. Set up the standby DR EC2 instance host.
-[source, cli]
-ansible-playbook -i hosts postgresql_standby_setup.yml -u ec2-user --private-key psql_01s.pem -e @vars/fsx_vars.yml
-
-. Set up FSx ONTAP cluster peering and database volume replication.
-[source, cli]
-ansible-playbook -i hosts fsx_replication_setup.yml -e @vars/fsx_vars.yml
-
-. Consolidate the previous steps into a single-step PostgreSQL deployment and HA/DR setup. 
-[source, cli]
-ansible-playbook -i hosts postgresql_hadr_setup.yml -u ec2-user -e @vars/fsx_vars.yml
-
-. For setting up a standby PostgreSQL DB host at either the primary or standby sites, comment out all other servers in the hosts file [dr_postgresql] section and then execute the postgresql_standby_setup.yml playbook with the respective target host (such as psql_01ps or standby EC2 compute instance at primary site). Make sure that a host parameters file such as `psql_01ps.yml` is configured under the `host_vars` directory. 
-[source, cli]
-[dr_postgresql] --   
-#psql_01s ansible_ssh_private_key_file=psql_01s.pem
-psql_01ps ansible_ssh_private_key_file=psql_01ps.pem  
-#psql_01ss ansible_ssh_private_key_file=psql_01ss.pem
-+
-[source, cli]
-ansible-playbook -i hosts postgresql_standby_setup.yml -u ec2-user --private-key psql_01ps.pem -e @vars/fsx_vars.yml
-
-=== PostgreSQL database snapshot backup and replication to standby site
-
-PostgreSQL database snapshot backup and replication to the standby site can be controlled and executed on the Ansible controller with a user-defined interval. We have validated that the interval can be as low as 5 minutes. Therefore, in the case of failure at the primary site, there is 5 minutes of potential data loss if failure occurs right before the next scheduled snapshot backup.
-
-[source, cli]
-*/15 * * * * /home/admin/na_postgresql_aws_deploy_hadr/data_log_snap.sh
-
-=== Failover to Standby Site for DR
-
-For testing the PostgreSQL HA/DR system as a DR exercise, execute failover and PostgreSQL database recovery on the primary standby EC2 DB instance on standby site by executing following playbook. In an actually DR scenario, execute the same for an actually failover to DR site.  
-
-[source, cli]
-ansible-playbook -i hosts postgresql_failover.yml -u ec2-user --private-key psql_01s.pem -e @vars/fsx_vars.yml 
-
-=== Resync Replicated DB volumes after Failover Test
-
-Run resync after the failover test to reestablish database-volume SnapMirror replication.
-
-[source, cli]
-ansible-playbook -i hosts postgresql_standby_resync.yml -u ec2-user --private-key psql_01s.pem -e @vars/fsx_vars.yml
-
-=== Failover from primary EC2 DB server to standby EC2 DB server due to EC2 compute instance failure 
-
-NetApp recommends running manual failover or using well-established OS cluster-ware that might require a license.
-
-== Automated Deployment Option
+=== Automated Deployment Option
 
 NetApp will release a fully automated solution deployment toolkit with Ansible to facilitate the implementation of the solution. Please check back for the availability of the toolkit. Once it is released, a link will be posted here.
 
