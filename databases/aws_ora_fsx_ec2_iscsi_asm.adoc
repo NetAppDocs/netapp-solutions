@@ -686,11 +686,234 @@ ASMCMD-9526: The AFD state is 'LOADED' and filtering is 'ENABLED' on host 'ip-17
 === Oracle database installation
 [%collapsible]
 
+====
+. Login as oracle user and unset $ORACLE_HOME, $ORACLE_SID if set
++
+[source, cli]
+unset ORACLE_HOME
+unset ORACLE_SID
+
+. Create oracle DB home directory and change to it
++
+[source, cli]
+mkdir /u01/app/oracle/product/19.0.0/db1
+cd /u01/app/oracle/product/19.0.0/db1
+
+. Unzip oracle DB installation files
++
+[source, cli]
+unzip -q /tmp/archive/LINUX.X64_193000_db_home.zip
+
+. From DB home, delete OPatch directory
++
+[source, cl]
+rm -rf OPatch
+
+. From DB home, copy p6880880_190000_Linux-x86-64.zip to grid_home, then unzip it
++
+[source, cli]
+cp /tmp/archive/p6880880_190000_Linux-x86-64.zip .
+unzip p6880880_190000_Linux-x86-64.zip
+
+. From DB home, revise cv/admin/cvu_config, uncomment and replace "CV_ASSUME_DISTID=OEL5" to "CV_ASSUME_DISTID=OL7"
++
+[source, cli]
+vi cv/admin/cvu_config
+
+. From /tmp/archive directory, unpack DB 19.18 RU patch
++
+[source, cli]
+unzip p34765931_190000_Linux-x86-64.zip
+
+. Prepare DB silent install rsp file in /tmp/archive/dbinstall.rsp directory with following values
++
+oracle.install.option=INSTALL_DB_SWONLY
+UNIX_GROUP_NAME=oinstall
+INVENTORY_LOCATION=/u01/app/oraInventory
+ORACLE_HOME=/u01/app/oracle/product/19.0.0/db1
+ORACLE_BASE=/u01/app/oracle
+oracle.install.db.InstallEdition=EE
+oracle.install.db.OSDBA_GROUP=dba
+oracle.install.db.OSOPER_GROUP=oper
+oracle.install.db.OSBACKUPDBA_GROUP=oper
+oracle.install.db.OSDGDBA_GROUP=dba
+oracle.install.db.OSKMDBA_GROUP=dba
+oracle.install.db.OSRACDBA_GROUP=dba
+oracle.install.db.rootconfig.executeRootScript=false
+
+. Execute silent softwareonly DB installation
++
+[source, cli]
+./runInstaller -applyRU /tmp/archive/34765931/ -silent -ignorePrereqFailure -responseFile /tmp/archive/dbinstall.rsp
+
+. Run root.sh script after sofware only installation
++
+[source, cli]
+/u01/app/oracle/product/19.0.0/db1/root.sh
+
+. create dbca.rsp file with following entries:
++
+gdbName=db1.demo.netapp.com
+sid=db1
+createAsContainerDatabase=true
+numberOfPDBs=3
+pdbName=db1_pdb
+useLocalUndoForPDBs=true
+pdbAdminPassword="yourPWD"
+templateName=General_Purpose.dbc
+sysPassword="yourPWD"
+systemPassword="yourPWD"
+dbsnmpPassword="yourPWD"
+storageType=ASM
+diskGroupName=DATA
+characterSet=AL32UTF8
+nationalCharacterSet=AL16UTF16
+listeners=LISTENER
+databaseType=MULTIPURPOSE
+automaticMemoryManagement=false
+totalMemory=8192
+
+. Lauch DB creation with dbca
++
+[source, cli]
+bin/dbca -silent -createDatabase -responseFile /tmp/archive/dbca.rsp
++
+output:
+Prepare for db operation
+7% complete
+Registering database with Oracle Restart
+11% complete
+Copying database files
+33% complete
+Creating and starting Oracle instance
+35% complete
+38% complete
+42% complete
+45% complete
+48% complete
+Completing Database Creation
+53% complete
+55% complete
+56% complete
+Creating Pluggable Databases
+60% complete
+64% complete
+69% complete
+78% complete
+Executing Post Configuration Actions
+100% complete
+Database creation complete. For details check the logfiles at:
+ /u01/app/oracle/cfgtoollogs/dbca/db1.
+Database Information:
+Global Database Name:db1.demo.netapp.com
+System Identifier(SID):db1
+Look at the log file "/u01/app/oracle/cfgtoollogs/dbca/db1/db1.log" for further details.
+
+. Validate Oracle Restart HA services after DB creation
++
+[oracle@ip-172-30-15-58 db1]$ ../grid/bin/crsctl stat res -t
++
+Name           	Target  State        Server                   State details
++
+Local Resources
++
+ora.DATA.dg		ONLINE  ONLINE       ip-172-30-15-58          STABLE
+ora.LISTENER.lsnr	ONLINE  ONLINE       ip-172-30-15-58          STABLE
+ora.LOGS.dg		ONLINE  ONLINE       ip-172-30-15-58          STABLE
+ora.asm		ONLINE  ONLINE       ip-172-30-15-58          Started,STABLE
+ora.ons		OFFLINE OFFLINE      ip-172-30-15-58          STABLE
++
+Cluster Resources
++
+ora.cssd        	ONLINE  ONLINE       ip-172-30-15-58          STABLE
+ora.db1.db		ONLINE  ONLINE       ip-172-30-15-58          Open,HOME=/u01/app/oracle/product/19.0.0/db1,STABLE
+ora.diskmon		OFFLINE OFFLINE                               STABLE
+ora.driver.afd	ONLINE  ONLINE       ip-172-30-15-58          STABLE
+ora.evmd		ONLINE  ONLINE       ip-172-30-15-58          STABLE
+
+. Validate the CDB/PDB created
++
+SQL> select name, open_mode from v$database;
++
+NAME      OPEN_MODE
++
+DB1       READ WRITE
++
+SQL> select name from v$datafile;
++
+NAME
++
++DATA/DB1/DATAFILE/system.256.1132176177
++DATA/DB1/DATAFILE/sysaux.257.1132176221
++DATA/DB1/DATAFILE/undotbs1.258.1132176247
++DATA/DB1/86B637B62FE07A65E053F706E80A27CA/DATAFILE/system.265.1132177009
++DATA/DB1/86B637B62FE07A65E053F706E80A27CA/DATAFILE/sysaux.266.1132177009
++DATA/DB1/DATAFILE/users.259.1132176247
++DATA/DB1/86B637B62FE07A65E053F706E80A27CA/DATAFILE/undotbs1.267.1132177009
++DATA/DB1/F7852758DCD6B800E0533A0F1EAC1DC6/DATAFILE/system.271.1132177853
++DATA/DB1/F7852758DCD6B800E0533A0F1EAC1DC6/DATAFILE/sysaux.272.1132177853
++DATA/DB1/F7852758DCD6B800E0533A0F1EAC1DC6/DATAFILE/undotbs1.270.1132177853
++DATA/DB1/F7852758DCD6B800E0533A0F1EAC1DC6/DATAFILE/users.274.1132177871
++
+NAME
++
++DATA/DB1/F785288BBCD1BA78E0533A0F1EACCD6F/DATAFILE/system.276.1132177871
++DATA/DB1/F785288BBCD1BA78E0533A0F1EACCD6F/DATAFILE/sysaux.277.1132177871
++DATA/DB1/F785288BBCD1BA78E0533A0F1EACCD6F/DATAFILE/undotbs1.275.1132177871
++DATA/DB1/F785288BBCD1BA78E0533A0F1EACCD6F/DATAFILE/users.279.1132177889
++DATA/DB1/F78529A14DD8BB18E0533A0F1EACB8ED/DATAFILE/system.281.1132177889
++DATA/DB1/F78529A14DD8BB18E0533A0F1EACB8ED/DATAFILE/sysaux.282.1132177889
++DATA/DB1/F78529A14DD8BB18E0533A0F1EACB8ED/DATAFILE/undotbs1.280.1132177889
++DATA/DB1/F78529A14DD8BB18E0533A0F1EACB8ED/DATAFILE/users.284.1132177907
++
+19 rows selected.
++
+SQL> show pdbs
++
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
++
+         2 PDB$SEED                       READ ONLY  NO
+         3 DB1_PDB1                       READ WRITE NO
+         4 DB1_PDB2                       READ WRITE NO
+         5 DB1_PDB3                       READ WRITE NO
+SQL>
+
+. Set DB recovery location to +LOGS disk group
++
+[source, cli]
+alter system set db_recovery_file_dest_size = 80G scope=both;
++
+[source, cli]
+alter system set db_recovery_file_dest = '+LOGS' scope=both;
+
+. Login database with sqlplus and enable archive log mode 
++
+[source, cli]
+sqlplus /as sysdba
++
+[source, cli]
+shutdown immediate;
++
+[source, cli]
+startup mount;
++
+[source, cli]
+alter database archivelog;
++
+[source, cli]
+alter database open;
+
+This would complete Oracle 19c version 19.18 Restart deployment on AWS FSx ONTAP and EC2 compute instance. If desired, it is recommended to relocate Oracle control file and online log files to +LOGS disk group. 
+
+====
 
 === Automated Deployment Option
 [%collapsible]
 
+====
 NetApp will release a fully automated solution deployment toolkit with Ansible to facilitate the implementation of the solution. Please check back for the availability of the toolkit. Once it is released, a link will be posted here.
+
+====
 
 == Oracle Database Backup, Restore, and Clone with SnapCenter Service
 
