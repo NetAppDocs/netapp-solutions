@@ -55,9 +55,9 @@ image::aws_ora_fsx_ec2_iscsi_asm_architecture.png["This image provides a detaile
 
 3+^| *Software*
 | RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
-| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch on top of 19.3 base release p34762026_190000_Linux-x86-64.zip
-| Oracle Database | Version 19.18 | | Applied RU patch on top of 19.3 base release p34765931_190000_Linux-x86-64.zip
-| Oracle OPatch | Version 12.2.0.1.36 | Required for version 18 of RU patch p6880880_190000_Linux-x86-64.zip
+| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
+| Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
+| Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 | SnapCenter Service | Version |  
 |===
 
@@ -471,12 +471,154 @@ sudo mount -t xfs /dev/mapper/ora_01_biny_01p1 /u01
 chown oracle:oinstall /u01
 
 . Download and staging Oracle binary installation files to /tmp/archive directory
++
+The list of installation files to be stated in /tmp/archive on EC2 instance
++
+[ec2-user@ip-172-30-15-58 ~]$ ls -l /tmp/archive
+total 10537316
+-rw-rw-r--. 1 ec2-user ec2-user      19112 Mar 21 15:57 compat-libcap1-1.10-7.el7.x86_64.rpm
+-rw-rw-r--  1 ec2-user ec2-user 3059705302 Mar 21 22:01 LINUX.X64_193000_db_home.zip
+-rw-rw-r--  1 ec2-user ec2-user 2889184573 Mar 21 21:09 LINUX.X64_193000_grid_home.zip
+-rw-rw-r--. 1 ec2-user ec2-user     589145 Mar 21 15:56 netapp_linux_unified_host_utilities-7-1.x86_64.rpm
+-rw-rw-r--. 1 ec2-user ec2-user      31828 Mar 21 15:55 oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
+-rw-rw-r--  1 ec2-user ec2-user 2872741741 Mar 21 22:31 p34762026_190000_Linux-x86-64.zip
+-rw-rw-r--  1 ec2-user ec2-user 1843577895 Mar 21 22:32 p34765931_190000_Linux-x86-64.zip
+-rw-rw-r--  1 ec2-user ec2-user  124347218 Mar 21 22:33 p6880880_190000_Linux-x86-64.zip
 
 ====
 
-
 === Oracle grid infrastructure installation
+[%collapsible]
 
+====
+. Login to EC2 instance as ec2-user via ssh and enable password authentication by uncomment "PasswordAuthentication yes" and comment out "PasswordAuthentication no" 
++
+[source, cli]
+sudo vi /etc/ssh/sshd_config
+
+. Restart sshd service
++
+[source, cli]
+sudo systemctl restart sshd
+
+. Reset oracle user password
++
+[source, cli]
+sudo passwd oracle
+
+. Login as the Oracle Restart software owner user (oracle). Create Oracle directory as follow:
++
+[source, cli]
+mkdir -p /u01/app/oracle
+mkdir -p /u01/app/oraInventory
+
+. Change directory permission setting
++
+[source, cli]
+chmod -R 775 /u01/app
+
+. Create grid home directory and change to grid home directory
++
+[source, cli]
+mkdir -p /u01/app/oracle/product/19.0.0/grid
+cd /u01/app/oracle/product/19.0.0/grid
+
+. Unzip grid installation files
++
+[source, cli]
+unzip -q /tmp/archive/LINUX.X64_193000_grid_home.zip
+
+. From grid home, delete OPatch directory
++
+[source, cl]
+rm -rf OPatch
+
+. From grid home, copy p6880880_190000_Linux-x86-64.zip to grid_home, then unzip it
++
+[source, cli]
+cp /tmp/archive/p6880880_190000_Linux-x86-64.zip .
+unzip p6880880_190000_Linux-x86-64.zip
+
+. From grid home, revise cv/admin/cvu_config, uncomment and replace "CV_ASSUME_DISTID=OEL5" to "CV_ASSUME_DISTID=OL7"
++
+[source, cli]
+vi cv/admin/cvu_config
+
+. Prepare a gridsetup.rsp file for silent installation and place the rsp file in grid home directory. The rsp file should cover section A,B and G with following infomation:
++
+INVENTORY_LOCATION=/u01/app/oraInventory
+oracle.install.option=HA_CONFIG
+ORACLE_BASE=/u01/app/oracle
+oracle.install.asm.OSDBA=dba
+oracle.install.asm.OSOPER=oper
+oracle.install.asm.OSASM=asm
+oracle.install.asm.SYSASMPassword="SetPWD"
+oracle.install.asm.diskGroup.name=DATA
+oracle.install.asm.diskGroup.redundancy=EXTERNAL
+oracle.install.asm.diskGroup.AUSize=4
+oracle.install.asm.diskGroup.disks=/dev/mapper/ora_01_data*
+oracle.install.asm.diskGroup.diskDiscoveryString=/dev/mapper/*
+oracle.install.asm.monitorPassword="SetPWD"
+oracle.install.asm.configureAFD=true
+
+. Login in to EC2 instance as root user and set ORACLE_HOME and ORACLE_BASE
++
+[source, cli]
+export ORACLE_HOME=/u01/app/oracle/product/19.0.0/grid
+export ORACLE_BASE=/tmp
+cd /u01/app/oracle/product/19.0.0/grid/bin
+
+. Provision disk devices for use with Oracle ASM filter driver
++
+[source, cli]
+./asmcmd afd_label DATA01 /dev/mapper/ora_01_data_01 --init
++
+[source, cli]
+./asmcmd afd_label DATA02 /dev/mapper/ora_01_data_02 --init
++
+[source, cli]
+./asmcmd afd_label DATA03 /dev/mapper/ora_01_data_03 --init
++
+[source, cli]
+./asmcmd afd_label DATA04 /dev/mapper/ora_01_data_04 --init
++
+[source, cli]
+./asmcmd afd_label LOGS01 /dev/mapper/ora_01_logs_01 --init
++
+[source, cli]
+./asmcmd afd_label LOGS02 /dev/mapper/ora_01_logs_02 --init
+
+. Change devices ownership to oracle:oinstall
++
+[source, cli]
+chown oracle:oinstall /dev/mapper/ora_01_data_01
+chown oracle:oinstall /dev/mapper/ora_01_data_02
+chown oracle:oinstall /dev/mapper/ora_01_data_03
+chown oracle:oinstall /dev/mapper/ora_01_data_04
+chown oracle:oinstall /dev/mapper/ora_01_logs_01
+chown oracle:oinstall /dev/mapper/ora_01_logs_02
+
+. Install cvuqdisk-1.0.10-1.rpm
++
+[source, cli]
+rpm -ivh /u01/app/oracle/product/19.0.0/grid/cv/rpm/cvuqdisk-1.0.10-1.rpm
+
+. Unset $ORACLE_BASE
++
+[source, cli]
+unset ORACLE_BASE
+
+. Login EC2 instance as oracle user and extract patch in /tmp/archive folder 
++
+[source, cli]
+unzip p34762026_190000_Linux-x86-64.zip
+
+. As oracle user launch gridSetup.sh for grid infrastructure installation
++
+[source, cli]
+./gridSetup.sh -applyRU /tmp/archive/34762026/ -silent -responseFile gridsetup.rsp
+
+====
 === Oracle database installation
 
 
