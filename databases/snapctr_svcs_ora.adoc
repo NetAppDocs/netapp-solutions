@@ -91,6 +91,7 @@ video::oracle-aws-fsx-part4c-bkup-restore-snapctrsvc_callout.mp4[]
 
 === Prerequisites for automated deployment
 
+====
 Deployment requires the following prerequisites.
 
 . A primary Oracle database server on EC2 instance with an Oracle database fully deployed and running. 
@@ -101,91 +102,39 @@ Deployment requires the following prerequisites.
 
 . If help is needed to meet the above prerequisites for Oracle database deployment on AWS FSx ONTAP and EC2 compute instance refer to this documentation link:aws_ora_fsx_ec2_iscsi_asm.htm[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^] 
 
+====
 
-=== Configure the hosts file
+=== Onboarding to BlueXP console
+====
 
-Input the primary FSx ONTAP cluster management IP and EC2 instances hosts names into the hosts file.
+====
 
-  # Primary FSx cluster management IP address
-  [fsx_ontap]  
-  172.30.15.33
 
-  # Primary PostgreSQL DB server at primary site where database is initialized at deployment time
-  [postgresql] 
-  psql_01p ansible_ssh_private_key_file=psql_01p.pem
+=== Deploy a connector for SnapCenter services
 
-  # Primary PostgreSQL DB server at standby site where postgresql service is installed but disabled at deployment
-  # Standby DB server at primary site, to setup this server comment out other servers in [dr_postgresql]
-  # Standby DB server at standby site, to setup this server comment out other servers in [dr_postgresql]
-  [dr_postgresql] --   
-  psql_01s ansible_ssh_private_key_file=psql_01s.pem
-  #psql_01ps ansible_ssh_private_key_file=psql_01ps.pem  
-  #psql_01ss ansible_ssh_private_key_file=psql_01ss.pem
+====
 
-=== Configure the host_name.yml file in the host_vars folder
+====
 
-include::../_include/aws_postgres_fsx_ec2_host_vars.adoc[]
+=== SnapCenter services setup
 
-=== Configure the global fsx_vars.yml file in the vars folder
+====
 
-include::../_include/aws_postgres_fsx_ec2_fsx_vars.adoc[]
+====
 
-=== PostgreSQL deployment and HA/DR setup
+=== Oracle database backup
 
-The following tasks deploy the PostgreSQL DB server service and initialize the database at the primary site on the primary EC2 DB server host. A standby primary EC2 DB server host is then set up at the standby site. Finally, DB volume replication is set up from the primary-site FSx cluster to the standby-site FSx cluster for disaster recovery.  
 
-. Create DB volumes on the primary FSx cluster, and set up postgresql on the primary EC2 instance host.
-[source, cli]
-ansible-playbook -i hosts postgresql_deploy.yml -u ec2-user --private-key psql_01p.pem -e @vars/fsx_vars.yml
 
-. Set up the standby DR EC2 instance host.
-[source, cli]
-ansible-playbook -i hosts postgresql_standby_setup.yml -u ec2-user --private-key psql_01s.pem -e @vars/fsx_vars.yml
-
-. Set up FSx ONTAP cluster peering and database volume replication.
-[source, cli]
-ansible-playbook -i hosts fsx_replication_setup.yml -e @vars/fsx_vars.yml
-
-. Consolidate the previous steps into a single-step PostgreSQL deployment and HA/DR setup. 
-[source, cli]
-ansible-playbook -i hosts postgresql_hadr_setup.yml -u ec2-user -e @vars/fsx_vars.yml
-
-. For setting up a standby PostgreSQL DB host at either the primary or standby sites, comment out all other servers in the hosts file [dr_postgresql] section and then execute the postgresql_standby_setup.yml playbook with the respective target host (such as psql_01ps or standby EC2 compute instance at primary site). Make sure that a host parameters file such as `psql_01ps.yml` is configured under the `host_vars` directory. 
-[source, cli]
-[dr_postgresql] --   
-#psql_01s ansible_ssh_private_key_file=psql_01s.pem
-psql_01ps ansible_ssh_private_key_file=psql_01ps.pem  
-#psql_01ss ansible_ssh_private_key_file=psql_01ss.pem
-+
 [source, cli]
 ansible-playbook -i hosts postgresql_standby_setup.yml -u ec2-user --private-key psql_01ps.pem -e @vars/fsx_vars.yml
 
-=== PostgreSQL database snapshot backup and replication to standby site
+=== Oracle database restore and recovery
 
-PostgreSQL database snapshot backup and replication to the standby site can be controlled and executed on the Ansible controller with a user-defined interval. We have validated that the interval can be as low as 5 minutes. Therefore, in the case of failure at the primary site, there is 5 minutes of potential data loss if failure occurs right before the next scheduled snapshot backup.
+====
+====
 
-[source, cli]
-*/15 * * * * /home/admin/na_postgresql_aws_deploy_hadr/data_log_snap.sh
-
-=== Failover to Standby Site for DR
-
-For testing the PostgreSQL HA/DR system as a DR exercise, execute failover and PostgreSQL database recovery on the primary standby EC2 DB instance on standby site by executing following playbook. In an actually DR scenario, execute the same for an actually failover to DR site.  
-
-[source, cli]
-ansible-playbook -i hosts postgresql_failover.yml -u ec2-user --private-key psql_01s.pem -e @vars/fsx_vars.yml 
-
-=== Resync Replicated DB volumes after Failover Test
-
-Run resync after the failover test to reestablish database-volume SnapMirror replication.
-
-[source, cli]
-ansible-playbook -i hosts postgresql_standby_resync.yml -u ec2-user --private-key psql_01s.pem -e @vars/fsx_vars.yml
-
-=== Failover from primary EC2 DB server to standby EC2 DB server due to EC2 compute instance failure 
-
-NetApp recommends running manual failover or using well-established OS cluster-ware that might require a license.
-
-== Where to find additional information
+== Additional information
 
 To learn more about the information that is described in this document, review the following documents and/or websites:
 
