@@ -18,26 +18,24 @@ Allen Cao, Niyaz Mohamed, NetApp
 
 == Purpose
 
-PostgreSQL is a widely used open-source database that is ranked number four among the top ten most popular database engines by link:https://db-engines.com/en/ranking[DB-Engines^]. On one hand, PostgreSQL derives its popularity from its license-free, open-source model while still possessing sophisticated features. On the other hand, because it is open sourced, there is shortage of detailed guidance on production-grade database deployment in the area of high availability and disaster recovery (HA/DR), particularly in the public cloud. In general, it can be difficult to set up a typical PostgreSQL HA/DR system with hot and warm standby, streaming replication, and so on. Testing the HA/DR environment by promoting the standby site and then switching back to the primary can be disruptive to production. There are well documented performance issues on the primary when read workloads are deployed on streaming hot standby.
+SnapCenter services is a SaaS version of classic SnapCenter database management UI tool that is available through NetApp BlueXP cloud management console. It is integral part of NetApp Cloud backup and data protection offering for database such as Oracle and HANA running on NetApp cloud storage. This SaaS based service simplifies traditional SnapCenter standalone server deployment that generally requires a Windows server and operates in a Windows domain environment.  
 
-In this documentation, we demonstrate how you can do away with an application-level PostgreSQL streaming HA/DR solution and build a PostgreSQL HA/DR solution based on AWS FSx ONTAP storage and EC2 compute instances using storage-level replication. The solution creates a simpler and comparable system and delivers equivalent results when compared with traditional PostgreSQL application-level streaming replication for HA/DR.  
-
-This solution is built on proven and mature NetApp SnapMirror storage-level replication technology that is available in AWS-native FSX ONTAP cloud storage for PostgreSQL HA/DR. It is simple to implement with an automation toolkit provided by the NetApp Solutions team. It provides similar functionality while eliminating the complexity and performance drag on the primary site with the application-level streaming-based HA/DR solution. The solution can be easily deployed and tested without affecting the active primary site. 
+In this documentation, we demonstrate how you can setup SnapCenter services for backup, restore, and clone Oracle databases deployed to AWS FSx ONTAP storage and EC2 compute instances step by step. While much easier to setup and use, it delivers the similar key functionalities as available in legacy SnapCenter UI tool. 
 
 This solution addresses the following use cases:
 
-* Production grade HA/DR deployment for PostgreSQL in the public AWS cloud 
-* Testing and validating a PostgreSQL workload in the public AWS cloud
-* Testing and validating a PostgreSQL HA/DR strategy based on NetApp SnapMirror replication technology
+* Database backup via snapshot for Oracle database hosted in AWS FSx ONTAP
+* Oracle database recovery in the case of a failure  
+* Fast and storage efficient clone of primary database for DEV/TEST environment or any other use cases  
 
 == Audience
 
 This solution is intended for the following people:
 
-* The DBA who is interested in deploying PostgreSQL with HA/DR in the public AWS cloud.
-* The database solution architect who is interested in testing PostgreSQL workloads in the public AWS cloud.
-* The storage administrator who is interested in deploying and managing PostgreSQL instances deployed to AWS FSx storage.
-* The application owner who is interested in standing up a PostgreSQL environment in AWS FSx/EC2.
+* The DBA, who manages Oracle databases running on AWS FSx ONTAP storage.
+* The solution architect, who is interested in testing Oracle database backup, restore, and clone in the public AWS cloud.
+* The storage administrator, who supports and manages the AWS FSx ONTAP storage.
+* The application owner, who owns applications that are deployed to AWS FSx ONTAP storage 
 
 == Solution test and validation environment
 
@@ -45,31 +43,33 @@ The testing and validation of this solution was performed in an AWS FSx and EC2 
 
 === Architecture
 
-image::aws_postgres_fsx_ec2_architecture.PNG["This image provides a detailed picture of the organization of the PostgreSQL hybrid cloud solution, including the on-premises side and the AWS site."]
+image::snapctr_svcs_architecture.png["This image provides a detailed picture of the Cloud Backup for Application within BlueXP console, including the UI, connector and resources it manages."]
+
+The above image provides a detailed picture of the Cloud Backup for Application within BlueXP console, including the UI, connector and resources it manages.
 
 === Hardware and software components
 
 [%autowidth.stretch]
 |===
 3+^| *Hardware*
-| FSx ONTAP storage | Current version | Two FSx HA pairs in the same VPC and availability zone as primary and standby HA clusters
-| EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge as primary and standby compute instances
-| Ansible controller | on-prem Centos VM/4vCPU/8G | A VM to host Ansible automation controller either on-premise or in the cloud  
+| FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone
+| EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge EC2 instances, one as primary DB server and the other as clone DB server 
 
 3+^| *Software*
 | RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
-| Centos Linux | CentOS Linux release 8.2.2004 (Core) | Hosting Ansible controller deployed in on-premises lab
-| PostgreSQL | Version 14.5 | Automation pulls the latest available version of PostgreSQL from the postgresql.ora yum repo  
-| Ansible | Version 2.10.3 | Prerequisites for required collections and libraries installed with requirements playbook  
+| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
+| Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
+| Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
+| SnapCenter Service | Version |  v2.3.1.2324
 |===
 
 === Key factors for deployment consideration
 
-* *PostgreSQL database backup, restore, and recovery.* A PostgreSQL database supports a number of backup methods, such as a logical backup using pg_dump, a physical online backup with pg_basebackup or a lower-level OS backup command, and storage-level-consistent snapshots. This solution uses NetApp consistency-group snapshots for PostgreSQL database data and WAL volumes backup, restore, and recovery at the standby site. The NetApp consistency-group volume snapshots sequence I/O as it is written to storage and protect the integrity of database data files.
+* *Connector to be deployed in the same VPC as database and FSx.* When possible the connector should be deployed in the same AWS VPC, which allow connectivity to both FSx storage and EC2 compute instance.
 
-* *EC2 compute instances.* In these tests and validations, we used the AWS EC2 t2.xlarge instance type for the PostgreSQL database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for PostgreSQL in deployment because it is optimized for database workloads. The standby compute instance should always be deployed in the same zone as the passive (standby) file system deployed for the FSx HA cluster. 
+* *IAM role created for SnapCenter connector for AWS access.* The role in json format is available in detailed SnapCenter service documentation or when you launch connector deployment via BlueXP console, you are prompted for setting up the prerequisites. The role should be assigned to a AWS user account that owns the connector.
 
-* *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. A disaster-recovery standby HA pair for business continuity can be set up in a different region if a specific distance is required between the primary and standby. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. 
+* *A ssh key pair created in AWS account.* The ssh key pair will be assigned to ec2-user for login to connector host, then deploy a database plugin to EC2 DB server host.  
 
 * *PostgreSQL data and log placement.* Typical PostgreSQL deployments share the same root directory or volumes for data and log files. In our tests and validations, we have separated PostgreSQL data and logs into two separate volumes for performance. A soft link is used in the data directory to point to the log directory or volume that hosts PostgreSQL WAL logs and archived WAL logs.
 
@@ -81,44 +81,26 @@ image::aws_postgres_fsx_ec2_architecture.PNG["This image provides a detailed pic
 
 == Solution Deployment
 
-The deployment of this solution can be completed automatically using the NetApp Ansible-based automation toolkit by following the detailed instructions outlined below.
+There are extensive NetApp documentations with a broader scope on protection of your cloud native application data. The goal of this documentation is to provide step by step procedures aided by screen shots that only covers the SnapCenter service deployment via BlueXP console to protect your Oracle database deployed to AWS FSx ONTAP and EC2 compute instance. This document fills in certain details that may be missing from general and overall instructions.
 
-. Read the instructions in the automation toolkit READme.md link:https://github.com/NetApp-Automation/na_postgresql_aws_deploy_hadr[na_postgresql_aws_deploy_hadr].
+. Nevertheless, first read the general and overall instructions link:https://docs.netapp.com/us-en/cloud-manager-backup-restore/concept-protect-cloud-app-data-to-cloud.html#architecture[Protect your cloud native applications data^] and the sections related to Oracle and FSx ONTAP.
 
 . Watch the following video walk through.
 +
-video::aws_postgres_fsx_ec2_deploy_hadr.mp4[]
-
-. Configure the required parameters files (`hosts`, `host_vars/host_name.yml`, `fsx_vars.yml`) by entering user-specific parameters into the template in the relevant sections. Then use the copy button to copy files to the Ansible controller host.
+video::oracle-aws-fsx-part4c-bkup-restore-snapctrsvc_callout.mp4[]
 
 === Prerequisites for automated deployment
 
 Deployment requires the following prerequisites.
 
-. An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
+. A primary Oracle database server on EC2 instance with an Oracle database fully deployed and running. 
 
-. From the AWS EC2 console, you must deploy two EC2 Linux instances, one as the primary PostgreSQL DB server at the primary and one at the standby DR site. For compute redundancy at the primary and standby DR sites, deploy two additional EC2 Linux instances as standby PostgreSQL DB servers. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances] for more information.
+. A FSx ONTAP cluster deployed in AWS that is hosting database above.
 
-. From the AWS EC2 console, deploy two FSx ONTAP storage HA clusters to host the PostgreSQL database volumes. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems] for step-by-step instructions. 
+. An optional database server on EC2 instance that can be used for testing clone Oracle database to an alternative host for the purpose of supporting DEV/TEST workload or any use cases that requires a full data sets of production Oracle database. 
 
-. Build a Centos Linux VM to host the Ansible controller. The Ansible controller can be located either on-premises or in the AWS cloud. If it is located on-premises, you must have SSH connectivity to the VPC, EC2 Linux instances, and FSx storage clusters. 
+. If help is needed to meet the above prerequisites for Oracle database deployment on AWS FSx ONTAP and EC2 compute instance refer to this documentation link:aws_ora_fsx_ec2_iscsi_asm.htm[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^] 
 
-. Set up the Ansible controller as described in the section "Set up the Ansible Control Node for CLI deployments on RHEL/CentOS" from the resource link:https://docs.netapp.com/us-en/netapp-solutions/automation/getting-started.html[Getting Started with NetApp solution automation]. 
-
-. Clone a copy of the automation toolkit from the public NetApp GitHub site.
-+
-[source, cli]
-git clone https://github.com/NetApp-Automation/na_postgresql_aws_deploy_hadr.git
-
-. From the toolkit root directory, execute the prerequisite playbooks to install the required collections and libraries for the Ansible controller.
-+
-[source, cli] 
-ansible-playbook -i hosts requirements.yml
-+ 
-[source, cli]
-ansible-galaxy collection install -r collections/requirements.yml --force --force-with-deps
-
-. Retrieve the required EC2 FSx instance parameters for the DB host variables file `host_vars/*` and the global variables file `fsx_vars.yml` configuration.
 
 === Configure the hosts file
 
