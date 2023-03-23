@@ -32,22 +32,21 @@ VMware Cloud (in AWS) supports the use of NFS datastores as supplemental storage
 
 This solution addresses the following use cases:
 
-* Backup and restore of Windows and Linux virtual machines hosted in VMC using FSx for NetApp ONTAP as a backup target.
-* Backup and restore of Microsoft SQL Server application data using FSx for NetApp ONTAP as a backup target.
-* Backup and restore of Oracle application data using FSx for Netapp ONTAP as a backup target.
+* Backup and restore of Windows and Linux virtual machines hosted in VMC using FSx for NetApp ONTAP as a backup repository.
+* Backup and restore of Microsoft SQL Server application data using FSx for NetApp ONTAP as a backup repository.
+* Backup and restore of Oracle application data using FSx for Netapp ONTAP as a backup repository.
 
 
 .Solution Deployment Overview
 [%collapsible]
 =====
-This list provides the high level steps necessary to configure Veeam Backup & Replication and execute backup and restore jobs using FSx for ONTAP:
+This list provides the high level steps necessary to configure Veeam Backup & Replication, execute backup and restore jobs using FSx for ONTAP as a backup repository, and perform restores of SQL Server and Oracle VMs and databases:
 
 . Create the FSx for ONTAP file system to be used as iSCSI backup repository for Veeam Backup & Replication.
-. Deploy Veeam Proxy to distribute backup workloads.
+. Deploy Veeam Proxy to distribute backup workloads and mount iSCSI backup repositories hosted on FSx for ONTAP.
 . Configure Veeam Backup Jobs to backup SQL Server, Oracle, Linux and Windows virtual machines.
-. Restore of SQL Server virtual machines and individual databases.
-. Restore of Oracle virtual machines and individual databases.
-. Restore of Windows File System data.
+. Restore SQL Server virtual machines and individual databases.
+. Restore Oracle virtual machines and individual databases.
 =====
 
 .Prerequisites
@@ -56,12 +55,12 @@ This list provides the high level steps necessary to configure Veeam Backup & Re
 The purpose of this solution is to demonstrate data protection of virtual machines running in VMware Cloud and located on NFS Datastores hosted by FSx for NetApp ONTAP. This solution assumes the following components are configured and ready for use:
 
 . FSx for ONTAP filesystem with one or more NFS datastores connected to VMware Cloud.
-. A Microsoft Windows Server VM with Veeam Backup & Replication software installed.
-* The vCenter server has been discovered by the Veeam Backup & Replication server.
-. A Microsoft Windows Server VM to be installed with Veeam Backup Proxy components during the solution deployment.
-. Microsoft SQL Server VM's with VMDK's and application data residing on FSx for ONTAP NFS datastores. For this solution we had two SQL databases on two separate VMDK's.
-. Oracle Database VM's with VMDK's and application data residing on FSx for ONTAP NFS datastores.
-. Linux and Windows file server VM's with VMDK's residing on FSx for ONTAP NFS datastores.
+. Microsoft Windows Server VM with Veeam Backup & Replication software installed.
+* vCenter server has been discovered by the Veeam Backup & Replication server.
+. Microsoft Windows Server VM to be installed with Veeam Backup Proxy components during the solution deployment.
+. Microsoft SQL Server VMs with VMDKs and application data residing on FSx for ONTAP NFS datastores. For this solution we had two SQL databases on two separate VMDKs.
+. Oracle Database VMs with VMDKs and application data residing on FSx for ONTAP NFS datastores.
+. Linux and Windows file server VMs with VMDKs residing on FSx for ONTAP NFS datastores.
 =====
 
 == High Level Architecture
@@ -74,8 +73,7 @@ The purpose of this solution is to demonstrate data protection of virtual machin
 
 The testing / validation of this solution was performed in a lab that may or may not match the final deployment environment.  For more information, please refer to the following sections.
 
-image::image-name.jpg[Solution Architecture Diagram]
-=====
+image::aws-vmc-veeam-00.png[Solution Architecture Diagram]
 
 .Hardware / Software Components
 [%collapsible]
@@ -90,6 +88,7 @@ The purpose of this solution is to demonstrate data protection of virtual machin
 * Microsoft SQL Server VM's located on an FSx for ONTAP NFS Datastore
 ** Two databases hosted on separate VMDK's
 * Oracle VM's located on an FSx for ONTAP NFS Datastore
+=====
 
 == Solution Deployment
 // Describe the steps required to fully deploy the solution.
@@ -257,11 +256,11 @@ In this solution separate backup jobs were created for:
 
 . After enabling application-aware processing add the correct credentials with admin privileges to the application as this may be different than the guest OS credentials.
 +
-image::aws-vmc-veeam-18.png[Application processing settings]
+image::aws-vmc-veeam-17.png[Application processing settings]
 
 . To manage the retention policy for the backup check the *Keep certain full backups longer for archival purposes* and click the *Configure...* button to configure the policy.
 +
-image::aws-vmc-veeam-17.png[Long-term retention policy]
+image::aws-vmc-veeam-18.png[Long-term retention policy]
 =====
 
 === Restore Application VMs with Veeam full restore
@@ -352,23 +351,23 @@ In this section a database is published to an alternate server for fast access w
 
 . In the Veeam Backup and Replication console, navigate to the list of Oracle backups, right click on a server and select *Restore application items* and then *Oracle databases...*.
 +
-image::aws-vmc-veeam-33.png[Restore Oracle databases]
+image::aws-vmc-veeam-32.png[Restore Oracle databases]
 
 . In the Oracle Database Restore Wizard select a restore point from the list and click on *Next*.
 +
-image::aws-vmc-veeam-34.png[Select a restore point from the list]
+image::aws-vmc-veeam-33.png[Select a restore point from the list]
 
 . Enter a *Restore reason* if desired and then, on the Summary page, click on the *Browse* button to launch Veeam Explorer for Oracle.
 
 . In Veeam Explorer expand the list of database instances, click on the database to be restored and then from the *Publish Database* drop-down menu at the top select *Publish to another server...*.
 +
-image::aws-vmc-veeam-35.png[Select a restore point from the list]
+image::aws-vmc-veeam-34.png[Select a restore point from the list]
 
 . In the Publish wizard, specify the restore point at which to publish the database from and click *Next*.
 
 . Finally, specify the target linux file system location and click on *Publish* to begin the restore process.
 +
-image::aws-vmc-veeam-36.png[Select a restore point from the list]
+image::aws-vmc-veeam-35.png[Select a restore point from the list]
 
 . Once the publish has completed log into the target server and run the following commands to ensure the database is running:
 +
@@ -380,7 +379,7 @@ oracle@ora_srv_01> sqlplus / as sysdba
 SQL> select name, open_mode from v$database;
 ....
 +
-image::aws-vmc-veeam-37.png[Select a restore point from the list]
+image::aws-vmc-veeam-36.png[Select a restore point from the list]
 
 =====
 
