@@ -13,9 +13,9 @@ summary:
 // For the imagesdir setting, make sure the path to the media folder is correct.  The default path assumes
 // the source is located in the root of the repository.  Select the appropriate setting based on the level
 // of the folder containing the source
-:imagesdir: ./media/
-// :imagesdir: ./../media/
-// :imagesdir: ./../../media/
+//:imagesdir: ./media/
+//:imagesdir: ./../media/
+:imagesdir: ./../../media/
 
 
 [.lead]
@@ -25,28 +25,46 @@ Author: Josh Powell - NetApp Solutions Engineering
 // Describe WHAT problem this solution addresses.  What are the use cases(s) and how does it solve a problem?
 // Use a bulleted list and keep it brief!
 
-Veeam Backup & Replication is an effective and reliable solution for protecting data on VMware Cloud on AWS. This solution demonstrates the proper setup and configuration for using Veeam Backup and Replication to backup and restore application VM’s residing on FSx for ONTAP NFS datastores in VMware Cloud.
+Veeam Backup & Replication is an effective and reliable solution for protecting data in VMware Cloud. This solution demonstrates the proper setup and configuration for using Veeam Backup and Replication to backup and restore application VMs residing on FSx for ONTAP NFS datastores in VMware Cloud.
 
-VMware Cloud supports the use of NFS datastores as secondary storage, and FSx for NetApp ONTAP is a secure solution for customers who need to store large amounts of data for their cloud applications that can scale independent of the number of ESXi hosts in the SDDC cluster. This integrated AWS storage service offers highly efficient storage with all of the traditional NetApp ONTAP capabilities. 
+VMware Cloud (in AWS) supports the use of NFS datastores as supplemental storage, and FSx for NetApp ONTAP is a secure solution for customers who need to store large amounts of data for their cloud applications that can scale independent of the number of ESXi hosts in the SDDC cluster. This integrated AWS storage service offers highly efficient storage with all of the traditional NetApp ONTAP capabilities. 
 
 
 This solution addresses the following use cases:
 
-* Backup and restore of Windows and Linux virtual machines using FSx for NetApp ONTAP as a backup target.
+* Backup and restore of Windows and Linux virtual machines hosted in VMC using FSx for NetApp ONTAP as a backup target.
 * Backup and restore of Microsoft SQL Server application data using FSx for NetApp ONTAP as a backup target.
 * Backup and restore of Oracle application data using FSx for Netapp ONTAP as a backup target.
 
 
-== Audience
-// Who is this solution directed at?  DevOps engineer, IT specialist, DB administrator, etc.
-// If there are multiple audiences, use a list to identity them.
+.Solution Deployment Overview
+[%collapsible]
+=====
+This list provides the high level steps necessary to configure Veeam Backup & Replication and execute backup and restore jobs using FSx for ONTAP:
 
-This solution is intended for the:
+. Create the FSx for ONTAP file system to be used as iSCSI backup repository for Veeam Backup & Replication.
+. Deploy Veeam Proxy to distribute backup workloads.
+. Configure Veeam Backup Jobs to backup SQL Server, Oracle, Linux and Windows virtual machines.
+. Restore of SQL Server virtual machines and individual databases.
+. Restore of Oracle virtual machines and individual databases.
+. Restore of Windows File System data.
+=====
 
-* VMware Cloud administrator interested in a proven backup and restore solution for their virtual machines and application data
-* IT decision makers investigating data protection solutions that works seamlessly with VMware Cloud and FSx for NetApp ONTAP
+.Prerequisites
+[%collapsible]
+=====
+The purpose of this solution is to demonstrate data protection of virtual machines running in VMware Cloud and located on NFS Datastores hosted by FSx for NetApp ONTAP. This solution assumes the following components are configured and ready for use:
 
-== Solution Test / Validation Environment
+. FSx for ONTAP filesystem with one or more NFS datastores connected to VMware Cloud.
+. A Microsoft Windows Server VM with Veeam Backup & Replication software installed.
+* The vCenter server has been discovered by the Veeam Backup & Replication server.
+. A Microsoft Windows Server VM to be installed with Veeam Backup Proxy components during the solution deployment.
+. Microsoft SQL Server VM's with VMDK's and application data residing on FSx for ONTAP NFS datastores. For this solution we had two SQL databases on two separate VMDK's.
+. Oracle Database VM's with VMDK's and application data residing on FSx for ONTAP NFS datastores.
+. Linux and Windows file server VM's with VMDK's residing on FSx for ONTAP NFS datastores.
+=====
+
+== High Level Architecture
 // Identify the environment in which the solution was tested / validated.
 
 // Things to consider including here are:
@@ -54,14 +72,7 @@ This solution is intended for the:
 // * Software / hardware and version / release levels or model numbers
 // * Specific configuration that might be unique to a lab / test environment
 
-
-
 The testing / validation of this solution was performed in a lab that may or may not match the final deployment environment.  For more information, please refer to the following sections.
-
-.Architecture
-[%collapsible]
-=====
-// Insert an image that shows how the solution is architected.
 
 image::image-name.jpg[Solution Architecture Diagram]
 =====
@@ -79,35 +90,6 @@ The purpose of this solution is to demonstrate data protection of virtual machin
 * Microsoft SQL Server VM's located on an FSx for ONTAP NFS Datastore
 ** Two databases hosted on separate VMDK's
 * Oracle VM's located on an FSx for ONTAP NFS Datastore
-* 
-
-[%autowidth.stretch]
-|===
-// 3+^| *Hardware*
-// | <hardware name> | <model / version> | More Information
-
-3+^| *Software*
-| VMware Cloud | 11.? | More Information
-| Veeam Backup & Replication | 11.? | More Information
-| Veeam Backup Proxy | 11.? | More Information
-| FSx for NetApp ONTAP | ??? | More Information
-| Microsoft Windows SQL Server | 2019 Datacenter | More Information
-| Oracle | ??? | More Information
-| Windows Server 2019 | ??? | More Information
-| CentOS | 8.? | More Information
-|===
-=====
-
-.Additional Notes
-[%collapsible]
-=====
-// Identify anything that might differ in a production environment that was different in a lab environment or assumptions that were made
-
-* Note 1
-* Note 2
-...
-* Note n
-=====
 
 == Solution Deployment
 // Describe the steps required to fully deploy the solution.
@@ -115,81 +97,220 @@ The purpose of this solution is to demonstrate data protection of virtual machin
 // Include screenshots, demo videos, etc. that make the steps as simple and clear as possible.
 // DO NOT overdo it with screenshots - where options are "obvious", a screenshot might not be necessary.
 
-The deployment of this solution can be completed:
+In this solution we provide detailed instructions for deploying and validating a solution utilizing Veeam Backup and Replication software to perform backup and recovery of SQL Server, Oracle, and Windows and Linux file server virtual machines in a VMware Cloud SDDC on AWS. The Virtual Machines in this solution reside on a supplemental NFS datastore hosted by FSx for ONTAP. We will go over FSx for ONTAP file system creation, mounting iSCSI volumes to be used as backup repositories, creating and running backup jobs, and performing VM and database restores.
 
-. Manually by following the detailed instructions complete with screenshots, 
-. Manually by following along with videos showing the steps to be executed, or 
-. Automatically following the instructions provided in the automation section.
+For detailed information on FSx for NetApp ONTAP refer to the https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx for ONTAP User Guide^].
 
-[role="tabbed-block"]
-====
-.Detailed instructions
---
-.Step 1: Create FSx for ONTAP file system to be used as the backup repository for the Veeam proxy servers
+For detailed information on Veeam Backup and Replication refer to the https://www.veeam.com/documentation-guides-datasheets.html?productId=8&version=product%3A8%2F221[Veeam Help Center Technical Documentation^] site.
+
+=== Deploy Veeam Proxy server
+
+The Veeam Proxy server is a secondary backup server that has direct access to a backup repository and helps to distribute backup and restore workloads. In this step we cover deployment of the proxy server on a Windows VM in the VMC SDDC.
+
+.Deploy Veeam Proxy to distribute backup workloads
 [%collapsible]
 =====
-1. In the AWS console, Go to FSx and then "Create file system" 
+In this step the Veeam Proxy is deployed to an existing Windows VM. This allows backup jobs to be distributed between the primary Veeam Backup Server and the Veeam Proxy.
 
-image::aws-vmc-veeam-image01.png[Create File System]
+. On the Veeam Backup and Replication server, open the administration console and select *Backup Infrastructure* in the lower left menu.
 
-2. For file system type 
-...
-. Task n
+. Right click on *Backup Proxies* and click on *Add VMware backup proxy...* to open the wizard.
++
+image::aws-vmc-veeam-04.png[Open the Add Veeam backup proxy wizard]
+
+. In the *Add VMware Proxy* wizard click the *Add New...* button to add a new proxy server.
++
+image::aws-vmc-veeam-05.png[Select to add a new server]
+
+. Select to add Microsoft Windows and follow the prompts to add the server:
+* Fill out the DNS name or IP address
+* Select an account to use for Credentials on the new system or add new credentials
+* Review the components to be installed and then click on *Apply* to begin the deployment
++
+image::aws-vmc-veeam-06.png[Fills prompts to add new server]
+
+. Back in the *New VMware Proxy* wizard, choose a Transport Mode. In our case we chose *Direct storage access* in order to retrieve data directly from the NFS volume while avoiding impact to the production ESXi hosts. 
++
+image::aws-vmc-veeam-07.png[Select transport mode]
+
+. Select the Connected datastores that you want the VMware Proxy to have direct access to. 
++
+image::aws-vmc-veeam-08.png[Select a server for VMware Proxy]
++
+image::aws-vmc-veeam-09.png[Select datastores to access]
+
+. Configure and apply any specific network traffic rules such as encryption or throttling that are desired. When complete click on the *Apply* button to complete the deployment.
++
+image::aws-vmc-veeam-10.png[Configure network traffic rules]
 =====
 
-.Step 2: <descriptive step name>
+=== Configure storage and Backup Repositories
+
+The primary Veeam Backup server and Veeam Proxy server have access to a backup repository in the form of direct connected storage. In this section we cover creating an FSx for ONTAP file system, mounting iSCSI LUNs to the Veeam servers and creating Backup Repositories.
+
+.Create FSx for ONTAP file system
 [%collapsible]
 =====
-. Task 1
-. Task 2
-...
-. Task n
+Create an FSx for ONTAP file system that will be used to host the iSCSI volumes for the Veeam Backup Repositories.
+
+. In the AWS console, Go to FSx and then *Create file system* 
++
+image::aws-vmc-veeam-01.png[Create FSx for ONTAP File System]
+
+. Select *Amazon FSx for NetApp ONTAP* and then *Next* to continue. 
++
+image::aws-vmc-veeam-02.png[Select Amazon FSx for NetApp ONTAP]
+
+. Fill in the file system name, deployment type, SSD storage capacity and the VPC in which the FSx for ONTAP cluster will reside. This must be a VPC configured to communicate with the virtual machine network in VMware Cloud. Click on *Next*.
++
+image::aws-vmc-veeam-03.png[Fill out File System Info]
+
+. Review the deployment steps and click on *Create File System* to begin the file system creation process.
 =====
 
-...
-
-.Step n: <descriptive step name>
+.Configure and mount iSCSI LUNs
 [%collapsible]
 =====
-. Task 1
-. Task 2
-...
-. Task n
+Create and configure the iSCSI LUNs on FSx for ONTAP and mount to the Veeam backup and proxy servers. These LUNs will later be used to create Veeam backup repositories.
+
+NOTE: Creating an iSCSI LUN on FSx for ONTAP is a multi-step process. The first step of creating the volumes can be accomplished in the Amazon FSx Console or with the NetApp ONTAP CLI.
+
+NOTE: For more information on using FSx for ONTAP, see the https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx for ONTAP User Guide^].
+
+. From the NetApp ONTAP CLI create the initial volumes using the following command:
++
+....
+FSx-Backup::> FSx-Backup::> volume create -vserver svm_name -volume vol_name -aggregate aggregate_name -size vol_size -type RW
+....
+
+. Create LUNs using the volumes created in the previous step:
++
+....
+FSx-Backup::> lun create -vserver svm_name -path /vol/vol_name/lun_name -size size -ostype windows -space-allocation enabled
+....
+
+. Grant access to the LUNs by creating an initiator group containing the iSCSI IQN of the Veeam backup and proxy servers:
++
+....
+FSx-Backup::> igroup create -vserver svm_name -igroup igroup_name -protocol iSCSI -ostype windows -initiator IQN
+....
+NOTE: To complete the preceding step you will need to first retrieve the IQN from the iSCSI initiator properties on the Windows servers.
+
+. Finally, map the LUNs to the initiator group that you just created:
++
+....
+FSx-Backup::> lun mapping create -vserver svm_name -path /vol/vol_name/lun_name igroup igroup_name
+....
+
+. To mount the iSCSI LUNs, log into the Veeam Backup & Replication Server and open iSCSI Initiator Properties. Go to the *Discover* tab and enter the iSCSI target IP address.
++
+image::aws-vmc-veeam-11.png[iSCSI Initiator Discovery]
+
+. On the *Targets* tab, highlight the inactive LUN and click on *Connect*. Check the *Enable multi-path* box and click on *OK* to connect to the LUN.
++
+image::aws-vmc-veeam-12.png[Connect iSCSI Initiator to LUN]
+
+. In the Disk Management utility initialize the new LUN and create a volume with the desired name and drive letter. Check the *Enable multi-path* box and click on *OK* to connect to the LUN.
++
+image::aws-vmc-veeam-13.png[Windows Disk Management]
+
+. Repeat these steps to mount the iSCSI volumes on the Veeam Proxy server. 
 =====
---
-.Video Walkthrough
---
-<Include the video(s) details here>
---
-.Automated Deployment
---
-<include the automated steps/process/videos here>
---
-====
 
-== Other Deployment Options
-// Are there other options for deployment (alternate 3rd party software, another way to address the same problem, etc.)?
-// If so, BRIEFLY describe them here and point to documentation for more details on those options.
-
-.<Description of Option 1>
+.Create Veeam Backup Repositories
 [%collapsible]
 =====
-<enter the details of the option here>
+In the Veeam Backup and Replication console, create backup repositories for the Veeam Backup and Veeam Proxy servers. These repositories will be used as backup targets for the virtual machines backups.
+
+. In the Veeam Backup and Replication console click on *Backup Infrastructure* in the lower left and then select *Add Repository*
++
+image::aws-vmc-veeam-14.png[Create a new Backup Repository]
+
+. In the New Backup Repository wizard, enter a name for the repository and then select the server from the drop-down list and click on the *Populate* button to choose the NTFS volume that will be used.
++
+image::aws-vmc-veeam-15.png[Select Backup Repository server]
+
+. On the next page choose a Mount server that will be used to mount backups to when performing advanced restores. By default this is the same server that has the repository storage connected.
+
+. Review your selections and click on *Apply* to start the backup repository creation.
++
+image::aws-vmc-veeam-16.png[Choose Mount server]
+
+. Repeat these steps for any additional proxy servers.
 =====
 
-.<Description of Option 2>
+=== Configure Veeam backup jobs
+
+Backup jobs should be created utilizing the the Backup Repositories in the previous section. Creating backup jobs is a normal part of any storage administrator’s repertoire and we do not cover all of the steps here. For more complete information on creating backup jobs in Veeam, see the https://www.veeam.com/documentation-guides-datasheets.html?productId=8&version=product%3A8%2F221[Veeam Help Center Technical Documentation^].
+
+In this solution separate backup jobs were created for:
+
+* Microsoft Windows SQL Servers
+* Oracle database servers
+* Windows file servers
+* Linux file servers
+
+.General considerations when configuring Veeam backup jobs
 [%collapsible]
 =====
-<enter the details of the option here>
+. Enable application-aware processing to create consistent backups and perform transaction log processing.
+
+. After enabling application-aware processing add the correct credentials with admin privileges to the application as this may be different than the guest OS credentials.
++
+image::aws-vmc-veeam-18.png[Application processing settings]
+
+. To manage the retention policy for the backup check the *Keep certain full backups longer for archival purposes* and click the *Configure...* button to configure the policy.
++
+image::aws-vmc-veeam-17.png[Long-term retention policy]
 =====
 
-...
+=== Restore Application VMs with Veeam full restore
+Performing a full restore with Veeam provides a crash consistent application state that is suitable in some situations. We validated that full restores of our VMs powered on and we were able to consistently bring up our SQL Server and Oracle databases in this manner. 
 
-.<Description of Option n>
+Restoring servers is a normal part of any storage administrator’s repertoire and we do not cover all of the steps here. For more complete information on performing full restores in Veeam, see the https://www.veeam.com/documentation-guides-datasheets.html?productId=8&version=product%3A8%2F221[Veeam Help Center Technical Documentation^].
+
+=== Restore SQL Server databases
+Veeam Backup & Replication provides several options for restoring SQL Server databases. For this validation we used the Veeam Explorer for SQL Server with Instant Recovery to execute restores of our SQL Server databases. SQL Server Instant Recovery is a feature that allows you to quickly restore SQL Server databases without having to wait for a full database restore. This rapid recovery process minimizes downtime and ensures business continuity. Here's how it works:
+
+* Veeam Explorer *mounts the backup* containing the SQL Server database to be restored.
+* The software *publishes the database* directly from the mounted files, making it accessible as a temporary database on the target SQL Server instance.
+* While the temporary database is in use, Veeam Explorer *redirects user queries* to this database, ensuring that users can continue to access and work with the data.
+* In the background, Veeam *performs a full database restore*, transferring data from the temporary database to the original database location.
+* Once the full database restore is complete, Veeam Explorer *switches user queries back to the original* database and removes the temporary database.
+
+.Restore SQL Server database with Veeam SQL Server Instant Recovery
 [%collapsible]
 =====
-<enter the details of the option here>
+. In the Veeam Backup and Replication console, navigate to the list of SQL Server backups, right click on a server and select *Restore application items* and then *Microsoft SQL Server databases...*.
++
+image::aws-vmc-veeam-19.png[Restore SQL Server databases]
+
+. In the Microsoft SQL Server Database Restore Wizard select a restore point from the list and click on *Next*.
++
+image::aws-vmc-veeam-20.png[Select a restore point from the list]
+
+. Enter a *Restore reason* if desired and then, on the Summary page, click on the *Browse* button to launch Veeam Explorer for Microsoft SQL Server.
++
+image::aws-vmc-veeam-21.png[Click on Browse to launch Veeam Explorer]
+
+. In Veeam Explorer expand the list of database instances, right click and select *Instant recovery* and then the specific restore point to recover to.
++
+image::aws-vmc-veeam-22.png[Select instant recovery restore point]
+
+. In the Instant Recovery Wizard specify the switchover type. This can either be automatically with minimal downtime, manually, or at a specified time. Then click the *Recover* button to begin the restore process.
++
+image::aws-vmc-veeam-23.png[Select instant recovery restore point]
+
+. The recovery process can be monitored from Veeam Explorer.
++
+image::aws-vmc-veeam-24.png[Select instant recovery restore point]
 =====
+
+== Conclusion
+
+The use case presented in this documentation focuses on proven data protection technologies that highlight the integration between NetApp and VMware. FSx for ONTAP on AWS is supplemental datastores. Veeam Backup & Replication is another well-known technology that .
+
+This solution presented a data protection solution using guest connect storage from an ONTAP system hosting SQL Server and Oracle application data. SnapCenter with SnapMirror provides an easy-to-manage solution for protecting application volumes on ONTAP systems and replicating them to FSx or CVO residing in the cloud. SnapCenter is a DR-enabled solution for failing over all application data to VMware Cloud on AWS.
 
 == Additional Information
 // Include references to other documentation (internal or external), videos, demos, blogs, etc. that support the solution.
