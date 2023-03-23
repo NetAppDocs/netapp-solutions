@@ -307,11 +307,13 @@ image::aws-vmc-veeam-24.png[monitor sql server recovery process]
 =====
 
 === Restore Oracle databases with Veeam Explorer
-Veeam Explorer for Oracle database provides the ability to perform a standard Oracle database restore or an uninterrupted restore using Instant Recovery. It also supports recovery of Data Guard databases and restores from RMAN backups. In this section an Oracle database restore to a different server is covered using Veeam Explorer.
+Veeam Explorer for Oracle database provides the ability to perform a standard Oracle database restore or an uninterrupted restore using Instant Recovery. It also supports publishing databases for fast access, recovery of Data Guard databases and restores from RMAN backups. 
 
 .Restore Oracle database with Veeam Explorer
 [%collapsible]
 =====
+In this section an Oracle database restore to a different server is covered using Veeam Explorer. 
+
 . In the Veeam Backup and Replication console, navigate to the list of Oracle backups, right click on a server and select *Restore application items* and then *Oracle databases...*.
 +
 image::aws-vmc-veeam-25.png[Restore Oracle databases]
@@ -326,37 +328,71 @@ image::aws-vmc-veeam-27.png[Click on Browse to launch Veeam Explorer]
 
 . In Veeam Explorer expand the list of database instances, click on the database to be restored and then from the *Restore Database* drop-down menu at the top select *Restore to another server...*.
 +
-image::aws-vmc-veeam-28.png[Click on Browse to launch Veeam Explorer]
+image::aws-vmc-veeam-28.png[Select restore to another server]
 
 . In the Restore Wizard specify the restore point to restore from and click *Next*.
 +
-image::aws-vmc-veeam-29.png[Click on Browse to launch Veeam Explorer]
+image::aws-vmc-veeam-29.png[Select the restore point]
 
 . Specify the target server the database will be restored to and the account credentials and click *Next*.
 +
-image::aws-vmc-veeam-30.png[Click on Browse to launch Veeam Explorer]
+image::aws-vmc-veeam-30.png[Specify target server credentials]
 
 . Finally, specify the database files target location and click the *Restore* button to start the restore process.
 +
-image::aws-vmc-veeam-30.png[Click on Browse to launch Veeam Explorer]
+image::aws-vmc-veeam-31.png[Specifty target location]
 
-. Finally, specify the database files target location and click the *Restore* button to start the restore process.
+. Once the database recovery is complete check that the Oracle database starts properly on the server.
+=====
+
+.Publish Oracle database to alternate server
+[%collapsible]
+=====
+In this section a database is published to an alternate server for fast access without launching a full restore.
+
+. In the Veeam Backup and Replication console, navigate to the list of Oracle backups, right click on a server and select *Restore application items* and then *Oracle databases...*.
 +
-image::aws-vmc-veeam-31.png[Click on Browse to launch Veeam Explorer]
+image::aws-vmc-veeam-33.png[Restore Oracle databases]
 
+. In the Oracle Database Restore Wizard select a restore point from the list and click on *Next*.
++
+image::aws-vmc-veeam-34.png[Select a restore point from the list]
+
+. Enter a *Restore reason* if desired and then, on the Summary page, click on the *Browse* button to launch Veeam Explorer for Oracle.
+
+. In Veeam Explorer expand the list of database instances, click on the database to be restored and then from the *Publish Database* drop-down menu at the top select *Publish to another server...*.
++
+image::aws-vmc-veeam-35.png[Select a restore point from the list]
+
+. In the Publish wizard, specify the restore point at which to publish the database from and click *Next*.
+
+. Finally, specify the target linux file system location and click on *Publish* to begin the restore process.
++
+image::aws-vmc-veeam-36.png[Select a restore point from the list]
+
+. Once the publish has completed log into the target server and run the following commands to ensure the database is running:
++
+....
+oracle@ora_srv_01> sqlplus / as sysdba
+....
++
+....
+SQL> select name, open_mode from v$database;
+....
++
+image::aws-vmc-veeam-37.png[Select a restore point from the list]
 
 =====
 
 == Conclusion
 
-VMware Cloud is a powerful platform for running business-critical applications and storing sensitive data. A secure data protection solution is essential for businesses that rely on VMware Cloud. It ensures business continuity, and helps protect against cyber threats and data loss. By choosing a reliable and robust data protection solution, businesses can be confident that their critical data is safe and secure, no matter what.
+VMware Cloud is a powerful platform for running business-critical applications and storing sensitive data. A secure data protection solution is essential for businesses that rely on VMware Cloud to ensure business continuity and help protect against cyber threats and data loss. By choosing a reliable and robust data protection solution, businesses can be confident that their critical data is safe and secure, no matter what.
 
-The use case presented in this documentation focuses on proven data protection technologies that highlight the integration between NetApp and VMware. FSx for ONTAP is supported as supplemental datastores for VMware Cloud in AWS and is used for all virtual machine and application data. Veeam Backup & Replication is a comprehensive data protection solution designed to help businesses improve, automate, and streamline their backup and recovery processes. Veeam is used in conjunction with iSCSI volumes hosted on FSx for ONTAP to provide a secure and easy to manage data protection solution for application data residing in VMware Cloud. 
-
+The use case presented in this documentation focuses on proven data protection technologies that highlight the integration between NetApp, VMware, and Veeam. FSx for ONTAP is supported as supplemental NFS datastores for VMware Cloud in AWS and is used for all virtual machine and application data. Veeam Backup & Replication is a comprehensive data protection solution designed to help businesses improve, automate, and streamline their backup and recovery processes. Veeam is used in conjunction with iSCSI backup target volumes, hosted on FSx for ONTAP, to provide a secure and easy to manage data protection solution for application data residing in VMware Cloud. 
 
 
 == Additional Information
-// Include references to other documentation (internal or external), videos, demos, blogs, etc. that support the solution.
+To learn more about the technologies presented in this solution refer to the following additional information.
 
 * https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx for ONTAP User Guide^]
 * https://www.veeam.com/documentation-guides-datasheets.html?productId=8&version=product%3A8%2F221[Veeam Help Center Technical Documentation^]
