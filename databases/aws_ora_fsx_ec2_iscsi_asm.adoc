@@ -89,9 +89,9 @@ Deployment requires the following prerequisites.
 
 . An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
 
-. From the AWS EC2 console, you need to deploy two EC2 Linux instances, one as the primary Oracle DB server and an optional alternative clone target DB server. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances] for more information.
+. From the AWS EC2 console, you need to deploy two EC2 Linux instances, one as the primary Oracle DB server and an optional alternative clone target DB server. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
 
-. From the AWS EC2 console, deploy a FSx ONTAP storage HA clusters to host the Oracle database volumes. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems] for step-by-step instructions.
+. From the AWS EC2 console, deploy a FSx ONTAP storage HA clusters to host the Oracle database volumes. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
 
 . The above step 2 and 3 can be setup using following Terraform automation toolkit, which will create an EC2 instance named ora_01 and a FSx file system named as fsx_01. Review the instruction carefully and change the variables to your environment specifics before execution.
 +
@@ -106,20 +106,49 @@ git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
 ====
 With prerequisites provisioned, login into EC2 instance as root user to configure linux kernel for Oracle installation.
 
-. From Oracle, download and install Oracle 19c preinstall RPM, which will satisfy most kernel configuration requirement
+. Create a staging directory /tmp/archive folder and set 777 permission
 +
 [source, cli]
-yum install oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
+mkdir /tmp/archive
++
+[source, cli]
+chmod 777 /tmp/archive
+
+. Download and stage Oracle binary installation files and other required rpm files to /tmp/archive directory
++
+The list of installation files to be stated in /tmp/archive on EC2 instance
++
+[ec2-user@ip-172-30-15-58 ~]$ ls -l /tmp/archive
+total 10537316
+-rw-rw-r--. 1 ec2-user ec2-user      19112 Mar 21 15:57 compat-libcap1-1.10-7.el7.x86_64.rpm
+-rw-rw-r--  1 ec2-user ec2-user 3059705302 Mar 21 22:01 LINUX.X64_193000_db_home.zip
+-rw-rw-r--  1 ec2-user ec2-user 2889184573 Mar 21 21:09 LINUX.X64_193000_grid_home.zip
+-rw-rw-r--. 1 ec2-user ec2-user     589145 Mar 21 15:56 netapp_linux_unified_host_utilities-7-1.x86_64.rpm
+-rw-rw-r--. 1 ec2-user ec2-user      31828 Mar 21 15:55 oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
+-rw-rw-r--  1 ec2-user ec2-user 2872741741 Mar 21 22:31 p34762026_190000_Linux-x86-64.zip
+-rw-rw-r--  1 ec2-user ec2-user 1843577895 Mar 21 22:32 p34765931_190000_Linux-x86-64.zip
+-rw-rw-r--  1 ec2-user ec2-user  124347218 Mar 21 22:33 p6880880_190000_Linux-x86-64.zip
+-rw-r--r--  1 ec2-user ec2-user     257136 Mar 22 16:25 policycoreutils-python-utils-2.9-9.el8.noarch.rpm
+
+. Install Oracle 19c preinstall RPM, which will satisfy most kernel configuration requirement
++
+[source, cli]
+yum install /tmp/archive/oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
 
 . Download and install missing compat-libcap1 in Linux 8
 +
 [source, cli]
-yum install compat-libcap1-1.10-7.el7.x86_64.rpm
+yum install /tmp/archive/compat-libcap1-1.10-7.el7.x86_64.rpm
 
 . From NetApp, download and install NetApp host utilities 
 +
 [source, cli]
-yum install netapp_linux_unified_host_utilities-7-1.x86_64.rpm
+yum install /tmp/archive/netapp_linux_unified_host_utilities-7-1.x86_64.rpm
+
+. Install policycoreutils-python-utils not available in EC2 instance
++
+[source, cli]
+yum install /tmp/archive/policycoreutils-python-utils-2.9-9.el8.noarch.rpm
 
 . Install open JDK version 1.8
 +
@@ -161,17 +190,17 @@ Add following lines in /etc/rc.local to disable transparent_hugepage after reboo
 [source, cli]
 vi /etc/sysconfig/selinux
 
-. Add following lines to limit.conf to set file descriptor limit and stack size
+. Add following lines to limit.conf to set file descriptor limit and stack size without quote " "
 +
 [source, cli]
-/etc/security/limits.conf
+vi /etc/security/limits.conf
 +
   "*               hard    nofile          65536"
   "*               soft    stack           10240"
 
 . Add swap space to EC2 instance by following this instruction: link:https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^] The exact amount of space to add depends on the size of RAM up to 16G.
 
-. Change node.session.timeo.replacement_timeout in iscsi.conf configuration file to 5 seconds
+. Change node.session.timeo.replacement_timeout in iscsi.conf configuration file from 120 to 5 seconds
 +
 [source, cli]
 vi /etc/iscsi/iscsid.conf
@@ -470,28 +499,22 @@ sudo mount -t xfs /dev/mapper/ora_01_biny_01p1 /u01
 [source, cli]
 chown oracle:oinstall /u01
 
+. Find UUI of binary lun
++
+[source, cli]
+sudo blkid /dev/mapper/ora_01_biny_01p1
+
 . Add mount point to /etc/fstab 
 +
 [source, cli]
 sudo vi /etc/fstab
 +
-add this line "/dev/mapper/ora_01_biny_01p1 /u01 xfs defaults 0 0"
+add this line "UUID=d89fb1c9-4f89-4de4-b4d9-17754036d11d       /u01    xfs     defaults,nofail 0       2"
++
+[NOTE]
++
+It is important to mount binary with only UUID and with nofail option to avoid possible root lock issue during EC2 instance reboot.
 
-. Download and staging Oracle binary installation files to /tmp/archive directory
-+
-The list of installation files to be stated in /tmp/archive on EC2 instance
-+
-[ec2-user@ip-172-30-15-58 ~]$ ls -l /tmp/archive
-total 10537316
--rw-rw-r--. 1 ec2-user ec2-user      19112 Mar 21 15:57 compat-libcap1-1.10-7.el7.x86_64.rpm
--rw-rw-r--  1 ec2-user ec2-user 3059705302 Mar 21 22:01 LINUX.X64_193000_db_home.zip
--rw-rw-r--  1 ec2-user ec2-user 2889184573 Mar 21 21:09 LINUX.X64_193000_grid_home.zip
--rw-rw-r--. 1 ec2-user ec2-user     589145 Mar 21 15:56 netapp_linux_unified_host_utilities-7-1.x86_64.rpm
--rw-rw-r--. 1 ec2-user ec2-user      31828 Mar 21 15:55 oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
--rw-rw-r--  1 ec2-user ec2-user 2872741741 Mar 21 22:31 p34762026_190000_Linux-x86-64.zip
--rw-rw-r--  1 ec2-user ec2-user 1843577895 Mar 21 22:32 p34765931_190000_Linux-x86-64.zip
--rw-rw-r--  1 ec2-user ec2-user  124347218 Mar 21 22:33 p6880880_190000_Linux-x86-64.zip
--rw-r--r--  1 ec2-user ec2-user     257136 Mar 22 16:25 policycoreutils-python-utils-2.9-9.el8.noarch.rpm
 ====
 
 === Oracle grid infrastructure installation
@@ -609,11 +632,6 @@ chown oracle:oinstall /dev/mapper/ora_01_logs_02
 +
 [source, cli]
 rpm -ivh /u01/app/oracle/product/19.0.0/grid/cv/rpm/cvuqdisk-1.0.10-1.rpm
-
-. Install policycoreutils-python-utils not available in EC2 instance
-+
-[source, cli]
-yum install /tmp/archive/policycoreutils-python-utils-2.9-9.el8.noarch.rpm
 
 . Unset $ORACLE_BASE
 +
