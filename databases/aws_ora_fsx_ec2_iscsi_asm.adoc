@@ -263,14 +263,22 @@ lun create -path /vol/ora_01_biny/ora_01_biny_01 -size 40G -ostype linux
 +
 [source, cli]
 lun create -path /vol/ora_01_data/ora_01_data_01 -size 20G -ostype linux
++
+[source, cli]
 lun create -path /vol/ora_01_data/ora_01_data_02 -size 20G -ostype linux
++
+[source, cli]
 lun create -path /vol/ora_01_data/ora_01_data_03 -size 20G -ostype linux
++
+[source, cli]
 lun create -path /vol/ora_01_data/ora_01_data_04 -size 20G -ostype linux
 
 . Create logs luns within database logs volume
 +
 [source, cli]
 lun create -path /vol/ora_01_logs/ora_01_logs_01 -size 40G -ostype linux
++
+[source, cli]
 lun create -path /vol/ora_01_logs/ora_01_logs_02 -size 40G -ostype linux
 
 . Create igroup for EC2 instance with initiator retrieved from step 14 of EC2 kernel configuration above 
@@ -663,15 +671,25 @@ ignore the warnings about wrong groups for grid infrastructure. We are using sin
 [source, cli]
 /u01/app/oracle/product/19.0.0/grid/gridSetup.sh -executeConfigTools -responseFile /tmp/archive/gridsetup.rsp -silent
 
-. As oracle user, create LOGS disk group
+. If you received message "[INS-43080] Some of the configuration assistants failed, were cancelled or skipped", as oracle user, run following command to check if DATA disk group resource is created.
 +
 [source, cli]
-bin/asmca -silent -sysAsmPassword 'yourPWD' -asmsnmpPassword 'yourPWD' -createDiskGroup -diskString '/dev/mapper/*' -diskGroupName LOGS -disklist '/dev/mapper/ora_logs_01,/dev/mapper/ora_logs_02' -redundancy EXTERNAL
+bin/crsctl stat res -t
 
-. If needed, as oracle user, create DATA disk group if not created through grid installation
+. If DATA disk group not created, as root user, reload the multipathd
++
+[source, cli]
+systemctl restart multipathd
+
+. As oracle user, create DATA disk group if not created during grid installation. 
 +
 [source, cli]
 bin/asmca -silent -sysAsmPassword 'yourPWD' -asmsnmpPassword 'yourPWD' -createDiskGroup -diskString '/dev/mapper/*' -diskGroupName DATA -disklist '/dev/mapper/ora_01_data_01,/dev/mapper/ora_01_data_02,/dev/mapper/ora_01_data_03,/dev/mapper/ora_01_data_04' -redundancy EXTERNAL 
+
+. As oracle user, create LOGS disk group
++
+[source, cli]
+bin/asmca -silent -sysAsmPassword 'yourPWD' -asmsnmpPassword 'yourPWD' -createDiskGroup -diskString '/dev/mapper/*' -diskGroupName LOGS -disklist '/dev/mapper/ora_01_logs_01,/dev/mapper/ora_01_logs_02' -redundancy EXTERNAL
 
 . As oracle user, validate grid services after installation configuration
 +
@@ -693,6 +711,9 @@ ora.evmd            ONLINE  ONLINE       ip-172-30-15-58          STABLE
 
 . Valiate ASM filter driver status
 +
+[oracle@ip-172-30-15-58 grid]$ export ORACLE_HOME=/u01/app/oracle/product/19.0.0/grid
+[oracle@ip-172-30-15-58 grid]$ export ORACLE_SID=+ASM
+[oracle@ip-172-30-15-58 grid]$ export PATH=$PATH:$ORACLE_HOME/bin
 [oracle@ip-172-30-15-58 grid]$ asmcmd
 ASMCMD> lsdg
 State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name

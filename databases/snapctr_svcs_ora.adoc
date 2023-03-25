@@ -67,17 +67,13 @@ The above image provides a detailed picture of the Cloud Backup for Application 
 
 * *Connector to be deployed in the same VPC as database and FSx.* When possible the connector should be deployed in the same AWS VPC, which allow connectivity to both FSx storage and EC2 compute instance.
 
-* *IAM role created for SnapCenter connector for AWS access.* The role in json format is available in detailed SnapCenter service documentation or when you launch connector deployment via BlueXP console, you are prompted for setting up the prerequisites. The role should be assigned to a AWS user account that owns the connector.
+* *An AWS IAM policy created for SnapCenter connector.* The policy in json format is available in detailed SnapCenter service documentation or when you launch connector deployment via BlueXP console, you are prompted for setting up the prerequisites. The policy should be assigned to a AWS user account that owns the connector.
 
-* *A ssh key pair created in AWS account.* The ssh key pair will be assigned to ec2-user for login to connector host, then deploy a database plugin to EC2 DB server host.  
+* *AWS account access key and ssh key pair created in AWS account.* The ssh key pair will be assigned to ec2-user for login to connector host, then deploy a database plugin to EC2 DB server host. Access key grants permission for provisioning required connector.   
 
-* *PostgreSQL data and log placement.* Typical PostgreSQL deployments share the same root directory or volumes for data and log files. In our tests and validations, we have separated PostgreSQL data and logs into two separate volumes for performance. A soft link is used in the data directory to point to the log directory or volume that hosts PostgreSQL WAL logs and archived WAL logs.
+* *A credential added to BlueXP console setting.* To add FSx ONTAP to BlueXP working environment, a credential that grants permission to access FSx ONTAP from BlueXP console is setup in BlueXP console setting. 
 
-* *PostgreSQL service startup delay timer.* This solution uses NFS mounted volumes to store the PostgreSQL database file and WAL log files. During a database host reboot, PostgreSQL service might try to start while the volume is not mounted. This results in database service startup failure. A 10 to 15 seconds timer delay is needed for the PostgreSQL database to start up correctly.
-
-* *RPO/RTO for business continuity.* FSx data replication from primary to standby for DR is based on ASYNC, which means that the RPO depends on the frequency of Snapshot backups and SnapMirror replication. A higher frequency of Snapshot copy and SnapMirror replication reduces the RPO. Therefore, there is a balance between potential data loss in the event of a disaster and incremental storage cost. We have determined that Snapshot copy and SnapMirror replication can be implemented in as low as 5 minute intervals for RPO, and PostgreSQL can generally be recovered at the DR standby site in under a minute for the RTO.
-
-* *Database backup.* After a PostgreSQL database is implemented or migrated into AWS FSx storage from an on-premisses data center, the data is auto-sync mirrored in the FSx HA pair for protection. Data is further protected with a replicated standby site in case of a disaster. For longer-term backup retention or data protection, NetApp recommends using the built-in PostgreSQL pg_basebackup utility to run a full database backup that can be ported to S3 blob storage.
+* *SnapCenter plugin deployed to EC2 database instance host.* SnapCenter services make API calls that are executed by SnapCenter plugin on EC2 database instance host. It needs to be deployed before setting up the services.
 
 == Solution Deployment
 
@@ -189,7 +185,7 @@ image:snapctr_svcs_setup_03.png[Error: Missing Graphic Image]
 +
 image:snapctr_svcs_setup_04.png[Error: Missing Graphic Image]
 
-. Choose the AWS region where the FSx ONTAP is deployed, select the FSx cluster that is hosting the Oracle database.
+. Choose the AWS region where the FSx ONTAP is deployed, select the FSx cluster that is hosting the Oracle database and click Add.
 +
 image:snapctr_svcs_setup_05.png[Error: Missing Graphic Image]
 
