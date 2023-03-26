@@ -523,6 +523,30 @@ add this line "UUID=d89fb1c9-4f89-4de4-b4d9-17754036d11d       /u01    xfs     d
 +
 It is important to mount binary with only UUID and with nofail option to avoid possible root lock issue during EC2 instance reboot.
 
+. As root user, add udev rule for oracle devices
++
+[source, cli]
+vi /etc/udev/rules.d/99-oracle-asmdevices.rules
++ 
+with following entries:
+ENV{DM_NAME}=="ora_01_data_*", GROUP:="oinstall", OWNER:="oracle", MODE:="660"
+ENV{DM_NAME}=="ora_01_logs_*", GROUP:="oinstall", OWNER:="oracle", MODE:="660"
+
+. As root user, reload the udev rules
++
+[source, cli]
+udevadm control --reload-rules
+
+. As root user, trigger the udev rules
++
+[source, cli]
+udevadm trigger
+
+. As root user, reload multipathd
++
+[source, cli]
+systemctl restart multipathd
+
 ====
 
 === Oracle grid infrastructure installation
@@ -872,7 +896,22 @@ ora.diskmon		OFFLINE OFFLINE                               STABLE
 ora.driver.afd	ONLINE  ONLINE       ip-172-30-15-58          STABLE
 ora.evmd		ONLINE  ONLINE       ip-172-30-15-58          STABLE
 
+. Set Oracle user .bash_profile
+[source, cli]
+vi ~/.bash_profile
++
+add following entries:
++
+export ORACLE_HOME=/u01/app/oracle/product/19.0.0/db1
+export ORACLE_SID=db1
+export PATH=$PATH:$ORACLE_HOME/bin
+alias asm='export ORACLE_HOME=/u01/app/oracle/product/19.0.0/grid;export ORACLE_SID=+ASM;export PATH=$PATH:$ORACLE_HOME/bin'
+
 . Validate the CDB/PDB created
++
+/home/oracle/.bash_profile
++
+sqlplus / as sysdba
 +
 SQL> select name, open_mode from v$database;
 +
