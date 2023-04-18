@@ -29,12 +29,19 @@ Veeam Backup & Replication is an effective and reliable solution for protecting 
 
 VMware Cloud (in AWS) supports the use of NFS datastores as supplemental storage, and FSx for NetApp ONTAP is a secure solution for customers who need to store large amounts of data for their cloud applications that can scale independent of the number of ESXi hosts in the SDDC cluster. This integrated AWS storage service offers highly efficient storage with all of the traditional NetApp ONTAP capabilities. 
 
-
+=== Use Cases
 This solution addresses the following use cases:
 
 * Backup and restore of Windows and Linux virtual machines hosted in VMC using FSx for NetApp ONTAP as a backup repository.
 * Backup and restore of Microsoft SQL Server application data using FSx for NetApp ONTAP as a backup repository.
 * Backup and restore of Oracle application data using FSx for Netapp ONTAP as a backup repository.
+
+=== NFS Datastores Using Amazon FSx for ONTAP 
+All virtual machines in this solution reside on FSx for ONTAP supplemental NFS datastores. Using FSx for ONTAP as a supplemental NFS datastore has several benefits. For example, it allows you to:
+
+* Create a scalable and highly available file system in the cloud without the need for complex setup and management.
+* Integrate with your existing VMware environment, allowing you to use familiar tools and processes to manage your cloud resources.
+* Benefit from the advanced data management features provided by ONTAP, such as snapshots and replication, to protect your data and ensure its availability.
 
 
 .Solution Deployment Overview
@@ -56,9 +63,10 @@ The purpose of this solution is to demonstrate data protection of virtual machin
 
 . FSx for ONTAP filesystem with one or more NFS datastores connected to VMware Cloud.
 . Microsoft Windows Server VM with Veeam Backup & Replication software installed.
-* vCenter server has been discovered by the Veeam Backup & Replication server.
+* vCenter server has been discovered by the Veeam Backup & Replication server using their IP address or fully qualified domain name.
 . Microsoft Windows Server VM to be installed with Veeam Backup Proxy components during the solution deployment.
 . Microsoft SQL Server VMs with VMDKs and application data residing on FSx for ONTAP NFS datastores. For this solution we had two SQL databases on two separate VMDKs.
+* Note: As a best practice database and transaction log files are placed on separate drives as this will improve performance and reliability. This is in part due to the fact that transaction logs are written sequentially, whereas database files are written randomly.
 . Oracle Database VMs with VMDKs and application data residing on FSx for ONTAP NFS datastores.
 . Linux and Windows file server VMs with VMDKs residing on FSx for ONTAP NFS datastores.
 =====
@@ -96,15 +104,29 @@ The purpose of this solution is to demonstrate data protection of virtual machin
 // Include screenshots, demo videos, etc. that make the steps as simple and clear as possible.
 // DO NOT overdo it with screenshots - where options are "obvious", a screenshot might not be necessary.
 
-In this solution we provide detailed instructions for deploying and validating a solution utilizing Veeam Backup and Replication software to perform backup and recovery of SQL Server, Oracle, and Windows and Linux file server virtual machines in a VMware Cloud SDDC on AWS. The Virtual Machines in this solution reside on a supplemental NFS datastore hosted by FSx for ONTAP. We will go over FSx for ONTAP file system creation, mounting iSCSI volumes to be used as backup repositories, creating and running backup jobs, and performing VM and database restores.
+In this solution we provide detailed instructions for deploying and validating a solution utilizing Veeam Backup and Replication software to perform backup and recovery of SQL Server, Oracle, and Windows and Linux file server virtual machines in a VMware Cloud SDDC on AWS. The Virtual Machines in this solution reside on a supplemental NFS datastore hosted by FSx for ONTAP. In addition, a separate FSx for ONTAP file system is used to host iSCSI volumes that will be used for Veeam backup repositories. 
+
+We will go over FSx for ONTAP file system creation, mounting iSCSI volumes to be used as backup repositories, creating and running backup jobs, and performing VM and database restores.
 
 For detailed information on FSx for NetApp ONTAP refer to the https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx for ONTAP User Guide^].
 
 For detailed information on Veeam Backup and Replication refer to the https://www.veeam.com/documentation-guides-datasheets.html?productId=8&version=product%3A8%2F221[Veeam Help Center Technical Documentation^] site.
 
+For considerations and limitations when using Veeam Backup and Replication with VMware Cloud on AWS, refer to https://www.veeam.com/kb2414[VMware Cloud on AWS and VMware Cloud on Dell EMC Support. Considerations and Limitations].
+
 === Deploy Veeam Proxy server
 
-The Veeam Proxy server is a secondary backup server that has direct access to a backup repository and helps to distribute backup and restore workloads. In this step we cover deployment of the proxy server on a Windows VM in the VMC SDDC.
+A Veeam proxy server is a component of the Veeam Backup & Replication software that acts as an intermediary between the source and the backup or replication target. The proxy server helps to optimize and accelerate data transfer during backup jobs by processing data locally and can use different Transport Modes to access data using VMware vStorage APIs for Data Protection or through direct storage access.
+
+When choosing a Veeam proxy server design it is important to consider the number of concurrent tasks and the transport mode or type of storage access desired.
+
+For sizing the number of proxy servers, and for their system requirements, refer to the https://bp.veeam.com/vbr/2_Design_Structures/D_Veeam_Components/D_backup_proxies/vmware_proxies.html[Veeam VMware vSphere Best Practice Guide].
+
+The Veeam Data Mover is a component of the Veeam Proxy Server and utilizes a Transport Mode as a method for obtaining VM data from the source and transferring it to the target. The transport mode is specified during the configuration of the backup job. It is possible to increase the efficiency backups from NFS datastores by using direct storage access.
+
+For more information on Transport Modes refer to the https://helpcenter.veeam.com/docs/backup/vsphere/transport_modes.html?ver=120[Veeam Backup and Replication User Guide for VMware vSphere].
+
+In the following step we cover deployment of the Veeam Proxy Server on a Windows VM in the VMware Cloud SDDC.
 
 .Deploy Veeam Proxy to distribute backup workloads
 [%collapsible]
@@ -395,3 +417,5 @@ To learn more about the technologies presented in this solution refer to the fol
 
 * https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx for ONTAP User Guide^]
 * https://www.veeam.com/documentation-guides-datasheets.html?productId=8&version=product%3A8%2F221[Veeam Help Center Technical Documentation^]
+* https://www.veeam.com/kb2414[VMware Cloud on AWS and VMware Cloud on Dell EMC Support. Considerations and Limitations]
+
