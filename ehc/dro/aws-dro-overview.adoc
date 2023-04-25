@@ -1,0 +1,236 @@
+---
+sidebar: sidebar
+permalink: ehc/dro/aws-dro-overview.html
+keywords: NetApp Solutions, hybrid, multicloud, multi cloud, hyperscalers, vmware, disaster recovery orchestrator, DRO
+summary:
+---
+
+= TR-4955: Disaster Recovery with FSx for ONTAP and VMC (AWS VMware Cloud)
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+[.lead]
+Niyaz Mohamed, NetApp
+
+== Overview
+
+Disaster recovery to cloud is a resilient and cost-effective way of protecting the workloads against site outages and data corruption events (for example, ransomware). With NetApp SnapMirror technology, on-premises VMware workloads can be replicated to FSx for ONTAP running in AWS.
+
+Disaster Recovery Orchestrator (DRO; a scripted solution with UI) can be used to seamlessly recover workloads replicated from on-premises to FSx for ONTAP. DRO automates the recovery from the SnapMirror level, through VM registration to VMC, to network mappings directly on NSX-T. This feature is included with all VMC environments.
+
+image::dro-vmc-image1.png["This graphic depicts the structure and interconnections between an on-premises data center, a VMware Cloud on AWS SDDC instance, and Amazon FSx for NetApp ONTAP. This includes SnapMirror replication, DRaaS Ops traffic, internet or direct connect, and VMware Transit Connect."]
+
+== Getting started  
+
+=== Deploy and configure VMware Cloud on AWS
+
+link:https://www.vmware.com/products/vmc-on-aws.html[VMware Cloud on AWS^] provides a cloud-native experience for VMware-based workloads in the AWS ecosystem. Each VMware Software-Defined Data Center (SDDC) runs in an Amazon Virtual Private Cloud (VPC) and provides a full VMware stack (including vCenter Server), NSX-T software-defined networking, vSAN software-defined storage, and one or more ESXi hosts that provide compute and storage resources to the workloads. To configure a VMC environment on AWS, follow the steps at this link:https://docs.netapp.com/us-en/netapp-solutions/ehc/aws/aws-setup.html[link^]. A pilot-light cluster can also be used for DR purposes. 
+
+NOTE: In the initial release, DRO supports an existing pilot-light cluster. On-demand SDDC creation will be available in an upcoming release.  
+
+=== Provision and configure FSx for ONTAP
+
+Amazon FSx for NetApp ONTAP is a fully managed service that provides highly reliable, scalable, high-performing, and feature-rich file storage built on the popular NetApp ONTAP file system. Follow the steps at this link:https://docs.netapp.com/us-en/netapp-solutions/ehc/aws/aws-native-overview.html[link^] to provision and configure FSx for ONTAP.
+
+=== Deploy and configure SnapMirror to FSx for ONTAP
+
+The next step is to use NetApp BlueXP and discover the provisioned FSx for ONTAP on AWS instance and replicate the desired datastore volumes from an on-premises environment to FSx for ONTAP with the appropriate frequency and NetApp Snapshot copy retention:
+
+image::dro-vmc-image2.png["This graphic depicts the BlueXP Canvas relationship map that shows the various interactions between enabled services."]
+
+Follow the steps in this link to configure BlueXP. You can also use the NetApp ONTAP CLI to schedule replication following this link.
+
+NOTE: A SnapMirror relationship is a prerequisite and must be created beforehand.
+
+== DRO installation
+
+To get started with DRO, use the Ubuntu operating system on a designated EC2 instance or virtual machine to make sure you meet the prerequisites. Then install the package.
+
+=== Prerequisites
+
+* Make sure that connectivity to the source and destination vCenter and storage systems exists.
+* DNS resolution should be in place if you are using DNS names. Otherwise, you should use IP addresses for the vCenter and storage systems.
+* Create a user with root permissions. You can also use sudo with an EC2 instance.
+
+=== OS requirements
+
+* Ubuntu 20.04 (LTS) with minimum of 2GB and 4 vCPUs
+* The following packages must be installed on the designated agent VM: 
+** Docker 
+** Docker-compose 
+** Jq 
+
+Change permissions on `docker.sock`: `sudo chmod 666 /var/run/docker.sock`.
+
+NOTE: The `deploy.sh` script executes all the required prerequisites.
+
+=== Install the package
+
+. Download the installation package on the designated virtual machine: 
++
+----
+https://github.com/NetApp-Automation/DRO.git
+----
++
+NOTE: The agent can be installed on-premises or within an AWS VPC.
+
+. Unzip the package, run the deployment script, and enter the host IP (for example, 10.10.10.10). 
++
+----
+tar xvf DRO-prereq.tar
+----
+
+. Navigate to the directory and run the deploy script as follows:
++
+----
+sudo sh deploy.sh  
+----
+
+
+. Access the UI using:
++
+----
+https://<host-ip-address>
+----
++
+with the following default credentials:
++
+----
+Username: admin
+Password: admin
+----
+
+NOTE: The password can be changed using the "Change Password" option.
+
+image::dro-vmc-image3.png["Disaster Recovery Orchestrator Login screen."]
+
+== DRO configuration
+
+After FSx for ONTAP and VMC have been configured properly, you can begin configuring DRO to automate the recovery of on-premises workloads to VMC by using the read-only SnapMirror copies on FSx for ONTAP.
+
+NetApp recommends deploying the DRO agent in AWS and also to the same VPC where FSx for ONTAP is deployed (it can be peer connected too), so that the DRO agent can communicate through the network with your on-premises components as well as with the FSx for ONTAP and VMC resources.
+
+The first step is to discover and add the on-premises and cloud resources (both vCenter and storage) to DRO. Open DRO in a supported browser and use the default username and password (admin/admin) and Add Sites. Sites can also be added using the Discover option. Add the following platforms:
+
+* On-premises
+** On-premises vCenter
+** ONTAP storage system
+* Cloud
+** VMC vCenter
+** FSx for ONTAP
+
+image::dro-vmc-image4.png["Temporary placeholder image description."]
+
+image::dro-vmc-image5.png["DRO site overview page containing Source and Destination sites."]
+
+Once added, DRO performs automatic discovery and displays the VMs that have corresponding SnapMirror replicas from the source storage to FSx for ONTAP.  DRO automatically detects the networks and portgroups used by the VMs and populates them. 
+
+image::dro-vmc-image6.png["Automatic discovery screen containing 219 VMs and 10 datastores."]
+
+The next step is to group the required VMs into functional groups to serve as resource groups.
+
+=== Resource groupings
+
+After the platforms have been added, you can group the VMs you want to recover into resource groups. DRO resource groups allow you to group a set of dependent VMs into logical groups that contain their boot orders, boot delays, and optional application validations that can be executed upon recovery.
+
+To start creating resource groups, complete the following steps: 
+
+. Access *Resource Groups*, and click *Create New Resource Group*.
+. Under *New resource group*, select the source site from the dropdown and click *Create*.
+. Provide *Resource Group Details* and click *Continue*.
+. Select the appropriate VMs using the search option.
+. Select the boot order and boot delay (secs) for the selected VMs. Set the order of the power-on sequence by selecting each VM and setting up the priority for it. Three is the default value for all VMs.
++
+Options are as follows: 
++
+1 – The first virtual machine to power on
+3 – Default
+5 – The last virtual machine to power on
+
+. Click *Create Resource Group*.
+
+image::dro-vmc-image7.png["Screenshot of Resource group list with two entries: Test and DemoRG1."]
+
+=== Replication plans
+
+You need a plan to recover applications in the event of a disaster. Select the source and destination vCenter platforms from the drop down and pick the resource groups to be included in this plan, along with the grouping of how applications should be restored and powered on (for example, domain controllers, then tier-1, then tier-2, and so on). Such plans are sometimes also called blueprints. To define the recovery plan, navigate to the *Replication Plan* tab and click *New Replication Plan*. 
+
+To start creating a replication plan, complete the following steps:
+
+. Access *Replication Plans*, and click *Create New Replication Plan*.
++
+image::dro-vmc-image8.png["Screenshot of the replication plan screen containing one plan called DemoRP."]
+
+. Under *New Replication Plan*, provide a name for the plan and add recovery mappings by selecting the source site, associated vCenter, destination site, and associated vCenter.  
++
+image::dro-vmc-image9.png["Screenshot of replication plan details, including the recovery mapping."]
+
+. After Recovery mapping is completed, select the cluster mapping.
++
+image::dro-vmc-image10.png["Temporary placeholder image description."]
+
+. Select *Resource Group Details* and click *Continue*.
+
+. Set the execution order for the resource group. This option enables you to select the sequence of operations when multiple resource groups exist. 
+
+. After you are done, select the network mapping to the appropriate segment. The segments should already be provisioned within VMC, so select the appropriate segment to map the VM.	
+
+. Based on the selection of VMs, datastore mappings are automatically selected.
++
+NOTE: SnapMirror is at the volume level. Therefore, all VMs are replicated to the replication destination. Make sure to select all VMs that are part of the datastore. If they are not selected, only the VMs that are part of the replication plan are processed.
++
+image::dro-vmc-image11.png["Temporary placeholder image description."]
+
+. Under the VM details, you can optionally resize the VM's CPU and RAM parameters; this can be very helpful when recovering large environments to smaller target clusters or for conducting DR tests without having to provision a one-to-one physical VMware infrastructure. Also, you can modify the boot order and boot delay (seconds) for all the selected VMs across the resource groups. There is an additional option to modify the boot order if there are any changes required from those selected during the resource-group boot-order selection. By default, the boot order selected during resource-group selection is used; however, any modifications can be performed at this stage. 
++
+image::dro-vmc-image12.png["Temporary placeholder image description."]
+
+. Click *Create Replication Plan*.
++
+image::dro-vmc-image13.png["Temporary placeholder image description."]
+
+After the replication plan is created, the failover option, the test-failover option, or the migrate option can be exercised depending on the requirements. During the failover and test-failover options, the most recent SnapMirror Snapshot copy is used, or a specific Snapshot copy can be selected from a point-in-time Snapshot copy (per the retention policy of SnapMirror). The point-in-time option can be very helpful if you are facing a corruption event like ransomware, where the most recent replicas are already compromised or encrypted. DRO shows all available points in time. To trigger failover or test failover with the configuration specified in the replication plan, you can click *Failover* or *Test failover*.  
+
+image::dro-vmc-image14.png["Temporary placeholder image description."]
+image::dro-vmc-image15.png["In this screen, you are provided with the Volume Snapshot details and are given the choice between using the latest snapshot and choosing a specific snapshot."]
+
+The replication plan can be monitored in the task menu:
+
+image::dro-vmc-image16.png["The task menu shows all jobs and options for the replication plan, and also allows you to see the logs."]
+
+After failover is triggered, the recovered items can be seen in the VMC vCenter (VMs, networks, datastores). By default, the VMs are recovered to the Workload folder.
+
+image::dro-vmc-image17.png["Temporary placeholder image description."]
+
+Failback can be triggered at the replication-plan level. For a test failover, the tear-down option can be used to roll back the changes and remove the FlexClone relationship. Failback related to failover is a two-step process. Select the replication plan and select *Reverse data sync*. 
+
+image::dro-vmc-image18.png["Screenshot of Replication Plan overview with dropdown containing Reverse Data Sync option."]
+image::dro-vmc-image19.png["Temporary placeholder image description."]
+
+Once completed, you can trigger failback to move back to original production site.
+
+image::dro-vmc-image20.png["Screenshot of Replication Plan overview with dropdown containing the Failback option."]
+image::dro-vmc-image21.png["Screenshot of DRO summary page with original production site up and running."]
+
+From NetApp BlueXP, we can see that replication health has broken off for the appropriate volumes (those that were mapped to VMC as read-write volumes).  During test failover, DRO does not map the destination or replica volume. Instead, it makes a FlexClone copy of the required SnapMirror (or Snapshot) instance and exposes the FlexClone instance, which does not consume additional physical capacity for FSx for ONTAP. This process makes sure that the volume is not modified and replica jobs can continue even during DR tests or triage workflows. Additionally, this process makes sure that, if errors occur or corrupted data is recovered, the recovery can be cleaned up without the risk of the replica being destroyed.
+
+image::dro-vmc-image22.png["Temporary placeholder image description."]
+
+=== Ransomware recovery
+
+Recovering from ransomware can be a daunting task. Specifically, it can be hard for IT organizations to pin-point where the safe point of return is and, once that is determined, to protect recovered workloads from reoccurring attacks from, for example, sleeping malware or vulnerable applications.
+
+DRO addresses these concerns by enabling you to recover your system from any available point in time. You can also recover workloads to functional and yet isolated networks so that applications can function and communicate with each other in a location where they are not exposed to north-south traffic. This gives your security team a safe place to conduct forensics and make sure there is no hidden or sleeping malware.
+
+== Benefits
+* Use of the efficient and resilient SnapMirror replication.
+* Recovery to any available point in time with Snapshot copy retention.
+* Full automation of all required steps to recover hundreds to thousands of VMs from the storage, compute, network, and application validation steps.
+* Workload recovery with ONTAP FlexClone technology using a method that doesn't change the replicated volume.
+** Avoids risk of data corruption for volumes or Snapshot copies.
+** Avoids replication interruptions during DR test workflows.
+** Potential use of DR data with cloud computing resources for workflows beyond DR such as DevTest, security testing, patch or upgrade testing, and remediation testing.
+* CPU and RAM optimization to help lower cloud costs by allowing recovery to smaller compute clusters.
