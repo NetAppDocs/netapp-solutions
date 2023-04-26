@@ -1,0 +1,118 @@
+// === host_name.yml - Host VARS Config
+Enter the appropriate parameters for your system into the blue underlined fields, and then copy and paste the entries into the `host_name.yml` file in the Ansible controller `host_vars` folder.
+
+++++
+<style>
+div {
+position: relative;
+}
+div button {
+position: absolute;
+top: 0;
+right: 0;
+}
+button {
+  transition-duration: 0.4s;
+  background-color: white;
+  color: #1563a3;
+  border: 2px solid #1563a3;
+}
+button:hover {
+  background-color: #1563a3;
+  color: white;
+}
+#more_datastores_nfs {
+  display: block;
+}
+#more_datastores_nfs_button {
+  display: none;
+}
+</style>
+<div class="listingblock"><div class="content"><div><button id="copy-button1" onclick="CopyClassText1()">Copy</button></div><pre><code><div class="CopyMeClass1" id="CopyMeID1">
+######################################################################
+##############      Host Variables Configuration        ##############
+######################################################################
+
+# Add your AWS EC2 instance IP address for the respective PostgreSQL server host
+ansible_host: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>10.61.180.15</i></span>
+
+# "{{groups.postgresql[0]}}" represents first PostgreSQL DB server as defined in PostgreSQL hosts group [postgresql]. For concurrent multiple PostgreSQL DB servers deployment, [0] will be incremented for each additional DB server. For example,  "{{groups.posgresql[1]}}" represents DB server 2, "{{groups.posgresql[2]}}" represents DB server 3 ... As a good practice and the default, two volumes are allocated to a PostgreSQL DB server with corresponding /pgdata, /pglogs mount points, which store PostgreSQL data, and PostgreSQL log files respectively. The number and naming of DB volumes allocated to a DB server must match with what is defined in global fsx_vars.yml file by src_db_vols, src_archivelog_vols parameters, which dictates how many volumes are to be created for each DB server. aggr_name is aggr1 by default. Do not change. lif address is the NFS IP address for the SVM where PostgreSQL server is expected to mount its database volumes. Primary site servers from primary SVM and standby servers from standby SVM.  
+host_datastores_nfs:
+  - {vol_name: &quot<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>{{groups.postgresql[0]}}_pgdata</i></span>&quot, aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr1</i></span>, lif: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.200</i></span>, size: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>100</i></span>}
+  - {vol_name: &quot<span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>{{groups.postgresql[0]}}_pglogs</i></span>&quot;, aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr1</i></span>, lif: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.200</i></span>, size: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>100</i></span>}
+
+# Add swap space to EC2 instance, that is equal to size of RAM up to 16G max. Determine the number of blocks by dividing swap size in MB by 128.
+swap_blocks: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>128</i></span>
+
+# Postgresql user configurable parameters
+psql_port: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>5432</i></span>
+buffer_cache: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>8192MB</i></span>
+archive_mode: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>"on"</i></span>
+max_wal_size: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>5GB</i></span>
+client_address: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline; text-decoration:underline;"/><i>172.30.15.0/24</i></span>
+
+</div></code></pre></div></div>
+<script>
+function CopyClassText1(){
+  	var textToCopy = document.getElementById("CopyMeID1");
+  	var currentRange;
+  	if(document.getSelection().rangeCount > 0)
+  	{
+  		currentRange = document.getSelection().getRangeAt(0);
+  		window.getSelection().removeRange(currentRange);
+  	}
+  	else
+  	{
+  		currentRange = false;
+  	}
+  	var CopyRange = document.createRange();
+  	CopyRange.selectNode(textToCopy);
+  	window.getSelection().addRange(CopyRange);
+    document.getElementById("more_datastores_nfs").style.display = "none";
+    var command = document.execCommand("copy");
+      if (command)
+      {
+          document.getElementById("copy-button1").innerHTML = "Copied!";
+          setTimeout(revert_copy, 3000);
+      }
+  	window.getSelection().removeRange(CopyRange);
+  	if(currentRange)
+  	{
+  		window.getSelection().addRange(currentRange);
+  	}
+}
+function revert_copy() {
+      document.getElementById("copy-button1").innerHTML = "Copy";
+      document.getElementById("more_datastores_nfs").style.display = "block";
+}
+
+function datastoredropdown() {
+    document.getElementById("more_datastores_nfs").style.display = "none";
+	document.getElementById("more_datastores_nfs_button").style.display = "block";
+    var x=1;
+    var myHTML = '';
+    var buildup = '';
+    var wrapper = document.getElementById("select_more_datastores_nfs");
+    while (x < 100) {
+      buildup += '<option value="' + x + '">' + x + '</option>';
+  	  x++;
+    }
+    myHTML += '<a id="more_datastores_nfs">How many extra NFS volumes do you wish to add?</a><select name="number_of_extra_datastores_nfs" id="number_of_extra_datastores_nfs">' + buildup + '</select>';
+    wrapper.innerHTML = myHTML;
+}
+function adddatastorevolumes() {
+    var y = document.getElementById("number_of_extra_datastores_nfs").value;
+    var j=0;
+    var myHTML = '';
+    var wrapper = document.getElementById("extra_datastores_nfs");
+    while (j < y) {
+    	j++;
+        myHTML += '  - {vol_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>"{{groups.oracle[0]}}_u01"</i></span>, aggr_name: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>aggr01_node02</i></span>, lif: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>172.21.94.201</i></span>, size: <span <div contenteditable="true" style="color:#004EFF; font-weight:bold; font-style:italic; text-decoration:underline;"/><i>25</i></span>}<br>';
+    }
+	wrapper.innerHTML = myHTML;
+	document.getElementById("select_more_datastores_nfs").style.display = "none";
+	document.getElementById("more_datastores_nfs_button").style.display = "none";
+}
+
+</script>
+++++

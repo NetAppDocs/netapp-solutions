@@ -1,0 +1,304 @@
+---
+sidebar: sidebar
+permalink: ehc/gcp/gcp-migrate-vmware-hcx.html
+keywords: gcp, gcve, hybrid multicloud, migrate, vmware hcx, hcx, google cloud, enterprise, hybrid, cloud, migration
+summary:
+---
+
+= Migrate workloads to NetApp Cloud Volume Service datastore on Google Cloud VMware Engine using VMware HCX - Quickstart guide
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+[.lead]
+Author(s): NetApp Solutions Engineering
+
+== Overview: Migrating virtual machines with VMware HCX, NetApp Cloud Volume Service datastores, and Google Cloud VMware Engine (GCVE)
+
+One of the most common use cases for the Google Cloud VMware Engine and Cloud Volume Service datastore is the migration of VMware workloads. VMware HCX is a preferred option and provides various migration mechanisms to move on-premises virtual machines (VMs) and its data to Cloud Volume Service NFS datastores.
+
+VMware HCX is primarily a migration platform that is designed to simplify application migration, workload rebalancing, and even business continuity across clouds. It is included as part of Google Cloud VMware Engine Private Cloud and offers many ways to migrate workloads and can be used for disaster recovery (DR) operations.  
+
+This document provides step-by-step guidance for provisioning Cloud Volume Service datastore followed by downloading, deploying, and configuring VMware HCX, including all its main components in on-premises and the Google Cloud VMware Engine side including Interconnect, Network Extension, and WAN optimization for enabling various VM migration mechanisms.
+
+[NOTE]
+VMware HCX works with any datastore type as the migration is at the VM level. Hence this document is applicable to existing NetApp customers and non-NetApp customers who are planning to deploy Cloud Volume Service with Google Cloud VMware Engine for a cost-effective VMware cloud deployment.
+
+.High-level steps
+[%collapsible]
+=====
+This list provides the high-level steps necessary to pair & Migrate the VMs to HCX Cloud Manager on the Google Cloud VMware Engine side from HCX Connector on-premises:
+
+. Prepare HCX through the Google VMware Engine portal.
+. Download and deploy the HCX Connector Open Virtualization Appliance (OVA) installer in the on-premises VMware vCenter Server.
+. Activate HCX with the license key.
+. Pair the on-premises VMware HCX Connector with Google Cloud VMware Engine HCX Cloud Manager.
+. Configure the network profile, compute profile, and service mesh.
+. (Optional) Perform network extension to avoid re-IP during migrations.
+. Validate the appliance status and ensure that migration is possible.
+. Migrate the VM workloads.
+=====
+
+.Prerequisites
+[%collapsible]
+=====
+Before you begin, make sure the following prerequisites are met. For more information, see this https://cloud.google.com/vmware-engine/docs/workloads/howto-migrate-vms-using-hcx[link^]. After the prerequisites, including connectivity, are in place, download HCX license key from the Google Cloud VMware Engine portal. After the OVA installer is downloaded, proceed with the installation process as described below.
+
+[NOTE]
+HCX advanced is the default option and VMware HCX Enterprise edition is also available through a support ticket and supported at no additional cost. Refer https://cloud.google.com/blog/products/compute/whats-new-with-google-cloud-vmware-engine[this link^]
+
+* Use an existing Google Cloud VMware Engine software-defined data center (SDDC) or create a private cloud by using this https://docs.netapp.com/us-en/netapp-solutions/ehc/gcp/gcp-setup.html[NetApp link^] or this https://cloud.google.com/vmware-engine/docs/create-private-cloud[Google link^].
+* Migration of VMs and associated data from the on-premises VMware vSphere- enabled data center requires network connectivity from the data center to the SDDC environment. Before migrating workloads, https://cloud.google.com/vmware-engine/docs/networking/howto-connect-to-onpremises[set up a Cloud VPN or Cloud Interconnect connection^] between the on-premises environment and the respective private cloud.
+* The network path from on-premises VMware vCenter Server environment to the Google Cloud VMware Engine private cloud must support the migration of VMs by using vMotion.
+* Make sure the required https://ports.esp.vmware.com/home/VMware-HCX[firewall rules and ports^] are allowed for vMotion traffic between the on-premises vCenter Server and SDDC vCenter. 
+* Cloud Volume Service NFS volume should be mounted as a datastore in Google Cloud VMware Engine.  Follow the steps detailed in this https://cloud.google.com/vmware-engine/docs/vmware-ecosystem/howto-cloud-volumes-service-datastores[link^] to attach Cloud Volume Service datastores to Google Cloud VMware Engines hosts.
+=====
+
+.High Level Architecture
+[%collapsible]
+=====
+For testing purposes, the lab environment from on-premises used for this validation was connected through a Cloud VPN, which allows on-premises connectivity to Google Cloud VPC.
+
+image:gcpd-hcx-image1.png[This image depicts the high-level architecture used in this solution.]
+
+For more detailed diagram on HCX, please refer https://www.vmware.com/content/dam/digitalmarketing/vmware/en/pdf/products/vmw-google-cloud-vmware-engine-logical-design-poster-for-workload-mobility.pdf[VMware link^]
+=====
+
+== Solution Deployment
+
+Follow the series of steps to complete the deployment of this solution:
+
+.Step 1: Prepare HCX through the Google VMware Engine Portal
+[%collapsible]
+=====
+HCX Cloud Manager component automatically gets installed as you provision private cloud with VMware Engine. To prepare for site pairing, complete the following steps:
+
+. Log in to the Google VMware Engine Portal and sign-in to the HCX Cloud Manager. 
++
+You can login to HCX Console either by clicking on the HCX version link
+image:gcpd-hcx-image2.png[HCX Console access with link on GCVE resource]
+or clicking on HCX FQDN under vSphere Management Network tab.
+image:gcpd-hcx-image3.png[HCX Console access with FQDN link]
++
+. In HCX Cloud Manager, go to *Administration > System Updates*.
+. Click *Request download link* and download the OVA file.
+image:gcpd-hcx-image4.png[Request download link]
+. Update HCX Cloud Manager to the latest version available from the HCX Cloud Manager UI.  
+
+
+=====
+
+.Step 2: Deploy the installer OVA in the on-premises vCenter Server
+[%collapsible]
+=====
+For the on-premises Connector to connect to the HCX Manager in Google Cloud VMware Engine, make sure the appropriate firewall ports are open in the on-premises environment.
+
+To download and install HCX Connector in the on-premises vCenter Server, complete the following steps:
+
+. Have the ova downloaded from the HCX Console on Google Cloud VMware Engine as stated in previous step.
+
+. After the OVA is downloaded, deploy it on to the on-premises VMware vSphere environment by using the *Deploy OVF Template* option.
++
+image:gcpd-hcx-image5.png[Error: Screenshot to select the correct OVA template.]
+
+. Enter all the required information for the OVA deployment, click *Next*, and then click *Finish* to deploy the VMware HCX connector OVA. 
++
+[NOTE]
+Power on the virtual appliance manually.
+
+For step-by-step instructions, see the https://docs.vmware.com/en/VMware-HCX/4.5/hcx-user-guide/GUID-47774FEA-6BDA-48E5-9D5F-ABEAD64FDDF7.html[VMware HCX User Guide^].
+=====
+
+.Step 3: Activate HCX Connector with the license key
+[%collapsible]
+=====
+After you deploy the VMware HCX Connector OVA on-premises and start the appliance, complete the following steps to activate HCX Connector. Generate the license key from the Google Cloud VMware Engine portal and activate it in VMware HCX Manager.
+
+. From the VMware Engine portal, Click on Resources, select the private cloud, and *click on download icon under HCX Manager Cloud Version*.
+image:gcpd-hcx-image6.png[Download HCX License]
+Open Downloaded file and copy the License Key String.
+
+
+. Log into the on-premises VMware HCX Manager at https://hcxmanagerIP:9443[https://hcxmanagerIP:9443^] using administrator credentials.
++
+[NOTE]
+Use the hcxmanagerIP and password defined during the OVA deployment.
+
+. In the licensing, enter the key copied from step 3 and click *Activate*.
++
+[NOTE]
+The on-premises HCX Connector should have internet access.
+
+. Under *Datacenter Location*, provide the nearest location for installing the VMware HCX Manager on-premises. Click *Continue*.
+. Under *System Name*, update the name and click *Continue*.
+. Click *Yes, Continue*.
+. Under *Connect your vCenter*, provide the fully qualified domain name (FQDN) or IP address of vCenter Server and the appropriate credentials and click *Continue*.
++
+[NOTE]
+Use the FQDN to avoid connectivity issues later.
+
+. Under *Configure SSO/PSC*, provide the Platform Services Controller's(PSC) FQDN or IP address and click *Continue*.
++
+[NOTE]
+For Embedded PSC, Enter the VMware vCenter Server FQDN or IP address.
+
+. Verify that the information entered is correct and click *Restart*.
+. After the services restart, vCenter Server is displayed as green on the page that appears. Both vCenter Server and SSO must have the appropriate configuration parameters, which should be the same as the previous page.
++
+[NOTE]
+This process should take approximately 10 to 20 minutes and for the plug-in to be added to the vCenter Server.
++
+image:gcpd-hcx-image7.png[Screenshot showing completed process.]
+=====
+
+.Step 4: Pair on-premises VMware HCX Connector with Google Cloud VMware Engine HCX Cloud Manager
+[%collapsible]
+=====
+After HCX Connector is deployed and configured on on-premises vCenter, establish connection to Cloud Manager by adding the pairing. To configure the site pairing, complete the following steps:
+
+. To create a site pair between the on-premises vCenter environment and Google Cloud VMware Engine SDDC, log in to the on-premises vCenter Server and access the new HCX vSphere Web Client plug-in.
++
+image:gcpd-hcx-image8.png[Screenshot of the HCX vSphere Web Client plug-in.]
+
+. Under Infrastructure, click *Add a Site Pairing*.
++
+[NOTE]	
+Enter the Google Cloud VMware Engine HCX Cloud Manager URL or IP address and the credentials for user with Cloud-Owner-Role privileges for accessing the private cloud.
++
+image:gcpd-hcx-image9.png[Screenshot URL or IP address and credentials for CloudOwner role.]
+
+. Click *Connect*.
++
+[NOTE]
+VMware HCX Connector must be able to route to HCX Cloud Manager IP over port 443.
+
+. After the pairing is created, the newly configured site pairing is available on the HCX Dashboard.
++
+image:gcpd-hcx-image10.png[Screenshot of the completed process on the HCX dashboard.]
+=====
+
+.Step 5: Configure the network profile, compute profile, and service mesh
+[%collapsible]
+=====
+The VMware HCX Interconnect service appliance provides replication and vMotion-based migration capabilities over the internet and private connections to the target site. The interconnect provides encryption, traffic engineering, and VM mobility. To create an Interconnect service appliance, complete the followings steps:
+
+. Under Infrastructure, select *Interconnect > Multi-Site Service Mesh > Compute Profiles > Create Compute Profile*.
++
+[NOTE]
+The compute profiles define the deployment parameters including the appliances that are deployed and which portion of the VMware data center are accessible to HCX service.
++
+image:gcpd-hcx-image11.png[Screenshot of the vSphere client Interconnect page.]
+
+. After the compute profile is created, create the network profiles by selecting *Multi-Site Service Mesh > Network Profiles > Create Network Profile*.
++
+The network profile defines a range of IP address and networks that are used by HCX for its virtual appliances.
++
+[NOTE]
+This step requires two or more IP addresses. These IP addresses are assigned from the management network to the Interconnect Appliances.
++
+image:gcpd-hcx-image12.png[Screenshot of Network Profile.]
+
+. At this time, the compute and network profiles have been successfully created.
+. Create the Service Mesh by selecting the *Service Mesh* tab within the *Interconnect* option and select the on-premises and GCVE SDDC sites.
+. The Service Mesh specifies a local and remote compute and network profile pair. 
++
+[NOTE]
+As part of this process, the HCX appliances are deployed and automatically configured on both the source and target sites in order to create a secure transport fabric.
++
+image:gcpd-hcx-image13.png[Screenshot of Service Mesh tab on the vSphere client Interconnect page.]
+
+. This is the final step of configuration. This should take close to 30 minutes to complete the deployment. After the service mesh is configured, the environment is ready with the IPsec tunnels successfully created to migrate the workload VMs.
++
+image:gcpd-hcx-image14.png[Screenshot of the HCX Appliances on the vSphere client Interconnect page.]
+=====
+
+.Step 6: Migrate workloads
+[%collapsible]
+=====
+Workloads can be migrated bidirectionally between on-premises and GCVE SDDCs using various VMware HCX migration technologies. VMs can be moved to and from VMware HCX-activated entities using multiple migration technologies such as HCX bulk migration, HCX vMotion, HCX Cold migration, HCX Replication Assisted vMotion (available with HCX Enterprise edition), and HCX OS Assisted Migration (available with the HCX Enterprise edition).
+
+To learn more about various HCX migration mechanisms, see https://docs.vmware.com/en/VMware-HCX/4.5/hcx-user-guide/GUID-8A31731C-AA28-4714-9C23-D9E924DBB666.html[VMware HCX Migration Types^].
+
+The HCX-IX appliance uses the Mobility Agent service to perform vMotion, Cold, and Replication Assisted vMotion (RAV) migrations.
+[NOTE]
+The HCX-IX appliance adds the Mobility Agent service as a host object in the vCenter Server. The processor, memory, storage and networking resources displayed on this object do not represent actual consumption on the physical hypervisor hosting the IX appliance.
+
+*HCX vMotion*
+
+This section describes the HCX vMotion mechanism. This migration technology uses the VMware vMotion protocol to migrate a VM to GCVE.  The vMotion migration option is used for migrating the VM state of a single VM at a time.  There is no service interruption during this migration method.  
+
+[NOTE]
+Network Extension should be in place (for the port group in which the VM is attached) in order to migrate the VM without the need to make an IP address change.
+
+. From the on-premises vSphere client,  go to Inventory, right- click on the VM to be migrated,  and select HCX Actions > Migrate to HCX Target Site.
++
+image:gcpd-hcx-image15.png[Error: Missing Graphic Image]
+
+. In the Migrate Virtual Machine wizard,  select the Remote Site Connection (target GCVE). 
++
+image:gcpd-hcx-image16.png[Error: Missing Graphic Image]
+
+. Update the mandatory fields (Cluster, Storage, and Destination Network), Click Validate.
++
+image:gcpd-hcx-image17.png[Error: Missing Graphic Image]
+
+. After the validation checks are complete, click Go to initiate the migration.
++
+[NOTE]
+The vMotion transfer captures the VM active memory, its execution state, its IP address, and its MAC address.  For more information about the requirements and limitations of HCX vMotion,  see https://docs.vmware.com/en/VMware-HCX/4.5/hcx-user-guide/GUID-517866F6-AF06-4EFC-8FAE-DA067418D584.html[Understanding VMware HCX vMotion and Cold Migration^].
+
+. You can monitor the progress and completion of the vMotion from the HCX > Migration dashboard.
++
+image:gcpd-hcx-image18.png[Error: Missing Graphic Image]
+
+[NOTE]
+The target CVS NFS datastore should have sufficient space to handle the migration.
+=====
+
+== Conclusion
+
+Whether you’re targeting all-cloud or hybrid cloud and data residing on any type/vendor storage in on-premises, Cloud Volume Service and HCX provide excellent options to deploy and migrate the application workloads while reducing the TCO by making the data requirements seamless to the application layer. Whatever the use case, choose Google Cloud VMware Engine along with Cloud Volume Service for rapid realization of cloud benefits, consistent infrastructure, and operations across on-premises and multiple clouds, bidirectional portability of workloads, and enterprise-grade capacity and performance. It is the same familiar process and procedures used to connect the storage and migrate VMs using VMware vSphere Replication, VMware vMotion, or even network file copy (NFC).
+
+== Takeaways
+
+The key points of this document include:
+
+* You can now use Cloud Volume Service as a datastore on Google Cloud VMware Engine SDDC.
+* You can easily migrate data from on-premises to Cloud Volume Service datastore.
+* You can easily grow and shrink the Cloud Volume Service datastore to meet the capacity and performance requirements during migration activity.
+
+== Videos from Google and VMware for reference
+
+.From Google
+[%collapsible]
+====
+* link:https://www.youtube.com/watch?v=xZOtqiHY5Uw[Deploy HCX Connector with GCVE]
+* link:https://youtu.be/2ObPvekMlqA[Configure HCX ServiceMesh with GCVE]
+* link:https://youtu.be/zQSGq4STX1s[Migrate VM with HCX to GCVE]
+====
+
+.From VMware
+[%collapsible]
+====
+* link:https://youtu.be/EFE5ZYFit3M[HCX Connector deployment for GCVE]
+* link:https://youtu.be/uwRFFqbezIE[HCX ServiceMesh configuration for GCVE]
+* link:https://youtu.be/4KqL0Rxa3kM[HCX Workload Migration to GCVE]
+====
+
+== Where to find additional information
+
+To learn more about the information described in this document, refer to the following website links:
+
+* Google Cloud VMware Engine documentation
++
+https://cloud.google.com/vmware-engine/docs/overview/[https://cloud.google.com/vmware-engine/docs/overview^]
+
+* Cloud Volume Service documentation
++
+https://cloud.google.com/architecture/partners/netapp-cloud-volumes[https://cloud.google.com/architecture/partners/netapp-cloud-volumes^]
+
+* VMware HCX User Guide
++
+https://docs.vmware.com/en/VMware-HCX/index.html[https://docs.vmware.com/en/VMware-HCX/index.html^]

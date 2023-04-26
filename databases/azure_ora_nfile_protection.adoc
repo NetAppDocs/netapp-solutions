@@ -1,0 +1,254 @@
+---
+sidebar: sidebar
+permalink: databases/azure_ora_nfile_protection.html
+summary: This section describes how to protect your Oracle database with azacsnap tool and snapshot backup, restore and snapshots tiering to Azure blob.
+keywords: Oracle, Azure, database, backup, restore
+---
+
+= Protect your Oracle database in Azure cloud
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:table-stripes: odd
+:imagesdir: ./../media/
+
+link:azure_ora_nfile_procedures.html[Previous: Deployment procedures.]
+
+== Backup Oracle database with snapshot using AzAcSnap tool
+
+The Azure Application-Consistent Snapshot tool (AzAcSnap) is a command-line tool that enables data protection for third-party databases by handling all the orchestration required to put them into an application-consistent state before taking a storage snapshot, after which it returns the databases to an operational state.
+
+In the case of Oracle, you put the database in backup mode to take a snapshot and then take the database out of backup mode.
+
+=== Backup data and log volumes
+
+The backup can be set up on the database server host with simple shell script that executes the snapshot command. Then, the script can be scheduled to run from crontab.
+
+Generally, the frequency of backup depends on the desired RTO and RPO. Frequent snapshot creation consumes more storage space. There is a trade off between the frequency of backup and space consumption.
+
+Data volumes typically consume more storage space than log volumes. Therefore, you can take snapshots on data volumes every few hours and more frequent snapshots on log volumes every 15 to 30 minutes.
+
+See the following examples of backup scripts and scheduling.
+
+For data volume snapshots:
+[source, cli]
+ # /bin/sh
+cd /home/azacsnap/bin
+. ~/.bash_profile
+azacsnap -c backup --volume data --prefix acao-ora01-data --retention 36
+azacsnap -c backup --volume other --prefix acao-ora01-log --retention 250
+
+For log volume snapshots:
+[source, cli]
+ # /bin/sh
+cd /home/azacsnap/bin
+. ~/.bash_profile
+azacsnap -c backup --volume other --prefix acao-ora01-log --retention 250
+
+Crontab schedule:
+15,30,45 * * * * /home/azacsnap/snap_log.sh
+0 */2 * * * /home/azacsnap/snap_data.sh
+
+[NOTE]
+
+When setting up the backup `azacsnap.json` configuration file, add all data volumes, including the binary volume, to `dataVolume` and all log volumes to `otherVolume`. The maximum retention of snapshots is 250 copies.
+
+=== Validate the snapshots
+
+Go to the Azure portal > Azure NetApp Files/volumes to check if the snapshots have been successfully created.
+
+image:db_ora_azure_anf_snap_01.PNG["This screenshot depicts two files in the snapshot list."]
+image:db_ora_azure_anf_snap_02.PNG["This screenshot depicts eight files in the snapshot list."]
+
+== Oracle restore and recovery from local backup
+
+One of key benefits of snapshot backup is that it coexists with source database volumes, and the primary database volumes can be rolled back almost instantly.
+
+=== Restore and recovery of Oracle on the primary server
+
+The following example demonstrates how to restore and recover an Oracle database from the Azure dashboard and CLI on the same Oracle host.
+
+. Create a test table in the database to be restored.
+[oracle@acao-ora01 ~]$ sqlplus / as sysdba
++
+SQL*Plus: Release 19.0.0.0.0 - Production on Mon Sep 12 19:02:35 2022
+Version 19.8.0.0.0
++
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
++
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.8.0.0.0
++
+SQL> create table testsnapshot(
+     id integer,
+     event varchar(100),
+     dt timestamp);
++
+Table created.
++
+SQL> insert into testsnapshot values(1,'insert a data marker to validate snapshot restore',sysdate);
++
+1 row created.
++
+SQL> commit;
++
+Commit complete.
++
+SQL> select * from testsnapshot;
+
+ ID
+----------
+EVENT
+--------------------------------------------------------------------------------
+DT
+---------------------------------------------------------------------------
+         1
+insert a data marker to validate snapshot restore
+12-SEP-22 07.07.35.000000 PM
+
+. Drop the table after the snapshot backups.
++
+[oracle@acao-ora01 ~]$ sqlplus / as sysdba
++
+SQL*Plus: Release 19.0.0.0.0 - Production on Tue Sep 13 14:20:22 2022
+Version 19.8.0.0.0
++
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
++
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.8.0.0.0
++
+SQL> drop table testsnapshot;
++
+Table dropped.
++
+SQL> select * from testsnapshot;
+select * from testsnapshot
+              *
+ERROR at line 1:
+ORA-00942: table or view does not exist
++
+
+SQL> shutdown immediate;
+Database closed.
+Database dismounted.
+ORACLE instance shut down.
+SQL> exit
+Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.8.0.0.0
+
+. From the Azure NetApp Files dashboard, restore the log volume to the last available snapshot. Choose *Revert volume*.
++
+image:db_ora_azure_anf_restore_01.PNG[THis screenshot shows the method of snapshot reversion for volumes in the ANF dashboard.]
+
+. Confirm revert volume and click *Revert* to complete the volume reversion to the latest available backup.
++
+image:db_ora_azure_anf_restore_02.PNG[The "Are you sure you want to do this?" page for snapshot reversion.]
+
+. Repeat the same steps for the data volume, and make sure that the backup contains the table to be recovered.
++
+image:db_ora_azure_anf_restore_03.PNG[THis screenshot shows the method of snapshot reversion for data volumes in the ANF dashboard.]
+
+. Again confirm the volume reversion, and click "Revert."
++
+image:db_ora_azure_anf_restore_04.PNG[The "Are you sure you want to do this?" page for data volume snapshot reversion.]
+
+. Resync the control files if you have multiple copies of them, and replace the old control file with the latest copy available.
++
+[oracle@acao-ora01 ~]$ mv /u02/oradata/ORATST/control01.ctl /u02/oradata/ORATST/control01.ctl.bk
+[oracle@acao-ora01 ~]$ cp /u03/orareco/ORATST/control02.ctl /u02/oradata/ORATST/control01.ctl
+
+. Log into the Oracle server VM and run database recovery with sqlplus.
++
+[oracle@acao-ora01 ~]$ sqlplus / as sysdba
++
+SQL*Plus: Release 19.0.0.0.0 - Production on Tue Sep 13 15:10:17 2022
+Version 19.8.0.0.0
++
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
++
+Connected to an idle instance.
++
+SQL> startup mount;
+ORACLE instance started.
++
+Total System Global Area 6442448984 bytes
+Fixed Size                  8910936 bytes
+Variable Size            1090519040 bytes
+Database Buffers         5335154688 bytes
+Redo Buffers                7864320 bytes
+Database mounted.
+SQL> recover database using backup controlfile until cancel;
+ORA-00279: change 3188523 generated at 09/13/2022 10:00:09 needed for thread 1
+ORA-00289: suggestion :
+/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_43__22rnjq9q_.arc
+ORA-00280: change 3188523 for thread 1 is in sequence #43
++
+
+Specify log: {<RET>=suggested | filename | AUTO | CANCEL}
++
+ORA-00279: change 3188862 generated at 09/13/2022 10:01:20 needed for thread 1
+ORA-00289: suggestion :
+/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_44__29f2lgb5_.arc
+ORA-00280: change 3188862 for thread 1 is in sequence #44
+ORA-00278: log file
+'/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_43__22rnjq9q_.arc' no longer
+needed for this recovery
++
+
+Specify log: {<RET>=suggested | filename | AUTO | CANCEL}
++
+ORA-00279: change 3193117 generated at 09/13/2022 12:00:08 needed for thread 1
+ORA-00289: suggestion :
+/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_45__29h6qqyw_.arc
+ORA-00280: change 3193117 for thread 1 is in sequence #45
+ORA-00278: log file
+'/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_44__29f2lgb5_.arc' no longer
+needed for this recovery
++
+
+Specify log: {<RET>=suggested | filename | AUTO | CANCEL}
++
+ORA-00279: change 3193440 generated at 09/13/2022 12:01:20 needed for thread 1
+ORA-00289: suggestion :
+/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_46_%u_.arc
+ORA-00280: change 3193440 for thread 1 is in sequence #46
+ORA-00278: log file
+'/u03/orareco/ORATST/archivelog/2022_09_13/o1_mf_1_45__29h6qqyw_.arc' no longer
+needed for this recovery
++
+
+Specify log: {<RET>=suggested | filename | AUTO | CANCEL}
+cancel
+Media recovery cancelled.
+SQL> alter database open resetlogs;
++
+Database altered.
++
+SQL> select * from testsnapshot;
+
+  ID
+----------
+EVENT
+--------------------------------------------------------------------------------
+DT
+---------------------------------------------------------------------------
+         1
+insert a data marker to validate snapshot restore
+12-SEP-22 07.07.35.000000 PM
++
+
+SQL> select systimestamp from dual;
+
+ SYSTIMESTAMP
+---------------------------------------------------------------------------
+13-SEP-22 03.28.52.646977 PM +00:00
+
+This screen demonstrates that the dropped table has been recovered using local snapshot backups.
+
+link:azure_ora_nfile_migration.html[Next: Database migration.]
