@@ -1,0 +1,538 @@
+---
+sidebar: sidebar
+permalink: databases/sqlsb-backup-and-restore-aws-fsxn.html
+keywords: SQL server, SQL, backup, recover, AWS, aws, sql
+summary:
+---
+
+= TR-4951: Backup and Recovery for Microsoft SQL Server on AWS FSx for ONTAP
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2023-01-13 14:16:25.720568
+//
+
+[.lead]
+Author(s): Niyaz Mohammed, Carine Ngwekwe - NetApp Solutions Engineering
+
+This document covers the steps necessary to perform backup and recovery for Microsoft SQL Server on AWS FSx for ONTAP with SnapCenter.  This includes the following information:
+
+* NetApp SnapCenter configuration
+* SnapCenter backup operations
+* Backup operation for an FCI database
+* Backup operation for multiple databases
+* Restore and recovery
+
+== SnapCenter Configuration
+
+The following steps must be performed for SnapCenter configuration and the protection of Microsoft SQL Server resources. Each of the following steps is detailed in the following sections.
+
+. Configure sysadmin credentials for the SQL Server backup and restore user.
+. Configure storage settings. Provide Amazon Web Services (AWS) management credential to access the Amazon FSx for NetApp ONTAP storage virtual machines (SVMs) from SnapCenter.
+. Add a SQL Server host to SnapCenter. Deploy and install the required SnapCenter Plug-ins.
+. Configure policies. Define the backup operation type, retention, and optional Snapshot backup replication.
+. Configure and protect the Microsoft SQL Server database.
+
+== SnapCenter newly installed user interface
+
+Configure credentials for SQL Server backup and restore the user with sysadmin rights.
+
+image:sqlsb-aws-image1.png[Error: Missing Graphic Image]
+
+NetApp recommends using role-based access control (RBAC) to delegate data protection and management capabilities to individual users across the SnapCenter and window hosts. The user must have access to the SQL Server hosting the database. For multiple hosts,  the username and password must be the same across the various hosts. Furthermore, to enable SnapCenter to deploy the required plug-in on SQL Server hosts,  you must register the domain information for SnapCenter to validate your credentials and hosts.
+
+Expand the following sections to see the detailed instructions on how to complete each step.
+
+.Add the credentials
+[%collapsible]
+====
+Go to *Settings*, select *Credentials*, and click (*+*).
+
+image:sqlsb-aws-image2.png[Error: Missing Graphic Image]
+
+The new user must have administrator rights on the SQL Server host.
+
+image:sqlsb-aws-image3.png[Error: Missing Graphic Image]
+====
+
+.Configure storage
+[%collapsible]
+====
+To configure storage in SnapCenter, complete the following steps:
+
+. In the SnapCenter UI, select *Storage Systems*.  There are two storage types,  *ONTAP SVM* and *ONTAP Cluster*.  By default,  the storage type is *ONTAP SVM*.
+
+. Click (*+*) to add the storage system information.
++
+image:sqlsb-aws-image4.png[Error: Missing Graphic Image]
+
+. Provide the *FSx for ONTAP management* endpoint.
++
+image:sqlsb-aws-image5.png[Error: Missing Graphic Image]
+
+. The SVM is now configured in SnapCenter.
++
+image:sqlsb-aws-image6.png[Error: Missing Graphic Image]
+====
+
+.Add a SQL Server host to SnapCenter
+[%collapsible]
+====
+To add a SQL Server host,  complete the following steps:
+
+. From the Host tab,  click (*+*) to add the Microsoft SQL Server host.
++
+image:sqlsb-aws-image7.png[Error: Missing Graphic Image]
+
+. Provide the fully qualified domain name (FQDN) or IP address of the remote host.
++
+[NOTE]
+The credentials are populated by default.
+
+. Select the option for Microsoft windows and Microsoft SQL Server and then submit.
++
+image:sqlsb-aws-image8.png[Error: Missing Graphic Image]
+
+The SQL Server packages are installed.
+
+image:sqlsb-aws-image9.png[Error: Missing Graphic Image]
+
+. After the installation is complete,  go to the *Resource* tab to verify whether all FSx for ONTAP iSCSI volumes are present.
++
+image:sqlsb-aws-image10.png[Error: Missing Graphic Image]
+====
+
+.Configure log directory
+[%collapsible]
+====
+To configure a host log directory,  complete the following steps:
+
+. Click the check box.  A new tab opens.
++
+image:sqlsb-aws-image11.png[Error: Missing Graphic Image]
+
+. Click the *configure log directory* link.
++
+image:sqlsb-aws-image12.png[Error: Missing Graphic Image]
+
+. Select the drive for the host log directory and the FCI instance log directory. Click *Save*. Repeat the same process for the second node in the cluster.  Close the window.
++
+image:sqlsb-aws-image13.png[Error: Missing Graphic Image]
+
+The host is now in a running state.
+
+image:sqlsb-aws-image14.png[Error: Missing Graphic Image]
+
+. From the *Resources* tab, we have all the servers and databases.
++
+image:sqlsb-aws-image15.png[Error: Missing Graphic Image]
+====
+
+== Configure a backup policy
+
+A backup policy is a set of rules that govern how to manage, schedule,  and retain backup. It helps with the backup type and frequency based on your company’s SLA.
+
+Expand the following sections to see the detailed instructions on how to complete each step.
+
+.Configure back-up operation for an FCI database
+[%collapsible]
+====
+To configure a backup policy for an FCI database, complete the following steps:
+
+. Go to *Settings* and select *Policies* on the top left. Then click *New*.
++
+image:sqlsb-aws-image16.png[Error: Missing Graphic Image]
+
+. Enter the policy name and a description. Click *Next*.
++
+image:sqlsb-aws-image17.png[Error: Missing Graphic Image]
+
+. Select *Full backup* as the backup type.
++
+image:sqlsb-aws-image18.png[Error: Missing Graphic Image]
+
+. Select the schedule frequency (this is based on the company SLA). Click *Next*.
++
+image:sqlsb-aws-image19.png[Error: Missing Graphic Image]
+
+. Configure the retention settings for the backup.
++
+image:sqlsb-aws-image20.png[Error: Missing Graphic Image]
+
+. Configure the replication options.
++
+image:sqlsb-aws-image21.png[Error: Missing Graphic Image]
+
+. Specify a run script to run before and after a backup job is run (if any).
++
+image:sqlsb-aws-image22.png[Error: Missing Graphic Image]
+
+. Run verification based on the backup schedule.
++
+image:sqlsb-aws-image23.png[Error: Missing Graphic Image]
+
+. The *Summary* page provides details of the backup policy. Any errors can be corrected here.
++
+image:sqlsb-aws-image24.png[Error: Missing Graphic Image]
+====
+
+== Configure and protect MSSQL Server database
+
+. Set up the starting date and expiration date of the backup policy.
++
+image:sqlsb-aws-image25.png[Error: Missing Graphic Image]
+
+. Define the schedule for the backup.  To do that,  click (*+*) to configure a schedule.  Enter the *Start date* and *Expires on* date.  Set the time based on the company’s SLA.
++
+image:sqlsb-aws-image26.png[Error: Missing Graphic Image]
+
+. Configure the verification server.  From the drop- down menu, select the server.
++
+image:sqlsb-aws-image27.png[Error: Missing Graphic Image]
+
+. Confirm the configured schedule by clicking the plus sign and confirm.
+. Provide information for email notification.  Click *Next*.
++
+image:sqlsb-aws-image28.png[Error: Missing Graphic Image]
+
+The summary of the backup policy for SQL Server database is now configured.
+
+image:sqlsb-aws-image29.png[Error: Missing Graphic Image]
+
+== SnapCenter backup operations
+
+To create on-demand SQL Server backups, complete the following steps:
+
+. From the *Resource* view, select the resource and select *Backup now*.
++
+image:sqlsb-aws-image30.png[Error: Missing Graphic Image]
+
+. In the *Backup* dialog box, click *Backup*.
++
+image:sqlsb-aws-image31.png[Error: Missing Graphic Image]
+
+. A confirmation screen is displayed. Click *Yes* to confirm.
++
+image:sqlsb-aws-image32.png[Error: Missing Graphic Image]
+
+== Monitor backup job
+
+. From the *Monitor* tab, click the job and select *Details* on the right to view the jobs.
++
+image:sqlsb-aws-image33.png[Error: Missing Graphic Image]
++
+image:sqlsb-aws-image34.png[Error: Missing Graphic Image]
+
+When the backup is completed,  a new entry is shown in the Topology view.
+
+== Backup operation for multiple databases
+
+To configure a backup policy for multiple SQL Server databases,  create resource group policies by completing the following steps:
+
+. In the *Resources* tab from the *View* menu,  change to a resource group using the drop-down menu.
++
+image:sqlsb-aws-image35.png[Error: Missing Graphic Image]
+
+. Click (*+*) for a new resource group.
++
+image:sqlsb-aws-image36.png[Error: Missing Graphic Image]
+
+. Provide a name and tag. Click *Next*.
++
+image:sqlsb-aws-image37.png[Error: Missing Graphic Image]
+
+. Add resources to the resource group:
++
+** *Host.* Select the server from the drop-down menu hosting the database.
+** *Resource type.* From the drop-down menu,  select *Database*.
+** *SQL Server instance.* Select the server.
++
+image:sqlsb-aws-image38.png[Error: Missing Graphic Image]
++
+The *option* Auto Selects All the Resources from the Same Storage Volume* is selected by default.  Clear the option and select only the databases you need to add to the resource group, Click the arrow to add and click *Next*.
++
+image:sqlsb-aws-image39.png[Error: Missing Graphic Image]
+
+. On the policies,  click (*+*).
++
+image:sqlsb-aws-image40.png[Error: Missing Graphic Image]
+
+. Enter the resource group policy name.
++
+image:sqlsb-aws-image41.png[Error: Missing Graphic Image]
+
+. Select *Full backup* and the schedule frequency depending on your company’s SLA.
++
+image:sqlsb-aws-image42.png[Error: Missing Graphic Image]
+
+. Configure the retention settings.
++
+image:sqlsb-aws-image43.png[Error: Missing Graphic Image]
+
+. Configure the replication options.
++
+image:sqlsb-aws-image44.png[Error: Missing Graphic Image]
+
+. Configure the scripts to run before performing a backup. Click *Next*.
++
+image:sqlsb-aws-image45.png[Error: Missing Graphic Image]
+
+. Confirm the verification for the following backup schedules.
++
+image:sqlsb-aws-image46.png[Error: Missing Graphic Image]
+
+. On the *Summary* page, verify the information,  and click *Finish*.
++
+image:sqlsb-aws-image47.png[Error: Missing Graphic Image]
+
+==  Configure and protect multiple SQL Server databases
+
+. Click the (*+*) sign to configure the start date and the expire- on date.
++
+image:sqlsb-aws-image48.png[Error: Missing Graphic Image]
+
+. Set the time.
++
+image:sqlsb-aws-image49.png[Error: Missing Graphic Image]
++
+image:sqlsb-aws-image50.png[Error: Missing Graphic Image]
+
+. From the *Verification* tab,  select the server,  configure the schedule, and click *Next*.
++
+image:sqlsb-aws-image51.png[Error: Missing Graphic Image]
+
+. Configure notifications to send an email.
++
+image:sqlsb-aws-image52.png[Error: Missing Graphic Image]
+
+The policy is now configured for backing up multiple SQL Server databases.
+
+image:sqlsb-aws-image53.png[Error: Missing Graphic Image]
+
+== Trigger on-demand backup for multiple SQL Server databases
+
+. From the *Resource* tab, select view. From the drop-down menu,  select *Resource Group*.
++
+image:sqlsb-aws-image54.png[Error: Missing Graphic Image]
+
+. Select the resource group name.
+. Click *Backup now* in the upper right.
++
+image:sqlsb-aws-image55.png[Error: Missing Graphic Image]
+
+. A new window opens.  Click the *Verify after backup* checkbox and then click backup. 
++
+image:sqlsb-aws-image56.png[Error: Missing Graphic Image]
+
+. A confirmation message is dsiplayed.  Click *Yes*.
++
+image:sqlsb-aws-image57.png[Error: Missing Graphic Image]
+
+== Monitor multiple-database backup jobs
+
+From the left navigation bar, click *Monitor*, select the backup job, and click *Details* to view job progress.
+
+image:sqlsb-aws-image58.png[Error: Missing Graphic Image]
+
+Click the *Resource* tab to see the time it takes for the backup to be completed.
+
+image:sqlsb-aws-image59.png[Error: Missing Graphic Image]
+
+== Transaction log backup for multiple database backup
+
+SnapCenter supports the full, bulked logged,  and simple recovery models.  The simple recovery mode does not support transactional log backup.
+
+To perform a transaction log backup, complete the following steps:
+
+. From the *Resources* tab,  change the view menu from *Database* to *Resource group*.
++
+image:sqlsb-aws-image60.png[Error: Missing Graphic Image]
+
+. Select the resource group backup policy created.
+. Select *Modify Resource Group* in the upper right.
++
+image:sqlsb-aws-image61.png[Error: Missing Graphic Image]
+
+. The *Name* section defaults to the backup policy name and tag. Click *Next*.
++
+The *Resources* tab highlights the bases to which the transaction backup policy is to be configured.
++
+image:sqlsb-aws-image62.png[Error: Missing Graphic Image]
+
+. Enter the policy name.
++
+image:sqlsb-aws-image63.png[Error: Missing Graphic Image]
+
+. Select the SQL Server backup options.
+. Select log backup.
+. Set the schedule frequency based on your company’s RTO. Click *Next*.
++
+image:sqlsb-aws-image64.png[Error: Missing Graphic Image]
+
+. Configure the log backup retention settings. Click *Next*.
++
+image:sqlsb-aws-image65.png[Error: Missing Graphic Image]
+
+. (Optional) Configure the replication options.
++
+image:sqlsb-aws-image66.png[Error: Missing Graphic Image]
+
+. (Optional) Configure any scripts to run before performing a backup job.
++
+image:sqlsb-aws-image67.png[Error: Missing Graphic Image]
+
+. (Optional) Configure backup verfication.
++
+image:sqlsb-aws-image68.png[Error: Missing Graphic Image]
+
+. On the *Summary* page, click *Finish*.
++
+image:sqlsb-aws-image69.png[Error: Missing Graphic Image]
+
+== Configure and protect multiple MSSQL Server databases
+
+. Click the newly created transaction log backup policy.
++
+image:sqlsb-aws-image70.png[Error: Missing Graphic Image]
+
+. Set the *Start date* and *Expires on* date.
+. Enter the frequency of the log backup policy depending on the SLA,  RTP,  and RPO. Click OK.
++
+image:sqlsb-aws-image71.png[Error: Missing Graphic Image]
+
+. You can see both policies.  Click *Next*.
++
+image:sqlsb-aws-image72.png[Error: Missing Graphic Image]
+
+. Configure the verification server.
++
+image:sqlsb-aws-image73.png[Error: Missing Graphic Image]
+
+. Configure email notification.
++
+image:sqlsb-aws-image74.png[Error: Missing Graphic Image]
+
+. On the *Summary* page, click *Finish*.
++
+image:sqlsb-aws-image75.png[Error: Missing Graphic Image]
+
+== Triggering an on-demand transaction log backup for mutiple SQL Server databases
+
+To trigger an on- demand backup of the transactional log for multiple SQL server databases, complete the following steps:
+
+. On the newly created policy page,  select *Backup now* at the upper right of the page.
++
+image:sqlsb-aws-image76.png[Error: Missing Graphic Image]
+
+. From the pop-up on the *Policy* tab, select the drop-down menu, select the backup policy,  and configure the transaction log backup.
++
+image:sqlsb-aws-image77.png[Error: Missing Graphic Image]
+
+. Click *Backup*. A new window is displayed.
+. Click *Yes* to confirm the backup policy.
++
+image:sqlsb-aws-image78.png[Error: Missing Graphic Image]
+
+== Monitoring
+
+Move to the *Monitoring* tab and monitor the progress of the backup job.
+
+image:sqlsb-aws-image79.png[Error: Missing Graphic Image]
+
+== Restore and recovery
+
+See the following prerequisites necessary for restoring a SQL Server database in SnapCenter.
+
+* The target instance must be online and running before a restore job completes.
+* SnapCenter operations that are scheduled to run against the SQL Server database must be disabled,  including any jobs scheduled on remote management or remote verification servers.
+* If you are restoring custom log directory backups to an alternate host, the SnapCenter server and the plugin host must have the same SnapCenter version installed.
+* You can restore the system database to an alternate host.
+* SnapCenter can restore a database in a Windows cluster without taking the SQL Server cluster group offline.
+
+== Restoring deleted tables on a SQL Server database to a point in time
+
+To restore a SQL Server database to a point in time, complete the following steps:
+
+. The following screenshot shows the initial state of the SQL Server database before the deleted tables.
++
+image:sqlsb-aws-image80.png[Error: Missing Graphic Image]
++
+The screenshot shows that 20 rows were deleted from the table.
++
+image:sqlsb-aws-image81.png[Error: Missing Graphic Image]
+
+. Log into SnapCenter Server. From the *Resources* tab,  select the database.
++
+image:sqlsb-aws-image82.png[Error: Missing Graphic Image]
+
+. Select the most recent backup.
+.  On the right,  select *Restore*.
++
+image:sqlsb-aws-image83.png[Error: Missing Graphic Image]
+
+. A new window is displayed.  Select the *Restore* option.
+. Restore the database to the same host where the backup was created.  Click *Next*.
++
+image:sqlsb-aws-image84.png[Error: Missing Graphic Image]
+
+. For the *Recovery type*, select *All log backups*. Click *Next*.
++
+image:sqlsb-aws-image85.png[Error: Missing Graphic Image]
++
+image:sqlsb-aws-image86.png[Error: Missing Graphic Image]
+
+*Pre- restore options:*
+
+. Select the option *Overwrite the database with same name during restore*. Click *Next*.
++
+image:sqlsb-aws-image87.png[Error: Missing Graphic Image]
+
+*Post- restore options:*
+
+. Select the option *Operational, but unavailable for restoring additional transaction logs*. Click *Next*.
++
+image:sqlsb-aws-image88.png[Error: Missing Graphic Image]
+
+. Provide the email settings. Click *Next*.
++
+image:sqlsb-aws-image89.png[Error: Missing Graphic Image]
+
+. On the *Summary* page, click *Finish*.
++
+image:sqlsb-aws-image90.png[Error: Missing Graphic Image]
+
+== Monitoring the restore progress
+
+. From the *Monitoring* tab, click the restore job details to view the progress of the restore job.
++
+image:sqlsb-aws-image91.png[Error: Missing Graphic Image]
+
+. Restore the job details.
++
+image:sqlsb-aws-image92.png[Error: Missing Graphic Image]
+
+. Return to SQL Server host > database > table are present. 
++
+image:sqlsb-aws-image93.png[Error: Missing Graphic Image]
+
+== Where to find additional information
+
+To learn more about the information that is described in this document, review the following documents and/or websites:
+
+* https://www.netapp.com/pdf.html?item=/media/12400-tr4714pdf.pdf[TR-4714: Best Practices Guide for Microsoft SQL Server using NetApp SnapCenter^]
++
+https://www.netapp.com/pdf.html?item=/media/12400-tr4714pdf.pdf[https://www.netapp.com/pdf.html?item=/media/12400-tr4714pdf.pdf^] 
+
+* https://docs.netapp.com/us-en/snapcenter-45/protect-scsql/concept_requirements_for_restoring_a_database.html[Requirements for restoring a database^]
++
+https://docs.netapp.com/us-en/snapcenter-45/protect-scsql/concept_requirements_for_restoring_a_database.html[https://docs.netapp.com/us-en/snapcenter-45/protect-scsql/concept_requirements_for_restoring_a_database.html^] 
+
+* Understanding cloned database lifecycles
++
+https://library.netapp.com/ecmdocs/ECMP1217281/html/GUID-4631AFF4-64FE-4190-931E-690FCADA5963.html[https://library.netapp.com/ecmdocs/ECMP1217281/html/GUID-4631AFF4-64FE-4190-931E-690FCADA5963.html^] 
