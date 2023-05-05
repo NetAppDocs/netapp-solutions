@@ -98,13 +98,17 @@ Deployment requires the following prerequisites.
 git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
 ....
 
+[NOTE]
+
+Ensure that you have allocated at least 50G in EC2 instance root volume in order to have sufficient space to stage Oracle installation files.
+
 ====
 
 === EC2 instance kernel configuration
 [%collapsible]
 
 ====
-With the prerequisites provisioned, log into the EC2 instance as the root user to configure the Linux kernel for Oracle installation.
+With the prerequisites provisioned, log into the EC2 instance as ec2-user and sudo to root user to configure the Linux kernel for Oracle installation.
 
 . Create a staging directory `/tmp/archive` folder and set the `777` permission.
 +
@@ -255,9 +259,13 @@ usermod -a -G asm oracle
 
 ====
 
-Provision three volumes from the FSx console to host the Oracle database binary, data, and logs files.
+Provision three volumes from the command line by login to FSx cluster via ssh as fsxadmin user with FSx cluster management IP to host the Oracle database binary, data, and logs files.
 
 . Log into the FSx cluster through SSH as the fsxadmin user.
++
+....
+ssh fsxadmin@172.30.15.53
+....
 
 . Execute the following command to create a volume for the Oracle binary.
 + 
@@ -351,7 +359,7 @@ svm_ora    /vol/ora_01_logs/ora_01_logs_02           ora_01        6  iscsi
 ====
 Now, import and set up the FSx storage for the Oracle grid infrastructure and database installation on the EC2 instance host.
 
-. Log into the EC2 instance via SSH as the ec2-user. Then change to your SSH key and EC2 instance IP address.
+. Log into the EC2 instance via SSH as the ec2-user with your SSH key and EC2 instance IP address.
 +
 ....
 ssh -i ora_01.pem ec2-user@172.30.15.58
@@ -566,7 +574,7 @@ sudo mount -t xfs /dev/mapper/ora_01_biny_01p1 /u01
 . Change `/u01` mount point ownership to the Oracle user and it's asssociated primary group.
 +
 ....
-chown oracle:oinstall /u01
+sudo chown oracle:oinstall /u01
 ....
 
 . Find the UUI of the binary LUN.
@@ -599,8 +607,7 @@ vi /etc/udev/rules.d/99-oracle-asmdevices.rules
 Include following entries:
 +
 ....
-ENV{DM_NAME}=="ora_01_data_*", GROUP:="oinstall", OWNER:="oracle", MODE:="660"
-ENV{DM_NAME}=="ora_01_logs_*", GROUP:="oinstall", OWNER:="oracle", MODE:="660"
+ENV{DM_NAME}=="ora*", GROUP:="oinstall", OWNER:="oracle", MODE:="660"
 ....
 
 . As the root user, reload the udev rules.
@@ -620,6 +627,8 @@ udevadm trigger
 ....
 systemctl restart multipathd
 ....
+
+. Reboot the EC2 instance host.
 
 ====
 
