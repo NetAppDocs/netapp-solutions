@@ -713,7 +713,7 @@ oracle.install.asm.diskGroup.name=DATA
 oracle.install.asm.diskGroup.redundancy=EXTERNAL
 oracle.install.asm.diskGroup.AUSize=4
 oracle.install.asm.diskGroup.disks=/dev/mapper/ora_01_data*
-oracle.install.asm.diskGroup.diskDiscoveryString=/dev/mapper/*
+oracle.install.asm.diskGroup.diskDiscoveryString=/dev/mapper/ora_02_data_01,/dev/mapper/ora_02_data_02,/dev/mapper/ora_02_data_03,/dev/mapper/ora_02_data_04
 oracle.install.asm.monitorPassword="SetPWD"
 oracle.install.asm.configureAFD=true
 ....
@@ -742,17 +742,6 @@ cd /u01/app/oracle/product/19.0.0/grid/bin
  ./asmcmd afd_label LOGS02 /dev/mapper/ora_01_logs_02 --init
 ....
 
-. Change devices ownership to `oracle:oinstall`.
-+
-....
-chown oracle:oinstall /dev/mapper/ora_01_data_01
-chown oracle:oinstall /dev/mapper/ora_01_data_02
-chown oracle:oinstall /dev/mapper/ora_01_data_03
-chown oracle:oinstall /dev/mapper/ora_01_data_04
-chown oracle:oinstall /dev/mapper/ora_01_logs_01
-chown oracle:oinstall /dev/mapper/ora_01_logs_02
-....
-
 . Install `cvuqdisk-1.0.10-1.rpm`.
 +
 ....
@@ -771,7 +760,7 @@ unset ORACLE_BASE
 unzip p34762026_190000_Linux-x86-64.zip
 ....
 
-. As the Oracle user, launch `gridSetup.sh` for grid infrastructure installation.
+. From grid home /u01/app/oracle/product/19.0.0/grid and as the oracle user, launch `gridSetup.sh` for grid infrastructure installation.
 +
 ....
  ./gridSetup.sh -applyRU /tmp/archive/34762026/ -silent -responseFile /tmp/archive/gridsetup.rsp
@@ -779,12 +768,18 @@ unzip p34762026_190000_Linux-x86-64.zip
 +
 Ignore the warnings about wrong groups for grid infrastructure. We are using a single Oracle user to manage Oracle Restart, so this is expected. 
 
-. As a root user, execute the following script(s):
+. As root user, execute the following script(s):
 +
 ....
 /u01/app/oraInventory/orainstRoot.sh
 
 /u01/app/oracle/product/19.0.0/grid/root.sh
+....
+
+. As root user, reload the multipathd.
++
+....
+systemctl restart multipathd
 ....
 
 . As the Oracle user, execute the following command to complete the configuration:
@@ -793,28 +788,10 @@ Ignore the warnings about wrong groups for grid infrastructure. We are using a s
 /u01/app/oracle/product/19.0.0/grid/gridSetup.sh -executeConfigTools -responseFile /tmp/archive/gridsetup.rsp -silent
 ....
 
-. If you received the message "[INS-43080] Some of the configuration assistants failed, were cancelled or skipped", run the following command as oracle user to check if the DATA disk group resource was created.
-+
-....
-bin/crsctl stat res -t
-....
-
-. If the DATA disk group was not created, reload the multipathd as root user.
-+
-....
-systemctl restart multipathd
-....
-
-. As the oracle user, create a DATA disk group if it was not created during grid installation. 
-+
-....
-bin/asmca -silent -sysAsmPassword 'yourPWD' -asmsnmpPassword 'yourPWD' -createDiskGroup -diskString '/dev/mapper/*' -diskGroupName DATA -disklist '/dev/mapper/ora_01_data_01,/dev/mapper/ora_01_data_02,/dev/mapper/ora_01_data_03,/dev/mapper/ora_01_data_04' -redundancy EXTERNAL 
-....
-
 . As the Oracle user, create the LOGS disk group.
 +
 ....
-bin/asmca -silent -sysAsmPassword 'yourPWD' -asmsnmpPassword 'yourPWD' -createDiskGroup -diskString '/dev/mapper/*' -diskGroupName LOGS -disklist '/dev/mapper/ora_01_logs_01,/dev/mapper/ora_01_logs_02' -redundancy EXTERNAL
+bin/asmca -silent -sysAsmPassword 'yourPWD' -asmsnmpPassword 'yourPWD' -createDiskGroup -diskGroupName LOGS -disk 'AFD:LOGS*' -redundancy EXTERNAL -au_size 4
 ....
 
 . As the Oracle user, validate grid services after installation configuration.
@@ -920,19 +897,19 @@ oracle.install.db.OSRACDBA_GROUP=dba
 oracle.install.db.rootconfig.executeRootScript=false
 ....
 
-. Execute silent software-only DB installation.
+. From db1 home /u01/app/oracle/product/19.0.0/db1, execute silent software-only DB installation.
 +
 ....
  ./runInstaller -applyRU /tmp/archive/34765931/ -silent -ignorePrereqFailure -responseFile /tmp/archive/dbinstall.rsp
 ....
 
-. Run the `root.sh` script after sofware-only installation.
+. As root user, run the `root.sh` script after sofware-only installation.
 +
 ....
 /u01/app/oracle/product/19.0.0/db1/root.sh
 ....
 
-. Create the `dbca.rsp` file with the following entries:
+. As Oracle user, create the `dbca.rsp` file with the following entries:
 +
 ....
 gdbName=db1.demo.netapp.com
@@ -956,7 +933,7 @@ automaticMemoryManagement=false
 totalMemory=8192
 ....
 
-. Lauch DB creation with dbca.
+. As Oracle user, lauch DB creation with dbca.
 +
 ....
 bin/dbca -silent -createDatabase -responseFile /tmp/archive/dbca.rsp
@@ -993,7 +970,7 @@ System Identifier(SID):db1
 Look at the log file "/u01/app/oracle/cfgtoollogs/dbca/db1/db1.log" for further details.
 ....
 
-. Validate Oracle Restart HA services after DB creation.
+. As Oracle user, validate Oracle Restart HA services after DB creation.
 +
 ....
 [oracle@ip-172-30-15-58 db1]$ ../grid/bin/crsctl stat res -t
