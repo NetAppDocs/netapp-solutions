@@ -166,22 +166,10 @@ yum install /tmp/archive/policycoreutils-python-utils-2.9-9.el8.noarch.rpm
 yum install java-1.8.0-openjdk.x86_64
 ....
 
-. Install iSCSI initiator utils.
+. Install nfs-utils.
 +
 ....
-yum install iscsi-initiator-utils
-....
-
-. Install `sg3_utils`.
-+
-....
-yum install sg3_utils
-....
-
-. Install `device-mapper-multipath`.
-+
-....
-yum install device-mapper-multipath
+yum install nfs-utils
 ....
 
 . Disable transparent hugepages in the current system.
@@ -218,25 +206,6 @@ vi /etc/security/limits.conf
 ....
 
 . Add swap space to EC2 instance by following this instruction: link:https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^] The exact amount of space to add depends on the size of RAM up to 16G.
-
-. Change `node.session.timeo.replacement_timeout` in the `iscsi.conf` configuration file from 120 to 5 seconds.
-+
-....
-vi /etc/iscsi/iscsid.conf
-....
-
-. Enable and start the iSCSI service on the EC2 instance.
-+
-....
-systemctl enable iscsid
-systemctl start iscsid
-....
-
-. Retrieve the iSCSI initiator address to be used for database LUN mapping.
-+
-....
-cat /etc/iscsi/initiatorname.iscsi
-....
 
 . Add the ASM group to be used for the asm sysasm group
 +
@@ -285,70 +254,25 @@ vol create -volume ora_01_data -aggregate aggr1 -size 100G -state online  -type 
 vol create -volume ora_01_logs -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
 ....
 
-. Create a binary LUN within the database binary volume.
+. Validate the DB volumes created.
 +
 ....
-lun create -path /vol/ora_01_biny/ora_01_biny_01 -size 40G -ostype linux
-....
-
-. Create data LUNs within the database data volume.
-+
-....
-lun create -path /vol/ora_01_data/ora_01_data_01 -size 20G -ostype linux
-
-lun create -path /vol/ora_01_data/ora_01_data_02 -size 20G -ostype linux
-
-lun create -path /vol/ora_01_data/ora_01_data_03 -size 20G -ostype linux
-
-lun create -path /vol/ora_01_data/ora_01_data_04 -size 20G -ostype linux
-....
-
-. Create log LUNs within the database logs volume.
-+
-....
-lun create -path /vol/ora_01_logs/ora_01_logs_01 -size 40G -ostype linux
-
-lun create -path /vol/ora_01_logs/ora_01_logs_02 -size 40G -ostype linux
-....
-
-. Create an igroup for the EC2 instance with the initiator retrieved from step 14 of the EC2 kernel configuration above.
-+
-....
-igroup create -igroup ora_01 -protocol iscsi -ostype linux -initiator iqn.1994-05.com.redhat:f65fed7641c2
-....
-
-. Map the LUNs to the igroup created above. Increment the LUN ID sequentially for each additional LUN within a volume.
-+
-....
-map -path /vol/ora_01_biny/ora_01_biny_01 -igroup ora_01 -vserver svm_ora -lun-id 0
-map -path /vol/ora_01_data/ora_01_data_01 -igroup ora_01 -vserver svm_ora -lun-id 1
-map -path /vol/ora_01_data/ora_01_data_02 -igroup ora_01 -vserver svm_ora -lun-id 2
-map -path /vol/ora_01_data/ora_01_data_03 -igroup ora_01 -vserver svm_ora -lun-id 3
-map -path /vol/ora_01_data/ora_01_data_04 -igroup ora_01 -vserver svm_ora -lun-id 4
-map -path /vol/ora_01_logs/ora_01_logs_01 -igroup ora_01 -vserver svm_ora -lun-id 5
-map -path /vol/ora_01_logs/ora_01_logs_02 -igroup ora_01 -vserver svm_ora -lun-id 6
-....
-
-. Validate the LUN mapping.
-+
-....
-mapping show
+vol show
 ....
 +
 This is expected to return:
 +
 ....
-FsxId02ad7bf3476b741df::> mapping show
-  (lun mapping show)
-Vserver    Path                                      Igroup   LUN ID  Protocol
----------- ----------------------------------------  -------  ------  --------
-svm_ora    /vol/ora_01_biny/ora_01_biny_01           ora_01        0  iscsi
-svm_ora    /vol/ora_01_data/ora_01_data_01           ora_01        1  iscsi
-svm_ora    /vol/ora_01_data/ora_01_data_02           ora_01        2  iscsi
-svm_ora    /vol/ora_01_data/ora_01_data_03           ora_01        3  iscsi
-svm_ora    /vol/ora_01_data/ora_01_data_04           ora_01        4  iscsi
-svm_ora    /vol/ora_01_logs/ora_01_logs_01           ora_01        5  iscsi
-svm_ora    /vol/ora_01_logs/ora_01_logs_02           ora_01        6  iscsi
+FsxId02ad7bf3476b741df::> vol show
+  (vol show)
+FsxId06c3c8b2a7bd56458::> vol show
+Vserver   Volume       Aggregate    State      Type       Size  Available Used%
+--------- ------------ ------------ ---------- ---- ---------- ---------- -----
+svm_ora   ora_01_data  aggr1        online     RW      148.8GB    29.01GB   79%
+svm_ora   ora_01_logs  aggr1        online     RW      148.8GB    86.97GB   38%
+svm_ora   ora_01_biny  aggr1        online     RW         50GB    21.78GB   54%
+svm_ora   svm_ora_root aggr1        online     RW          1GB    972.0MB    0%
+4 entries were displayed.
 ....
 
 ====
@@ -365,222 +289,58 @@ Now, import and set up the FSx storage for the Oracle grid infrastructure and da
 ssh -i ora_01.pem ec2-user@172.30.15.58
 ....
 
-. Discover the FSx iSCSI endpoints using either SVM iSCSI IP address. Then change to your environment-specific portal address.
+. Create /u01 directory to mount Oracle binary file system
 +
 ....
-sudo iscsiadm iscsiadm --mode discovery --op update --type sendtargets --portal 172.30.15.51
+sudo mkdir /u01
 ....
 
-. Establish iSCSI sessions by logging into each target.
+. Mount the binary volume to `/u01`, changed to your FSx NFS lif IP address
 +
 ....
-sudo iscsiadm --mode node -l all
-....
-+
-The expected output from the command is:
-+
-....
-[ec2-user@ip-172-30-15-58 ~]$ sudo iscsiadm --mode node -l all
-Logging in to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.51,3260]
-Logging in to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.13,3260]
-Login to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.51,3260] successful.
-Login to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.13,3260] successful.
+sudo mount -t nfs 172.30.15.19:/ora_01_biny /u01 -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
 ....
 
-. View and validate a list of active iSCSI sessions.
-+
-....
-sudo iscsiadm --mode session
-....
-+
-Return the iSCSI sessions.
-+
-....
-[ec2-user@ip-172-30-15-58 ~]$ sudo iscsiadm --mode session
-tcp: [1] 172.30.15.51:3260,1028 iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3 (non-flash)
-tcp: [2] 172.30.15.13:3260,1029 iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3 (non-flash)
-....
-
-. Verify that the LUNs were imported into the host.
-+
-....
-sudo sanlun lun show
-....
-+
-This will return a list of Oracle LUNs from FSx.
-+
-....
-
-[ec2-user@ip-172-30-15-58 ~]$ sudo sanlun lun show
-controller(7mode/E-Series)/                                   device          host                  lun
-vserver(cDOT/FlashRay)        lun-pathname                    filename        adapter    protocol   size    product
-
-svm_ora                       /vol/ora_01_logs/ora_01_logs_02 /dev/sdn        host3      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_logs/ora_01_logs_01 /dev/sdm        host3      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_03 /dev/sdk        host3      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_04 /dev/sdl        host3      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_01 /dev/sdi        host3      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_02 /dev/sdj        host3      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_biny/ora_01_biny_01 /dev/sdh        host3      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_logs/ora_01_logs_02 /dev/sdg        host2      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_logs/ora_01_logs_01 /dev/sdf        host2      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_04 /dev/sde        host2      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_02 /dev/sdc        host2      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_03 /dev/sdd        host2      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_01 /dev/sdb        host2      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_biny/ora_01_biny_01 /dev/sda        host2      iSCSI      40g     cDOT
-....
-
-. Configure the `multipath.conf` file with following default and blacklist entries.
-+
-....
-sudo vi /etc/multipath.conf
-
-defaults {
-    find_multipaths yes
-    user_friendly_names yes
-}
-
-[source, cli]
-blacklist {
-    devnode "^(ram|raw|loop|fd|md|dm-|sr|scd|st)[0-9]*"
-    devnode "^hd[a-z]"
-    devnode "^cciss.*"
-}
-....
-
-. Start the multipath service.
-+
-....
-sudo systemctl start multipathd
-....
-+
-Now multipath devices appear in the `/dev/mapper` directory.
-+
-....
-[ec2-user@ip-172-30-15-58 ~]$ ls -l /dev/mapper
-total 0
-lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e68512d -> ../dm-0
-lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685141 -> ../dm-1
-lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685142 -> ../dm-2
-lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685143 -> ../dm-3
-lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685144 -> ../dm-4
-lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685145 -> ../dm-5
-lrwxrwxrwx 1 root root       7 Mar 21 20:13 3600a09806c574235472455534e685146 -> ../dm-6
-crw------- 1 root root 10, 236 Mar 21 18:19 control
-....
-
-. Log into the FSx cluster as the fsxadmin user via SSH to retrieve the serial-hex number for each LUN start with 6c574xxx..., the HEX number start with 3600a0980, which is AWS vendor ID.
-+
-....
-lun show -fields serial-hex
-....
-+
-and return as follow:
-+
-....
-FsxId02ad7bf3476b741df::> lun show -fields serial-hex
-vserver path                            serial-hex
-------- ------------------------------- ------------------------
-svm_ora /vol/ora_01_biny/ora_01_biny_01 6c574235472455534e68512d
-svm_ora /vol/ora_01_data/ora_01_data_01 6c574235472455534e685141
-svm_ora /vol/ora_01_data/ora_01_data_02 6c574235472455534e685142
-svm_ora /vol/ora_01_data/ora_01_data_03 6c574235472455534e685143
-svm_ora /vol/ora_01_data/ora_01_data_04 6c574235472455534e685144
-svm_ora /vol/ora_01_logs/ora_01_logs_01 6c574235472455534e685145
-svm_ora /vol/ora_01_logs/ora_01_logs_02 6c574235472455534e685146
-7 entries were displayed.
-....
-
-. Update the `/dev/multipath.conf` file to add a user-friendly name for the multipath device.
-+
-....
-sudo vi /etc/multipath.conf
-....
-+
-with following entries:
-+
-....
-multipaths {
-        multipath {
-                wwid            3600a09806c574235472455534e68512d
-                alias           ora_01_biny_01
-        }
-        multipath {
-                wwid            3600a09806c574235472455534e685141
-                alias           ora_01_data_01
-        }
-        multipath {
-                wwid            3600a09806c574235472455534e685142
-                alias           ora_01_data_02
-        }
-        multipath {
-                wwid            3600a09806c574235472455534e685143
-                alias           ora_01_data_03
-        }
-        multipath {
-                wwid            3600a09806c574235472455534e685144
-                alias           ora_01_data_04
-        }
-        multipath {
-                wwid            3600a09806c574235472455534e685145
-                alias           ora_01_logs_01
-        }
-        multipath {
-                wwid            3600a09806c574235472455534e685146
-                alias           ora_01_logs_02
-        }
-....
-
-. Reboot the multipath service to verify that the devices under `/dev/mapper` have changed to LUN names versus serial-hex IDs.
-+
-....
-sudo systemctl restart multipathd
-....
-+
-Check `/dev/mapper` to return as following:
-+
-....
-[ec2-user@ip-172-30-15-58 ~]$ ls -l /dev/mapper
-total 0
-crw------- 1 root root 10, 236 Mar 21 18:19 control
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_biny_01 -> ../dm-0
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_01 -> ../dm-1
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_02 -> ../dm-2
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_03 -> ../dm-3
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_04 -> ../dm-4
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_logs_01 -> ../dm-5
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_logs_02 -> ../dm-6
-....
-
-. Partition the binary LUN with a single primary partition.
-+
-....
-sudo fdisk /dev/mapper/ora_01_biny_01
-....
-
-. Format the partitioned binary LUN with an XFS file system.
-+
-....
-sudo mkfs.xfs /dev/mapper/ora_01_biny_01p1
-....
-
-. Mount the binary LUN to `/u01`.
-+
-....
-sudo mount -t xfs /dev/mapper/ora_01_biny_01p1 /u01
-....
-
-. Change `/u01` mount point ownership to the Oracle user and it's asssociated primary group.
+. Change `/u01` mount point ownership to the Oracle user and it's associated primary group.
 +
 ....
 sudo chown oracle:oinstall /u01
 ....
 
-. Find the UUI of the binary LUN.
+. Create /oradata directory to mount Oracle data file system
 +
 ....
-sudo blkid /dev/mapper/ora_01_biny_01p1
+sudo mkdir /oradata
+....
+
+. Mount the data volume to `/oradata`, changed to your FSx NFS lif IP address
++
+....
+sudo mount -t nfs 172.30.15.19:/ora_01_data /oradata -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
+....
+
+. Change `/oradata` mount point ownership to the Oracle user and it's associated primary group.
++
+....
+sudo chown oracle:oinstall /oradata
+....
+
+. Create /oralogs directory to mount Oracle logs file system
++
+....
+sudo mkdir /oralogs
+....
+
+. Mount the log volume to `/oralogs`, changed to your FSx NFS lif IP address
++
+....
+sudo mount -t nfs 172.30.15.19:/ora_01_data /oradata -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
+....
+
+. Change `/oralogs` mount point ownership to the Oracle user and it's associated primary group.
++
+....
+sudo chown oracle:oinstall /oralogs
 ....
 
 . Add a mount point to `/etc/fstab`.
@@ -592,40 +352,45 @@ sudo vi /etc/fstab
 Add the following line.
 +
 ....
-UUID=d89fb1c9-4f89-4de4-b4d9-17754036d11d       /u01    xfs     defaults,nofail 0       2
-....
-+
-[NOTE]
-It is important to mount the binary with only the UUID and with the nofail option to avoid possible root-lock issues during EC2-instance reboot.
+172.30.15.19:/ora_01_biny       /u01            nfs     rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536   0       0
+172.30.15.19:/ora_01_data       /oradata        nfs     rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536   0       0
+172.30.15.19:/ora_01_logs       /oralogs        nfs     rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536   0       0
 
-. As the root user, add the udev rule for Oracle devices.
-+
-....
-vi /etc/udev/rules.d/99-oracle-asmdevices.rules
-....
-+ 
-Include following entries:
-+
-....
-ENV{DM_NAME}=="ora*", GROUP:="oinstall", OWNER:="oracle", MODE:="660"
 ....
 
-. As the root user, reload the udev rules.
+. sudo to oracle user, create asm folders to store asm disk files 
 +
 ....
-udevadm control --reload-rules
+mkdir /oradata/asm
+mkdir /oralogs/asm
 ....
 
-. As the root user, trigger the udev rules.
+. As the oracle user, create asm data disk files, change the count to match to the disk size with block size.
 +
 ....
-udevadm trigger
+dd if=/dev/zero of=/oradata/asm/nfs_data_disk01 bs=1M count=20480 oflag=direct
+dd if=/dev/zero of=/oradata/asm/nfs_data_disk02 bs=1M count=20480 oflag=direct
+dd if=/dev/zero of=/oradata/asm/nfs_data_disk03 bs=1M count=20480 oflag=direct
+dd if=/dev/zero of=/oradata/asm/nfs_data_disk04 bs=1M count=20480 oflag=direct
 ....
 
-. As the root user, reload multipathd.
+. As the root user, change data disk file permission to 640
 +
 ....
-systemctl restart multipathd
+chmod 640 /oradata/asm/*
+....
+
+. AS the oracle user, create asm logs disk files, change to count to match to the disk size with block size.
++
+....
+dd if=/dev/zero of=/oralogs/asm/nfs_logs_disk01 bs=1M count=40960 oflag=direct
+dd if=/dev/zero of=/oralogs/asm/nfs_logs_disk02 bs=1M count=40960 oflag=direct
+....
+
+. As the root user, change logs disk file permission to 640
++
+....
+chmod 640 /oralogs/asm/*
 ....
 
 . Reboot the EC2 instance host.
@@ -712,46 +477,18 @@ oracle.install.asm.SYSASMPassword="SetPWD"
 oracle.install.asm.diskGroup.name=DATA
 oracle.install.asm.diskGroup.redundancy=EXTERNAL
 oracle.install.asm.diskGroup.AUSize=4
-oracle.install.asm.diskGroup.disks=/dev/mapper/ora_01_data*
-oracle.install.asm.diskGroup.diskDiscoveryString=/dev/mapper/ora_01_data_01,/dev/mapper/ora_01_data_02,/dev/mapper/ora_01_data_03,/dev/mapper/ora_01_data_04
+oracle.install.asm.diskGroup.disks=/oradata/asm/*,/oralogs/asm/*
+oracle.install.asm.diskGroup.diskDiscoveryString=/oradata/asm/nfs_data_disk01,/oradata/asm/nfs_data_disk02,/oradata/asm/nfs_data_disk03,/oradata/asm/nfs_data_disk04
 oracle.install.asm.monitorPassword="SetPWD"
 oracle.install.asm.configureAFD=true
 ....
 
-. Log into the EC2 instance as the root user and set `ORACLE_HOME` and `ORACLE_BASE`.
-+
-....
-export ORACLE_HOME=/u01/app/oracle/product/19.0.0/grid
-export ORACLE_BASE=/tmp
-cd /u01/app/oracle/product/19.0.0/grid/bin
-....
-
-. Provision disk devices for use with the Oracle ASM filter driver.
-+
-....
- ./asmcmd afd_label DATA01 /dev/mapper/ora_01_data_01 --init
-
- ./asmcmd afd_label DATA02 /dev/mapper/ora_01_data_02 --init
-
- ./asmcmd afd_label DATA03 /dev/mapper/ora_01_data_03 --init
-
- ./asmcmd afd_label DATA04 /dev/mapper/ora_01_data_04 --init
-
- ./asmcmd afd_label LOGS01 /dev/mapper/ora_01_logs_01 --init
-
- ./asmcmd afd_label LOGS02 /dev/mapper/ora_01_logs_02 --init
-....
+. Log into the EC2 instance as the root user.
 
 . Install `cvuqdisk-1.0.10-1.rpm`.
 +
 ....
 rpm -ivh /u01/app/oracle/product/19.0.0/grid/cv/rpm/cvuqdisk-1.0.10-1.rpm
-....
-
-. Unset `$ORACLE_BASE`.
-+
-....
-unset ORACLE_BASE
 ....
 
 . Log into the EC2 instance as the Oracle user and extract the patch in the `/tmp/archive` folder. 
@@ -776,12 +513,6 @@ Ignore the warnings about wrong groups for grid infrastructure. We are using a s
 /u01/app/oracle/product/19.0.0/grid/root.sh
 ....
 
-. As root user, reload the multipathd.
-+
-....
-systemctl restart multipathd
-....
-
 . As the Oracle user, execute the following command to complete the configuration:
 +
 ....
@@ -791,7 +522,7 @@ systemctl restart multipathd
 . As the Oracle user, create the LOGS disk group.
 +
 ....
-bin/asmca -silent -sysAsmPassword 'yourPWD' -asmsnmpPassword 'yourPWD' -createDiskGroup -diskGroupName LOGS -disk 'AFD:LOGS*' -redundancy EXTERNAL -au_size 4
+bin/asmca -silent -sysAsmPassword 'yourPWD' -asmsnmpPassword 'yourPWD' -createDiskGroup -diskGroupName LOGS -disk '/oralogs/asm/nfs_logs_disk*' -redundancy EXTERNAL -au_size 4
 ....
 
 . As the Oracle user, validate grid services after installation configuration.
@@ -811,21 +542,6 @@ ora.cssd            ONLINE  ONLINE       ip-172-30-15-58          STABLE
 ora.diskmon         OFFLINE OFFLINE                               STABLE
 ora.driver.afd      ONLINE  ONLINE       ip-172-30-15-58          STABLE
 ora.evmd            ONLINE  ONLINE       ip-172-30-15-58          STABLE
-....
-
-. Valiate ASM filter driver status.
-+
-....
-[oracle@ip-172-30-15-58 grid]$ export ORACLE_HOME=/u01/app/oracle/product/19.0.0/grid
-[oracle@ip-172-30-15-58 grid]$ export ORACLE_SID=+ASM
-[oracle@ip-172-30-15-58 grid]$ export PATH=$PATH:$ORACLE_HOME/bin
-[oracle@ip-172-30-15-58 grid]$ asmcmd
-ASMCMD> lsdg
-State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
-MOUNTED  EXTERN  N         512             512   4096  1048576     81920    81847                0           81847              0             N  DATA/
-MOUNTED  EXTERN  N         512             512   4096  1048576     81920    81853                0           81853              0             N  LOGS/
-ASMCMD> afd_state
-ASMCMD-9526: The AFD state is 'LOADED' and filtering is 'ENABLED' on host 'ip-172-30-15-58.ec2.internal'
 ....
 
 ====
@@ -1062,18 +778,32 @@ SQL> show pdbs
 SQL>
 ....
 
-. Set the DB recovery location to the +LOGS disk group.
+. As oracle user, change to Oracle database home directory /u01/app/oracle/product/19.0.0/db1 and Enable dNFS 
 +
 ....
+cd /u01/app/oracle/product/19.0.0/db1
+
+mkdir rdbms/lib/odm
+
+cp lib/libnfsodm19.so rdbms/lib/odm/
+....
+
+. As oracle user, login to database from sqlplus and set the DB recovery size and location to the +LOGS disk group.
++
+....
+
+. ~/.bash_profile
+
+sqlplus / as sysdba
+
 alter system set db_recovery_file_dest_size = 80G scope=both;
 
 alter system set db_recovery_file_dest = '+LOGS' scope=both;
 ....
 
-. Log into the database with sqlplus and enable archive log mode.
+. Enable archive log mode and reboot Oracle DB instance
 +
 ....
-sqlplus /as sysdba.
 
 shutdown immediate;
 
@@ -1084,7 +814,70 @@ alter database archivelog;
 alter database open;
 ....
 
-This completes Oracle 19c version 19.18 Restart deployment on an Amazon FSx for ONTAP and EC2 compute instance. If desired, NetApp recommends relocating the Oracle control file and online log files to the +LOGS disk group. 
+. Login to DB instance to validate dNFS after instance reboot
++
+....
+
+sqlplus / as sysdba
+
+SQL> select svrname, dirname from v$dnfs_servers;
+
+SVRNAME
+--------------------------------------------------------------------------------
+DIRNAME
+--------------------------------------------------------------------------------
+172.30.15.19
+/ora_01_data
+
+172.30.15.19
+/ora_01_u01
+
+172.30.15.19
+/ora_01_logs
+
+....
+
+. Validate Oracle ASM
++
+....
+[oracle@ip-172-30-15-25 db1]$ asm
+[oracle@ip-172-30-15-25 db1]$ sqlplus / as sysasm
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Tue May 9 20:39:39 2023
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+  1* select name, path, header_status, mount_status,state from v$asm_disk
+SQL> /
+
+NAME                           PATH                                               HEADER_STATU MOUNT_S STATE
+------------------------------ -------------------------------------------------- ------------ ------- --------
+DATA_0002                      /oradata/asm/nfs_data_disk01                       MEMBER       CACHED  NORMAL
+DATA_0000                      /oradata/asm/nfs_data_disk02                       MEMBER       CACHED  NORMAL
+DATA_0001                      /oradata/asm/nfs_data_disk03                       MEMBER       CACHED  NORMAL
+DATA_0003                      /oradata/asm/nfs_data_disk04                       MEMBER       CACHED  NORMAL
+LOGS_0000                      /oralogs/asm/nfs_logs_disk01                       MEMBER       CACHED  NORMAL
+LOGS_0001                      /oralogs/asm/nfs_logs_disk02                       MEMBER       CACHED  NORMAL
+
+6 rows selected.
+
+SQL>
+
+SQL> select name, state, ALLOCATION_UNIT_SIZE, TOTAL_MB, FREE_MB from v$asm_diskgroup;
+
+NAME                           STATE       ALLOCATION_UNIT_SIZE   TOTAL_MB    FREE_MB
+------------------------------ ----------- -------------------- ---------- ----------
+DATA                           MOUNTED                  4194304      81920      73536
+LOGS                           MOUNTED                  4194304      81920      81640
+
+This completes Oracle 19c version 19.18 Restart deployment on an Amazon FSx for ONTAP and EC2 compute instance with NFS/ASM. If desired, NetApp recommends relocating the Oracle control file and online log files to the +LOGS disk group. 
+....
 
 ====
 
