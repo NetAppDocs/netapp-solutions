@@ -31,7 +31,7 @@ This solution addresses the following use cases:
 
 This solution is intended for the following people:
 
-* A DBA who would like to deploy Oracle in an AWS public cloud with iSCSI/ASM.
+* A DBA who would like to deploy Oracle in an AWS public cloud with NFS/ASM.
 * A database solution architect who would like to test Oracle workloads in the AWS public cloud.
 * The storage administrator who would like to deploy and manage an Oracle database deployed to AWS FSx storage.
 * The application owner who would like to stand up an Oracle database in AWS FSx/EC2.
@@ -239,19 +239,19 @@ ssh fsxadmin@172.30.15.53
 . Execute the following command to create a volume for the Oracle binary.
 + 
 ....
-vol create -volume ora_01_biny -aggregate aggr1 -size 50G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+vol create -volume ora_01_biny -aggregate aggr1 -size 50G -state online  -type RW -junction-path /ora_01_biny -snapshot-policy none -tiering-policy snapshot-only
 ....
 
 . Execute the following command to create a volume for Oracle data.
 +
 ....
-vol create -volume ora_01_data -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+vol create -volume ora_01_data -aggregate aggr1 -size 100G -state online  -type RW -junction-path /ora_01_data -snapshot-policy none -tiering-policy snapshot-only
 ....
 
 . Execute the following command to create a volume for Oracle logs.
 + 
 ....
-vol create -volume ora_01_logs -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+vol create -volume ora_01_logs -aggregate aggr1 -size 100G -state online  -type RW -junction-path /ora_01_logs -snapshot-policy none -tiering-policy snapshot-only
 ....
 
 . Validate the DB volumes created.
@@ -268,10 +268,10 @@ FsxId02ad7bf3476b741df::> vol show
 FsxId06c3c8b2a7bd56458::> vol show
 Vserver   Volume       Aggregate    State      Type       Size  Available Used%
 --------- ------------ ------------ ---------- ---- ---------- ---------- -----
-svm_ora   ora_01_data  aggr1        online     RW      148.8GB    29.01GB   79%
-svm_ora   ora_01_logs  aggr1        online     RW      148.8GB    86.97GB   38%
-svm_ora   ora_01_biny  aggr1        online     RW         50GB    21.78GB   54%
-svm_ora   svm_ora_root aggr1        online     RW          1GB    972.0MB    0%
+svm_ora   ora_01_biny  aggr1        online     RW         50GB    47.50GB    0%
+svm_ora   ora_01_data  aggr1        online     RW        100GB    95.00GB    0%
+svm_ora   ora_01_logs  aggr1        online     RW        100GB    95.00GB    0%
+svm_ora   svm_ora_root aggr1        online     RW          1GB    972.1MB    0%
 4 entries were displayed.
 ....
 
@@ -334,7 +334,7 @@ sudo mkdir /oralogs
 . Mount the log volume to `/oralogs`, changed to your FSx NFS lif IP address
 +
 ....
-sudo mount -t nfs 172.30.15.19:/ora_01_data /oradata -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
+sudo mount -t nfs 172.30.15.19:/ora_01_logs /oralogs -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
 ....
 
 . Change `/oralogs` mount point ownership to the Oracle user and it's associated primary group.
@@ -361,6 +361,8 @@ Add the following line.
 . sudo to oracle user, create asm folders to store asm disk files 
 +
 ....
+sudo su 
+su - oracle
 mkdir /oradata/asm
 mkdir /oralogs/asm
 ....
@@ -480,7 +482,7 @@ oracle.install.asm.diskGroup.AUSize=4
 oracle.install.asm.diskGroup.disks=/oradata/asm/*,/oralogs/asm/*
 oracle.install.asm.diskGroup.diskDiscoveryString=/oradata/asm/nfs_data_disk01,/oradata/asm/nfs_data_disk02,/oradata/asm/nfs_data_disk03,/oradata/asm/nfs_data_disk04
 oracle.install.asm.monitorPassword="SetPWD"
-oracle.install.asm.configureAFD=true
+oracle.install.asm.configureAFD=false
 ....
 
 . Log into the EC2 instance as the root user.
@@ -690,24 +692,37 @@ Look at the log file "/u01/app/oracle/cfgtoollogs/dbca/db1/db1.log" for further 
 +
 ....
 [oracle@ip-172-30-15-58 db1]$ ../grid/bin/crsctl stat res -t
-
-Name           	Target  State        Server                   State details
-
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
 Local Resources
-
-ora.DATA.dg		ONLINE  ONLINE       ip-172-30-15-58          STABLE
-ora.LISTENER.lsnr	ONLINE  ONLINE       ip-172-30-15-58          STABLE
-ora.LOGS.dg		ONLINE  ONLINE       ip-172-30-15-58          STABLE
-ora.asm		ONLINE  ONLINE       ip-172-30-15-58          Started,STABLE
-ora.ons		OFFLINE OFFLINE      ip-172-30-15-58          STABLE
-
+--------------------------------------------------------------------------------
+ora.DATA.dg
+               ONLINE  ONLINE       ip-172-30-15-58          STABLE
+ora.LISTENER.lsnr
+               ONLINE  ONLINE       ip-172-30-15-58          STABLE
+ora.LOGS.dg
+               ONLINE  ONLINE       ip-172-30-15-58          STABLE
+ora.asm
+               ONLINE  ONLINE       ip-172-30-15-58          Started,STABLE
+ora.ons
+               OFFLINE OFFLINE      ip-172-30-15-58          STABLE
+--------------------------------------------------------------------------------
 Cluster Resources
+--------------------------------------------------------------------------------
+ora.cssd
+      1        ONLINE  ONLINE       ip-172-30-15-58          STABLE
+ora.db1.db
+      1        ONLINE  ONLINE       ip-172-30-15-58          Open,HOME=/u01/app/o
+                                                             racle/product/19.0.0
+                                                             /db1,STABLE
+ora.diskmon
+      1        OFFLINE OFFLINE                               STABLE
+ora.evmd
+      1        ONLINE  ONLINE       ip-172-30-15-58          STABLE
+--------------------------------------------------------------------------------
+[oracle@ip-172-30-15-58 db1]$
 
-ora.cssd        	ONLINE  ONLINE       ip-172-30-15-58          STABLE
-ora.db1.db		ONLINE  ONLINE       ip-172-30-15-58          Open,HOME=/u01/app/oracle/product/19.0.0/db1,STABLE
-ora.diskmon		OFFLINE OFFLINE                               STABLE
-ora.driver.afd	ONLINE  ONLINE       ip-172-30-15-58          STABLE
-ora.evmd		ONLINE  ONLINE       ip-172-30-15-58          STABLE
 ....
 
 . Set the Oracle user `.bash_profile`.
@@ -728,7 +743,7 @@ alias asm='export ORACLE_HOME=/u01/app/oracle/product/19.0.0/grid;export ORACLE_
 . Validate the CDB/PDB created.
 +
 ....
-/home/oracle/.bash_profile
+. ~/.bash_profile
 
 sqlplus / as sysdba
 
@@ -788,6 +803,21 @@ mkdir rdbms/lib/odm
 cp lib/libnfsodm19.so rdbms/lib/odm/
 ....
 
+. Configure oranfstab file in ORACLE_HOME
++
+....
+vi $ORACLE_HOME/dbs/oranfstab
+
+add following entries:
+
+server: fsx_01
+local: 172.30.15.58 path: 172.30.15.19
+nfs_version: nfsv3
+export: /ora_01_biny mount: /u01
+export: /ora_01_data mount: /oradata
+export: /ora_01_logs mount: /oralogs
+....
+
 . As oracle user, login to database from sqlplus and set the DB recovery size and location to the +LOGS disk group.
 +
 ....
@@ -812,13 +842,20 @@ startup mount;
 alter database archivelog;
 
 alter database open;
+
+alter system switch logfile;
+
 ....
 
-. Login to DB instance to validate dNFS after instance reboot
+. Validate DB log mode and dNFS after instance reboot
 +
 ....
 
-sqlplus / as sysdba
+SQL> select name, log_mode from v$database;
+
+NAME      LOG_MODE
+--------- ------------
+DB1       ARCHIVELOG
 
 SQL> select svrname, dirname from v$dnfs_servers;
 
@@ -826,13 +863,13 @@ SVRNAME
 --------------------------------------------------------------------------------
 DIRNAME
 --------------------------------------------------------------------------------
-172.30.15.19
+fsx_01
 /ora_01_data
 
-172.30.15.19
-/ora_01_u01
+fsx_01
+/ora_01_biny
 
-172.30.15.19
+fsx_01
 /ora_01_logs
 
 ....
@@ -840,8 +877,8 @@ DIRNAME
 . Validate Oracle ASM
 +
 ....
-[oracle@ip-172-30-15-25 db1]$ asm
-[oracle@ip-172-30-15-25 db1]$ sqlplus / as sysasm
+[oracle@ip-172-30-15-58 db1]$ asm
+[oracle@ip-172-30-15-58 db1]$ sqlplus / as sysasm
 
 SQL*Plus: Release 19.0.0.0.0 - Production on Tue May 9 20:39:39 2023
 Version 19.18.0.0.0
@@ -853,21 +890,21 @@ Connected to:
 Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
 Version 19.18.0.0.0
 
-  1* select name, path, header_status, mount_status,state from v$asm_disk
-SQL> /
+SQL> set lin 200
+SQL> col path form a30
+SQL> select name, path, header_status, mount_status, state from v$asm_disk;
 
-NAME                           PATH                                               HEADER_STATU MOUNT_S STATE
------------------------------- -------------------------------------------------- ------------ ------- --------
-DATA_0002                      /oradata/asm/nfs_data_disk01                       MEMBER       CACHED  NORMAL
-DATA_0000                      /oradata/asm/nfs_data_disk02                       MEMBER       CACHED  NORMAL
-DATA_0001                      /oradata/asm/nfs_data_disk03                       MEMBER       CACHED  NORMAL
-DATA_0003                      /oradata/asm/nfs_data_disk04                       MEMBER       CACHED  NORMAL
-LOGS_0000                      /oralogs/asm/nfs_logs_disk01                       MEMBER       CACHED  NORMAL
-LOGS_0001                      /oralogs/asm/nfs_logs_disk02                       MEMBER       CACHED  NORMAL
+NAME                           PATH                           HEADER_STATU MOUNT_S STATE
+------------------------------ ------------------------------ ------------ ------- --------
+DATA_0002                      /oradata/asm/nfs_data_disk01   MEMBER       CACHED  NORMAL
+DATA_0000                      /oradata/asm/nfs_data_disk02   MEMBER       CACHED  NORMAL
+DATA_0001                      /oradata/asm/nfs_data_disk03   MEMBER       CACHED  NORMAL
+DATA_0003                      /oradata/asm/nfs_data_disk04   MEMBER       CACHED  NORMAL
+LOGS_0000                      /oralogs/asm/nfs_logs_disk01   MEMBER       CACHED  NORMAL
+LOGS_0001                      /oralogs/asm/nfs_logs_disk02   MEMBER       CACHED  NORMAL
 
 6 rows selected.
 
-SQL>
 
 SQL> select name, state, ALLOCATION_UNIT_SIZE, TOTAL_MB, FREE_MB from v$asm_diskgroup;
 
