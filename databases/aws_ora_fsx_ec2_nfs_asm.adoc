@@ -68,7 +68,7 @@ image::aws_ora_fsx_ec2_nfs_asm_architecture.png["This image provides a detailed 
 
 * *FSx storage cluster sizing.* An Amazon FSx for ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
 
-* *Oracle data and logs layout.* In our tests and validations, we deployed two ASM disk groups for data and logs respectively. Within the +DATA asm disk group, we provisioned four disks in a data NFS file system mount point. Within the +LOGS asm disk group, we provisioned two disks in a logs NFS file system mount point. For large database deployment, ASM disk groups can be built to span multiple FSx file systems with ASM NFS disks distributed through multiple NFS mount points anchored on FSx file systems. This particular setup is designed to meet certain database throughput and performance requirement.   
+* *Oracle data and logs layout.* In our tests and validations, we deployed two ASM disk groups for data and logs respectively. Within the +DATA asm disk group, we provisioned four disks in a data NFS file system mount point. Within the +LOGS asm disk group, we provisioned two disks in a logs NFS file system mount point. For large database deployment, ASM disk groups can be built to span multiple FSx file systems with ASM NFS disks distributed through multiple NFS mount points anchored on FSx file systems. This particular setup is designed to meet database throughput over 4GBps throughput and 160,000 raw SSD IOPS requirement.   
 
 * *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For multiple FSx file systems deployment for large database, dNFS multi-path should be properly configured.   
 
@@ -295,7 +295,7 @@ ssh -i ora_01.pem ec2-user@172.30.15.58
 sudo mkdir /u01
 ....
 
-. Mount the binary volume to `/u01`, changed to your FSx NFS lif IP address
+. Mount the binary volume to `/u01`, changed to your FSx NFS lif IP address. If you deployed FSx cluster via NetApp automation toolkit, FSx virtual storage server NFS lif IP address will be listed in the output at the end of resources provision execution. Otherwise, it can be retrieved from AWS FSx console UI.
 +
 ....
 sudo mount -t nfs 172.30.15.19:/ora_01_biny /u01 -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
@@ -650,6 +650,10 @@ databaseType=MULTIPURPOSE
 automaticMemoryManagement=false
 totalMemory=8192
 ....
++
+[NOTE] 
+
+Set the total memory based on available memory in EC2 instance host. Oracle allocates 75% of `totalMemory` to DB instance SGA or buffer cache.
 
 . As Oracle user, lauch DB creation with dbca.
 +
