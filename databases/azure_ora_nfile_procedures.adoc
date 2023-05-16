@@ -116,7 +116,9 @@ If you have not set up an Ansible controller, see link:https://docs.netapp.com/u
 Clone a copy of the Oracle deployment toolkit in your home directory under the user ID that you use to log into the Ansible controller.
 
 [source, cli]
+----
 git clone https://github.com/NetApp-Automation/na_oracle19c_deploy.git
+----
 
 === Execute the toolkit with your configuration
 
@@ -138,7 +140,9 @@ The Azure Application-Consistent Snapshot tool (AzAcSnap) is a command-line tool
 . Execute the self-installer as the root user with the default installation option. If necessary, make the file executable using the `chmod +x *.run` command.
 +
 [source, cli]
+----
  ./azacsnap_installer_v5.0.run -I
+----
 
 === Configure Oracle connectivity
 
@@ -151,30 +155,40 @@ The following examples show the setup of the Oracle database user and the use of
 . From the Oracle database installation, launch sqlplus to log into the database.
 +
 [source, cli]
+----
 su – oracle
 sqlplus / AS SYSDBA
+----
 
 . Create the user.
 +
 [source, cli]
+----
 CREATE USER azacsnap IDENTIFIED BY password;
+----
 
 . Grant the user permissions. This example sets the permission for the AZACSNAP user to enable putting the database into backup mode.
 +
 [source, cli]
+----
 GRANT CREATE SESSION TO azacsnap;
 GRANT SYSBACKUP TO azacsnap;
+----
 
 . Change the default user's password expiration to unlimited.
 +
 [source, cli]
+----
 ALTER PROFILE default LIMIT PASSWORD_LIFE_TIME unlimited;
+----
 
 . Validate azacsnap connectivity for the database.
 +
 [source, cli]
+----
 connect azacsnap/password
 quit;
+----
 
 ==== 2. Configure Linux-user azacsnap for DB access with Oracle wallet
 
@@ -183,68 +197,80 @@ The AzAcSnap default installation creates an azacsnap OS user. It's Bash shell e
 . As root user, run the `cat /etc/oratab` command to identify the ORACLE_HOME and ORACLE_SID variables on the host.
 +
 [source, cli]
+----
 cat /etc/oratab
+----
 
 . Add ORACLE_HOME, ORACLE_SID, TNS_ADMIN, and PATH variables to the azacsnap user bash profile. Change the variables as needed.
 +
 [source, cli]
+----
 echo "export ORACLE_SID=ORATEST" >> /home/azacsnap/.bash_profile
 echo "export ORACLE_HOME=/u01/app/oracle/product/19800/ORATST" >> /home/azacsnap/.bash_profile
 echo "export TNS_ADMIN=/home/azacsnap" >> /home/azacsnap/.bash_profile
 echo "export PATH=\$PATH:\$ORACLE_HOME/bin" >> /home/azacsnap/.bash_profile
+----
 
 . As the Linux user azacsnap, create the wallet. You are prompted for the wallet password.
 +
 [source, cli]
+----
 sudo su - azacsnap
-+
-[source, cli]
+
 mkstore -wrl $TNS_ADMIN/.oracle_wallet/ -create
+----
 
 . Add the connect string credentials to the Oracle Wallet. In the following example command, AZACSNAP is the ConnectString to be used by AzAcSnap, azacsnap is the Oracle Database User, and AzPasswd1 is the Oracle User's database password. You are again prompted for the wallet password.
 +
 [source, cli]
+----
 mkstore -wrl $TNS_ADMIN/.oracle_wallet/ -createCredential AZACSNAP azacsnap AzPasswd1
+----
 
 . Create the `tnsnames-ora` file. In the following example command, HOST should be set to the IP address of the Oracle Database and the Server SID should be set to the Oracle Database SID.
 +
 [source, cli]
+----
 echo "# Connection string
 AZACSNAP=\"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=172.30.137.142)(PORT=1521))(CONNECT_DATA=(SID=ORATST)))\"
 " > $TNS_ADMIN/tnsnames.ora
+----
 
 . Create the `sqlnet.ora` file.
 +
 [source, cli]
+----
 echo "SQLNET.WALLET_OVERRIDE = TRUE
 WALLET_LOCATION=(
     SOURCE=(METHOD=FILE)
     (METHOD_DATA=(DIRECTORY=\$TNS_ADMIN/.oracle_wallet))
 ) " > $TNS_ADMIN/sqlnet.ora
+----
 
 . Test Oracle access using the wallet.
 +
 [source, cli]
+----
 sqlplus /@AZACSNAP as SYSBACKUP
+----
 +
 The expected output from the command:
-[source, cli]
-[azacsnap@acao-ora01 ~]$ sqlplus /@AZACSNAP as SYSBACKUP
 +
 [source, cli]
+----
+[azacsnap@acao-ora01 ~]$ sqlplus /@AZACSNAP as SYSBACKUP
+
 SQL*Plus: Release 19.0.0.0.0 - Production on Thu Sep 8 18:02:07 2022
 Version 19.8.0.0.0
-+
-[source, cli]
+
 Copyright (c) 1982, 2019, Oracle.  All rights reserved.
-+
-[source, cli]
+
 Connected to:
 Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
 Version 19.8.0.0.0
-+
-[source, cli]
+
 SQL>
+----
 
 === Configure ANF connectivity
 
@@ -253,21 +279,28 @@ This section explains how to enable communication with Azure NetApp Files (with 
 . Within an Azure Cloud Shell session, make sure that you are logged into the subscription that you want to be associated with the service principal by default.
 +
 [source, cli]
+----
 az account show
+----
 
 . If the subscription isn't correct, use the following command:
 +
 [source, cli]
+----
 az account set -s <subscription name or id>
+----
 
 . Create a service principal using the Azure CLI as in the following example:
 +
 [source, cli]
+----
 az ad sp create-for-rbac --name "AzAcSnap" --role Contributor --scopes /subscriptions/{subscription-id} --sdk-auth
+----
 +
 The expected output:
 +
 [source, cli]
+----
 {
   "clientId": "00aa000a-aaaa-0000-00a0-00aa000aaa0a",
   "clientSecret": "00aa000a-aaaa-0000-00a0-00aa000aaa0a",
@@ -280,6 +313,7 @@ The expected output:
   "galleryEndpointUrl": "https://gallery.azure.com/",
   "managementEndpointUrl": "https://management.core.windows.net/"
 }
+----
 
 . Cut and paste the output content into a file called `oracle.json` stored in the Linux user azacsnap user bin directory and secure the file with the appropriate system permissions.
 
@@ -294,34 +328,39 @@ Follow these steps to configure and test the snapshot tools. After successful te
 . Change into the snapshot user account.
 +
 [source, cli]
+----
 su - azacsnap
+----
 
 . Change the location of commands.
 +
 [source, cli]
+----
 cd /home/azacsnap/bin/
+----
 
 . Configure a storage backup detail file. This creates an `azacsnap.json` configuration file.
 +
 [source, cli]
+----
 azacsnap -c configure –-configuration new
+----
 +
 The expected output with three Oracle volumes:
 +
 [source, cli]
+----
 [azacsnap@acao-ora01 bin]$ azacsnap -c configure --configuration new
 Building new config file
 Add comment to config file (blank entry to exit adding comments): Oracle snapshot bkup
 Add comment to config file (blank entry to exit adding comments):
 Enter the database type to add, 'hana', 'oracle', or 'exit' (for no database): oracle
-+
-[source, cli]
+
 === Add Oracle Database details ===
 Oracle Database SID (e.g. CDB1): ORATST
 Database Server's Address (hostname or IP address): 172.30.137.142
 Oracle connect string (e.g. /@AZACSNAP): /@AZACSNAP
-+
-[source, cli]
+
 === Azure NetApp Files Storage details ===
 Are you using Azure NetApp Files for the database? (y/n) [n]: y
 --- DATA Volumes have the Application put into a consistent state before they are snapshot ---
@@ -337,40 +376,43 @@ Add Azure NetApp Files resource to OTHER Volume section of Database configuratio
 Full Azure NetApp Files Storage Volume Resource ID (e.g. /subscriptions/.../resourceGroups/.../providers/Microsoft.NetApp/netAppAccounts/.../capacityPools/Premium/volumes/...): /subscriptions/0efa2dfb-917c-4497-b56a-b3f4eadb8111/resourceGroups/ANFAVSRG/providers/Microsoft.NetApp/netAppAccounts/ANFAVSAcct/capacityPools/CapPool/volumes/acao-ora01-u03
 Service Principal Authentication filename or Azure Key Vault Resource ID (e.g. auth-file.json or https://...): oracle.json
 Add Azure NetApp Files resource to OTHER Volume section of Database configuration? (y/n) [n]: n
-+
-[source, cli]
+
 === Azure Managed Disk details ===
 Are you using Azure Managed Disks for the database? (y/n) [n]: n
-+
-[source, cli]
+
 === Azure Large Instance (Bare Metal) Storage details ===
 Are you using Azure Large Instance (Bare Metal) for the database? (y/n) [n]: n
-+
-[source, cli]
+
 Enter the database type to add, 'hana', 'oracle', or 'exit' (for no database): exit
-+
-[source, cli]
+
 Editing configuration complete, writing output to 'azacsnap.json'.
+----
 
 . As the azacsnap Linux user, run the azacsnap test command for an Oracle backup.
 +
 [source, cli]
+----
 cd ~/bin
 azacsnap -c test --test oracle --configfile azacsnap.json
+----
 +
 The expected output:
 +
 [source, cli]
+----
 [azacsnap@acao-ora01 bin]$ azacsnap -c test --test oracle --configfile azacsnap.json
 BEGIN : Test process started for 'oracle'
 BEGIN : Oracle DB tests
 PASSED: Successful connectivity to Oracle DB version 1908000000
 END   : Test process complete for 'oracle'
 [azacsnap@acao-ora01 bin]$
+----
 
 . Run your first snapshot backup.
 +
 [source, cli]
+----
 azacsnap -c backup –-volume data --prefix ora_test --retention=1
+----
 
 link:azure_ora_nfile_protection.html[Next: Database protection.]
