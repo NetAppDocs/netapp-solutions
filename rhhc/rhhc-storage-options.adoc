@@ -1,0 +1,57 @@
+---
+sidebar: sidebar
+permalink: rhhc/rhhc-storage-options.html
+keywords: NetApp Solutions, hybrid cloud, container workloads, containers, Red Hat OpenShift, RedHat OpenShift, VMware, ROSA, ACC, Astra Control Center, Advanced Cluster Management, ACM, Hub Cluster, VMware CSI, nconnect, session trunking, SMBC
+summary:
+---
+
+= Supported NetApp Storage integrations with Red Hat Open Shift Containers
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+Whether the Red Hat Open Shift containers are running on VMware or in the hyperscalers, NetApp Astra Trident can be used as the CSI provisioner for the various types of backend NetApp storage that it supports. 
+
+The following diagram depicts the various backend NetApp storage that can be integrated with OpenShift clusters using NetApp Astra Trident.
+
+image:a-w-n_astra_trident.png[]
+
+ONTAP Storage Virtual Machine (SVM) provides secure multi-tenancy. A Single OpenShift cluster can connect to single SVM or multiple SVMs or even to multiple ONTAP clusters. Storage class filters the backend storage based on parameters or by labels. Storage administrators define the parameters to connect to storage system using trident backend configuration. On successful connection establishment, it creates the trident backend and populates the information which the storage class can filter.
+
+The relationship between the storageclass and backend is shown below.
+
+image:rhhc-storage-options-sc2ontap.png[Storage class to ONTAP relationship]
+
+
+Application owner requests persistent volume using storage class. The storage class filters the backend storage.
+The relationship between the pod and backend storage is shown below.
+
+image:rhhc_storage_opt_pod2vol.png[Pod to ONTAP Volume relationship]
+
+== Container Storage Interface (CSI) Options
+On vSphere environments, customers can pick VMware CSI driver and/or Astra Trident CSI to integrate with ONTAP. With VMware CSI, the persistent volumes are consumed as local SCSI disks, whereas with Trident, it is consumed with network.
+As VMware CSI does not support RWX access modes with ONTAP, applications need to use Trident CSI if RWX mode is required. With FC based deployments, VMware CSI is preferred and SnapMirror Business Continuity (SMBC) provides zone level high availability.
+
+=== VMware CSI supports
+* Core Block based datastores (FC, FCoE, iSCSI, NVMeoF)
+* Core File based datastores (NFS v3, v4)
+* vVol datastores (block and file)
+
+=== Trident has following drivers to support ONTAP
+* ontap-san (dedicated volume)
+* ontap-san-economy (shared volume)
+* ontap-nas (dedicated volume)
+* ontap-nas-economy (shared volume)
+* ontap-nas-flexgroup (dedicated large scale volume)
+ 
+For both VMware CSI and Astra Trident CSI, ONTAP supports nconnect, session trunking, kerberos, etc. for NFS and  multipathing, chap authentication, etc. for block protocols.
+
+In AWS, FSx for NetApp ONTAP (FSxN) can be deployed in single Availability Zone (AZ) or in Multi AZ. For production workloads that requires high availability, multi-AZ provides zonal level fault tolerance and has better NVMe read cache compared to single AZ. For more info, check link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/performance.html[AWS performance guidelines].
+To save cost on disaster recovery site, single AZ FSx ONTAP can be utilized.
+image:rhhc_storage_options_fsxn_options.png["Replication between Multi-AZ and Single-AZ"]
+
+For number of SVMs that are supported by FSx ONTAP, refer link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/managing-svms.html#max-svms[managing FSx ONTAP storage virtual machine]
+
