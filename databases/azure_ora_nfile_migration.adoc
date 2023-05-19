@@ -34,12 +34,14 @@ The following procedures plug a single instance database into a container databa
 
 . Run the `DBMS_PDB.DESCRIBE` procedure to generate the database metadata.
 +
-[source, cli]
+[source,cli]
+----
 BEGIN
   DBMS_PDB.DESCRIBE(
     pdb_descr_file => '/home/oracle/ncdb.xml');
 END;
 /
+----
 
 . Shut down the single-instance database.
 
@@ -47,7 +49,8 @@ END;
 
 . Run the `DBMS_PDB.CHECK_PLUG_COMPATIBILITY` function to determine whether the non-CDB is compatible with the CDB.
 +
-[source, cli]
+[source,cli]
+----
 SET SERVEROUTPUT ON
 DECLARE
   compatible CONSTANT VARCHAR2(3) :=
@@ -61,6 +64,7 @@ BEGIN
   DBMS_OUTPUT.PUT_LINE(compatible);
 END;
 /
+----
 +
 If the output is YES, then the non-CDB is compatible, and you can continue with the next step.
 +
@@ -69,52 +73,47 @@ If the output is NO, then the non-CDB is not compatible, and you can check the `
 . Plug in the single instance non-CDB.
 +
 [source, cli]
+----
 CREATE PLUGGABLE DATABASE ncdb USING '/home/oracle/ncdb.xml'
   COPY
   FILE_NAME_CONVERT = ('/disk1/oracle/dbs/', '/disk2/oracle/ncdb/')
 ;
+----
 +
-
 [NOTE]
 If there is not sufficient space on the host, the `NOCOPY` option can be used to create the PDB. In that case, a single-instance non-CDB is not useable after plug in as a PDB because the original data files has been used for the PDB. Make sure to create a backup before the conversion so that there is something to fall back on if anything goes wrong.
 
 . Start with PDB upgrade after conversion if the version between the source single-instance non-CDB and the target CDB are different. For the same-version conversion, this step can be skipped.
 +
 [source, cli]
+----
 sqlplus / as sysdba;
-+
-[source, cli]
-alter session set container=ncdb;
-+
-[source, cli]
+alter session set container=ncdb
 alter pluggable database open upgrade;
 exit;
-+
-[source, cli]
 dbupgrade -c ncdb -l /home/oracle
+----
 +
 Review the upgrade log file in the `/home/oracle` directory.
 
 . Open the pluggable database, check for pdb plug-in violations, and recompile the invalid objects.
 +
 [source, cli]
+----
 alter pluggable database ncdb open;
-+
-[source, cli]
 alter session set container=ncdb;
 select message from pdb_plug_in_violations where type like '%ERR%' and status <> 'RESOLVED';
-+
-[source, cli]
 $ORACLE_HOME/perl/bin/perl $ORACLE_HOME/rdbms/admin/catcon.pl -n 1 -c 'ncdb' -e -b utlrp -d $ORACLE_HOME/rdbms/admin utlrp.sql
+----
 
 . Execute `noncdb_to_pdb.sql` to update the data dictionary.
 +
 [source, cli]
+----
 sqlplus / as sysdba
-+
-[source, cli]
 alter session set container=ncdb;
 @$ORACLE_HOME/rdbms/admin/noncdb_to_pdb.sql;
+----
 +
 Shut down and restart the container DB. The ncdb is taken out of restricted mode.
 
@@ -127,7 +126,9 @@ Oracle PDB relocation with the maximum-availability option uses PDB hot-clone te
 . From the Ansible controller, clone a copy of the automation toolkit.
 +
 [source, cli]
+----
 git clone https://github.com/NetApp-Automation/na_ora_aws_migration.git
+----
 
 . Read the instruction in the README file.
 
@@ -136,23 +137,28 @@ git clone https://github.com/NetApp-Automation/na_ora_aws_migration.git
 . Install the Ansible controller prerequisites on Ansible controller.
 +
 [source, cli]
+----
 ansible-playbook -i hosts requirements.yml
 ansible-galaxy collection install -r collections/requirements.yml --force
+----
 
 . Execute any pre-migration tasks against the on-premises server.
 +
 [source, cli]
+----
 ansible-playbook -i hosts ora_pdb_relocate.yml -u admin -k -K -t ora_pdb_relo_onprem
+----
 +
-
 [NOTE]
 The admin user is the management user on the on-premises Oracle server host with sudo privileges. The admin user is authenticated with a password.
 
 . Execute Oracle PDB relocation from on-premises to the target Azure Oracle host.
 +
 [source, cli]
+----
 ansible-playbook -i hosts ora_pdb_relocate.yml -u azureuser --private-key db1.pem -t ora_pdb_relo_primary
-
+----
++
 [NOTE]
 
 The Ansible controller can be located either on-premises or in the Azure cloud. The controller needs connectivity to the on-premises Oracle server host and the Azure Oracle VM host. The Oracle database port (such as 1521) is open between the on-premises Oracle server host and the Azure Oracle VM host.

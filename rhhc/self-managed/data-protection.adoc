@@ -1,0 +1,58 @@
+---
+sidebar: sidebar
+permalink: rhhc/self-managed/data-protection.html
+keywords: NetApp Solutions, redhat OpenShift, red hat OpenShift, redhat openshift container platform, ocp, openshift container platform, Advanced Cluster Management, ACM, Hub Cluster, containers, container workloads, VMware, customer managed storage, ONTAP
+summary:
+---
+
+= Data protection using Astra Control Center
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+[.lead]
+This page shows the data protection options for Red Hat OpenShift Container based applications running on VMware vSphere using Astra Control Center (ACC). 
+
+As users take their journey of modernizing their applications with Red Hat OpenShift, a data protection strategy should be in place to protect them from accidental deletion or any other human errors. Often a protection strategy is also required for regulatory or compliance purposes to protect their data from a diaster.
+
+The requirements of data protection varies from reverting back to a point in time copy to automatically failing over to a different fault domain without any human intervention. Many customers pick ONTAP as their preferred storage platform for their Kubernetes applications because of its rich features like multitenancy, multi-protocol, high performance and capacity offerings, replication and caching for multi-site locations, security and flexibility.
+
+Customers may have a cloud environment setup as their data center extension, so that they can leverage the benefits of the cloud as well as be well positioned to move their workloads at a future time. For such customers, backing up of their OpenShift applications and their data to the cloud environment becomes an inevitable choice. They can then restore the applications and the associated data either to an OpenShift cluster in the cloud or in their data center.
+
+
+== Backup and Restore with ACC
+Application owners can review and update the applications discovered by ACC. ACC can take Snapshot copies using CSI and perform backup using the point in time Snapshot copy. Backup destination can be an object store in the cloud environment. Protection policy can be configured for scheduled backups and the number of backup versions to keep. The minimum RPO is one hour.
+
+=== Restoring an application from a backup using ACC
+image:rhhc-onprem-dp-br.png[Astra Control Center Restore option]
+
+== Application specific execution hooks
+Even though storage array level data protection features are available, often additional steps are needed to make backups and restores application consistent. The app-specific additional steps could be:
+- before or after a Snapshot copy is created.
+- before or after a backup is created.
+- after restoring from a Snapshot copy or backup.
+Astra Control can execute these app-specific steps coded as custom scripts called execution hooks.
+
+NetApp's link:https://github.com/NetApp/Verda[open source project Verda] provides execution hooks for popular cloud-native applications to make protecting applications straightforward, robust, and easy to orchestrate. Feel free to contribute to that project if you have enough information for an application that is not in the repository.
+
+== Sample execution hook for pre-Snapshot of a redis application.
+image::rhhc-onprem-dp-br-hook.png[Astra Control Center execution hook]
+
+== Replication with ACC
+
+For regional protection or for a low RPO and RTO solution, an application can be replicated to another Kubernetes instance running at a different site, preferably in another region. ACC utilizes ONTAP async SnapMirror with RPO as low as 5 minutes.
+Refer link:https://docs.netapp.com/us-en/astra-control-center/use/replicate_snapmirror.html[here] for SnapMirror setup instructions.  
+
+=== SnapMirror with ACC
+image::rhhc-onprem-dp-rep.png[Astra Control Center replication]
+
+NOTE: san-economy and nas-economy storage drivers do not support replication feature. Refer link:https://docs.netapp.com/us-en/astra-control-center/get-started/requirements.html#astra-trident-requirements[here] for additional details. 
+
+
+=== Demo video:
+link:https://www.netapp.tv/details/29504?mcid=35609780286441704190790628065560989458[Demonstration video of disaster recovery with Astra Control Center]
+
+
+Details on Astra Control Center Data Protection features are available link:https://docs.netapp.com/us-en/astra-control-center/concepts/data-protection.html[here]
