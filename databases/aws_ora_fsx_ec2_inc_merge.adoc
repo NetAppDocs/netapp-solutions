@@ -17,21 +17,23 @@ Allen Cao, Niyaz Mohamed, NetApp
 [.lead]
 == Purpose
 
-ASM (Automatic Storage Management) is a popular Oracle storage volume manager that is employed in many Oracle installations. It is also Oracle's recommended storage management solution. It provides an alternative to conventional volume managers and file systems. Since Oracle version 11g, ASM has been packaged with grid infrastructure rather than a database. As a result, in order to utilize Oracle ASM for storage management without RAC, you must install Oracle grid infrastructure in a standalone server, also known as Oracle Restart. Doing so certainly adds more complexity in an otherwise simpler Oracle database deployment. However, as the name implies, when Oracle is deployed in Restart mode, any failed Oracle services are restarted after a host reboot without user intervention, which provides a certain degree of high availability or HA functionality.
+Recovery of an Oracle VLDB ( Very Large Database ) via Oracle RMAN  ( Recovery Manager ) backup tool can be a very challenging task. It could take long time to restore an Oracle VLDB from backup media in the event of a failure before database can be recovered. Your SLA could suffer a major hit as a result. Since version 10g, Oracle released a RMAN feature to allow Oracle user to stage image copy of an Oracle database data file at an extra disk storage on DB server host. This image copy of the data file can be incrementally updated via RMAN on the daily basis. In the event of a failure, DBA can switch Oracle database quickly from failed storage media to this image copy as database media restore is avoided. The net result is much improved SLA at the expense of doubling of database storage.   
 
-Oracle ASM is generally deployed in FC, iSCSI storage protocols and luns as raw storage devices. However, ASM on NFS protocol and NFS file system is also supported configuration by Oracle. In this documentation, we demonstrate how to deploy an Oracle 19c database with the NFS protocol and Oracle ASM in an Amazon FSx for ONTAP storage environment with EC2 compute instances. We also demonstrate how to use the NetApp SnapCenter service through the NetApp BlueXP console to backup, restore, and clone your Oracle database for dev/test or other use cases for storage-efficient database operation in the AWS public cloud.  
+If you are keen on SLA for your Oracle VLDB and contemplating on moving the database to public cloud such as AWS, you could set up similar database protection structure using resources such as AWS FSx ONTAP for staging your standby database image copy. In this documentation, we demonstrate how to provision and export a NFS file system from AWS FSx ONTAP to be mounted on an Oracle database server for staging a standby data file image copy for quick recovery in the event of a failure. 
+
+Better yet, we also show how you could leverage NetApp FlexClone to create a copy of the same staging NFS file system for other use cases such as standing up a dev/test Oracle environment with exactly the same data file image copy without additional storage investment.  
 
 This solution addresses the following use cases:
 
-* Oracle database deployment in Amazon FSx for ONTAP storage and EC2 compute instances with NFS/ASM 
-* Testing and validating an Oracle workload in the public AWS cloud with NFS/ASM
-* Testing and validating Oracle database Restart functionalities deployed in AWS
+* Oracle VLDB data file image copy incremental merge via RMAN on NFS mount point off AWS FSx ONTAP storage.  
+* Quick recovery of Oracle VLDB by switching to database data file image copy on FSx ONTAP storage in the event of a failure.
+* Clone FSx NFS file system volume storing VLDB data file image copy to be used for standing up a concurrent database copy for any other use cases. 
 
 == Audience
 
 This solution is intended for the following people:
 
-* A DBA who would like to deploy Oracle in an AWS public cloud with NFS/ASM.
+* A DBA who would like to setup Oracle VLDB data file image copy incremental merge via RMAN for faster database recovery.
 * A database solution architect who would like to test Oracle workloads in the AWS public cloud.
 * The storage administrator who would like to deploy and manage an Oracle database deployed to AWS FSx storage.
 * The application owner who would like to stand up an Oracle database in AWS FSx/EC2.
