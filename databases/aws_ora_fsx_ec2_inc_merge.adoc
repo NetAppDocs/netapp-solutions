@@ -44,7 +44,7 @@ The testing and validation of this solution was performed in an AWS FSx and EC2 
 
 === Architecture
 
-image::aws_ora_fsx_ec2_incm_architecture.png["This image provides a detailed picture of the Oracle VLDB incremental merge implementation in AWS public cloud with FSxN."]
+image::aws_ora_fsx_ec2_vldb_architecture.png["This image provides a detailed picture of the Oracle VLDB incremental merge implementation in AWS public cloud with FSxN."]
 
 === Hardware and software components
 
@@ -67,7 +67,7 @@ image::aws_ora_fsx_ec2_incm_architecture.png["This image provides a detailed pic
 
 * *Oracle recoverability using RMAN incremental merge.* The RMAN incremental backup and merge is generally executed at user defined frequency based on your RTO and RPO objectives. If there are total loss of primary data storage and/or archived logs, the data loss can occur. The Oracle database can be recovered up to last incremental backup that is available from FSx database image copy. To minimize the data loss, Oracle flash recovery area can be setup on FSx NFS mount point and archived logs are backed up to FSx NFS mount along with database data file image copy. 
 
-* *Running Oracle VLDB off FSx NFS file system.* Unlike other bulk storage for database backup, AWS FSx ONTAP is a cloud enabled production grid storage that delivers high level of performance. Once Oracle VLDB switches over from primary storage to data file image copy on FSx NFS file system, there is no performance drop-off at all. While the primary storage issue is fixed after a switch-over, you can take comfort to know that the database performance can be sustained for extended period of time. 
+* *Running Oracle VLDB off FSx NFS file system.* Unlike other bulk storage for database backup, AWS FSx ONTAP is a cloud enabled production grade storage that delivers high level of performance. Once Oracle VLDB switches over from primary storage to data file image copy on FSx NFS file system, there is no performance drop-off at all. While the primary storage issue is fixed after a switch-over, you can take comfort to know that the database performance can be sustained for extended period of time. 
 
 * *FlexClone of NFS volume for RMAN incremental merge.* AWS FSx ONTAP FlexClone provides extra shared copies of the same data volume that are writable. Thus, they can be used for many other use cases while still maintaining the integrity of staging Oracle VLDB image copy whether Oracle database is switched over or not. This provides tremendous storage cost saving by substantially reducing VLDB storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to database image copy in order to maintain Oracle performance at high level. 
 
@@ -82,7 +82,15 @@ image::aws_ora_fsx_ec2_incm_architecture.png["This image provides a detailed pic
 
 == Solution deployment
 
-The following section provides step-by-step deployment procedures. 
+It is assumed that you already have your Oracle VLDB database deployed in AWS EC2 environment within a VPC. If you need help on Oracle deployment in AWS, please referred following technical reports for help. 
+
+* link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_deploy_intro.html[Oracle Database Deployment on EC2 and FSx Best Practices^]
+
+* link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_iscsi_asm.html[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^]
+
+* link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_nfs_asm.html[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^]
+
+It should be point out that your Oracle VLDB can be running either on a FSx ONTAP or any other storage of choices within the AWS EC2 platform. The following section provides step-by-step deployment procedures for setting up RMAN incremental merge to an image copy of an Oracle VLDB that is staging in NFS mounts off AWS FSx ONTAP storage.    
 
 === Prerequisites for deployment
 [%collapsible]
@@ -96,7 +104,7 @@ Deployment requires the following prerequisites.
 
 . From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host the Oracle database volumes. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
 
-. Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution.
+. Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution. The template can be easily revised for your own deployment requirements.
 +
 ....
 git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
@@ -108,184 +116,54 @@ Ensure that you have allocated at least 50G in EC2 instance root volume in order
 
 ====
 
-=== EC2 instance kernel configuration
-[%collapsible]
-
-====
-With the prerequisites provisioned, log into the EC2 instance as ec2-user and sudo to root user to configure the Linux kernel for Oracle installation.
-
-. Create a staging directory `/tmp/archive` folder and set the `777` permission.
-+
-....
-mkdir /tmp/archive
-
-chmod 777 /tmp/archive
-....
-
-. Download and stage the Oracle binary installation files and other required rpm files to the `/tmp/archive` directory.
-+
-See the following list of installation files to be stated in `/tmp/archive` on the EC2 instance.
-+
-....
-[ec2-user@ip-172-30-15-58 ~]$ ls -l /tmp/archive
-total 10537316
--rw-rw-r--. 1 ec2-user ec2-user      19112 Mar 21 15:57 compat-libcap1-1.10-7.el7.x86_64.rpm
--rw-rw-r--  1 ec2-user ec2-user 3059705302 Mar 21 22:01 LINUX.X64_193000_db_home.zip
--rw-rw-r--  1 ec2-user ec2-user 2889184573 Mar 21 21:09 LINUX.X64_193000_grid_home.zip
--rw-rw-r--. 1 ec2-user ec2-user     589145 Mar 21 15:56 netapp_linux_unified_host_utilities-7-1.x86_64.rpm
--rw-rw-r--. 1 ec2-user ec2-user      31828 Mar 21 15:55 oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
--rw-rw-r--  1 ec2-user ec2-user 2872741741 Mar 21 22:31 p34762026_190000_Linux-x86-64.zip
--rw-rw-r--  1 ec2-user ec2-user 1843577895 Mar 21 22:32 p34765931_190000_Linux-x86-64.zip
--rw-rw-r--  1 ec2-user ec2-user  124347218 Mar 21 22:33 p6880880_190000_Linux-x86-64.zip
--rw-r--r--  1 ec2-user ec2-user     257136 Mar 22 16:25 policycoreutils-python-utils-2.9-9.el8.noarch.rpm
-....
-
-. Install Oracle 19c preinstall RPM, which satisfies most kernel configuration requirements.
-+
-....
-yum install /tmp/archive/oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
-....
-
-. Download and install the missing `compat-libcap1` in Linux 8.
-+
-....
-yum install /tmp/archive/compat-libcap1-1.10-7.el7.x86_64.rpm
-....
-
-. From NetApp, download and install NetApp host utilities.
-+
-....
-yum install /tmp/archive/netapp_linux_unified_host_utilities-7-1.x86_64.rpm
-....
-
-. Install `policycoreutils-python-utils`, which is not available in the EC2 instance.
-+
-....
-yum install /tmp/archive/policycoreutils-python-utils-2.9-9.el8.noarch.rpm
-....
-
-. Install open JDK version 1.8.
-+
-....
-yum install java-1.8.0-openjdk.x86_64
-....
-
-. Install nfs-utils.
-+
-....
-yum install nfs-utils
-....
-
-. Disable transparent hugepages in the current system.
-+
-....
-echo never > /sys/kernel/mm/transparent_hugepage/enabled
-echo never > /sys/kernel/mm/transparent_hugepage/defrag
-....
-+
-Add the following lines in `/etc/rc.local` to disable `transparent_hugepage` after reboot:
-+
-....
-  # Disable transparent hugepages
-          if test -f /sys/kernel/mm/transparent_hugepage/enabled; then
-            echo never > /sys/kernel/mm/transparent_hugepage/enabled
-          fi
-          if test -f /sys/kernel/mm/transparent_hugepage/defrag; then
-            echo never > /sys/kernel/mm/transparent_hugepage/defrag
-          fi
-....
-
-. Disable selinux by changing `SELINUX=enforcing` to `SELINUX=disabled`. You must reboot the host to make the change effective.
-+
-....
-vi /etc/sysconfig/selinux
-....
-
-. Add the following lines to `limit.conf` to set the file descriptor limit and stack size without quotes `" "`.
-+
-....
-vi /etc/security/limits.conf
-  "*               hard    nofile          65536"
-  "*               soft    stack           10240"
-....
-
-. Add swap space to EC2 instance by following this instruction: link:https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^] The exact amount of space to add depends on the size of RAM up to 16G.
-
-. Add the ASM group to be used for the asm sysasm group
-+
-....
-groupadd asm
-....
-
-. Modify the oracle user to add ASM as a secondary group (the oracle user should have been created after Oracle preinstall RPM installation).
-+
-....
-usermod -a -G asm oracle
-....
-
-. Reboot the EC2 instance. 
-
-====
-
-=== Provision and export NFS volumes to be mounted to EC2 instance host
+=== Provision and export NFS volumes to be mounted to EC2 DB instance host
 [%collapsible]
 
 ====
 
-Provision three volumes from the command line by login to FSx cluster via ssh as fsxadmin user with FSx cluster management IP to host the Oracle database binary, data, and logs files.
+In this demonstration, we will show how to provision a NFS volume from the command line by login to a FSx cluster via ssh as fsxadmin user through FSx cluster management IP. Alternatively, the volume can be allocated using AWS FSx console as well. Repeat the procedures on other FSx file system if more than one FSx file systems are setup to accommodate the size of database. 
 
-. Log into the FSx cluster through SSH as the fsxadmin user.
+. First, provision NFS volume via CLI by logging to the FSx cluster through SSH as the fsxadmin user. Change to your FSx cluster management IP address.
 +
 ....
+[source, cli]
 ssh fsxadmin@172.30.15.53
 ....
 
-. Execute the following command to create a volume for the Oracle binary.
+. Create NFS volume the same size as source Oracle VLDB database to store data files image copy.
 + 
-....
-vol create -volume ora_01_biny -aggregate aggr1 -size 50G -state online  -type RW -junction-path /ora_01_biny -snapshot-policy none -tiering-policy snapshot-only
-....
+[source, cli]
+vol create -volume ora_01_copy -aggregate aggr1 -size 100G -state online -type RW -junction-path /ora_01_copy -snapshot-policy none -tiering-policy snapshot-only
 
-. Execute the following command to create a volume for Oracle data.
+
+. Alternatively, the volume can be provisioned from AWS FSx console UI as show below.
 +
-....
-vol create -volume ora_01_data -aggregate aggr1 -size 100G -state online  -type RW -junction-path /ora_01_data -snapshot-policy none -tiering-policy snapshot-only
-....
+image::aws_ora_fsx_ec2_vldb_vol.png[Error: Missing Graphic Image]
 
-. Execute the following command to create a volume for Oracle logs.
+
+. Login to EC2 instance as ec2-user and create a directory /nfsfsxn. Create additional mount point directory for additional FSx file system.
 + 
-....
-vol create -volume ora_01_logs -aggregate aggr1 -size 100G -state online  -type RW -junction-path /ora_01_logs -snapshot-policy none -tiering-policy snapshot-only
-....
+[source, cli]
+sudo mkdir /nfsfsxn
 
-. Validate the DB volumes created.
+. Mount the FSx ONTAP NFS volume to EC2 DB instance host. Change to your FSx virtual server NFS lif address.
 +
-....
-vol show
-....
+[source, cli]
+sudo mount 172.30.15.19:/ora_01_copy /nfsfsxn -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
+
+. Change mount point ownership to oracle:oisntall, change to your oracle user name and primary group as necessary.
 +
-This is expected to return:
-+
-....
-FsxId02ad7bf3476b741df::> vol show
-  (vol show)
-FsxId06c3c8b2a7bd56458::> vol show
-Vserver   Volume       Aggregate    State      Type       Size  Available Used%
---------- ------------ ------------ ---------- ---- ---------- ---------- -----
-svm_ora   ora_01_biny  aggr1        online     RW         50GB    47.50GB    0%
-svm_ora   ora_01_data  aggr1        online     RW        100GB    95.00GB    0%
-svm_ora   ora_01_logs  aggr1        online     RW        100GB    95.00GB    0%
-svm_ora   svm_ora_root aggr1        online     RW          1GB    972.1MB    0%
-4 entries were displayed.
-....
+[source, cli]
+sudo chown oracle:oinstall /nfsfsxn
 
 ====
 
-=== Database storage configuration
+=== Setup Oracle RMAN incremental merge to image copy on FSx
 [%collapsible]
 
 ====
-Now, import and set up the FSx storage for the Oracle grid infrastructure and database installation on the EC2 instance host.
+
+RMAN incremental merge update the staging database data files image copy at every incremental backup interval. 
 
 . Log into the EC2 instance via SSH as the ec2-user with your SSH key and EC2 instance IP address.
 +
@@ -403,7 +281,7 @@ chmod 640 /oralogs/asm/*
 
 ====
 
-=== Oracle grid infrastructure installation
+=== Switch Oracle DB to image copy for quick recovery
 [%collapsible]
 
 ====
@@ -552,7 +430,7 @@ ora.evmd            ONLINE  ONLINE       ip-172-30-15-58          STABLE
 
 ====
 
-=== Oracle database installation
+=== Oracle DB recovery from image copy on different EC2 DB instance host
 [%collapsible]
 
 ====
@@ -927,8 +805,12 @@ This completes Oracle 19c version 19.18 Restart deployment on an Amazon FSx for 
 ====
 
 === Automated deployment option
+[%collapsible]
 
-NetApp will release a fully automated solution deployment toolkit with Ansible to facilitate the implementation of this solution. Please check back for the availability of the toolkit. After it is released, a link will be posted here.
+====
+NetApp will release a fully automated solution deployment toolkit with Ansible or Terraform to facilitate the implementation of this solution. Please check back for the availability of the toolkit. After it is released, a link will be posted here.
+
+====
 
 == Oracle Database backup, restore, and clone with SnapCenter Service
 
