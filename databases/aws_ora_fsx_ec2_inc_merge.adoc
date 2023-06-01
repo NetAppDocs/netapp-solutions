@@ -966,13 +966,14 @@ RMAN> @rman_bkup_merge.cmd
 
 . Shutdown primary EC2 DB instance host to simulate a total failure of storage and DB server host.
 
-. Privison a new EC2 DB instance host ora_02 with same OS and version via AWS EC2 console. Configure OS kernal with same patches as primary EC2 DB server host, Oracle preinstall RPM and add swap space to the host as well. Install same version and patches of Oracle as in primary EC2 DB server host with software only option. These tasks can be automated with NetApp automation toolkit as listed in below link. 
+. Privison a new EC2 DB instance host ora_02 with same OS and version via AWS EC2 console. Configure OS kernal with same patches as primary EC2 DB server host, Oracle preinstall RPM and add swap space to the host as well. Install same version and patches of Oracle as in primary EC2 DB server host with software only option. These tasks can be automated with NetApp automation toolkit as available from below links. 
 +
-link:https://docs.netapp.com/us-en/netapp-solutions/databases/marketing_overview.html#awxtower-deployments[Automated Deployment of Oracle19c for ONTAP on NFS^]
+Toolkit: link:https://github.com/NetApp-Automation/na_oracle19c_deploy[na_oracle19c_deploy^]
+Documentation: link:https://docs.netapp.com/us-en/netapp-solutions/databases/marketing_overview.html#awxtower-deployments[Automated Deployment of Oracle19c for ONTAP on NFS^]
 
 . Configure oracle environment similiarly to primary EC2 DB instance host ora_01, such as oratab, oraInst.loc, and oracle user .bash_profile. It is a good practice to backup those files to FSxN NFS mount point.
 
-. Oracle image copy backup on FSxN NFS mount is stored on a FSx cluster that can span AWS availability zones for redundancy, high avilability, and high performance. The backup NFS file system can be easily mounted to a new server as far as the networking reachable. The following will mount the image copy of an Oracle VLDB backup to newly provsioned EC2 DB instance host.
+. Oracle image copy backup on FSxN NFS mount is stored on a FSx cluster that can span AWS availability zones for redundancy, high avilability, and high performance. The backup NFS file system can be easily mounted to a new server as far as the networking is reachable. The following will mount the image copy of an Oracle VLDB backup to newly provsioned EC2 DB instance host.
 +
 As ec2-user, create the mount point.
 +
@@ -1111,7 +1112,7 @@ total 5714400
 [source, cli]
 vi $ORACLE_HOME/dbs/initdb1.ora
 +
-with following entries:
+with following example entries:
 +
 ....
 
@@ -1196,7 +1197,7 @@ db_recovery_file_dest_size=80G
 
 ....
 
-The above init file should be replaced by restored backup init file from primary server in the case of discrepancy. 
+The above init file should be replaced by restored backup init file from primary EC2 Oracle DB server in the case of discrepancy. 
 
 . As oracle user, launch RMAN to run Oracle recovery on a new EC2 DB instance host.
 +
@@ -1209,8 +1210,6 @@ Version 19.18.0.0.0
 Copyright (c) 1982, 2019, Oracle and/or its affiliates.  All rights reserved.
 
 connected to target database (not started)
-
-RMAN> startup nomount;
 
 RMAN> startup nomount;
 
@@ -1237,7 +1236,7 @@ executing command: SET DBID
 
 ....
 
-. Restore controlfile from auto backup. By RMAN default, Oracle controlfile is enabled for auto backup. The latest backup will be restored if multiple copies are available.
+. Restore controlfile from autobackup. By RMAN default, Oracle controlfile and spfile autobackup is enabled. They are backed up in every incremental backup and merge cycle. The latest backup will be restored if multiple copies are available.
 +
 ....
 RMAN> restore controlfile from autobackup;
@@ -1277,7 +1276,7 @@ Finished restore at 31-MAY-23
 
 ....
 
-. Mount control file and validate the database backup copy.
+. Mount control file and validate the database backup image copy.
 +
 ....
 RMAN> alter database mount;
@@ -1613,7 +1612,7 @@ Finished recover at 31-MAY-23
 
 For faster recovery, enable parallel sessions with recovery_parallelism parameter or specify degree of parallel in recovery command for database recovery: `RECOVER DATABASE PARALLEL (DEGREE d INSTANCES DEFAULT);`. In general, degrees of parallelism should be equal to number of CPU cores on the host.
 
-. Exit RMAN, login to Oracle as oracle user via sqlplus to open database.
+. Exit RMAN, login to Oracle as oracle user via sqlplus to open database and reset log after an incomplete recovery.
 +
 ....
 
@@ -1724,11 +1723,11 @@ As EC2 user, vi /etc/fstab and add following entry:
 
 172.30.15.19:/ora_01_copy       /nfsfsxn        nfs     rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=262144,wsize=262144,nointr  0       0
 
-Update the Oracle init file from current databse init file backup restored to /tmp/archive and create spfile as needed.
+Update the Oracle init file from primary databse init file backup that is restored to /tmp/archive and create spfile as needed.
 
 ....
 
-This completes the database recovery to backup image copy on FSxN NFS file system to a new EC2 DB instance host.
+This completes the Oracle VLDB database recovery from backup image copy on FSxN NFS file system to a new EC2 DB instance host.
 
 ====
 
