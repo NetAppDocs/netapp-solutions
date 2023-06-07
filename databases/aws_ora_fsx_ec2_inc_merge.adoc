@@ -17,30 +17,30 @@ Allen Cao, Niyaz Mohamed, NetApp
 [.lead]
 == Purpose
 
-Recovery of an Oracle VLDB ( Very Large Database ) via Oracle RMAN  ( Recovery Manager ) backup tool can be a very challenging task. It could take long time to restore an Oracle VLDB from backup media in the event of a failure before database can be recovered. Your SLA could suffer a major hit as a result. Since version 10g, Oracle released a RMAN feature to allow Oracle user to stage image copy of an Oracle database data files at an extra disk storage on DB server host. This image copy of the data files can be incrementally updated via RMAN on the daily basis. In the event of a failure, DBA can switch Oracle database quickly from failed storage media to this image copy. Thus database media restore is completely avoided. The net result is much improved SLA at the expense of doubling of database storage.   
+Recovering a Very Large Database (VLDB) in Oracle using the Oracle Recovery Manager (RMAN) backup tool can be a highly challenging task. The database restoration process from backup media in the event of a failure can be time-consuming, delaying the database recovery and potentially impacting your Service Level Agreement (SLA) significantly. However, starting from version 10g, Oracle introduced a RMAN feature that allows users to create staged image copies of the Oracle database data files on additional disk storage located on the DB server host. These image copies can be incrementally updated using RMAN on a daily basis. In the case of a failure, the Database Administrator (DBA) can swiftly switch the Oracle database from the failed media to the image copy, eliminating the need for a complete database media restore. The result is a greatly improved SLA, albeit at the cost of doubling the required database storage. 
 
-If you are keen on SLA for your Oracle VLDB and contemplating on moving the database to public cloud such as AWS, you could set up similar database protection structure using resources such as AWS FSx ONTAP for staging your standby database image copy. In this documentation, we demonstrate how to provision and export a NFS file system from AWS FSx ONTAP to be mounted on an Oracle database server for staging a standby data file image copy for quick recovery in the event of a failure. 
+If you are keen on SLA for your VLDB and contemplating moving the Oracle database to a public cloud such as AWS, you could set up a similar database protection structure using resources such as AWS FSx ONTAP for staging your standby database image copy. In this documentation, we demonstrate how to provision and export an NFS file system from AWS FSx ONTAP to be mounted on an Oracle database server for staging a standby database copy for quick recovery in the event of a primary storage failure. 
 
-Better yet, we also show how you could leverage NetApp FlexClone to create a copy of the same staging NFS file system for other use cases such as standing up a dev/test Oracle environment with exactly the same data file image copy without additional storage investment.  
+Better yet, we also show how you could leverage NetApp FlexClone to create a copy of the same staging NFS file system for other use cases such as standing up a dev/test Oracle environment with this same standby database image copy without additional storage investment. 
 
 This solution addresses the following use cases:
 
-* An Oracle VLDB data files image copy incremental merge via RMAN on NFS mount point off AWS FSx ONTAP storage.  
-* Quick recovery of an Oracle VLDB by switching to database data files image copy on FSx ONTAP storage in the event of a failure.
-* Clone FSx NFS file system volume storing an Oracle VLDB data files image copy to be used for standing up another database copy for any other use cases. 
+* An Oracle VLDB image copy incremental merge via RMAN on NFS mount point off AWS FSx ONTAP storage.  
+* Quick recovery of an Oracle VLDB by switching to database image copy on FSx ONTAP storage in the event of failure.
+* Clone FSx ONTAP NFS file system volume storing an Oracle VLDB image copy to be used for standing up another database copy for other use cases. 
 
 == Audience
 
 This solution is intended for the following people:
 
-* A DBA who would like to setup Oracle VLDB data files image copy incremental merge via RMAN for faster database recovery.
-* A database solution architect who would like to test Oracle workloads in the AWS public cloud.
-* The storage administrator who would like to deploy and manage an Oracle database deployed to AWS FSx storage.
-* The application owner who would like to stand up an Oracle database in AWS FSx/EC2.
+* A DBA who set up Oracle VLDB image copy incremental merge via RMAN in AWS for faster database recovery.
+* A database solution architect who tests Oracle workloads in the AWS public cloud.
+* A storage administrator who manages Oracle databases deployed to AWS FSx ONTAP storage.
+* An application owner who would like to stand up Oracle databases in AWS FSx/EC2 environment.
 
 == Solution test and validation environment
 
-The testing and validation of this solution was performed in an AWS FSx and EC2 environment that might not match the final deployment environment. For more information, see the section <<Key Factors for Deployment Consideration>>.
+The testing and validation of this solution was performed in an AWS FSx ONTAP and EC2 environment that might not match the final deployment environment. For more information, see the section <<Key Factors for Deployment Consideration>>.
 
 === Architecture
 
@@ -63,26 +63,26 @@ image::aws_ora_fsx_ec2_vldb_architecture.png["This image provides a detailed pic
 
 === Key factors for deployment consideration
 
-* *Oracle VLDB storage layout for RMAN incremental merge.* In our tests and validations, the NFS volume for Oracle incremental backup and merge is allocated from a single FSx file system, which has 4GBps throughput, 160,000 raw SSD IOPS, and 192TiB capacity limit.  For deployment over the thresholds, multiple FSx file systems can be concatenated in parallel with multiple NFS mount points to provide higher capacity. 
+* *Oracle VLDB storage layout for RMAN incremental merge.* In our tests and validations, the NFS volume for Oracle incremental backup and merge is allocated from a single FSx file system, which has 4GBps throughput, 160,000 raw SSD IOPS, and 192TiB capacity limit. For deployment over the thresholds, multiple FSx file systems can be concatenated in parallel with multiple NFS mount points to provide higher capacity. 
 
-* *Oracle recoverability using RMAN incremental merge.* The RMAN incremental backup and merge is generally executed at user defined frequency based on your RTO and RPO objectives. If there are total loss of primary data storage and/or archived logs, the data loss can occur. The Oracle database can be recovered up to last incremental backup that is available from FSx database image copy. To minimize the data loss, Oracle flash recovery area can be setup on FSx NFS mount point and archived logs are backed up to FSx NFS mount along with database data file image copy. 
+* *Oracle recoverability using RMAN incremental merge.* The RMAN incremental backup and merge is generally executed at user defined frequency based on your RTO and RPO objectives. If there are total loss of primary data storage and/or archived logs, the data loss can occur. The Oracle database can be recovered up to last incremental backup that is available from FSx database backup image copy. To minimize the data loss, Oracle flash recovery area can be setup on FSx NFS mount point and archived logs are backed up to FSx NFS mount along with database image copy. 
 
-* *Running Oracle VLDB off FSx NFS file system.* Unlike other bulk storage for database backup, AWS FSx ONTAP is a cloud enabled production grade storage that delivers high level of performance and storage efficiency. Once Oracle VLDB switches over from primary storage to data file image copy on FSx ONTAP NFS file system, database performance can be maintained at high level while the primary storage failure is addressed. You can take comfort to know that user application experience does not suffer as the result of storage failure. 
+* *Running Oracle VLDB off FSx NFS file system.* Unlike other bulk storage for database backup, AWS FSx ONTAP is a cloud enabled production grade storage that delivers high level of performance and storage efficiency. Once Oracle VLDB switches over from primary storage to image copy on FSx ONTAP NFS file system, database performance can be maintained at high level while the primary storage failure is addressed. You can take comfort to know that user application experience does not suffer as the result of primary storage failure. 
 
-* *FlexClone of NFS volume for RMAN incremental merge.* AWS FSx ONTAP FlexClone provides extra shared copies of the same data volume that are writable. Thus, they can be used for many other use cases while still maintaining the integrity of staging Oracle VLDB image copy whether Oracle database is switched over or not. This provides tremendous storage cost saving by substantially reducing VLDB storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to database image copy in order to maintain Oracle performance at high level. 
+* *FlexClone Oracle VLDB image copy of NFS volume for other use cases.* AWS FSx ONTAP FlexClone provides shared copies of the same NFS data volume that are writable. Thus, they can be used for many other use cases while still maintaining the integrity of staging Oracle VLDB image copy even when Oracle database is switched over. This provides tremendous storage cost saving by substantially reducing VLDB storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to database image copy in order to maintain Oracle performance at high level. 
 
-* *EC2 compute instances.* In these tests and validations, we used an AWS EC2 t2.xlarge instance type for the Oracle database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workloads. You need to size the EC2 instance appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
+* *EC2 compute instances.* In these tests and validations, we used an AWS EC2 t2.xlarge instance as the Oracle database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workload. You need to size the EC2 instance appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
 
 * *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi-zone deployment further enhances high availability in the event of failure in a single AWS zone. 
 
 * *FSx storage cluster sizing.* An Amazon FSx for ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
 
-* *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For multiple FSx file systems deployment for large database, dNFS multi-path to different FSx NFS file systems should be properly configured.   
+* *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For multiple FSx file systems deployment for a VLDB, dNFS multi-path to different FSx NFS file systems should be properly configured.   
 
 
 == Solution deployment
 
-It is assumed that you already have your Oracle VLDB database deployed in AWS EC2 environment within a VPC. If you need help on Oracle deployment in AWS, please refer to following technical reports for help. 
+It is assumed that you already have your Oracle VLDB deployed in AWS EC2 environment within a VPC. If you need help on Oracle deployment in AWS, please refer to following technical reports for help. 
 
 * link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_deploy_intro.html[Oracle Database Deployment on EC2 and FSx Best Practices^]
 
@@ -90,7 +90,7 @@ It is assumed that you already have your Oracle VLDB database deployed in AWS EC
 
 * link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_nfs_asm.html[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^]
 
-It should be point out that your Oracle VLDB can be running either on a FSx ONTAP or any other storage of choices within the AWS EC2 platform. The following section provides step-by-step deployment procedures for setting up RMAN incremental merge to an image copy of an Oracle VLDB that is staging in NFS mounts off AWS FSx ONTAP storage.    
+Your Oracle VLDB can be running either on a FSx ONTAP or any other storage of choices within the AWS EC2 ecosystem. The following section provides step-by-step deployment procedures for setting up RMAN incremental merge to an image copy of an Oracle VLDB that is staging in an NFS mount off AWS FSx ONTAP storage.    
 
 === Prerequisites for deployment
 [%collapsible]
@@ -116,14 +116,14 @@ Ensure that you have allocated at least 50G in EC2 instance root volume in order
 
 ====
 
-=== Provision and export NFS volumes to be mounted to EC2 DB instance host
+=== Provision and export NFS volume to be mounted to EC2 DB instance host
 [%collapsible]
 
 ====
 
-In this demonstration, we will show how to provision a NFS volume from the command line by login to a FSx cluster via ssh as fsxadmin user through FSx cluster management IP. Alternatively, the volume can be allocated using AWS FSx console as well. Repeat the procedures on other FSx file systems if more than one FSx file system is setup to accommodate the size of database. 
+In this demonstration, we will show how to provision an NFS volume from the command line by login to an FSx cluster via ssh as fsxadmin user through FSx cluster management IP. Alternatively, the volume can be allocated using the AWS FSx console as well. Repeat the procedures on other FSx file systems if more than one FSx file system is set up to accommodate the size of the database. 
 
-. First, provision NFS volume via CLI by logging to the FSx cluster through SSH as the fsxadmin user. Change to your FSx cluster management IP address.
+. First, provision NFS volume via CLI by logging to the FSx cluster through SSH as the fsxadmin user. Change to your FSx cluster management IP address, which can be retrieved from AWS FSx ONTAP UI console. 
 +
 [source, cli]
 ssh fsxadmin@172.30.15.53
@@ -138,13 +138,22 @@ vol create -volume ora_01_copy -aggregate aggr1 -size 100G -state online -type R
 +
 image::aws_ora_fsx_ec2_vldb_vol.png[Error: Missing Graphic Image]
 
+. Create a customized snapshot policy for oracle database with a daily schedule and 30 days retention.
++
+[source, cli] 
+snapshot policy create -policy oracle -enabled true -schedule1 daily -count1 30
++
+Apply policy to provisioned NFS volume for RMAN incremental backup and merge.
++
+[source, cli]
+vol modify -volume ora_01_copy -snapshot-policy oracle
 
 . Login to EC2 instance as ec2-user and create a directory /nfsfsxn. Create additional mount point directories for additional FSx file systems.
 + 
 [source, cli]
 sudo mkdir /nfsfsxn
 
-. Mount the FSx ONTAP NFS volume to EC2 DB instance host. Change to your FSx virtual server NFS lif address.
+. Mount the FSx ONTAP NFS volume to EC2 DB instance host. Change to your FSx virtual server NFS lif address. The NFS lif address can be retrieved from FSx ONTAP UI console.
 +
 [source, cli]
 sudo mount 172.30.15.19:/ora_01_copy /nfsfsxn -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=262144,wsize=262144,nointr
@@ -161,17 +170,20 @@ sudo chown oracle:oinstall /nfsfsxn
 
 ====
 
-RMAN incremental merge update the staging database data files image copy continuously at every incremental backup/merge interval. The image copy of database backup will be as up to date as how frequently you execute the incremental backup/merge. So, make sure to take into consideration of database performance, your RTO and RPO objectives when deciding the frequency of RMAN incremental backup and merge.
+RMAN incremental merge update the staging database data files image copy continuously at every incremental backup/merge interval. The image copy of database backup will be as up to date as the frequency you execute the incremental backup/merge. So, make sure to take into consideration of database performance, your RTO and RPO objectives when deciding the frequency of RMAN incremental backup and merge.
 
-. Login to EC2 instance as oracle user
+. Login to primary DB server EC2 instance as oracle user
 
-. Create an oracopy directory under mount point /nfsfsxn to store oracle data file image copy
+. Create an oracopy directory under mount point /nfsfsxn to store oracle data files image copies and archlog directory for Oracle flash recovery area.
 +
 [source, cli]
 mkdir /nfsfsxn/oracopy
++
+[source, cli]
+mkdir /nfsfsxn/archlog
 
-
-. Login to Oracle database via sqlplus, enable block change tracking for faster incremental backup.
+. Login to Oracle database via sqlplus, enable block change tracking for faster incremental backup and change Oracle flash recovery area to FSxN mount if it is currently on primary storage. This allows the RMAN default control file/spfile autobackup and archived logs to be backed up to FSxN NFS mount for recovery.
++
 +
 [source, cli]
 sqlplus / as sysdba
@@ -179,8 +191,11 @@ sqlplus / as sysdba
 From sqlplus prompt, execute following command.
 [source, cli]
 alter database enable block change tracking using file '/nfsfsxn/oracopy/bct_db1.ctf'
++
+[source, cli]
+alter system set db_recovery_file_dest='/nfsfsxn/archlog/' scope=both;
 
-. Create a RMAN backup and incremental merge script. The script allocates multiple channels for parallel RMAN backup and merge. First execution would generate the initial baseline image copy. In a full run, it purges obsolete backups out of retention window to keep staging area clean, switch current log file before merge and backup. Finally, it dumps a control file text copy to staging area for rebuilding control file in the event of a major failure. Incremental backup follows the merge so the base database image copy is always trailing current database state by more than one backup/merge cycle.
+. Create a RMAN backup and incremental merge script. The script allocates multiple channels for parallel RMAN backup and merge. First execution would generate the initial baseline image copy. In a complete run, it purges obsolete backups out of retention window to keep staging area clean, switch current log file before merge and backup. Incremental backup follows the merge so the database image copy is trailing current database state by one backup/merge cycle. the RMAN script can be integrated into a simple shell script to be executed from crontab on the primary DB server. Ensure control file autobackup is on in RMAN setting. 
 +
 ....
 vi /home/oracle/rman_bkup_merge.cmd
@@ -197,8 +212,6 @@ RUN
   sql 'alter system archive log current';
   recover copy of database with tag 'OraCopyBKUPonFSxN_level_0';
   backup incremental level 1 copies=1 for recover of copy with tag 'OraCopyBKUPonFSxN_level_0' database;
-  host 'rm /nfsfsxn/oracopy/db1_ctl.sql';
-  alter database backup controlfile to trace as '/nfsfsxn/oracopy/db1_ctl.sql';
 }
 
 ....
@@ -225,7 +238,7 @@ RMAN>
 
 ....
 
-. From RMAN prompt, execute the script. First execution would create image copy of database. From third execution and on, RMAN starts merge and update the image copy. The following is how to execute the script and the typical output. Set the number of channels to match the CPU cores on the host. Setup a shell script to run the command continuously to keep updating backup copy to be closely in sync with production data copy. 
+. From RMAN prompt, execute the script. First execution creates a baseline database image copy and subsequent executions merge and update the baseline image copy incrementally. The following is how to execute the script and the typical output. Set the number of channels to match the CPU cores on the host. Setup a shell script to run the command continuously to keep the copy closely in sync with production database. 
 +
 ....
 RMAN> @/home/oracle/rman_bkup_merge.cmd
@@ -240,9 +253,8 @@ RMAN> RUN
 8>   sql 'alter system archive log current';
 9>   recover copy of database with tag 'OraCopyBKUPonFSxN_level_0';
 10>  backup incremental level 1 copies=1 for recover of copy with tag 'OraCopyBKUPonFSxN_level_0' database;
-11>  host 'rm /nfsfsxn/oracopy/db1_ctl.sql';
-12>  alter database backup controlfile to trace as '/nfsfsxn/oracopy/db1_ctl.sql';
-13> }
+11> }
+
 allocated channel: c1
 channel c1: SID=411 device type=DISK
 
@@ -590,9 +602,9 @@ This completes the setup of Oracle database standby image copy backup and merge.
 [%collapsible]
  
 ====
-In the event of database failure due to primary storage issue such as data loss or corruption, Oracle database can be quickly switch over to image copy on FSx ONTAP NFS mount and recovered to current state without database restore. This speeds up the database recovery tremendously for a VLDB. This is assuming that the database host instance is intact and database control file, archived and current logs are all available for recovery.
+In the event of a failure due to primary storage issue such as data loss or corruption,  database can be quickly switched over to image copy on FSx ONTAP NFS mount and recovered to current state without database restore. Eliminating media restoration speeds up the database recovery tremendously for a VLDB. This use case assumes that the database host instance is intact and database control file, archived and current logs are all available for recovery.
 
-. Log into EC2 DB server host as oracle user and create a test table before switch over.
+. Login to EC2 DB server host as oracle user and create a test table before switch over.
 +
 ....
 [ec2-user@ip-172-30-15-99 ~]$ sudo su
@@ -869,7 +881,7 @@ test oracle incremental merge switch to copy
 SQL>
 ....
 
-. You could run the switched over Oracle database in FSx NFS mount for an extended period of time as FSx is redundant production grade storage that deliver high performance while the existing storage issues are mitigated. Then, by the time the current production storage issues are fixed, you can then swing back to it by reversing the entire incremental backup copy merge processes with minimal down time.  
+. You could run the Oracle database in FSx NFS mount for an extended period without a performance penalty like other bulk storage because FSx ONTAP is redundant production-grade storage that delivers high performance. When the primary storage issue is fixed, you can swing back to it by reversing the incremental backup merge processes with minimal downtime.  
 
 
 ====
@@ -878,19 +890,10 @@ SQL>
 [%collapsible]
 
 ====
-For a major failure when both primary storage and EC2 DB instance host are both lost, the recovery can not be conducted from original server. Fortunately, you still have an Oracle database backup image copy on redundant FSxN NFS file system. You could quickly provision another identical EC2 DB instance and easily mount the image copy of your VLDB to the new EC2 DB host via NFS to run recovery. In this section, we will demonstrate the step by step procedures in doing so.
+In a failure when both primary storage and EC2 DB instance host are lost, the recovery can not be conducted from the original server. Fortunately, you still have an Oracle database backup image copy on the redundant FSxN NFS file system. You could quickly provision another identical EC2 DB instance and easily mount the image copy of your VLDB to the new EC2 DB host via NFS to run recovery. In this section, we will demonstrate the step-by-step procedures for doing so.
 
-. On the current Oracle EC2 DB server host, change Oracle flash recovery area to FSxN mount if you have not already done so. This allows the RMAN default control/spfile autobackup and archived logs to be backed up to FSxN NFS mount for recovery.
-+
-As oracle user, create a directory for Oracle flash recovery area.
-[source, cli]
-mkdir /nfsfsxn/archlog
-+
-As oracle user, login database as sysdba via sqlplus and execute following command.
-[source, cli]
-alter system set db_recovery_file_dest='/nfsfsxn/archlog/' scope=both;
 
-. Insert a row to test table we have created previously for Oracle restoring to alternative host validation.
+. Insert a row to test table we have created previously for Oracle database restoring to alternative host validation.
 +
 ....
 
@@ -966,14 +969,14 @@ RMAN> @rman_bkup_merge.cmd
 
 . Shutdown primary EC2 DB instance host to simulate a total failure of storage and DB server host.
 
-. Privison a new EC2 DB instance host ora_02 with same OS and version via AWS EC2 console. Configure OS kernal with same patches as primary EC2 DB server host, Oracle preinstall RPM and add swap space to the host as well. Install same version and patches of Oracle as in primary EC2 DB server host with software only option. These tasks can be automated with NetApp automation toolkit as available from below links. 
+. Privison a new EC2 DB instance host ora_02 with same OS and version via AWS EC2 console. Configure OS kernal with same patches as primary EC2 DB server host, Oracle preinstall RPM, and add swap space to the host as well. Install same version and patches of Oracle as in primary EC2 DB server host with software only option. These tasks can be automated with NetApp automation toolkit as available from below links. 
 +
 Toolkit: link:https://github.com/NetApp-Automation/na_oracle19c_deploy[na_oracle19c_deploy^]
 Documentation: link:https://docs.netapp.com/us-en/netapp-solutions/databases/marketing_overview.html#awxtower-deployments[Automated Deployment of Oracle19c for ONTAP on NFS^]
 
 . Configure oracle environment similiarly to primary EC2 DB instance host ora_01, such as oratab, oraInst.loc, and oracle user .bash_profile. It is a good practice to backup those files to FSxN NFS mount point.
 
-. Oracle image copy backup on FSxN NFS mount is stored on a FSx cluster that can span AWS availability zones for redundancy, high avilability, and high performance. The backup NFS file system can be easily mounted to a new server as far as the networking is reachable. The following will mount the image copy of an Oracle VLDB backup to newly provsioned EC2 DB instance host.
+. The Oracle database backup image copy on FSxN NFS mount is stored on a FSx cluster that spans AWS availability zones for redundancy, high avilability, and high performance. The NFS file system can be easily mounted to a new server as far as the networking is reachable. The following procedures mount the image copy of an Oracle VLDB backup to newly provsioned EC2 DB instance host for recovery.
 +
 As ec2-user, create the mount point.
 +
@@ -984,7 +987,7 @@ As ec2-user, mount the NFS volume that stored Oracle VLDB backup image copy.
 [source, cli]
 sudo mount 172.30.15.19:/ora_01_copy /nfsfsxn -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=262144,wsize=262144,nointr
 
-. Validate the primary Oracle image copy backup on FSxN NFS mount point.
+. Validate the Oracle database backup image copy on FSxN NFS mount point.
 +
 ....
 [ec2-user@ip-172-30-15-124 ~]$ ls -ltr /nfsfsxn/oracopy
@@ -1107,97 +1110,41 @@ total 5714400
 
 . As oracle user, set ORACLE_HOME variable to current Oracle installation on new EC2 instance DB host ora_02, ORACLE_SID to primary Oracle instance SID. In this case, it is db1.
 
-. As oracle user, create a generic Oracle init file in $ORACLE_HOME/dbs directory with proper admin directories configured and most importantly have Oracle `flash recovery area` point to FSxN NFS mount path as defined in primary Oracle VLDB instance as demonstrated in Step 1 above. Add a control file entry to point to FSxN NFS file system.
+. As oracle user, create a generic Oracle init file in $ORACLE_HOME/dbs directory with proper admin directories configured. Most importantly, have Oracle `flash recovery area` point to FSxN NFS mount path as defined in primary Oracle VLDB instance.  `flash recovery area` configuration is demonstrated in section `Setup Oracle RMAN incremental merge to image copy on FSx`. Set the Oracle control file to FSx ONTAP NFS file system.
 +
 [source, cli]
 vi $ORACLE_HOME/dbs/initdb1.ora
 +
-with following example entries:
+With following example entries:
 +
 ....
 
-##############################################################################
-# Copyright (c) 1991, 2013 by Oracle Corporation
-##############################################################################
-
-###########################################
-# Cache and I/O
-###########################################
-db_block_size=8192
-
-###########################################
-# Cursors and Library Cache
-###########################################
-open_cursors=300
-
-###########################################
-# Database Identification
-###########################################
-db_domain="demo.netapp.com"
-db_name="db1"
-
-###########################################
-# File Configuration
-###########################################
-db_create_file_dest="+DATA"
-
-###########################################
-# Miscellaneous
-###########################################
-compatible=19.0.0
-diagnostic_dest=/u01/app/oracle
-enable_pluggable_database=true
-
-###########################################
-# NLS
-###########################################
-nls_language="AMERICAN"
-nls_territory="AMERICA"
-
-###########################################
-# Network Registration
-###########################################
-local_listener=LISTENER_DB1
-
-###########################################
-# Processes and Sessions
-###########################################
-processes=320
-
-###########################################
-# SGA Memory
-###########################################
-sga_target=12288m
-
-###########################################
-# Security and Auditing
-###########################################
-audit_file_dest="/u01/app/oracle/admin/db1/adump"
-audit_trail=db
-remote_login_passwordfile=EXCLUSIVE
-
-###########################################
-# Shared Server
-###########################################
-dispatchers="(PROTOCOL=TCP) (SERVICE=db1XDB)"
-
-###########################################
-# Sort, Hash Joins, Bitmap Indexes
-###########################################
-pga_aggregate_target=4096m
-
-###########################################
-# System Managed Undo and Rollback Segments
-###########################################
-undo_tablespace=UNDOTBS1
-
-control_files=("/nfsfsxn/oracopy/db1.ctl")
-db_recovery_file_dest="/nfsfsxn/archlog"
-db_recovery_file_dest_size=80G
+*.audit_file_dest='/u01/app/oracle/admin/db1/adump'
+*.audit_trail='db'
+*.compatible='19.0.0'
+*.control_files=('/nfsfsxn/oracopy/db1.ctl')
+*.db_block_size=8192
+*.db_create_file_dest='/nfsfsxn/oracopy/'
+*.db_domain='demo.netapp.com'
+*.db_name='db1'
+*.db_recovery_file_dest_size=85899345920
+*.db_recovery_file_dest='/nfsfsxn/archlog/'
+*.diagnostic_dest='/u01/app/oracle'
+*.dispatchers='(PROTOCOL=TCP) (SERVICE=db1XDB)'
+*.enable_pluggable_database=true
+*.local_listener='LISTENER'
+*.nls_language='AMERICAN'
+*.nls_territory='AMERICA'
+*.open_cursors=300
+*.pga_aggregate_target=1024m
+*.processes=320
+*.remote_login_passwordfile='EXCLUSIVE'
+*.sga_target=10240m
+*.undo_tablespace='UNDOTBS1'
 
 ....
 
-The above init file should be replaced by restored backup init file from primary EC2 Oracle DB server in the case of discrepancy. 
+The above init file should be replaced by restored backup init file from primary Oracle DB server in the case of discrepancy. 
 
 . As oracle user, launch RMAN to run Oracle recovery on a new EC2 DB instance host.
 +
@@ -1224,10 +1171,8 @@ Redo Buffers                  24375296 bytes
 
 ....
 
-. Set database ID, if you don't know the database ID. Run an Unix strings command against root container sysaux data file to retrive the value.
+. Set database ID. The database ID can be retrieved from Oracle file name of image copy on FSx NFS mount point.  
 +
-[source, cli]
-strings /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-3_4g1t506m | grep MAXVALUE
 ....
 
 RMAN> set dbid = 1730530050;
@@ -1236,7 +1181,7 @@ executing command: SET DBID
 
 ....
 
-. Restore controlfile from autobackup. By RMAN default, Oracle controlfile and spfile autobackup is enabled. They are backed up in every incremental backup and merge cycle. The latest backup will be restored if multiple copies are available.
+. Restore controlfile from autobackup. If Oracle controlfile and spfile autobackup is enabled, they are backed up in every incremental backup and merge cycle. The latest backup will be restored if multiple copies are available.
 +
 ....
 RMAN> restore controlfile from autobackup;
@@ -1257,7 +1202,7 @@ Finished restore at 31-MAY-23
 
 ....
 
-. Restore init file from spfile to run Oracle on new EC2 instance host with matching parameters from primary DB instance.
+. Restore init file from spfile to a /tmp folder for updating parameter file later to match with primary DB instance.
 +
 ....
 RMAN> restore spfile to pfile '/tmp/archive/initdb1.ora' from autobackup;
@@ -1648,29 +1593,9 @@ Database altered.
 
 ....
 
-. Drop invalid temp files and add new temp files from NFS mount 
+. Validate the database restored to new host that has the row we have inserted before primary database failure. 
 +
 ....
-As oracle user, from sqlplus:
-
-SQL> select name, con_id from v$tempfile;
-
-NAME                                                                                 CON_ID
--------------------------------------------------------------------------------- ----------
-+DATA/DB1/TEMPFILE/temp.265.1136666447                                                    1
-+DATA/DB1/FB864A929AEB79B9E053630F1EAC7046/TEMPFILE/temp.269.1136667185                   2
-+DATA/DB1/FB867DA8C68C816EE053630F1EAC2BCF/TEMPFILE/temp.274.1136668051                   3
-+DATA/DB1/FB867EA89ECF81C0E053630F1EACB901/TEMPFILE/temp.279.1136668067                   4
-+DATA/DB1/FB867F8A4D4F821CE053630F1EAC69CC/TEMPFILE/temp.284.1136668081                   5
-
-SQL> alter tablespace temp drop tempfile '+DATA/DB1/TEMPFILE/temp.265.1136666447';
-
-Tablespace altered.
-
-SQL> alter tablespace temp add tempfile '/nfsfsxn/oracopy/temp.265.1136666447' size 5G;
-
-Tablespace altered.
-
 SQL> show pdbs
 
     CON_ID CON_NAME                       OPEN MODE  RESTRICTED
@@ -1682,28 +1607,6 @@ SQL> show pdbs
 SQL> alter session set container=db1_pdb1;
 
 Session altered.
-
-SQL> select name from v$tempfile;
-
-NAME
---------------------------------------------------------------------------------
-+DATA/DB1/FB867DA8C68C816EE053630F1EAC2BCF/TEMPFILE/temp.274.1136668051
-
-SQL> alter tablespace temp add tempfile '/nfsfsxn/oracopy/temp.274.1136668051' size 5G;
-
-Tablespace altered.
-
-SQL> alter tablespace temp drop tempfile '+DATA/DB1/FB867DA8C68C816EE053630F1EAC2BCF/TEMPFILE/temp.274.1136668051';
-
-Tablespace altered.
-
-Repeat the temp file add and drop for other container databases other than seed PDB. 
-
-....
-
-. Validate the database restored to new host that has the row we have inserted before primary database failure. 
-+
-....
 
 SQL> select * from test;
 
