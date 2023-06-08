@@ -27,7 +27,7 @@ This solution addresses the following use cases:
 
 * An Oracle VLDB image copy incremental merge via RMAN on NFS mount point off AWS FSx ONTAP storage.  
 * Quick recovery of an Oracle VLDB by switching to database image copy on FSx ONTAP storage in the event of failure.
-* Clone FSx ONTAP NFS file system volume storing an Oracle VLDB image copy to be used for standing up another database copy for other use cases. 
+* Clone FSx ONTAP NFS file system volume storing an Oracle VLDB image copy to be used for standing up another database instance for other use cases. 
 
 == Audience
 
@@ -121,14 +121,14 @@ Ensure that you have allocated at least 50G in EC2 instance root volume in order
 
 ====
 
-In this demonstration, we will show how to provision an NFS volume from the command line by login to an FSx cluster via ssh as fsxadmin user through FSx cluster management IP. Alternatively, the volume can be allocated using the AWS FSx console as well. Repeat the procedures on other FSx file systems if more than one FSx file system is set up to accommodate the size of the database. 
+In this demonstration, we will show how to provision an NFS volume from the command line by login to an FSx cluster via ssh as fsxadmin user through FSx cluster management IP. Alternatively, the volume can be allocated using the AWS FSx console as well. Repeat the procedures on other FSx file systems if more than one FSx file system are set up to accommodate the size of the database. 
 
 . First, provision NFS volume via CLI by logging to the FSx cluster through SSH as the fsxadmin user. Change to your FSx cluster management IP address, which can be retrieved from AWS FSx ONTAP UI console. 
 +
 [source, cli]
 ssh fsxadmin@172.30.15.53
 
-. Create NFS volume the same size as your primary storage for storing source Oracle VLDB database data files image copy.
+. Create NFS volume the same size as your primary storage for storing primary Oracle VLDB database data files image copy.
 + 
 [source, cli]
 vol create -volume ora_01_copy -aggregate aggr1 -size 100G -state online -type RW -junction-path /ora_01_copy -snapshot-policy none -tiering-policy snapshot-only
@@ -170,7 +170,7 @@ sudo chown oracle:oinstall /nfsfsxn
 
 ====
 
-RMAN incremental merge update the staging database data files image copy continuously at every incremental backup/merge interval. The image copy of database backup will be as up to date as the frequency you execute the incremental backup/merge. So, make sure to take into consideration of database performance, your RTO and RPO objectives when deciding the frequency of RMAN incremental backup and merge.
+RMAN incremental merge update the staging database data files image copy continuously at every incremental backup/merge interval. The image copy of database backup will be as up to date as the frequency you execute the incremental backup/merge. So, take into consideration of database performance, your RTO and RPO objectives when deciding the frequency of RMAN incremental backup and merge.
 
 . Login to primary DB server EC2 instance as oracle user
 
@@ -184,7 +184,6 @@ mkdir /nfsfsxn/archlog
 
 . Login to Oracle database via sqlplus, enable block change tracking for faster incremental backup and change Oracle flash recovery area to FSxN mount if it is currently on primary storage. This allows the RMAN default control file/spfile autobackup and archived logs to be backed up to FSxN NFS mount for recovery.
 +
-+
 [source, cli]
 sqlplus / as sysdba
 +
@@ -195,7 +194,7 @@ alter database enable block change tracking using file '/nfsfsxn/oracopy/bct_db1
 [source, cli]
 alter system set db_recovery_file_dest='/nfsfsxn/archlog/' scope=both;
 
-. Create a RMAN backup and incremental merge script. The script allocates multiple channels for parallel RMAN backup and merge. First execution would generate the initial baseline image copy. In a complete run, it purges obsolete backups out of retention window to keep staging area clean, switch current log file before merge and backup. Incremental backup follows the merge so the database image copy is trailing current database state by one backup/merge cycle. the RMAN script can be integrated into a simple shell script to be executed from crontab on the primary DB server. Ensure control file autobackup is on in RMAN setting. 
+. Create a RMAN backup and incremental merge script. The script allocates multiple channels for parallel RMAN backup and merge. First execution would generate the initial full baseline image copy. In a complete run, it first purges obsolete backups that are outside of retention window to keep staging area clean. It then switches current log file before merge and backup. The incremental backup follows the merge so that the database image copy is trailing current database state by one backup/merge cycle. The merge and backup order can be reversed for quicker recovery at user's preference. The RMAN script can be integrated into a simple shell script to be executed from crontab on the primary DB server. Ensure control file autobackup is on in RMAN setting. 
 +
 ....
 vi /home/oracle/rman_bkup_merge.cmd
@@ -238,7 +237,7 @@ RMAN>
 
 ....
 
-. From RMAN prompt, execute the script. First execution creates a baseline database image copy and subsequent executions merge and update the baseline image copy incrementally. The following is how to execute the script and the typical output. Set the number of channels to match the CPU cores on the host. Setup a shell script to run the command continuously to keep the copy closely in sync with production database. 
+. From RMAN prompt, execute the script. First execution creates a baseline database image copy and subsequent executions merge and update the baseline image copy incrementally. The following is how to execute the script and the typical output. Set the number of channels to match the CPU cores on the host. 
 +
 ....
 RMAN> @/home/oracle/rman_bkup_merge.cmd
@@ -881,7 +880,7 @@ test oracle incremental merge switch to copy
 SQL>
 ....
 
-. You could run the Oracle database in FSx NFS mount for an extended period without a performance penalty like regular backup storage because FSx ONTAP is redundant production-grade storage that delivers high performance. When the primary storage issue is fixed, you can swing back to it by reversing the incremental backup merge processes with minimal downtime.  
+. You could run the Oracle database in FSx NFS mount for an extended period without a performance penalty because FSx ONTAP is redundant production-grade storage that delivers high performance. When the primary storage issue is fixed, you can swing back to it by reversing the incremental backup merge processes with minimal downtime.  
 
 
 ====
@@ -1143,7 +1142,7 @@ With following example entries:
 *.undo_tablespace='UNDOTBS1'
 
 ....
-
++
 The above init file should be replaced by restored backup init file from primary Oracle DB server in the case of discrepancy. 
 
 . As oracle user, launch RMAN to run Oracle recovery on a new EC2 DB instance host.
@@ -1679,7 +1678,7 @@ test clone on a new EC2 instance host with image copy on FSxN
 SQL>
 ....
 
-. Take a RMAN backup and merge to FSx ONTAP copy so that the transaction will be captured in the backup set on FSx NFS mount but not merged into copy until cloned database is recovered. 
+. Take a RMAN backup and merge to FSx ONTAP database image copy so that the transaction will be captured in the backup set on FSx NFS mount but not merged into copy until cloned database is recovered. 
 +
 ....
 RMAN> @/home/oracle/rman_bkup_merge.cmd
@@ -1716,7 +1715,7 @@ svm_ora  ora_01_copy
 
 ....
 
-. Clone from the one-off snapshot to be used for standing up a new DB1 clone instance on a alternative EC2 Oracle host. You have the option to clone from any available daily snapshots for volume ora_01_copy.
+. Clone from the one-off snapshot to be used for standing up a new DB1 clone instance on an alternative EC2 Oracle host. You have the option to clone from any available daily snapshots for volume ora_01_copy.
 +
 ....
 FsxId06c3c8b2a7bd56458::> vol clone create -flexclone db1_20230605of -type RW -parent-vserver svm_ora -parent-volume ora_01_copy -junction-path /db1_20230605of -junction-active true -parent-snapshot one-off.2023-06-05-1137
