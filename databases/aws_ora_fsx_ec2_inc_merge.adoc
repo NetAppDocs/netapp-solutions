@@ -138,7 +138,7 @@ vol create -volume ora_01_copy -aggregate aggr1 -size 100G -state online -type R
 +
 image::aws_ora_fsx_ec2_vldb_vol.png[Error: Missing Graphic Image]
 
-. Create a customized snapshot policy for oracle database with a daily schedule and 30 days retention.
+. Create a customized snapshot policy for oracle database with a daily schedule and 30 days retention. You should adjust the policy to fit your specific needs in terms of snapshot frequency and retention window. 
 +
 [source, cli] 
 snapshot policy create -policy oracle -enabled true -schedule1 daily -count1 30
@@ -881,7 +881,7 @@ test oracle incremental merge switch to copy
 SQL>
 ....
 
-. You could run the Oracle database in FSx NFS mount for an extended period without a performance penalty like other bulk storage because FSx ONTAP is redundant production-grade storage that delivers high performance. When the primary storage issue is fixed, you can swing back to it by reversing the incremental backup merge processes with minimal downtime.  
+. You could run the Oracle database in FSx NFS mount for an extended period without a performance penalty like regular backup storage because FSx ONTAP is redundant production-grade storage that delivers high performance. When the primary storage issue is fixed, you can swing back to it by reversing the incremental backup merge processes with minimal downtime.  
 
 
 ====
@@ -1634,14 +1634,816 @@ This completes the Oracle VLDB database recovery from backup image copy on FSxN 
 
 ====
 
-=== Clone Oracle stanby image copy for other use cases 
+=== Clone Oracle standby image copy for other use cases 
 [%collapsible]
 
 ====
 
-One major benefit for using AWS FSx ONTAP for staging Oracle VLDB image copy is that it can be FlexCloned to serve many other purposes with minimal additional storage investment. In this section, we will demonstrate how to snapshot and clone NFS volume on FSx ONTAP for other Oracle use cases such DEV, UAT etc.  
+Another benefit of using AWS FSx ONTAP for staging Oracle VLDB image copy is that it can be FlexCloned to serve many other purposes with minimal additional storage investment. In the following use case,  we demonstrate how to snapshot and clone the staging NFS volume on FSx ONTAP for other Oracle use cases such as DEV, UAT, etc.  
 
-TBD
+. We begin with inserting a row into the same test table we have created before.
++
+....
+ SQL> insert into test values (3, sysdate, 'test clone on a new EC2 instance host with image copy on FSxN');
+
+1 row created.
+
+SQL> select * from test;
+
+        ID
+----------
+DT
+---------------------------------------------------------------------------
+EVENT
+--------------------------------------------------------------------------------
+         1
+18-MAY-23 02.35.37.000000 PM
+test oracle incremental merge switch to copy
+
+         2
+30-MAY-23 05.23.11.000000 PM
+test recovery on a new EC2 instance host with image copy on FSxN
+
+        ID
+----------
+DT
+---------------------------------------------------------------------------
+EVENT
+--------------------------------------------------------------------------------
+
+         3
+05-JUN-23 03.19.46.000000 PM
+test clone on a new EC2 instance host with image copy on FSxN
+
+
+SQL>
+....
+
+. Take a RMAN backup and merge to FSx ONTAP copy so that the transaction will be captured in the backup set on FSx NFS mount but not merged into copy until cloned database is recovered. 
++
+....
+RMAN> @/home/oracle/rman_bkup_merge.cmd
+
+....
+
+. Login to FSx cluster via ssh as fsxadmin user to observe the snapshots created by scheduled backup policy - oracle and take an one-off snapshot so that it will include the transaction we commited in step 1. 
++
+....
+FsxId06c3c8b2a7bd56458::> vol snapshot create -vserver svm_ora -volume ora_01_copy -snapshot one-off.2023-06-05-1137 -foreground true
+
+FsxId06c3c8b2a7bd56458::> snapshot show
+                                                                 ---Blocks---
+Vserver  Volume   Snapshot                                  Size Total% Used%
+-------- -------- ------------------------------------- -------- ------ -----
+svm_ora  ora_01_copy
+                  daily.2023-06-02_0010                   3.59GB     2%    5%
+                  daily.2023-06-03_0010                   1.10GB     1%    1%
+                  daily.2023-06-04_0010                    608KB     0%    0%
+                  daily.2023-06-05_0010                   3.81GB     2%    5%
+                  one-off.2023-06-05-1137                  168KB     0%    0%
+         svm_ora_root
+                  weekly.2023-05-28_0015                  1.86MB     0%   78%
+                  daily.2023-06-04_0010                    152KB     0%   22%
+                  weekly.2023-06-04_0015                  1.24MB     0%   70%
+                  daily.2023-06-05_0010                    196KB     0%   27%
+                  hourly.2023-06-05_1005                   156KB     0%   22%
+                  hourly.2023-06-05_1105                   156KB     0%   22%
+                  hourly.2023-06-05_1205                   156KB     0%   22%
+                  hourly.2023-06-05_1305                   156KB     0%   22%
+                  hourly.2023-06-05_1405                  1.87MB     0%   78%
+                  hourly.2023-06-05_1505                   148KB     0%   22%
+15 entries were displayed.
+
+....
+
+. Clone from the one-off snapshot to be used for standing up a new DB1 clone instance on a alternative EC2 Oracle host. You have the option to clone from any available daily snapshots for volume ora_01_copy.
++
+....
+FsxId06c3c8b2a7bd56458::> vol clone create -flexclone db1_20230605of -type RW -parent-vserver svm_ora -parent-volume ora_01_copy -junction-path /db1_20230605of -junction-active true -parent-snapshot one-off.2023-06-05-1137
+[Job 464] Job succeeded: Successful
+
+FsxId06c3c8b2a7bd56458::>
+
+FsxId06c3c8b2a7bd56458::> vol show db1*
+Vserver   Volume       Aggregate    State      Type       Size  Available Used%
+--------- ------------ ------------ ---------- ---- ---------- ---------- -----
+svm_ora   db1_20230605of
+                       aggr1        online     RW        200GB    116.6GB   38%
+
+FsxId06c3c8b2a7bd56458::>
+
+....
+
+. Turn off snapshot policy for the cloned volume as it inherits parent volume snapshot policy unless you want to protect the cloned volume, then leave it alone.
++
+....
+FsxId06c3c8b2a7bd56458::> vol modify -volume db1_20230605of -snapshot-policy none
+
+Warning: You are changing the Snapshot policy on volume "db1_20230605of" to "none". Snapshot copies on this volume that do not match any of the prefixes of the new Snapshot policy will not be deleted. However, when the new Snapshot policy
+         takes effect, depending on the new retention count, any existing Snapshot copies that continue to use the same prefixes might be deleted. See the 'volume modify' man page for more information.
+Do you want to continue? {y|n}: y
+Volume modify successful on volume db1_20230605of of Vserver svm_ora.
+
+FsxId06c3c8b2a7bd56458::>
+
+....
+
+. Login to a new EC2 Linux instance with Oracle software pre-installed with same version and patch level as your primary Oracle EC2 instance and mount the cloned volume.
++
+....
+[ec2-user@ip-172-30-15-124 ~]$ sudo mkdir /nfsfsxn
+[ec2-user@ip-172-30-15-124 ~]$ sudo mount -t nfs 172.30.15.19:/db1_20230605of /nfsfsxn -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=262144,wsize=262144,nointr
+
+....
+
+. Validate the database incremental backup sets, image copy, and available archived logs on FSx NFS mount.
++
+....
+[ec2-user@ip-172-30-15-124 ~]$ ls -ltr /nfsfsxn/oracopy
+total 79450332
+-rw-r----- 1 oracle 54331  482353152 Jun  1 19:02 data_D-DB1_I-1730530050_TS-SYSAUX_FNO-6_891tkrhr
+-rw-r----- 1 oracle 54331  419438592 Jun  1 19:03 data_D-DB1_I-1730530050_TS-SYSTEM_FNO-5_8d1tkril
+-rw-r----- 1 oracle 54331  241180672 Jun  1 19:03 data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-8_8g1tkrj7
+-rw-r----- 1 oracle 54331  912506880 Jun  1 20:21 8n1tkvv2_279_1_1
+-rw-r----- 1 oracle 54331     925696 Jun  1 20:21 8q1tl05i_282_1_1
+-rw-r----- 1 oracle 54331 1169014784 Jun  1 20:21 8p1tkvv2_281_1_1
+-rw-r----- 1 oracle 54331    6455296 Jun  1 20:21 8r1tl05m_283_1_1
+-rw-r----- 1 oracle 54331     139264 Jun  1 20:21 8t1tl05t_285_1_1
+-rw-r----- 1 oracle 54331    3514368 Jun  1 20:21 8s1tl05t_284_1_1
+-rw-r----- 1 oracle 54331     139264 Jun  1 20:21 8u1tl060_286_1_1
+-rw-r----- 1 oracle 54331     425984 Jun  1 20:21 901tl062_288_1_1
+-rw-r----- 1 oracle 54331     344064 Jun  1 20:21 911tl062_289_1_1
+-rw-r----- 1 oracle 54331     245760 Jun  1 20:21 931tl063_291_1_1
+-rw-r----- 1 oracle 54331     237568 Jun  1 20:21 941tl064_292_1_1
+-rw-r----- 1 oracle 54331      57344 Jun  1 20:21 961tl065_294_1_1
+-rw-r----- 1 oracle 54331      57344 Jun  1 20:21 971tl066_295_1_1
+-rw-r----- 1 oracle 54331      57344 Jun  1 20:21 981tl067_296_1_1
+-rw-r----- 1 oracle 54331 1040760832 Jun  1 20:23 8m1tkvv2_278_1_1
+-rw-r----- 1 oracle 54331  932847616 Jun  1 20:24 8o1tkvv2_280_1_1
+-rw-r----- 1 oracle 54331 1121984512 Jun  5 15:21 data_D-DB1_I-1730530050_TS-SYSTEM_FNO-1_821tkrb8
+-rw-r----- 1 oracle 54331 1027612672 Jun  5 15:21 data_D-DB1_I-1730530050_TS-SYSAUX_FNO-3_831tkrd9
+-rw-r----- 1 oracle 54331  429924352 Jun  5 15:21 data_D-DB1_I-1730530050_TS-SYSTEM_FNO-9_8a1tkrhr
+-rw-r----- 1 oracle 54331  707796992 Jun  5 15:21 data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-4_851tkrgf
+-rw-r----- 1 oracle 54331  534781952 Jun  5 15:21 data_D-DB1_I-1730530050_TS-SYSAUX_FNO-14_871tkrhr
+-rw-r----- 1 oracle 54331  534781952 Jun  5 15:21 data_D-DB1_I-1730530050_TS-SYSAUX_FNO-18_881tkrhr
+-rw-r----- 1 oracle 54331  429924352 Jun  5 15:21 data_D-DB1_I-1730530050_TS-SYSTEM_FNO-13_8b1tkril
+-rw-r----- 1 oracle 54331  429924352 Jun  5 15:21 data_D-DB1_I-1730530050_TS-SYSTEM_FNO-17_8c1tkril
+-rw-r----- 1 oracle 54331  246423552 Jun  5 15:21 data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-15_8e1tkril
+-rw-r----- 1 oracle 54331  246423552 Jun  5 15:21 data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-19_8f1tkrj4
+-rw-r----- 1 oracle 54331    5251072 Jun  5 15:21 data_D-DB1_I-1730530050_TS-USERS_FNO-7_8h1tkrj9
+-rw-r----- 1 oracle 54331    5251072 Jun  5 15:21 data_D-DB1_I-1730530050_TS-USERS_FNO-16_8j1tkrja
+-rw-r----- 1 oracle 54331    5251072 Jun  5 15:21 data_D-DB1_I-1730530050_TS-USERS_FNO-20_8k1tkrjb
+-rw-r----- 1 oracle 54331    5251072 Jun  5 15:21 data_D-DB1_I-1730530050_TS-USERS_FNO-12_8i1tkrj9
+-rw-r----- 1 oracle 54331  555753472 Jun  5 15:21 data_D-DB1_I-1730530050_TS-SYSAUX_FNO-10_861tkrgo
+-rw-r----- 1 oracle 54331  796925952 Jun  5 15:22 data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-11_841tkrf2
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-21_7j1tkqk6
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-34_801tkram
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-29_7r1tkr32
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-25_7n1tkqrh
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-31_7t1tkr3i
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-33_7v1tkra6
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-23_7l1tkqk6
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-27_7p1tkqrq
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-35_811tkrap
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-32_7u1tkr42
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-22_7k1tkqk6
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-24_7m1tkqk6
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-28_7q1tkqs1
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-30_7s1tkr3a
+-rw-r----- 1 oracle 54331 4294975488 Jun  5 15:22 data_D-DB1_I-1730530050_TS-SOE_FNO-26_7o1tkqrj
+-rw-r----- 1 oracle 54331 1241432064 Jun  5 15:30 9d1tv06n_301_1_1
+-rw-r----- 1 oracle 54331 1019805696 Jun  5 15:31 9a1tv06m_298_1_1
+-rw-r----- 1 oracle 54331    4612096 Jun  5 15:31 9e1tv0ld_302_1_1
+-rw-r----- 1 oracle 54331  967163904 Jun  5 15:31 9b1tv06n_299_1_1
+-rw-r----- 1 oracle 54331   31563776 Jun  5 15:31 9g1tv0lt_304_1_1
+-rw-r----- 1 oracle 54331     319488 Jun  5 15:31 9h1tv0lt_305_1_1
+-rw-r----- 1 oracle 54331     335872 Jun  5 15:31 9i1tv0m0_306_1_1
+-rw-r----- 1 oracle 54331     565248 Jun  5 15:31 9k1tv0m1_308_1_1
+-rw-r----- 1 oracle 54331     581632 Jun  5 15:31 9l1tv0m5_309_1_1
+-rw-r----- 1 oracle 54331   54345728 Jun  5 15:31 9f1tv0lt_303_1_1
+-rw-r----- 1 oracle 54331     368640 Jun  5 15:31 9n1tv0m5_311_1_1
+-rw-r----- 1 oracle 54331     385024 Jun  5 15:31 9o1tv0m6_312_1_1
+-rw-r----- 1 oracle 54331  985858048 Jun  5 15:31 9c1tv06n_300_1_1
+-rw-r----- 1 oracle 54331      57344 Jun  5 15:31 9q1tv0m7_314_1_1
+-rw-r----- 1 oracle 54331      57344 Jun  5 15:31 9r1tv0m8_315_1_1
+-rw-r----- 1 oracle 54331      57344 Jun  5 15:31 9s1tv0m9_316_1_1
+-rw-r--r-- 1 oracle 54331      12720 Jun  5 15:31 db1_ctl.sql
+-rw-r----- 1 oracle 54331   11600384 Jun  5 15:48 bct_db1.ctf
+[ec2-user@ip-172-30-15-124 ~]$
+
+[oracle@ip-172-30-15-124 ~]$ ls -l /nfsfsxn/archlog/DB1/archivelog/2023_06_05
+total 2008864
+-rw-r----- 1 oracle 54331    729088 Jun  5 14:38 o1_mf_1_190_l7vwvvt9_.arc
+-rw-r----- 1 oracle 54331 166651904 Jun  5 14:44 o1_mf_1_191_l7vx6vmg_.arc
+-rw-r----- 1 oracle 54331 167406080 Jun  5 14:47 o1_mf_1_192_l7vxctms_.arc
+-rw-r----- 1 oracle 54331 166868992 Jun  5 14:49 o1_mf_1_193_l7vxjjps_.arc
+-rw-r----- 1 oracle 54331 166087168 Jun  5 14:52 o1_mf_1_194_l7vxnxrh_.arc
+-rw-r----- 1 oracle 54331 175210496 Jun  5 14:54 o1_mf_1_195_l7vxswv5_.arc
+-rw-r----- 1 oracle 54331 167078400 Jun  5 14:57 o1_mf_1_196_l7vxylwp_.arc
+-rw-r----- 1 oracle 54331 169701888 Jun  5 14:59 o1_mf_1_197_l7vy3cyw_.arc
+-rw-r----- 1 oracle 54331 167845376 Jun  5 15:02 o1_mf_1_198_l7vy8245_.arc
+-rw-r----- 1 oracle 54331 170763776 Jun  5 15:05 o1_mf_1_199_l7vydv4c_.arc
+-rw-r----- 1 oracle 54331 193853440 Jun  5 15:07 o1_mf_1_200_l7vykf23_.arc
+-rw-r----- 1 oracle 54331 165523968 Jun  5 15:09 o1_mf_1_201_l7vyp1dh_.arc
+-rw-r----- 1 oracle 54331 161117184 Jun  5 15:12 o1_mf_1_202_l7vyvrm5_.arc
+-rw-r----- 1 oracle 54331  10098176 Jun  5 15:21 o1_mf_1_203_l7vzdfwm_.arc
+
+....
+
+. The recovery processes now are similar to previous use case of recovery to a new EC2 DB instance after a failure - set oracle environment (oratab, $ORACLE_HOME, $ORACLE_SID) to match with primary production instance, create an init file including db_recovery_file_dest_size and db_recovery_file_dest that point to flash recovery directory on FSx NFS mount. Then, lanuch RMAN to run recovery. Following are command steps and output.
++
+....
+[oracle@ip-172-30-15-124 dbs]$ rman target / nocatalog
+
+Recovery Manager: Release 19.0.0.0.0 - Production on Wed Jun 7 14:44:33 2023
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2019, Oracle and/or its affiliates.  All rights reserved.
+
+connected to target database (not started)
+
+RMAN> startup nomount;
+
+Oracle instance started
+
+Total System Global Area   10737418000 bytes
+
+Fixed Size                     9174800 bytes
+Variable Size               1577058304 bytes
+Database Buffers            9126805504 bytes
+Redo Buffers                  24379392 bytes
+
+RMAN> set dbid = 1730530050;
+
+executing command: SET DBID
+
+RMAN> restore controlfile from autobackup;
+
+Starting restore at 07-JUN-23
+allocated channel: ORA_DISK_1
+channel ORA_DISK_1: SID=2 device type=DISK
+
+recovery area destination: /nfsfsxn/archlog/
+database name (or database unique name) used for search: DB1
+channel ORA_DISK_1: AUTOBACKUP /nfsfsxn/archlog/DB1/autobackup/2023_06_05/o1_mf_s_1138721482_l7vzybvq_.bkp found in the recovery area
+channel ORA_DISK_1: looking for AUTOBACKUP on day: 20230607
+channel ORA_DISK_1: looking for AUTOBACKUP on day: 20230606
+channel ORA_DISK_1: looking for AUTOBACKUP on day: 20230605
+channel ORA_DISK_1: restoring control file from AUTOBACKUP /nfsfsxn/archlog/DB1/autobackup/2023_06_05/o1_mf_s_1138721482_l7vzybvq_.bkp
+channel ORA_DISK_1: control file restore from AUTOBACKUP complete
+output file name=/nfsfsxn/oracopy/db1.ctl
+Finished restore at 07-JUN-23
+
+RMAN> alter database mount;
+
+released channel: ORA_DISK_1
+Statement processed
+
+RMAN> list incarnation;
+
+
+List of Database Incarnations
+DB Key  Inc Key DB Name  DB ID            STATUS  Reset SCN  Reset Time
+------- ------- -------- ---------------- --- ---------- ----------
+1       1       DB1      1730530050       PARENT  1          17-APR-19
+2       2       DB1      1730530050       CURRENT 1920977    12-MAY-23
+
+RMAN> list copy of database tag 'OraCopyBKUPonFSxN_level_0';
+
+List of Datafile Copies
+=======================
+
+Key     File S Completion Time Ckp SCN    Ckp Time        Sparse
+------- ---- - --------------- ---------- --------------- ------
+362     1    A 05-JUN-23       8319160    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-1_821tkrb8
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+
+363     3    A 05-JUN-23       8319165    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-3_831tkrd9
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+
+365     4    A 05-JUN-23       8319171    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-4_851tkrgf
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+
+355     5    A 01-JUN-23       2383520    12-MAY-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-5_8d1tkril
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 2, PDB Name: PDB$SEED
+
+349     6    A 01-JUN-23       2383520    12-MAY-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-6_891tkrhr
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 2, PDB Name: PDB$SEED
+
+372     7    A 05-JUN-23       8319201    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-7_8h1tkrj9
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+
+361     8    A 01-JUN-23       2383520    12-MAY-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-8_8g1tkrj7
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 2, PDB Name: PDB$SEED
+
+364     9    A 05-JUN-23       8318717    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-9_8a1tkrhr
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+376     10   A 05-JUN-23       8318714    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-10_861tkrgo
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+377     11   A 05-JUN-23       8318720    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-11_841tkrf2
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+375     12   A 05-JUN-23       8318719    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-12_8i1tkrj9
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+368     13   A 05-JUN-23       8319184    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-13_8b1tkril
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 4, PDB Name: DB1_PDB2
+
+366     14   A 05-JUN-23       8319175    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-14_871tkrhr
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 4, PDB Name: DB1_PDB2
+
+370     15   A 05-JUN-23       8319193    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-15_8e1tkril
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 4, PDB Name: DB1_PDB2
+
+373     16   A 05-JUN-23       8319206    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-16_8j1tkrja
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 4, PDB Name: DB1_PDB2
+
+369     17   A 05-JUN-23       8319188    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-17_8c1tkril
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 5, PDB Name: DB1_PDB3
+
+367     18   A 05-JUN-23       8319180    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-18_881tkrhr
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 5, PDB Name: DB1_PDB3
+
+371     19   A 05-JUN-23       8319197    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-19_8f1tkrj4
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 5, PDB Name: DB1_PDB3
+
+374     20   A 05-JUN-23       8319210    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-20_8k1tkrjb
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 5, PDB Name: DB1_PDB3
+
+378     21   A 05-JUN-23       8318720    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-21_7j1tkqk6
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+388     22   A 05-JUN-23       8318714    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-22_7k1tkqk6
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+384     23   A 05-JUN-23       8318717    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-23_7l1tkqk6
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+389     24   A 05-JUN-23       8318719    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-24_7m1tkqk6
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+381     25   A 05-JUN-23       8318720    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-25_7n1tkqrh
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+392     26   A 05-JUN-23       8318714    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-26_7o1tkqrj
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+385     27   A 05-JUN-23       8318717    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-27_7p1tkqrq
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+390     28   A 05-JUN-23       8318719    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-28_7q1tkqs1
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+380     29   A 05-JUN-23       8318720    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-29_7r1tkr32
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+391     30   A 05-JUN-23       8318714    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-30_7s1tkr3a
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+382     31   A 05-JUN-23       8318717    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-31_7t1tkr3i
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+387     32   A 05-JUN-23       8318719    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-32_7u1tkr42
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+383     33   A 05-JUN-23       8318719    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-33_7v1tkra6
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+379     34   A 05-JUN-23       8318717    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-34_801tkram
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+386     35   A 05-JUN-23       8318714    01-JUN-23       NO
+        Name: /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-35_811tkrap
+        Tag: ORACOPYBKUPONFSXN_LEVEL_0
+        Container ID: 3, PDB Name: DB1_PDB1
+
+RMAN> switch database to copy;
+
+datafile 1 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-1_821tkrb8"
+datafile 3 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-3_831tkrd9"
+datafile 4 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-4_851tkrgf"
+datafile 5 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-5_8d1tkril"
+datafile 6 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-6_891tkrhr"
+datafile 7 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-7_8h1tkrj9"
+datafile 8 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-8_8g1tkrj7"
+datafile 9 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-9_8a1tkrhr"
+datafile 10 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-10_861tkrgo"
+datafile 11 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-11_841tkrf2"
+datafile 12 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-12_8i1tkrj9"
+datafile 13 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-13_8b1tkril"
+datafile 14 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-14_871tkrhr"
+datafile 15 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-15_8e1tkril"
+datafile 16 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-16_8j1tkrja"
+datafile 17 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-17_8c1tkril"
+datafile 18 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-18_881tkrhr"
+datafile 19 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-19_8f1tkrj4"
+datafile 20 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-20_8k1tkrjb"
+datafile 21 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-21_7j1tkqk6"
+datafile 22 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-22_7k1tkqk6"
+datafile 23 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-23_7l1tkqk6"
+datafile 24 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-24_7m1tkqk6"
+datafile 25 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-25_7n1tkqrh"
+datafile 26 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-26_7o1tkqrj"
+datafile 27 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-27_7p1tkqrq"
+datafile 28 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-28_7q1tkqs1"
+datafile 29 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-29_7r1tkr32"
+datafile 30 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-30_7s1tkr3a"
+datafile 31 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-31_7t1tkr3i"
+datafile 32 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-32_7u1tkr42"
+datafile 33 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-33_7v1tkra6"
+datafile 34 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-34_801tkram"
+datafile 35 switched to datafile copy "/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-35_811tkrap"
+
+RMAN> run {
+2> set until sequence 204;
+3> recover database;
+4> }
+
+executing command: SET until clause
+
+Starting recover at 07-JUN-23
+using channel ORA_DISK_1
+
+starting media recovery
+
+archived log for thread 1 with sequence 190 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_190_l7vwvvt9_.arc
+archived log for thread 1 with sequence 191 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_191_l7vx6vmg_.arc
+archived log for thread 1 with sequence 192 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_192_l7vxctms_.arc
+archived log for thread 1 with sequence 193 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_193_l7vxjjps_.arc
+archived log for thread 1 with sequence 194 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_194_l7vxnxrh_.arc
+archived log for thread 1 with sequence 195 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_195_l7vxswv5_.arc
+archived log for thread 1 with sequence 196 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_196_l7vxylwp_.arc
+archived log for thread 1 with sequence 197 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_197_l7vy3cyw_.arc
+archived log for thread 1 with sequence 198 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_198_l7vy8245_.arc
+archived log for thread 1 with sequence 199 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_199_l7vydv4c_.arc
+archived log for thread 1 with sequence 200 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_200_l7vykf23_.arc
+archived log for thread 1 with sequence 201 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_201_l7vyp1dh_.arc
+archived log for thread 1 with sequence 202 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_202_l7vyvrm5_.arc
+archived log for thread 1 with sequence 203 is already on disk as file /nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_203_l7vzdfwm_.arc
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_190_l7vwvvt9_.arc thread=1 sequence=190
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_191_l7vx6vmg_.arc thread=1 sequence=191
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_192_l7vxctms_.arc thread=1 sequence=192
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_193_l7vxjjps_.arc thread=1 sequence=193
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_194_l7vxnxrh_.arc thread=1 sequence=194
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_195_l7vxswv5_.arc thread=1 sequence=195
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_196_l7vxylwp_.arc thread=1 sequence=196
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_197_l7vy3cyw_.arc thread=1 sequence=197
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_198_l7vy8245_.arc thread=1 sequence=198
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_199_l7vydv4c_.arc thread=1 sequence=199
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_200_l7vykf23_.arc thread=1 sequence=200
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_201_l7vyp1dh_.arc thread=1 sequence=201
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_202_l7vyvrm5_.arc thread=1 sequence=202
+archived log file name=/nfsfsxn/archlog/DB1/archivelog/2023_06_05/o1_mf_1_203_l7vzdfwm_.arc thread=1 sequence=203
+media recovery complete, elapsed time: 00:19:30
+Finished recover at 07-JUN-23
+
+RMAN> exit
+
+Recovery Manager complete.
+[oracle@ip-172-30-15-124 dbs]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Wed Jun 7 15:58:12 2023
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> select member from v$logfile;
+
+MEMBER
+--------------------------------------------------------------------------------
++DATA/DB1/ONLINELOG/group_3.264.1136666437
++DATA/DB1/ONLINELOG/group_2.263.1136666437
++DATA/DB1/ONLINELOG/group_1.262.1136666437
+
+SQL> alter database rename file '+DATA/DB1/ONLINELOG/group_1.262.1136666437' to '/nfsfsxn/oracopy/redo01.log';
+
+Database altered.
+
+SQL> alter database rename file '+DATA/DB1/ONLINELOG/group_2.263.1136666437' to '/nfsfsxn/oracopy/redo02.log';
+
+Database altered.
+
+SQL> alter database rename file '+DATA/DB1/ONLINELOG/group_3.264.1136666437' to '/nfsfsxn/oracopy/redo03.log';
+
+Database altered.
+
+SQL> alter database noarchivelog;
+
+Database altered.
+
+SQL> alter database open resetlogs;
+
+Database altered.
+
+SQL> set lin 200;
+SQL> select name from v$datafile
+  2  union
+  3  select name from v$controlfile
+  4  union
+  5  select name from v$tempfile
+  6  union
+  7  select member from v$logfile;
+
+NAME
+----------------------------------------------------------------------------------------
+/nfsfsxn/oracopy/DB1/FB864A929AEB79B9E053630F1EAC7046/datafile/o1_mf_temp_l81bhz6g_.tmp
+/nfsfsxn/oracopy/DB1/FB867DA8C68C816EE053630F1EAC2BCF/datafile/o1_mf_temp_l81bj16t_.tmp
+/nfsfsxn/oracopy/DB1/FB867EA89ECF81C0E053630F1EACB901/datafile/o1_mf_temp_l81bj135_.tmp
+/nfsfsxn/oracopy/DB1/FB867F8A4D4F821CE053630F1EAC69CC/datafile/o1_mf_temp_l81bj13g_.tmp
+/nfsfsxn/oracopy/DB1/datafile/o1_mf_temp_l81bhwjg_.tmp
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-21_7j1tkqk6
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-22_7k1tkqk6
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-23_7l1tkqk6
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-24_7m1tkqk6
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-25_7n1tkqrh
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-26_7o1tkqrj
+
+NAME
+----------------------------------------------------------------------------------------
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-27_7p1tkqrq
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-28_7q1tkqs1
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-29_7r1tkr32
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-30_7s1tkr3a
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-31_7t1tkr3i
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-32_7u1tkr42
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-33_7v1tkra6
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-34_801tkram
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-35_811tkrap
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-10_861tkrgo
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-14_871tkrhr
+
+NAME
+----------------------------------------------------------------------------------------
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-18_881tkrhr
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-3_831tkrd9
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-6_891tkrhr
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-13_8b1tkril
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-17_8c1tkril
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-1_821tkrb8
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-5_8d1tkril
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-9_8a1tkrhr
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-11_841tkrf2
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-15_8e1tkril
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-19_8f1tkrj4
+
+NAME
+-----------------------------------------------------------------------------------------
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-4_851tkrgf
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-8_8g1tkrj7
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-12_8i1tkrj9
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-16_8j1tkrja
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-20_8k1tkrjb
+/nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-7_8h1tkrj9
+/nfsfsxn/oracopy/db1.ctl
+/nfsfsxn/oracopy/redo01.log
+/nfsfsxn/oracopy/redo02.log
+/nfsfsxn/oracopy/redo03.log
+
+43 rows selected.
+
+SQL> show pdbs;
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 DB1_PDB1                       READ WRITE NO
+         4 DB1_PDB2                       READ WRITE NO
+         5 DB1_PDB3                       READ WRITE NO
+SQL> alter session set container=db1_pdb1;
+
+Session altered.
+
+SQL> select * from test;
+
+        ID DT                                                                          EVENT
+---------- --------------------------------------------------------------------------- ----------------------------------------------------------------
+         1 18-MAY-23 02.35.37.000000 PM                                                test oracle incremental merge switch to copy
+         2 30-MAY-23 05.23.11.000000 PM                                                test recovery on a new EC2 instance host with image copy on FSxN
+         3 05-JUN-23 03.19.46.000000 PM                                                test clone on a new EC2 instance host with image copy on FSxN
+
+SQL>
+
+....
+
+. Rename the cloned database instance and change database ID with Oracle nid utility. The database instance state needs to be in `mount` to execute the command.
++
+....
+SQL> select name, open_mode, log_mode from v$database;
+
+NAME      OPEN_MODE            LOG_MODE
+--------- -------------------- ------------
+DB1       READ WRITE           NOARCHIVELOG
+
+SQL> shutdown immediate;
+Database closed.
+Database dismounted.
+ORACLE instance shut down.
+
+SQL> startup mount;
+ORACLE instance started.
+
+Total System Global Area 1.0737E+10 bytes
+Fixed Size                  9174800 bytes
+Variable Size            1577058304 bytes
+Database Buffers         9126805504 bytes
+Redo Buffers               24379392 bytes
+Database mounted.
+SQL> exit
+Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+[oracle@ip-172-30-15-124 dbs]$ nid target=/ dbname=db1tst
+
+DBNEWID: Release 19.0.0.0.0 - Production on Wed Jun 7 16:15:14 2023
+
+Copyright (c) 1982, 2019, Oracle and/or its affiliates.  All rights reserved.
+
+Connected to database DB1 (DBID=1730530050)
+
+Connected to server version 19.18.0
+
+Control Files in database:
+    /nfsfsxn/oracopy/db1.ctl
+
+Change database ID and database name DB1 to DB1TST? (Y/[N]) => Y
+
+Proceeding with operation
+Changing database ID from 1730530050 to 3054879890
+Changing database name from DB1 to DB1TST
+    Control File /nfsfsxn/oracopy/db1.ctl - modified
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-1_821tkrb - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-3_831tkrd - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-4_851tkrg - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-5_8d1tkri - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-6_891tkrh - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-7_8h1tkrj - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-8_8g1tkrj - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-9_8a1tkrh - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-10_861tkrg - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-11_841tkrf - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-12_8i1tkrj - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-13_8b1tkri - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-14_871tkrh - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-15_8e1tkri - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-16_8j1tkrj - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSTEM_FNO-17_8c1tkri - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SYSAUX_FNO-18_881tkrh - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-UNDOTBS1_FNO-19_8f1tkrj - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-USERS_FNO-20_8k1tkrj - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-21_7j1tkqk - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-22_7k1tkqk - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-23_7l1tkqk - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-24_7m1tkqk - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-25_7n1tkqr - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-26_7o1tkqr - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-27_7p1tkqr - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-28_7q1tkqs - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-29_7r1tkr3 - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-30_7s1tkr3 - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-31_7t1tkr3 - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-32_7u1tkr4 - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-33_7v1tkra - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-34_801tkra - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/data_D-DB1_I-1730530050_TS-SOE_FNO-35_811tkra - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/DB1/datafile/o1_mf_temp_l81bhwjg_.tm - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/DB1/FB864A929AEB79B9E053630F1EAC7046/datafile/o1_mf_temp_l81bhz6g_.tm - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/DB1/FB867DA8C68C816EE053630F1EAC2BCF/datafile/o1_mf_temp_l81bj16t_.tm - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/DB1/FB867EA89ECF81C0E053630F1EACB901/datafile/o1_mf_temp_l81bj135_.tm - dbid changed, wrote new name
+    Datafile /nfsfsxn/oracopy/DB1/FB867F8A4D4F821CE053630F1EAC69CC/datafile/o1_mf_temp_l81bj13g_.tm - dbid changed, wrote new name
+    Control File /nfsfsxn/oracopy/db1.ctl - dbid changed, wrote new name
+    Instance shut down
+
+Database name changed to DB1TST.
+Modify parameter file and generate a new password file before restarting.
+Database ID for database DB1TST changed to 3054879890.
+All previous backups and archived redo logs for this database are unusable.
+Database is not aware of previous backups and archived logs in Recovery Area.
+Database has been shutdown, open database with RESETLOGS option.
+Succesfully changed database name and ID.
+DBNEWID - Completed succesfully.
+
+....
+
+. Change Oracle database environment configuration to new database name or instance ID in oratab, init file, and create necessary admin directories that match with new instance ID. Then, start the instance with resetlogs option.
++
+....
+SQL> startup mount;
+ORACLE instance started.
+
+Total System Global Area 1.0737E+10 bytes
+Fixed Size                  9174800 bytes
+Variable Size            1577058304 bytes
+Database Buffers         9126805504 bytes
+Redo Buffers               24379392 bytes
+Database mounted.
+SQL> alter database open resetlogs;
+
+Database altered.
+
+SQL> select name, open_mode, log_mode from v$database;
+
+NAME      OPEN_MODE            LOG_MODE
+--------- -------------------- ------------
+DB1TST    READ WRITE           NOARCHIVELOG
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 DB1_PDB1                       MOUNTED
+         4 DB1_PDB2                       MOUNTED
+         5 DB1_PDB3                       MOUNTED
+SQL> alter pluggable database all open;
+
+Pluggable database altered.
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 DB1_PDB1                       READ WRITE NO
+         4 DB1_PDB2                       READ WRITE NO
+         5 DB1_PDB3                       READ WRITE NO
+SQL>
+
+....
+
+This completes the clone of a new Oracle instance from staging database copy on FSx NFS mount for DEV, UAT, or any other use cases. Multiple Oracle instances can be cloned off the same staging image copy.
+
+[NOTE]
+
+If you run into error `RMAN-06571: datafile 1 does not have recoverable copy` when switching the database to copy, check database incarnation that matches with primary production DB. If needed, reset the incarnation to match with primary with RMAN command `reset database to incarnation n;`.
+
 ====
 
 
