@@ -1,0 +1,93 @@
+---
+sidebar: sidebar
+permalink: ehc/gcp/gcp-migrate-veeam.html
+keywords: gcp, gcve, cvs, migrate , dr, disaster recovery, veeam, replication, proxy, re-ip
+summary: Customers who currently use Veeam for their data protection requirements continue using that solution to migrate the workloads to GCVE and enjoy the benefits of NetApp Cloud Volume Service NFS Datastores.
+---
+
+= VM Migration to NetApp Cloud Volume Service NFS Datastore on Google Cloud VMware Engine using Veeam Replication feature
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+
+
+== Overview
+Authors: Suresh Thoppay, NetApp
+
+VM Workloads running on VMware vSphere can be migrated to Google Cloud VMware Engine (GCVE) utilizing Veeam Replication feature.
+
+This document provides a step-by-step approach for setting up and performing VM migration that uses NetApp Cloud Volume Service, Veeam, and the Google Cloud VMware Engine (GCVE).
+
+image:gcp_migration_veeam_01.png[Veeam VM Replication Architecture]
+
+== Assumptions
+
+This document assumes you have either Google Cloud VPN or Cloud Interconnect or other networking option in place to establish network connectivity from existing vSphere servers to Google Cloud VMware Engine. 
+
+
+[NOTE]
+There are multiple options for connecting on-premises datacenters to Google Cloud, which prevents us from outlining a specific workflow in this document. 
+Refer to the link:https://cloud.google.com/network-connectivity/docs/how-to/choose-product[Google Cloud documentation] for the appropriate on-premises-to-Google connectivity method.
+
+== Deploying the Migration Solution
+=== Solution Deployment Overview
+
+. Make sure NFS datastore from NetApp Cloud Volume Service is mounted on GCVE vCenter.
+. Ensure Veeam Backup Recovery is deployed on existing VMware vSphere environment
+. Create Replication Job to start replicating virtual machines to Google Cloud VMware Engine instance.
+. Perform Failover of Veeam Replication Job.
+. Perform Permanent Failover on Veeam.
+
+=== Deployment Details
+
+==== Make sure NFS datastore from NetApp Cloud Volume Service is mounted on GCVE vCenter
+
+
+Login to GCVE vCenter and ensure NFS datastore with sufficient space is available.
+If not, Please refer link:gcp-ncvs-datastore.html[Mount NetApp CVS as NFS datastore on GCVE] 
+
+
+==== Ensure Veeam Backup Recovery is deployed on existing VMware vSphere environment
+
+
+Please refer link:https://helpcenter.veeam.com/docs/backup/vsphere/replication_components.html?ver=120[Veeam Replication Components] documentation to install required components.
+
+
+
+
+==== Create Replication Job to start replicating virtual machines to Google Cloud VMware Engine instance.
+
+
+Both on-premises vCenter and GCVE vCenter needs to be registered with Veeam. link:https://helpcenter.veeam.com/docs/backup/vsphere/replica_job.html?ver=120[Setup vSphere VM Replication Job] 
+Here is a video explaining how to 
+link:https://youtu.be/uzmKXtv7EeY[Configure Replication Job].
+
+[NOTE]
+Replica VM can have different IP from the source VM and can also be connected to different port group. For more details, check the video above.
+
+
+==== Perform Failover of Veeam Replication Job
+
+
+To Migrate VMs, perform link:https://helpcenter.veeam.com/docs/backup/vsphere/performing_failover.html?ver=120[Perform Failover]
+
+
+==== Perform Permanent Failover on Veeam.
+
+
+To treat GCVE as your new source environment, perform link:https://helpcenter.veeam.com/docs/backup/vsphere/permanent_failover.html?ver=120[Permanent Failover]
+
+
+== Benefits of this solution
+
+* Existing Veeam backup infrastructure can be utilized for migration.
+* Veeam Replication allows changing VM IP addresses on target site.
+* Has ability to remap existing data replicated outside of Veeam (like replicated data from BlueXP)
+* Has ability to specify different network portgroup on target site.
+* Can specify the order of VMs to power on.
+* Utilizes VMware Change Block Tracking to minimize the amount of data to send across WAN.
+* Capability to execute pre and post scripts for replication.
+* Capability to execute pre and post scripts for snapshots.
