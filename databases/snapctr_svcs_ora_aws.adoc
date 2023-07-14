@@ -20,26 +20,26 @@ Allen Cao, Niyaz Mohamed, NetApp
 
 SnapCenter Services is the SaaS version of the classic SnapCenter database management UI tool that is available through the NetApp BlueXP cloud management console. It is an integral part of the NetApp cloud-backup, data-protection offering for databases such as Oracle and HANA running on NetApp cloud storage. This SaaS-based service simplifies traditional SnapCenter standalone server deployment that generally requires a Windows server operating in a Windows domain environment.  
 
-In this documentation, we demonstrate how you can set up SnapCenter Services to backup, restore, and clone Oracle databases deployed to Amazon FSx for ONTAP storage and EC2 compute instances. Although it is much easier to set up and use, SnapCenter Services deliver key functionalities that are available in the legacy SnapCenter UI tool.
+In this documentation, we demonstrate how you can set up SnapCenter Services to backup, restore, and clone Oracle databases deployed to Azure NetApp Files capacity pool storage and Azure compute instances. Although it is much easier to set up and use, SnapCenter Services deliver key functionalities that are available in the legacy SnapCenter UI tool.
 
 This solution addresses the following use cases:
 
-* Database backup with snapshots for Oracle databases hosted in Amazon FSx for ONTAP
+* Database backup with snapshots for Oracle databases hosted in Azure NetApp Files and Azure VMs
 * Oracle database recovery in the case of a failure  
-* Fast and storage-efficient cloning of primary databases for a dev/test environment or other use cases  
+* Fast cloning of primary databases for a dev/test environment or other use cases  
 
 == Audience
 
 This solution is intended for the following audiences:
 
-* The DBA who manages Oracle databases running on Amazon FSx for ONTAP storage
-* The solution architect who is interested in testing Oracle database backup, restore, and clone in the public AWS cloud
-* The storage administrator who supports and manages the Amazon FSx for ONTAP storage
-* The application owner who owns applications that are deployed to Amazon FSx for ONTAP storage 
+* The DBA who manages Oracle databases running on Azure NetApp Files storage
+* The solution architect who is interested in testing Oracle database backup, restore, and clone in the public Azure cloud
+* The storage administrator who supports and manages the Azure NetApp Files capacity storage pool
+* The application owner who owns applications that are deployed to Azure NetApp Files storage and Azure VMs 
 
 == Solution test and validation environment
 
-The testing and validation of this solution was performed in an AWS FSx and EC2 environment that might not match the final deployment environment. For more information, see the section <<Key Factors for Deployment Consideration>>.
+The testing and validation of this solution was performed in an Azure NetApp Files and Azure VMs environment that might not match the final deployment environment. For more information, see the section <<Key Factors for Deployment Consideration>>.
 
 === Architecture
 
@@ -52,41 +52,36 @@ This image provides a detailed picture of Cloud Backup for Application within th
 [%autowidth.stretch]
 |===
 3+^| *Hardware*
-| FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone
-| EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge EC2 instances, one as primary DB server and the other as clone DB server 
+| Azure NetApp Files storage | Current version offered by Azure | Premium Service level, Auto QoS type, and 4TB in storage capacity in testing
+| Azure instance for compute | Standard B4ms (4 vcpus, 16 GiB memory) | Two instances deployed, one as primary DB server and the other as clone DB server 
 
 3+^| *Software*
-| RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
-| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
+| RedHat Linux | Red Hat Enterprise Linux 8.7 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
-| SnapCenter Service | Version |  v2.3.1.2324
+| SnapCenter Service | Version v2.5.0-2822 |  Agent Version v2.5.0-2822
 |===
 
 === Key factors for deployment consideration
 
-* *Connector to be deployed in the same VPC as database and FSx.* When possible, the connector should be deployed in the same AWS VPC, which enables connectivity to the FSx storage and the EC2 compute instance.
+* *Connector to be deployed in the same virtual network / subnet as databases and Azure NetApp Files.* When possible, the connector should be deployed in the same Azure virtual networks and resource groups, which enables connectivity to the Azure NetApp Files storage and the Azure compute instances.
 
-* *An AWS IAM policy created for SnapCenter connector.* The policy in JSON format is available in the detailed SnapCenter service documentation. When you launch connector deployment with the BlueXP console, you are prompted to set up the prerequisites. The policy should be assigned to the AWS user account that owns the connector.
+* *An Azure user account or Active Directory service principle created at Azure portal for SnapCenter connector.* Deploying a BlueXP Connector requires specific permissions to create and configure a virtual machine and other compute resources, to configure networking, and to get access to the Azure subscription. It also requires permissions to later create roles and permissions for the Connector to operate. Create a custom role in Azure with permissions and assign to the user account or service principle. The policy in JSON format is available in the detailed SnapCenter service documentation. Or when you launch connector deployment within the BlueXP console, you are prompted to set up the prerequisites with the details of permission grants. 
 
-* *The AWS account access key and the SSH key pair created in the AWS account.* The SSH key pair is assigned to the ec2-user for logging into the connector host and then deploying a database plug-in to the EC2 DB server host. The access key grants permission for provisioning the required connector.
+* *A ssh key pair created in the Azure resource group.* The ssh key pair is assigned to the Azure VM user for logging into the connector host and also the database VM host for deploying and executing a plug-in. BlueXP console UI uses the ssh key to deploy SnapCenter service plugin to database host for one-step plugin installation and application host database discovery.
 
-* *A credential added to the BlueXP console setting.* To add Amazon FSx for ONTAP to the BlueXP working environment, a credential that grants permissions to access Amazon FSx for ONTAP from the BlueXP console is set up in the BlueXP console setting. 
+* *A credential added to the BlueXP console setting.* To add Azure NetApp Files storage to the BlueXP working environment, a credential that grants permissions to access Azure NetApp Files from the BlueXP console needs to be set up in the BlueXP console setting. 
 
-* *SnapCenter plug-in deployed to the EC2 database instance host.* SnapCenter services make API calls that are executed by the SnapCenter plug-in on the EC2 database instance host. You must deploy it before setting up the services.
+* *java-11-openjdk installed on the Azure VM database instance host.* SnapCenter service installation requires java version 11. It needs to be installed before plugin deployment attempt. 
 
 == Solution deployment
 
-There is extensive NetApp documentation with a broader scope to help you protect your cloud-native application data. The goal of this documentation is to provide step-by-step procedures that cover SnapCenter Service deployment with the BlueXP console to protect your Oracle database deployed to Amazon FSx for ONTAP and an EC2 compute instance. This document fills in certain details that might be missing from more general instructions.
+There is extensive NetApp documentation with a broader scope to help you protect your cloud-native application data. The goal of this documentation is to provide step-by-step procedures that cover SnapCenter Service deployment with the BlueXP console to protect your Oracle database deployed to Azure NetApp Files storage pool and an Azure compute instance. This document fills in certain details that might be missing from more general instructions.
 
 To get started, complete the following steps:
 
-* Read the general instructions link:https://docs.netapp.com/us-en/cloud-manager-backup-restore/concept-protect-cloud-app-data-to-cloud.html#architecture[Protect your cloud native applications data^] and the sections related to Oracle and Amazon FSx for ONTAP.
-
-* Watch the following video walkthrough.
-+
-[pass]
-<iframe src="https://netapp.hosted.panopto.com/Panopto/Pages/Embed.aspx?id=4b0fd212-7641-46b8-9e55-b01200f9383a&autoplay=false&offerviewer=false&showtitle=false&showbrand=false&captions=false&interactivity=all" height="203" width="360" style="border: 1px solid #464646;" allowfullscreen allow="autoplay"></iframe>
+* Read the general instructions link:https://docs.netapp.com/us-en/cloud-manager-backup-restore/concept-protect-cloud-app-data-to-cloud.html#architecture[Protect your cloud native applications data^] and the sections related to Oracle and Azure NetApp Files.
+ 
 
 === Prerequisites for SnapCenter service deployment
 [%collapsible]
@@ -94,12 +89,13 @@ To get started, complete the following steps:
 ====
 Deployment requires the following prerequisites.
 
-. A primary Oracle database server on an EC2 instance with an Oracle database fully deployed and running. 
+. A primary Oracle database server on an Azure VM instance with an Oracle database fully deployed and running. 
 
-. A Amazon FSx for ONTAP cluster deployed in AWS that is hosting the database above.
-. An optional database server on an EC2 instance that can be used for testing the cloning of an Oracle database to an alternative host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of production Oracle database.
+. A Azure NetApp Files storage capacity pool deployed in Azure that has capacity to meet the database storage needs above.
 
-. If you need help to meet the above prerequisites for Oracle database deployment on Amazon FSx for ONTAP and EC2 compute instance, see link:aws_ora_fsx_ec2_iscsi_asm.html[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^].
+. A secondary database server on an Azure VM instance that can be used for testing the cloning of an Oracle database to an alternative host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of production Oracle database.
+
+. If you need help to meet the above prerequisites for Oracle database deployment on Azure NetApp Files and Azure compute instance, see link:azure_ora_nfile_usercase.html[Oracle Database Deployment and Protection on Azure NetApp Files^].
 
 ====
 
@@ -110,13 +106,11 @@ Deployment requires the following prerequisites.
 
 . Use the link link:https://console.bluexp.netapp.com/[NetApp BlueXP] to sign up for BlueXP console access.
 
-. To set up BlueXP to manage AWS cloud resources such as Amazon FSx for ONTAP, you should already have an AWS account set up. You can then log into your AWS account to create an IAM policy for granting SnapCenter service access to an AWS account to use for connector deployment.
-+
-image:snapctr_svcs_connector_01-policy.png["Screenshot showing this step in the GUI."]
-+
-The policy should be configured with a JSON string that is available when connector provisioning is launched and you are prompted as a reminder that an IAM policy has been created and granted to an AWS account that is used for connector deployment. 
+. Create an Azure user account or an Active Directory service principle and grant permissions with role in Azure portal for Azure connector deployment.
 
-. You also need the AWS VPC, a key and secrets for your AWS account, an SSH key for EC2 access, a security group, and so on ready for connector provisioning. 
+. To set up BlueXP to manage Azure resources, add a BlueXP credential with details of an ID of an Active Directory service principal that BlueXP can use to authenticate with Azure Active Directory (App client ID), a client secret for the service principal application (Client Secret), and the Active Directory ID for your organization (Tenant ID).
+
+. You also need the Azure virtual network, resources group, security group, an SSH key for VM access, etc. for connector provisioning and database plugin installation. 
 
 ====
 
