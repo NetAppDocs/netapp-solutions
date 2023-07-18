@@ -91,7 +91,7 @@ Deployment requires the following prerequisites.
 
 . A primary Oracle database server on an Azure VM instance with an Oracle database fully deployed and running. 
 
-. A Azure NetApp Files storage capacity pool deployed in Azure that has capacity to meet the database storage needs above.
+. An Azure NetApp Files storage capacity pool deployed in Azure that has capacity to meet the database storage needs above.
 
 . A secondary database server on an Azure VM instance that can be used for testing the cloning of an Oracle database to an alternative host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of production Oracle database.
 
@@ -138,7 +138,7 @@ image:snapctr_svcs_connector_04-azure.png["Screenshot showing this step in the G
 +
 image:snapctr_svcs_connector_05-azure.png["Screenshot showing this step in the GUI."]
 
-. Click on "Skip to Deployment" to configure your connector "Virtual Machine Authentication".
+. Click on "Skip to Deployment" to configure your connector "Virtual Machine Authentication". Add the SSH key pair you have created in Azure resource group during onboarding to BlueXP preparation for connector OS authentication.
 +
 image:snapctr_svcs_connector_06-azure.png["Screenshot showing this step in the GUI."]
 
@@ -146,19 +146,19 @@ image:snapctr_svcs_connector_06-azure.png["Screenshot showing this step in the G
 +
 image:snapctr_svcs_connector_07-azure.png["Screenshot showing this step in the GUI."]
 
-. Configure networking with the proper VNet, Subnet, and enable Public IP if needed.
+. Configure networking with the proper *VNet*, *Subnet*, and disable *Public IP* but ensure that the connector has the internet access.
 +
 image:snapctr_svcs_connector_08-azure.png["Screenshot showing this step in the GUI."]
 
-. Configure the security group for the connector.
+. Configure the *Security Group* for the connector that allows HTTP, HTTPS, and SSH access.
 +
 image:snapctr_svcs_connector_09-azure.png["Screenshot showing this step in the GUI."]
 
-. Review the summary page and click *Add* to start connector creation. It generally takes about 10 mins to complete deployment. Once completed, the connector instance appears in the AWS EC2 dashboard.
+. Review the summary page and click *Add* to start connector creation. It generally takes about 10 mins to complete deployment. Once completed, the connector instance appears in the Azure VMs dashboard.
 +
 image:snapctr_svcs_connector_10-azure.png["Screenshot showing this step in the GUI."]
 
-. After the connector is deployed, the newly created connector will appear under Connector drop-down. 
+. After the connector is deployed, the newly created connector appears under *Connector* drop-down. 
 +
 image:snapctr_svcs_connector_11-azure.png["Screenshot showing this step in the GUI."]
 
@@ -180,8 +180,11 @@ image:snapctr_svcs_credential_02-azure.png["Screenshot showing this step in the 
 +
 image:snapctr_svcs_credential_03-azure.png["Screenshot showing this step in the GUI."]
 
-. Review and Add.
+. Review and *Add*.
 image:snapctr_svcs_credential_04-azure.png["Screenshot showing this step in the GUI."]
+
+. You may also need to associate a *Marketplace Subscription* with the credential.
+image:snapctr_svcs_credential_05-azure.png["Screenshot showing this step in the GUI."]
 ====
 
 === SnapCenter services setup
@@ -199,7 +202,7 @@ image:snapctr_svcs_connector_11-azure.png["Screenshot showing this step in the G
 +
 image:snapctr_svcs_setup_02-azure.png["Screenshot showing this step in the GUI."]
 
-. Name *Working Environment* and choose *Credential Name* created in previous steps, and click *Continue*.
+. Name *Working Environment* and choose *Credential Name* created in previous section, and click *Continue*.
 +
 image:snapctr_svcs_setup_03-azure.png["Screenshot showing this step in the GUI."]
 
@@ -228,15 +231,15 @@ image:snapctr_svcs_setup_13-azure.png["Screenshot showing this step in the GUI."
 image:snapctr_svcs_setup_15-azure.png["Screenshot showing this step in the GUI."]
 image:snapctr_svcs_setup_16-azure.png["Screenshot showing this step in the GUI."]
 
-. Move on to next *Configuration* page for sudoer access on Oracle database application host. 
+. Move on to next *Configuration* page to setup sudoer access on Oracle database application host. 
 +
 image:snapctr_svcs_setup_17-azure.png["Screenshot showing this step in the GUI."]
 
-. Review and click on *Discover Applications* to install a plugin on the Oracle database application host and discover Oracle database on the host.
+. Review and click on *Discover Applications* to install a plugin on the Oracle database application host and discover Oracle database on the host in one step.
 +
 image:snapctr_svcs_setup_18-azure.png["Screenshot showing this step in the GUI."]
 
-. Discovered Oracle databases on Azure VM host are added to *Applications*, and the Applications page list the number of hosts and Oracle databases within the environment. The database *Protection Status* initially shows as *Unprotected*.
+. Discovered Oracle databases on Azure VM host are added to *Applications*, and the *Applications* page lists the number of hosts and Oracle databases within the environment. The database *Protection Status* initially shows as *Unprotected*.
 +
 image:snapctr_svcs_setup_19-azure.png["Screenshot showing this step in the GUI."]
 
@@ -249,33 +252,53 @@ This completes the initial setup of SnapCenter services for Oracle. The next thr
 
 ====
 
-. Click the three dots next to the database *Protection Status*, and then click *Polices* to view the default preloaded database protection policies that can be applied to protect your Oracle databases.
+. Our test Oracle database in Azure VM is configured with three volumes with an aggregate total storage about 1.6 TiB. This give a context about the timing for the snapshot backup, restore, clone of database of this size.
 +
-image:snapctr_svcs_bkup_01.png["Screenshot showing this step in the GUI."]
+....
+[oracle@acao-ora01 ~]$ df -h
+Filesystem                 Size  Used Avail Use% Mounted on
+devtmpfs                   7.9G     0  7.9G   0% /dev
+tmpfs                      7.9G     0  7.9G   0% /dev/shm
+tmpfs                      7.9G   17M  7.9G   1% /run
+tmpfs                      7.9G     0  7.9G   0% /sys/fs/cgroup
+/dev/mapper/rootvg-rootlv   40G   23G   15G  62% /
+/dev/mapper/rootvg-usrlv   9.8G  1.6G  7.7G  18% /usr
+/dev/sda2                  496M  115M  381M  24% /boot
+/dev/mapper/rootvg-varlv   7.9G  787M  6.7G  11% /var
+/dev/mapper/rootvg-homelv  976M  323M  586M  36% /home
+/dev/mapper/rootvg-optlv   2.0G  9.6M  1.8G   1% /opt
+/dev/mapper/rootvg-tmplv   2.0G   22M  1.8G   2% /tmp
+/dev/sda1                  500M  6.8M  493M   2% /boot/efi
+172.30.136.68:/ora01-u01   100G   23G   78G  23% /u01
+172.30.136.68:/ora01-u03   500G  117G  384G  24% /u03
+172.30.136.68:/ora01-u02  1000G  804G  197G  81% /u02
+tmpfs                      1.6G     0  1.6G   0% /run/user/1000
+[oracle@acao-ora01 ~]$
+....
 
-. You can also create your own policy with a customized backup frequency and backup data-retention window.
-+ 
-image:snapctr_svcs_bkup_02.png["Screenshot showing this step in the GUI."]
-
-. When you are happy with the policy configuration, you can then assign your policy of choice to protect the database.
+. To protect database, click the three dots next to the database *Protection Status*, and then click *Assign Policy* to view the default preloaded or user defined database protection policies that can be applied to your Oracle databases. Under *Settings* - *Policies*, you have option to create your own policy with a customized backup frequency and backup data-retention window.
 +
-image:snapctr_svcs_bkup_03.png["Screenshot showing this step in the GUI."]
+image:snapctr_svcs_bkup_01-azure.png["Screenshot showing this step in the GUI."]
 
-. Choose the policy to assign to the database.
+. When you are happy with the policy configuration, you can then *Assign* your policy of choice to protect the database.
 +
-image:snapctr_svcs_bkup_04.png["Screenshot showing this step in the GUI."]
+image:snapctr_svcs_bkup_02-azure.png["Screenshot showing this step in the GUI."]
 
-. After the policy is applied, the database protection status changed to *Protected* with a green check mark.
+. After the policy is applied, the database protection status changed to *Protected* with a green check mark. BlueXP executes the snapshot backup according to your schedule. In addition, *ON-Demand Backup* is available from the three-dot drop down menu as shown below. 
 +
-image:snapctr_svcs_bkup_05.png["Screenshot showing this step in the GUI."]
+image:snapctr_svcs_bkup_03-azure.png["Screenshot showing this step in the GUI."]
 
-. The database backup runs on a predefined schedule. You can also run a one-off on-demand backup as shown below.
+. From *Job Monitoring* tab, backup job details can be viewed. Our test results showed that it took about 4 minutes to backup an Oracle database about 1.5 TiB.
 +
-image:snapctr_svcs_bkup_06.png["Screenshot showing this step in the GUI."]
+image:snapctr_svcs_bkup_04-azure.png["Screenshot showing this step in the GUI."]
 
-. The database backups details can be viewed by clicking *View Details* from the menu list. This includes the backup name, backup type, SCN, and backup date. A backup set covers a snapshot for both data volume and log volume. A log volume snapshot takes place right after a database volume snapshot. You can apply a filter if you are looking for a particular backup in a long list.
+. From three-dot drop down menu *View Details*, you can view the backup sets created from snapshot backup.
 +
-image:snapctr_svcs_bkup_07.png["Screenshot showing this step in the GUI."]
+image:snapctr_svcs_bkup_05-azure.png["Screenshot showing this step in the GUI."]
+
+. A database backup includes the *Backup Name*, *Backup Type*, *SCN*, *RMAN Catalog*, and *Backup Time*. A backup set covers a snapshot for both data volume and log volume. A log volume snapshot takes place right after a database volume snapshot. You can apply a filter if you are looking for a particular backup in the backup list.
++
+image:snapctr_svcs_bkup_06-azure.png["Screenshot showing this step in the GUI."]
 
 ====
 
