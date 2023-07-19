@@ -1,6 +1,6 @@
 ---
 sidebar: sidebar
-permalink: databases/snapctr_svcs_ora_aws.html
+permalink: databases/snapctr_svcs_ora.html
 keywords: Oracle, Database, SnapCenter, SnapShot, FlexClone, BlueXP, Database Backup, Database Restore, Database Clone
 summary: "The solution provides overview and details for Oracle database backup, restore, clone using NetApp SnapCenter SaaS using BlueXP console in Azure cloud." 
 ---
@@ -67,13 +67,13 @@ This image provides a detailed picture of Cloud Backup for Application within th
 
 * *Connector to be deployed in the same VPC as database and FSx.* When possible, the connector should be deployed in the same AWS VPC, which enables connectivity to the FSx storage and the EC2 compute instance.
 
-* *An AWS IAM policy created for SnapCenter connector.* The policy in JSON format is available in the detailed SnapCenter service documentation. When you launch connector deployment with the BlueXP console, you are prompted to set up the prerequisites. The policy should be assigned to the AWS user account that owns the connector.
+* *An AWS IAM policy created for SnapCenter connector.* The policy in JSON format is available in the detailed SnapCenter service documentation. Or when you launch connector deployment with the BlueXP console, you are prompted to set up the prerequisites with details of required permission in JSON format. The policy should be assigned to the AWS user account that owns the connector.
 
-* *The AWS account access key and the SSH key pair created in the AWS account.* The SSH key pair is assigned to the ec2-user for logging into the connector host and then deploying a database plug-in to the EC2 DB server host. The access key grants permission for provisioning the required connector.
+* *The AWS account access key and the SSH key pair created in the AWS account.* The SSH key pair is assigned to the ec2-user for logging into the connector host and then deploying a database plug-in to the EC2 DB server host. The access key grants permission for provisioning the required connector with IAM policy above.
 
-* *A credential added to the BlueXP console setting.* To add Amazon FSx for ONTAP to the BlueXP working environment, a credential that grants permissions to access Amazon FSx for ONTAP from the BlueXP console is set up in the BlueXP console setting. 
+* *A credential added to the BlueXP console setting.* To add Amazon FSx for ONTAP to the BlueXP working environment, a credential that grants BlueXP permissions to access Amazon FSx for ONTAP is set up in the BlueXP console setting. 
 
-* *SnapCenter plug-in deployed to the EC2 database instance host.* SnapCenter services make API calls that are executed by the SnapCenter plug-in on the EC2 database instance host. You must deploy it before setting up the services.
+* *java-11-openjdk installed on the EC2 database instance host.* SnapCenter service installation requires java version 11. It needs to be installed on application host before plugin deployment attempt.
 
 == Solution deployment
 
@@ -96,10 +96,11 @@ Deployment requires the following prerequisites.
 
 . A primary Oracle database server on an EC2 instance with an Oracle database fully deployed and running. 
 
-. A Amazon FSx for ONTAP cluster deployed in AWS that is hosting the database above.
-. An optional database server on an EC2 instance that can be used for testing the cloning of an Oracle database to an alternative host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of production Oracle database.
+. An Amazon FSx for ONTAP cluster deployed in AWS that is hosting the database volumes above.
 
-. If you need help to meet the above prerequisites for Oracle database deployment on Amazon FSx for ONTAP and EC2 compute instance, see link:aws_ora_fsx_ec2_iscsi_asm.html[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^].
+. An optional database server on an EC2 instance that can be used for testing the cloning of an Oracle database to an alternate host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of a production Oracle database.
+
+. If you need help to meet the above prerequisites for Oracle database deployment on Amazon FSx for ONTAP and EC2 compute instance, see link:aws_ora_fsx_ec2_iscsi_asm.html[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^] or white paper link:aws_ora_fsx_ec2_deploy_intro.html[Oracle Database Deployment on EC2 and FSx Best Practices^]
 
 ====
 
@@ -110,13 +111,13 @@ Deployment requires the following prerequisites.
 
 . Use the link link:https://console.bluexp.netapp.com/[NetApp BlueXP] to sign up for BlueXP console access.
 
-. To set up BlueXP to manage AWS cloud resources such as Amazon FSx for ONTAP, you should already have an AWS account set up. You can then log into your AWS account to create an IAM policy for granting SnapCenter service access to an AWS account to use for connector deployment.
+. Login to your AWS account to create an IAM policy with proper permissions and assign the policy to the AWS account that will be used for BlueXP connector deployment.
 +
 image:snapctr_svcs_connector_01-policy.png["Screenshot showing this step in the GUI."]
 +
-The policy should be configured with a JSON string that is available when connector provisioning is launched and you are prompted as a reminder that an IAM policy has been created and granted to an AWS account that is used for connector deployment. 
+The policy should be configured with a JSON string that is available in NetApp documentation. The JSON string can also be retrieved from the page when connector provisioning is launched and you are prompted for the prerequisites permissions assignment.
 
-. You also need the AWS VPC, a key and secrets for your AWS account, an SSH key for EC2 access, a security group, and so on ready for connector provisioning. 
+. You also need the AWS VPC, subnet, security group, an AWS user account access key and secrets, an SSH key for ec2-user, and so on ready for connector provisioning. 
 
 ====
 
@@ -124,7 +125,7 @@ The policy should be configured with a JSON string that is available when connec
 [%collapsible]
 
 ====
-. Log into the BlueXP console. For a shared account, it is a best practice to create an individual workspace by clicking *Account* > *Manage Account* > *Workspace* to add a new workspace.
+. Login to the BlueXP console. For a shared account, it is a best practice to create an individual workspace by clicking *Account* > *Manage Account* > *Workspace* to add a new workspace.
 + 
 image:snapctr_svcs_connector_02-wspace.png["Screenshot showing this step in the GUI."]
 
@@ -160,9 +161,46 @@ image:snapctr_svcs_connector_09-security.png["Screenshot showing this step in th
 +
 image:snapctr_svcs_connector_10-review.png["Screenshot showing this step in the GUI."]
 
-. After the connector is deployed, log into the connector EC2 host as the ec2-user with an SSH key to install the SnapCenter plug-in following these instructions: link:https://docs.netapp.com/us-en/cloud-manager-backup-restore/task-add-host-discover-oracle-databases.html#deploy-the-plug-in-using-script-and-add-host-from-ui-using-manual-option[Deploy the plug-in using script and add host from UI using manual option^].
+====
+
+=== Define a credential in BlueXP for AWS resources access
+[%collapsible]
 
 ====
+
+. First, from AWS EC2 console, create a role in *Identity and Access Management (IAM)* menu *Roles*, *Create role* to start role creation workflow.
++
+image:snapctr_svcs_credential_01-aws.png["Screenshot showing this step in the GUI."]
+
+. In *Select trusted entity* page, choose *AWS account*, *Another AWS account*, and paste in the BlueXP account ID, which can be retried from BlueXP console.
++
+image:snapctr_svcs_credential_02-aws.png["Screenshot showing this step in the GUI."]
+
+. Filter permission policies by *fsx* and add permission policy for the role.
++
+image:snapctr_svcs_credential_03-aws.png["Screenshot showing this step in the GUI."]
+
+. In *Role details* page, name the role, add a description, then click *Create role*.
++
+image:snapctr_svcs_credential_04-aws.png["Screenshot showing this step in the GUI."]
+
+. Back to BlueXP console, click on setting icon on top right corner of BlueXP console to open *Account credentials* page, click *Add credentials* to start credential configuration workflow.
++
+image:snapctr_svcs_credential_05-aws.png["Screenshot showing this step in the GUI."]
+
+. Choose credential location as - *Amazon Web Services - BlueXP*.
++
+image:snapctr_svcs_credential_06-aws.png["Screenshot showing this step in the GUI."]
+
+. Define AWS credentials with proper *Role ARN*, which can be retrieved from AWS IAM role created in above step one. BlueXP account ID, which is needed for creating AWS IAM role can be obtained from this page.
++
+image:snapctr_svcs_credential_07-aws.png["Screenshot showing this step in the GUI."]
+
+. Review and *Add*.
+image:snapctr_svcs_credential_08-aws.png["Screenshot showing this step in the GUI."]
+
+====
+
 === SnapCenter services setup
 [%collapsible]
 
