@@ -34,7 +34,7 @@ This solution is intended for the following audiences:
 
 * The DBA who manages Oracle databases running on Azure NetApp Files storage
 * The solution architect who is interested in testing Oracle database backup, restore, and clone in the public Azure cloud
-* The storage administrator who supports and manages the Azure NetApp Files capacity storage pool
+* The storage administrator who supports and manages the Azure NetApp Files capacity pool storage
 * The application owner who owns applications that are deployed to Azure NetApp Files storage and Azure VMs 
 
 == Solution test and validation environment
@@ -72,11 +72,11 @@ This image provides a detailed picture of Cloud Backup for Application within th
 
 * *A credential added to the BlueXP console setting.* To add Azure NetApp Files storage to the BlueXP working environment, a credential that grants permissions to access Azure NetApp Files from the BlueXP console needs to be set up in the BlueXP console setting. 
 
-* *java-11-openjdk installed on the Azure VM database instance host.* SnapCenter service installation requires java version 11. It needs to be installed before plugin deployment attempt. 
+* *java-11-openjdk installed on the Azure VM database instance host.* SnapCenter service installation requires java version 11. It needs to be installed on application host before plugin deployment attempt. 
 
 == Solution deployment
 
-There is extensive NetApp documentation with a broader scope to help you protect your cloud-native application data. The goal of this documentation is to provide step-by-step procedures that cover SnapCenter Service deployment with the BlueXP console to protect your Oracle database deployed to Azure NetApp Files storage pool and an Azure compute instance. This document fills in certain details that might be missing from more general instructions.
+There is extensive NetApp documentation with a broader scope to help you protect your cloud-native application data. The goal of this documentation is to provide step-by-step procedures that cover SnapCenter Service deployment with the BlueXP console to protect your Oracle database deployed to an Azure NetApp Files storage and an Azure compute instance. This document fills in certain details that might be missing from more general instructions.
 
 To get started, complete the following steps:
 
@@ -91,9 +91,9 @@ Deployment requires the following prerequisites.
 
 . A primary Oracle database server on an Azure VM instance with an Oracle database fully deployed and running. 
 
-. An Azure NetApp Files storage capacity pool deployed in Azure that has capacity to meet the database storage needs above.
+. An Azure NetApp Files capacity pool storage deployed in Azure that has capacity to meet the database storage needs listed in hardware component section.
 
-. A secondary database server on an Azure VM instance that can be used for testing the cloning of an Oracle database to an alternative host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of production Oracle database.
+. A secondary database server on an Azure VM instance that can be used for testing the cloning of an Oracle database to an alternate host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of production Oracle database.
 
 . If you need help to meet the above prerequisites for Oracle database deployment on Azure NetApp Files and Azure compute instance, see link:azure_ora_nfile_usercase.html[Oracle Database Deployment and Protection on Azure NetApp Files^].
 
@@ -108,9 +108,9 @@ Deployment requires the following prerequisites.
 
 . Create an Azure user account or an Active Directory service principle and grant permissions with role in Azure portal for Azure connector deployment.
 
-. To set up BlueXP to manage Azure resources, add a BlueXP credential with details of an ID of an Active Directory service principal that BlueXP can use to authenticate with Azure Active Directory (App client ID), a client secret for the service principal application (Client Secret), and the Active Directory ID for your organization (Tenant ID).
+. To set up BlueXP to manage Azure resources, add a BlueXP credential with details of an Active Directory service principal that BlueXP can use to authenticate with Azure Active Directory (App client ID), a client secret for the service principal application (Client Secret), and the Active Directory ID for your organization (Tenant ID).
 
-. You also need the Azure virtual network, resources group, security group, an SSH key for VM access, etc. for connector provisioning and database plugin installation. 
+. You also need the Azure virtual network, resources group, security group, an SSH key for VM access, etc. ready for connector provisioning and database plugin installation. 
 
 ====
 
@@ -118,7 +118,7 @@ Deployment requires the following prerequisites.
 [%collapsible]
 
 ====
-. Log into the BlueXP console. BlueXP opens in Canvas and shows an empty working environment with exception of possible Blob storage of public cloud, which may be loaded by default. On the top of the page, you will see your account, workspace, and connector. The connector shows "N/A" as it has yet to be deployed. 
+. Login to the BlueXP console. BlueXP opens in Canvas and shows an empty working environment with exception of possible Blob storage of public cloud, which may be loaded by default. On the top of the page, you will see your account, workspace, and connector. The connector shows "N/A" as it has yet to be deployed. 
 +
 image:snapctr_svcs_connector_02-canvas.png["Screenshot showing this step in the GUI."]
 
@@ -126,7 +126,7 @@ image:snapctr_svcs_connector_02-canvas.png["Screenshot showing this step in the 
 + 
 image:snapctr_svcs_connector_02-wspace.png["Screenshot showing this step in the GUI."]
 
-. Click on Connector drop down arrow and *Add Connector* to launch the connector provisioning workflow.
+. Click on *Connector* drop down arrow and *Add Connector* to launch the connector provisioning workflow.
 +
 image:snapctr_svcs_connector_03-addc.png["Screenshot showing this step in the GUI."]
 
@@ -138,7 +138,7 @@ image:snapctr_svcs_connector_04-azure.png["Screenshot showing this step in the G
 +
 image:snapctr_svcs_connector_05-azure.png["Screenshot showing this step in the GUI."]
 
-. Click on "Skip to Deployment" to configure your connector "Virtual Machine Authentication". Add the SSH key pair you have created in Azure resource group during onboarding to BlueXP preparation for connector OS authentication.
+. Click on *Skip to Deployment* to configure your connector *Virtual Machine Authentication*. Add the SSH key pair you have created in Azure resource group during onboarding to BlueXP preparation for connector OS authentication.
 +
 image:snapctr_svcs_connector_06-azure.png["Screenshot showing this step in the GUI."]
 
@@ -146,7 +146,7 @@ image:snapctr_svcs_connector_06-azure.png["Screenshot showing this step in the G
 +
 image:snapctr_svcs_connector_07-azure.png["Screenshot showing this step in the GUI."]
 
-. Configure networking with the proper *VNet*, *Subnet*, and disable *Public IP* but ensure that the connector has the internet access.
+. Configure networking with the proper *VNet*, *Subnet*, and disable *Public IP* but ensure that the connector has the internet access in your Azure environment.
 +
 image:snapctr_svcs_connector_08-azure.png["Screenshot showing this step in the GUI."]
 
@@ -192,9 +192,9 @@ image:snapctr_svcs_credential_05-azure.png["Screenshot showing this step in the 
 
 ====
 
-With the credential configured, SnapCenter services can now be set up with the following procedure:
+With the Azure credential configured, SnapCenter services can now be set up with the following procedures:
 
-. Now back to Canvas page, from *My Working Environment* click *Add working Environment* to discover Azure NetApp Files deployed in Azure cloud.
+. Back to Canvas page, from *My Working Environment* click *Add working Environment* to discover Azure NetApp Files deployed in Azure cloud.
 +
 image:snapctr_svcs_connector_11-azure.png["Screenshot showing this step in the GUI."]
 
@@ -210,7 +210,7 @@ image:snapctr_svcs_setup_03-azure.png["Screenshot showing this step in the GUI."
 +
 image:snapctr_svcs_setup_04-azure.png["Screenshot showing this step in the GUI."]
 
-. Click on *Azure NetApp Files* icon, then *Enter Working Environment* to view Oracle database volumes provisioned in capacity pool storage.
+. Click on *Azure NetApp Files* icon, then *Enter Working Environment* to view Oracle database volumes deployed in Azure NetApp Files capacity pool storage.
 +
 image:snapctr_svcs_setup_05-azure.png["Screenshot showing this step in the GUI."]
 
@@ -222,7 +222,7 @@ image:snapctr_svcs_setup_09-azure.png["Screenshot showing this step in the GUI."
 +
 image:snapctr_svcs_setup_10-azure.png["Screenshot showing this step in the GUI."]
 
-. Choose *Oracle* for the application type, click on *Next* to open *Host Details* page.
+. Choose *Oracle* for the application type, click on *Next* to open host details page.
 +
 image:snapctr_svcs_setup_13-azure.png["Screenshot showing this step in the GUI."]
 
@@ -252,8 +252,7 @@ This completes the initial setup of SnapCenter services for Oracle. The next thr
 
 ====
 
-. Our test Oracle database in Azure VM is configured with three volumes with an aggregate total storage about 1.6 TiB. This give a context about the timing for the snapshot backup, restore, clone of database of this size.
-+
+. Our test Oracle database in Azure VM is configured with three volumes with an aggregate total storage about 1.6 TiB. This gives context about the timing for the snapshot backup, restore, and clone of a database of this size.
 ....
 [oracle@acao-ora01 ~]$ df -h
 Filesystem                 Size  Used Avail Use% Mounted on
@@ -284,7 +283,7 @@ image:snapctr_svcs_bkup_01-azure.png["Screenshot showing this step in the GUI."]
 +
 image:snapctr_svcs_bkup_02-azure.png["Screenshot showing this step in the GUI."]
 
-. After the policy is applied, the database protection status changed to *Protected* with a green check mark. BlueXP executes the snapshot backup according to your schedule. In addition, *ON-Demand Backup* is available from the three-dot drop down menu as shown below. 
+. After the policy is applied, the database protection status changed to *Protected* with a green check mark. BlueXP executes the snapshot backup according to schedule defined. In addition, *ON-Demand Backup* is available from the three-dot drop down menu as shown below. 
 +
 image:snapctr_svcs_bkup_03-azure.png["Screenshot showing this step in the GUI."]
 
@@ -296,7 +295,7 @@ image:snapctr_svcs_bkup_04-azure.png["Screenshot showing this step in the GUI."]
 +
 image:snapctr_svcs_bkup_05-azure.png["Screenshot showing this step in the GUI."]
 
-. A database backup includes the *Backup Name*, *Backup Type*, *SCN*, *RMAN Catalog*, and *Backup Time*. A backup set covers a snapshot for both data volume and log volume. A log volume snapshot takes place right after a database volume snapshot. You can apply a filter if you are looking for a particular backup in the backup list.
+. Database backup details include the *Backup Name*, *Backup Type*, *SCN*, *RMAN Catalog*, and *Backup Time*. A backup set covers an application-consistent snapshot for both data volume and log volume. A log volume snapshot takes place right after a database volume snapshot. You could apply a filter if you are looking for a particular backup in the backup list.
 +
 image:snapctr_svcs_bkup_06-azure.png["Screenshot showing this step in the GUI."]
 
@@ -315,7 +314,7 @@ image:snapctr_svcs_restore_01-azure.png["Screenshot showing this step in the GUI
 +
 image:snapctr_svcs_restore_02-azure.png["Screenshot showing this step in the GUI."]
 
-. Choose your *Restore Location* to original location for an in place restore and recovery.
+. Choose your *Restore Location* to *original location* for an Oracle in place restore and recovery.
 +
 image:snapctr_svcs_restore_03-azure.png["Screenshot showing this step in the GUI."]
 
@@ -338,7 +337,7 @@ image:snapctr_svcs_restore_06-azure.png["Screenshot showing this step in the GUI
 
 ====
 
-Database clone procedures are similar to restore but to an alternative Azure VM database host with Oracle software stack pre-installed and configured.
+Database clone procedures are similar to restore but to an alternate Azure VM database host with Oracle software stack pre-installed and configured.
 
 . Click the three-dot drop down menu for the particular database to be cloned in *Applications*, then click *Restore* to initiate clone workflow.
 +
@@ -348,11 +347,11 @@ image:snapctr_svcs_restore_01-azure.png[Error: Missing Graphic Image]
 +
 image:snapctr_svcs_clone_01-azure.png[Error: Missing Graphic Image]
 
-. In the next *Configuration* page, set Alternate *Host*, new database *SID*, and *Oracle Home* at alternate Azure VM host.
+. In the next *Configuration* page, set alternate *Host*, new database *SID*, and *Oracle Home* as configured at alternate Azure VM host.
 +
 image:snapctr_svcs_clone_02-azure.png[Error: Missing Graphic Image]
 
-. Review *General* page shows the details of cloned database such as SID, alternate host, Data file locations, recovery scope etc.
+. Review *General* page shows the details of cloned database such as SID, alternate host, data file locations, recovery scope etc.
 +
 image:snapctr_svcs_clone_03-azure.png[Error: Missing Graphic Image]
 
@@ -371,6 +370,8 @@ image:snapctr_svcs_clone_06-azure.png[Error: Missing Graphic Image]
 . Validate the cloned database on the Azure VM instance host that showed the cloned database was running as expected.
 +
 image:snapctr_svcs_clone_07-azure.png[Error: Missing Graphic Image]
+
+This completes the demonstration of an Oracle database backup, restore, and clone in Azure cloud with NetApp BlueXP console using SnapCenter Service.
 
 ====
 
