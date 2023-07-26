@@ -355,6 +355,7 @@ Be sure to check the storage throughput when performing throughput or sync drive
 image:kafka-nfs-image31.png["This graph shows the performance in latency, IOPS, and Throughput."]
 
 == Apache Kafka in AWS FSx for NetApp ONTAP  
+[.lead]
 
 === Overview
 
@@ -366,16 +367,15 @@ Kafka by design works with POSIX compliant file system and relies on the file sy
 Amazon FSx for NetApp ONTAP provides a fully managed, scalable, and highly performance NFS file system in the cloud. Kafka data on FSx for NetApp ONTAP can scale to handle large amounts of data and ensure fault tolerance. NFS provides centralized storage management and data protection for critical and sensitive datasets.
 
 These enhancements make it possible for AWS customer to take advantage of FSx for NetApp ONTAP when running Kafka workloads on AWS compute services. These benefits are:
-
 * Reducing CPU utilization to reduce the I/O wait time
-* Faster Kafka broker recovery time
-* Reliability and efficiency
-* Scalability and performance
-* Multi-Availability Zone availability
-* Data protection
+* Faster Kafka broker recovery time.
+* Reliability and efficiency.
+* Scalability and performance.
+* Multi-Availability Zone availability.
+* Data protection.
 
 === Performance overview and validation in AWS FSx for NetApp ONTAP
-A Kafka cluster with the storage layer mounted on NetApp NFS was benchmarked for performance in the AWS FSx for NetApp ONTAP. The benchmarking examples are described in the following sections.
+A Kafka cluster with the storage layer mounted on NetApp NFS was benchmarked for performance in the AWS cloud. The benchmarking examples are described in the following sections.
 
 ==== Kafka in AWS FSx for NetApp ONTAP
 A Kafka cluster with AWS FSx for NetApp ONTAP was benchmarked for performance in the AWS cloud. This benchmarking is described in the following sections.
@@ -399,26 +399,31 @@ a|* 3 x zookeepers – t2.small
 |===
 
 ==== NetApp FSx for NetApp ONTAP setup
-1.	For our initial testing, we have created a FSx for NetApp ONTAP filesystem with 2TB of capacity and 40000 IOPs for 2GB/Sec throughput. 
+. For our initial testing, we have created a FSx for NetApp ONTAP filesystem with 2TB of capacity and 40000 IOPs for 2GB/Sec throughput. 
 +
 ....
 [root@ip-172-31-33-69 ~]# aws fsx create-file-system --region us-east-2  --storage-capacity 2048 --subnet-ids <desired subnet 1> subnet-<desired subnet 2> --file-system-type ONTAP --ontap-configuration DeploymentType=MULTI_AZ_HA_1,ThroughputCapacity=2048,PreferredSubnetId=<desired primary subnet>,FsxAdminPassword=<new password>,DiskIopsConfiguration="{Mode=USER_PROVISIONED,Iops=40000"}
 ....
 +
-
-In FSx for NetApp ONTAP, the max IOPS achievable for a 2GB/Sec throughput filesystem in our test region (US-East-1) is 80,000 iops. The total max iops for a FSx for NetApp ONTAP filesystem is 160,000 iops which requires a 4GB/Sec throughput deployment to achieve which we will demonstrate later in this document. For more information on FSx for NetApp ONTAP performance specifications, please feel free to visit the AWS FSx for NetApp ONTAP documentation here: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/performance.html 
-
+In our example, we are deploying FSx for NetApp ONTAP through the AWS CLI. You will need to customize the command further in your environment as needed. FSx for NetApp ONTAP can additionally be deployed and managed through the AWS Console for an easier and more streamlined deployment experience with less command line input. 
++
+Documentation In FSx for NetApp ONTAP, the max IOPS achievable for a 2GB/Sec throughput filesystem in our test region (US-East-1) is 80,000 iops. The total max iops for a FSx for NetApp ONTAP filesystem is 160,000 iops which requires a 4GB/Sec throughput deployment to achieve which we will demonstrate later in this document. 
++
+For more information on FSx for NetApp ONTAP performance specifications, please feel free to visit the AWS FSx for NetApp ONTAP documentation here: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/performance.html .
++
 Detailed command line syntax for FSx “create-file-system" can be found here: https://docs.aws.amazon.com/cli/latest/reference/fsx/create-file-system.html
++
 For instance, you can specify a specific KMS key as opposed to the default AWS FSx master key that is used when no KMS key is specified.
-2.	Wait till the “LifeCycle” status changes to “AVAILABLE” in your JSON return after describing your filesystem as follows:
+
+. While creating the FSx for NetApp ONTAP filesystem, Wait till the “LifeCycle” status changes to “AVAILABLE” in your JSON return after describing your filesystem as follows:
 +
 ....
 [root@ip-172-31-33-69 ~]# aws fsx describe-file-systems  --region us-east-1 --file-system-ids fs-02ff04bab5ce01c7c
 ....
 +
 
-3. The password for  fsxadmin is the password configured when first creating the filesystem.
-4. Validate the credentials by login into FsxN via fsxadmin
+. Validate the credentials by login into Fsx for NetApp ONTAP SSH with the fsxadmin user:
+Fsxadmin is the default admin account for FSx for NetApp ONTAP filesystems at creation. The password for fsxadmin is the password that was configured when first creating the filesystem either in the AWS Console or with the AWS CLI as we completed in Step 1.
 +
 ....
 [root@ip-172-31-33-69 ~]# ssh fsxadmin@198.19.250.244
@@ -432,19 +437,21 @@ Warning: Permanently added '198.19.250.244' (ED25519) to the list of known hosts
 This is your first recorded login.
 ....
 +
-5. Create the storage Virtual Machine on the FSx for NetApp ONTAP filesystem
+.	Once your credentials have been validated, Create the storage Virtual Machine on the FSx for NetApp ONTAP filesystem
 +
 ....
 [root@ip-172-31-33-69 ~]# aws fsx --region us-east-1 create-storage-virtual-machine --name svmkafkatest --file-system-id fs-02ff04bab5ce01c7c
 ....
 +
-6.	SSH into the newly created FSx for NetApp ONTAP filesystem and create volumes in storage virtual machine using below sample command and similarly we create 6 volumes for this validation. Based on our validation, keep the default constituent (8) or less constituents which will provides better performance to kafka. 
+A Storage Virtual Machine (SVM) is an isolated file server with its own administrative credentials and endpoints for administering and accessing data in FSx for NetApp ONTAP volumes and provides FSx for NetApp ONTAP multi-tenancy.
++
+.	Once you have configured your primary Storage Virtual Machine, SSH into the newly created FSx for NetApp ONTAP filesystem and create volumes in storage virtual machine using below sample command and similarly we create 6 volumes for this validation. Based on our validation, keep the default constituent (8) or less constituents which will provides better performance to kafka. 
 +
 ....
 FsxId02ff04bab5ce01c7c::*> volume create -volume kafkafsxN1 -state online -policy default -unix-permissions ---rwxr-xr-x -junction-active true -type RW -snapshot-policy none  -junction-path /kafkafsxN1 -aggr-list aggr1
 ....
 +
-7. Extend the size of the volume to 2TB and mount on the junction path.
+. We will need additional capacity in our volumes for our testing. Extend the size of the volume to 2TB and mount on the junction path.
 +
 ....
 FsxId02ff04bab5ce01c7c::*> volume size -volume kafkafsxN1 -new-size +2TB
@@ -498,8 +505,9 @@ FsxId02ff04bab5ce01c7c::*> volume mount -volume kafkafsxN5 -junction-path /kafka
 FsxId02ff04bab5ce01c7c::*> volume mount -volume kafkafsxN6 -junction-path /kafkafsxN6
 ....
 +
+In FSx for NetApp ONTAP, volumes can be thin provisioned. In our example, the total extended volume capacity exceeds total filesystem capacity so we will need to extend the total filesystem capacity in order to unlock additional provisioned volume capacity which we will demonstrate in our next step.
 
-8.	We extend the FSx for NetApp ONTAP throughput capacity from 2GB/Sec to 4GB/Sec and IOPS to 160000, and capacity to 5 TB
+. Next, for additional performance and capacity,We extend the FSx for NetApp ONTAP throughput capacity from 2GB/Sec to 4GB/Sec and IOPS to 160000, and capacity to 5 TB
 +
 ....
 [root@ip-172-31-33-69 ~]# aws fsx update-file-system --region us-east-1  --storage-capacity 5120 --ontap-configuration 'ThroughputCapacity=4096,DiskIopsConfiguration={Mode=USER_PROVISIONED,Iops=160000}' --file-system-id fs-02ff04bab5ce01c7c
@@ -507,20 +515,19 @@ FsxId02ff04bab5ce01c7c::*> volume mount -volume kafkafsxN6 -junction-path /kafka
 +
 Detailed command line syntax for FSx “update-file-system" can be found here: 
 https://docs.aws.amazon.com/cli/latest/reference/fsx/update-file-system.html
-9.	The FSx for NetApp ONTAP volumes are mounted with nconnect and default opions in Kafka brokers
-
+. The FSx for NetApp ONTAP volumes are mounted with nconnect and default opions in Kafka brokers
++
 The following picture shows our final architecture of a our FSx for NetApp ONTAP based Kafka cluster:
 +
 image:aws-fsx-kafka-arch1.png["This image shows the architecture of an FSxN-based Kafka cluster."]
 
 •	Compute. We used a three-node Kafka cluster with a three-node zookeeper ensemble running on dedicated servers. Each broker had six NFS mount points to a six volumes on the FSx for NetApp ONTAP instance.
 •	Monitoring. We used two nodes for a Prometheus-Grafana combination. For generating workloads, we used a separate three-node cluster that could produce and consume to this Kafka cluster.
-•	Storage. We used an FSx for NetApp ONTAP with six 1TB volumes mounted. The volume was then exported to the Kafka broker with an NFS mount.
+•	Storage. We used an FSx for NetApp ONTAP with six 2TB volumes mounted. The volume was then exported to the Kafka broker with an NFS mount.The FSx for NetApp ONTAP volumes are mounted with 16 nconnect sessions and default options in Kafka brokers.
 
 ==== OpenMessage Benchmarking configurations. 
 
 We used the same configuration used for the NetApp Cloud volumes ONTAP and their details are here - 
-
 https://docs.netapp.com/us-en/netapp-solutions/data-analytics/kafka-nfs-performance-overview-and-validation-in-aws.html#architectural-setup
 
 ==== Methodology of testing
