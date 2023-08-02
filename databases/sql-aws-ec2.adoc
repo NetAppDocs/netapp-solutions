@@ -67,10 +67,9 @@ Also, please refer to the NetApp Best Practices for SQL Server environments to e
 ====
 With FSx ONTAP, procuring storage is the easiest task and can be performed by updating the file system. This simple process enables dynamic cost and performance optimization as needed, it helps to balance the SQL workload, and it is also a great enabler for thin provisioning. FSx ONTAP thin provisioning is designed to present more logical storage to EC2 instances running SQL Server than what is provisioned in the file system. Instead of allocating space upfront, storage space is dynamically allocated to each volume or LUN as data is written. In most configurations, free space is also released back when data in the volume or LUN is deleted (and is not being held by any Snapshot copies). The following table provides configuration settings for dynamically allocating storage.
 
-[%autowidth.stretch]
+[width=100%,cols="40%, 60%", frame=none, grid=rows]
 |===
 | Setting | Configuration
-
 | Volume guarantee
 | None (set by default)
 | LUN reservation
@@ -109,7 +108,7 @@ Snapshot copies used to create FlexClone volumes are not deleted by the autodele
 [NOTE]
 Overcommitment of storage must be carefully considered and managed for a mission-critical application such as SQL server for which even a minimal outage cannot be tolerated. In such a case, it is best to monitor storage consumption trends to determine how much, if any, overcommitment is acceptable.
 
-[%autowidth.stretch]
+[width=100%, frame=all, grid=rows]
 |===
 |Best Practices
 
@@ -144,7 +143,7 @@ image:sql-awsec2-image3.png[Error: Missing Graphic Image]
 
 . Create volumes by following the step listed in https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-volumes.html[Creating a volume on FSx for NetApp ONTAP^].
 +
-[%autowidth.stretch]
+[width=100%, frame=all, grid=rows]
 |===
 |Best practices
 a|* Disable storage Snapshot copy schedules and retention policies. Instead, use NetApp SnapCenter to coordinate Snapshot copies of the SQL Server data and log volumes.
@@ -233,7 +232,7 @@ foreach ($TargetPortal in $TargetPortals) {New-IscsiTargetPortal -TargetPortalAd
 +
 image:sql-awsec2-image10.png[Error: Missing Graphic Image]
 +
-[%autowidth.stretch]
+[width=100%, frame=all, grid=rows]
 |===
 |Best Practices
 
@@ -289,7 +288,7 @@ NetApp SnapCenter is next-generation data protection software for tier-1 enterpr
 ====
 The following table lists the minimum requirements for installing the SnapCenter Server and plug-in on Microsoft Windows Server.
 
-[%autowidth.stretch]
+[width=100%, cols="50%, 50%", frame=none, grid=rows]
 |===
 |Components |Requirement
 
@@ -324,7 +323,7 @@ The following figure depicts some considerations for creating the Microsoft SQL 
 
 image:sql-awsec2-image13.png[Error: Missing Graphic Image]
 
-[%autowidth.stretch]
+[width=100%, frame=all, grid=rows]
 |===
 |Best practices
 
@@ -392,10 +391,9 @@ Now you are ready to perform backup, restore and clone operations for SQL Server
 ====
 After placing the database and log files on the FSx ONTAP LUNs, SnapCenter can be used to back up the databases. The following processes are used to create a full backup.
 
-[%autowidth.stretch]
+[width=100%, frame=all, grid=rows]
 |===
 |Best Practices
-
 a|* In SnapCenter terms, RPO can be identified as the backup frequency, for example, how frequently you want to schedule the backup so that you can reduce the loss of data to up to few minutes. SnapCenter allows you to schedule backups as frequently as every five minutes. However, there might be a few instances in which a backup might not complete within five minutes during peak transaction times or when the rate of change of data is more in the given time. A best practice is to schedule frequent transaction log backups instead of full backups.
 * There are numerous approaches to handle the RPO and RTO. One alternative to this backup approach is to have separate backup policies for data and logs with different intervals. For example, from SnapCenter, schedule log backups in 15-minute intervals and data backups in 6-hour intervals.
 * Use a resource group for a backup configuration for Snapshot optimization and the number of jobs to be managed.
@@ -421,10 +419,9 @@ image:sql-awsec2-image22.png[Error: Missing Graphic Image]
 +
 image:sql-awsec2-image23.png[Error: Missing Graphic Image]
 
-[%autowidth.stretch]
+[width=100%, frame=all, grid=rows]
 |===
-|Best Practices
-
+| Best Practices
 a|* Backup the transaction log backup from SnapCenter so that during the restoration process, SnapCenter can read all the backup files and restore in sequence automatically.
 * If third party products are used for backup, select Copy backup in SnapCenter to avoid log sequence issues, and test the restore functionality before rolling into production.
 |===
@@ -465,10 +462,9 @@ Running all three backup jobs in parallel backs up 1,200 databases simultaneousl
 
 In addition to the full backup, NetApp recommends that you configure a transaction log backup for critical databases. Make sure that the database property is set to full recovery model.
 
-[%autowidth.stretch]
+[width=100%, frame=all, grid=rows]
 |===
 |Best practices
-
 a|* Do not include the tempdb database in a backup because the data it contains is temporary. Place tempdb on a LUN or an SMB share that is in a storage system volume in which Snapshot copies will not be created.
 * A Microsoft SQL Server instance with a high I/O intensive application should be isolated in a different backup job to reduce the overall backup time for other resources.
 * Limit the set of databases to be simultaneously backed up to approximately 100 and stagger the remaining set of database backups to avoid a simultaneous process.
@@ -526,8 +522,7 @@ image:sql-awsec2-image27.png[Error: Missing Graphic Image]
 
 To learn more about this process, watch the following video:
 
-[pass]
-<iframe src="https://netapp.hosted.panopto.com/Panopto/Pages/Embed.aspx?id=27f28284-433d-4273-8748-b01200fb3cd7&autoplay=false&offerviewer=false&showtitle=false&showbrand=false&captions=false&interactivity=all" height="203" width="360" style="border: 1px solid #464646;" allowfullscreen allow="autoplay"></iframe>
+video::27f28284-433d-4273-8748-b01200fb3cd7[panopto, width=360]
 
 == Appendices
 
