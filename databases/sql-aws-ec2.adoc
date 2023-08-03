@@ -108,14 +108,11 @@ Snapshot copies used to create FlexClone volumes are not deleted by the autodele
 [NOTE]
 Overcommitment of storage must be carefully considered and managed for a mission-critical application such as SQL server for which even a minimal outage cannot be tolerated. In such a case, it is best to monitor storage consumption trends to determine how much, if any, overcommitment is acceptable.
 
-[width=100%, frame=all, grid=rows]
-|===
-|Best Practices
+*Best Practices*
 
-a|* For optimal storage performance, provision file-system capacity to 1.35x times the size of total database usage.
-* Appropriate monitoring accompanied by an effective action plan is required when using thin provisioning to avoid application downtime.
-* Make sure to set Cloudwatch and other monitoring tool alerts so that people are contacted with enough time to react as storage is filled.
-|===
+. For optimal storage performance, provision file-system capacity to 1.35x times the size of total database usage.
+. Appropriate monitoring accompanied by an effective action plan is required when using thin provisioning to avoid application downtime.
+. Make sure to set Cloudwatch and other monitoring tool alerts so that people are contacted with enough time to react as storage is filled.
 ====
 
 == Configure Storage for SQL Server and deploy Snapcenter for Backup, Restore and clone operations
@@ -143,14 +140,12 @@ image:sql-awsec2-image3.png[Error: Missing Graphic Image]
 
 . Create volumes by following the step listed in https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-volumes.html[Creating a volume on FSx for NetApp ONTAP^].
 +
-[width=100%, frame=all, grid=rows]
-|===
-|Best practices
-a|* Disable storage Snapshot copy schedules and retention policies. Instead, use NetApp SnapCenter to coordinate Snapshot copies of the SQL Server data and log volumes.
+*Best practices*
++
+* Disable storage Snapshot copy schedules and retention policies. Instead, use NetApp SnapCenter to coordinate Snapshot copies of the SQL Server data and log volumes.
 * Configure databases on individual LUNs on separate volumes to leverage fast and granular restore functionality.
 * Place user data files (.mdf) on separate volumes because they are random read/write workloads. It is common to create transaction log backups more frequently than database backups. For this reason, place transaction log files (.ldf) on a separate volume from the data files so that independent backup schedules can be created for each. This separation also isolates the sequential write I/O of the log files from the random read/write I/O of data files and significantly improves SQL Server performance.
 * Tempdb is a system database used by Microsoft SQL Server as a temporary workspace, especially for I/O intensive DBCC CHECKDB operations. Therefore, place this database on a dedicated volume. In large environments in which volume count is a challenge, you can consolidate tempdb into fewer volumes and store it in the same volume as other system databases after careful planning. Data protection for tempdb is not a high priority because this database is recreated every time Microsoft SQL Server is restarted. 
-|===
 
 . Use the following SSH command to create volumes:
 +
@@ -232,14 +227,11 @@ foreach ($TargetPortal in $TargetPortals) {New-IscsiTargetPortal -TargetPortalAd
 +
 image:sql-awsec2-image10.png[Error: Missing Graphic Image]
 +
-[width=100%, frame=all, grid=rows]
-|===
-|Best Practices
-
-a|* Configure five iSCSI sessions per target interface for optimal performance.
+*Best practices*
++
+* Configure five iSCSI sessions per target interface for optimal performance.
 * Configure a round-robin policy for the best overall iSCSI performance.
 * Make sure that the allocation unit size is set to 64K for partitions when formatting the LUNs
-|===
 
 . Run the following PowerShell command to make sure that the iSCSI session is persisted.
 +
@@ -312,7 +304,6 @@ a|* .NET 4.5.2 or later
 |===
 
 For detailed information, refer to link:https://docs.netapp.com/us-en/snapcenter/install/reference_space_and_sizing_requirements.html[space and sizing requirements].
-For detailed information, refer to link:https://docs.netapp.com/us-en/snapcenter/install/reference_space_and_sizing_requirements.html[space and sizing requirements].
 
 For version compatibility, see the https://mysupport.netapp.com/matrix/[NetApp Interoperability Matrix Tool^].
 ====
@@ -324,17 +315,14 @@ The following figure depicts some considerations for creating the Microsoft SQL 
 
 image:sql-awsec2-image13.png[Error: Missing Graphic Image]
 
-[width=100%, frame=all, grid=rows]
-|===
-|Best practices
+*Best practices*
 
-a|* Place databases with I/O-intensive queries or with large database size (say 500GB or more) on a separate volume for faster recovery. This volume should also be backed up by separate jobs.
-* Consolidate small-to-medium size databases that are less critical or have fewer I/O requirements to a single volume. Backing up a large number of databases residing in the same volume leads to fewer Snapshot copies that need to be maintained. It is also a best practice to consolidate Microsoft SQL Server instances to use the same volumes to control the number of backup Snapshot copies taken.
-* Create separate LUNs to store full text-related files and file-streaming related files.
-* Assign separate LUNs per host to store Microsoft SQL Server log backups.
-* System databases that store database server metadata configuration and job details are not updated frequently. Place system databases/tempdb in separate drives or LUNs. Do not place system databases in the same volume as the user databases. User databases have a different backup policy, and the frequency of user database backup is not same for system databases.
-* For Microsoft SQL Server Availability Group setup, place the data and log files for replicas in an identical folder structure on all nodes.
-|===
+. Place databases with I/O-intensive queries or with large database size (say 500GB or more) on a separate volume for faster recovery. This volume should also be backed up by separate jobs.
+. Consolidate small-to-medium size databases that are less critical or have fewer I/O requirements to a single volume. Backing up a large number of databases residing in the same volume leads to fewer Snapshot copies that need to be maintained. It is also a best practice to consolidate Microsoft SQL Server instances to use the same volumes to control the number of backup Snapshot copies taken.
+. Create separate LUNs to store full text-related files and file-streaming related files.
+. Assign separate LUNs per host to store Microsoft SQL Server log backups.
+. System databases that store database server metadata configuration and job details are not updated frequently. Place system databases/tempdb in separate drives or LUNs. Do not place system databases in the same volume as the user databases. User databases have a different backup policy, and the frequency of user database backup is not same for system databases.
+. For Microsoft SQL Server Availability Group setup, place the data and log files for replicas in an identical folder structure on all nodes.
 
 In addition to the performance benefit of segregating the user database layout into different volumes, the database also significantly affects the time required to back up and restore. Having separate volumes for data and log files significantly improves the restore time as compared to a volume hosting multiple user data files. Similarly, user databases with a high I/O intensive application are prone to an increase in the backup time. A more detailed explanation about backup and restore practices is provided later in this document. 
 
@@ -392,13 +380,11 @@ Now you are ready to perform backup, restore and clone operations for SQL Server
 ====
 After placing the database and log files on the FSx ONTAP LUNs, SnapCenter can be used to back up the databases. The following processes are used to create a full backup.
 
-[width=100%, frame=all, grid=rows]
-|===
-|Best Practices
-a|* In SnapCenter terms, RPO can be identified as the backup frequency, for example, how frequently you want to schedule the backup so that you can reduce the loss of data to up to few minutes. SnapCenter allows you to schedule backups as frequently as every five minutes. However, there might be a few instances in which a backup might not complete within five minutes during peak transaction times or when the rate of change of data is more in the given time. A best practice is to schedule frequent transaction log backups instead of full backups.
+*Best Practices*
+
+* In SnapCenter terms, RPO can be identified as the backup frequency, for example, how frequently you want to schedule the backup so that you can reduce the loss of data to up to few minutes. SnapCenter allows you to schedule backups as frequently as every five minutes. However, there might be a few instances in which a backup might not complete within five minutes during peak transaction times or when the rate of change of data is more in the given time. A best practice is to schedule frequent transaction log backups instead of full backups.
 * There are numerous approaches to handle the RPO and RTO. One alternative to this backup approach is to have separate backup policies for data and logs with different intervals. For example, from SnapCenter, schedule log backups in 15-minute intervals and data backups in 6-hour intervals.
 * Use a resource group for a backup configuration for Snapshot optimization and the number of jobs to be managed.
-|===
 
 . Select *Resources*, and then select *Microsoft SQL Server *on the drop-down menu on the top left. Select *Refresh Resources*.
 +
@@ -420,12 +406,10 @@ image:sql-awsec2-image22.png[Error: Missing Graphic Image]
 +
 image:sql-awsec2-image23.png[Error: Missing Graphic Image]
 
-[width=100%, frame=all, grid=rows]
-|===
-| Best Practices
-a|* Backup the transaction log backup from SnapCenter so that during the restoration process, SnapCenter can read all the backup files and restore in sequence automatically.
+*Best Practices*
+
+* Backup the transaction log backup from SnapCenter so that during the restoration process, SnapCenter can read all the backup files and restore in sequence automatically.
 * If third party products are used for backup, select Copy backup in SnapCenter to avoid log sequence issues, and test the restore functionality before rolling into production.
-|===
 ====
 
 .Restore database with SnapCenter
@@ -463,19 +447,17 @@ Running all three backup jobs in parallel backs up 1,200 databases simultaneousl
 
 In addition to the full backup, NetApp recommends that you configure a transaction log backup for critical databases. Make sure that the database property is set to full recovery model.
 
-[width=100%, frame=all, grid=rows]
-|===
-|Best practices
-a|* Do not include the tempdb database in a backup because the data it contains is temporary. Place tempdb on a LUN or an SMB share that is in a storage system volume in which Snapshot copies will not be created.
-* A Microsoft SQL Server instance with a high I/O intensive application should be isolated in a different backup job to reduce the overall backup time for other resources.
-* Limit the set of databases to be simultaneously backed up to approximately 100 and stagger the remaining set of database backups to avoid a simultaneous process.
-* Use the Microsoft SQL Server instance name in the resource group instead of multiple databases because whenever new databases are created in Microsoft SQL Server instance, SnapCenter automatically considers a new database for backup.
-* If you change the database configuration, such as changing the database recovery model to the full recovery model, perform a backup immediately to allow up-to-the-minute restore operations.
-* SnapCenter cannot restore transaction log backups created outside of SnapCenter.
-* When cloning FlexVol volumes, make sure that you have sufficient space for the clone metadata.
-* When restoring databases, make sure that sufficient space is available on the volume.
-* Create a separate policy to manage and back up system databases at least once a week.
-|===
+*Best practices*
+
+. Do not include the tempdb database in a backup because the data it contains is temporary. Place tempdb on a LUN or an SMB share that is in a storage system volume in which Snapshot copies will not be created.
+. A Microsoft SQL Server instance with a high I/O intensive application should be isolated in a different backup job to reduce the overall backup time for other resources.
+. Limit the set of databases to be simultaneously backed up to approximately 100 and stagger the remaining set of database backups to avoid a simultaneous process.
+. Use the Microsoft SQL Server instance name in the resource group instead of multiple databases because whenever new databases are created in Microsoft SQL Server instance, SnapCenter automatically considers a new database for backup.
+. If you change the database configuration, such as changing the database recovery model to the full recovery model, perform a backup immediately to allow up-to-the-minute restore operations.
+. SnapCenter cannot restore transaction log backups created outside of SnapCenter.
+. When cloning FlexVol volumes, make sure that you have sufficient space for the clone metadata.
+. When restoring databases, make sure that sufficient space is available on the volume.
+. Create a separate policy to manage and back up system databases at least once a week.
 ====
 
 .Cloning databases with SnapCenter
