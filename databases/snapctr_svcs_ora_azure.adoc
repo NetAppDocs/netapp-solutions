@@ -18,28 +18,28 @@ Allen Cao, Niyaz Mohamed, NetApp
 
 == Purpose
 
-SnapCenter Services is the SaaS version of the classic SnapCenter database management UI tool that is available through the NetApp BlueXP cloud management console. It is an integral part of the NetApp cloud-backup, data-protection offering for databases such as Oracle and HANA running on NetApp cloud storage. This SaaS-based service simplifies traditional SnapCenter standalone server deployment that generally requires a Windows server operating in a Windows domain environment.  
+SnapCenter Services is the SaaS version of the classic SnapCenter database management UI tool that is available through the NetApp BlueXP cloud management console. It is an integral part of the NetApp cloud-backup, data-protection offering for databases such as Oracle and HANA running on Azure NetApp Files. This SaaS-based service simplifies traditional SnapCenter standalone server deployment that generally requires a Windows server operating in a Windows domain environment.  
 
-In this documentation, we demonstrate how you can set up SnapCenter Services to backup, restore, and clone Oracle databases deployed to Azure NetApp Files capacity pool storage and Azure compute instances. Although it is much easier to set up and use, SnapCenter Services deliver key functionalities that are available in the legacy SnapCenter UI tool.
+In this documentation, we demonstrate how you can set up SnapCenter Services to backup, restore, and clone Oracle databases deployed on Azure NetApp Files volumes and Azure compute instances. It is very easy to setup data protection for Oracle database deployed on Azure NetApp Files with web based BlueXP user interface. 
 
 This solution addresses the following use cases:
 
 * Database backup with snapshots for Oracle databases hosted in Azure NetApp Files and Azure VMs
 * Oracle database recovery in the case of a failure  
-* Fast cloning of primary databases for a dev/test environment or other use cases  
+* Fast cloning of primary databases for dev, test environments or other use cases  
 
 == Audience
 
 This solution is intended for the following audiences:
 
 * The DBA who manages Oracle databases running on Azure NetApp Files storage
-* The solution architect who is interested in testing Oracle database backup, restore, and clone in the public Azure cloud
-* The storage administrator who supports and manages the Azure NetApp Files capacity pool storage
+* The solution architect who is interested in testing Oracle database backup, restore, and clone in Azure
+* The storage administrator who supports and manages the Azure NetApp Files storage
 * The application owner who owns applications that are deployed to Azure NetApp Files storage and Azure VMs 
 
 == Solution test and validation environment
 
-The testing and validation of this solution was performed in an Azure NetApp Files and Azure VMs environment that might not match the final deployment environment. For more information, see the section <<Key Factors for Deployment Consideration>>.
+The testing and validation of this solution was performed in a lab environment that might not match the final deployment environment. For more information, see the section <<Key Factors for Deployment Consideration>>.
 
 === Architecture
 
@@ -52,7 +52,7 @@ This image provides a detailed picture of Cloud Backup for Application within th
 [%autowidth.stretch]
 |===
 3+^| *Hardware*
-| Azure NetApp Files storage | Current version offered by Azure | Premium Service level, Auto QoS type, and 4TB in storage capacity in testing
+| Azure NetApp Files storage | Premium Service level | Auto QoS type, and 4TB in storage capacity in testing
 | Azure instance for compute | Standard B4ms (4 vcpus, 16 GiB memory) | Two instances deployed, one as primary DB server and the other as clone DB server 
 
 3+^| *Software*
@@ -66,7 +66,7 @@ This image provides a detailed picture of Cloud Backup for Application within th
 
 * *Connector to be deployed in the same virtual network / subnet as databases and Azure NetApp Files.* When possible, the connector should be deployed in the same Azure virtual networks and resource groups, which enables connectivity to the Azure NetApp Files storage and the Azure compute instances.
 
-* *An Azure user account or Active Directory service principle created at Azure portal for SnapCenter connector.* Deploying a BlueXP Connector requires specific permissions to create and configure a virtual machine and other compute resources, to configure networking, and to get access to the Azure subscription. It also requires permissions to later create roles and permissions for the Connector to operate. Create a custom role in Azure with permissions and assign to the user account or service principle. The policy in JSON format is available in the detailed SnapCenter service documentation. Or when you launch connector deployment within the BlueXP console, you are prompted to set up the prerequisites with the details of permission grants. 
+* *An Azure user account or Active Directory service principle created at Azure portal for SnapCenter connector.* Deploying a BlueXP Connector requires specific permissions to create and configure a virtual machine and other compute resources, to configure networking, and to get access to the Azure subscription. It also requires permissions to later create roles and permissions for the Connector to operate. Create a custom role in Azure with permissions and assign to the user account or service principle. Review the following link for details:link:https://docs.netapp.com/us-en/bluexp-setup-admin/task-set-up-permissions-azure.html#set-up-permissions-to-create-the-connector-from-bluexp[Set up Azure permissions^]. 
 
 * *A ssh key pair created in the Azure resource group.* The ssh key pair is assigned to the Azure VM user for logging into the connector host and also the database VM host for deploying and executing a plug-in. BlueXP console UI uses the ssh key to deploy SnapCenter service plugin to database host for one-step plugin installation and application host database discovery.
 
@@ -76,7 +76,7 @@ This image provides a detailed picture of Cloud Backup for Application within th
 
 == Solution deployment
 
-There is extensive NetApp documentation with a broader scope to help you protect your cloud-native application data. The goal of this documentation is to provide step-by-step procedures that cover SnapCenter Service deployment with the BlueXP console to protect your Oracle database deployed to an Azure NetApp Files storage and an Azure compute instance. This document fills in certain details that might be missing from more general instructions.
+There is extensive NetApp documentation with a broader scope to help you protect your cloud-native application data. The goal of this documentation is to provide step-by-step procedures that cover SnapCenter Service deployment with the BlueXP console to protect your Oracle database deployed to an Azure NetApp Files storage and an Azure compute instance. 
 
 To get started, complete the following steps:
 
@@ -100,7 +100,7 @@ Deployment requires the following prerequisites.
 
 . A secondary database server on an Azure VM instance that can be used for testing the cloning of an Oracle database to an alternate host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of production Oracle database.
 
-. If you need help to meet the above prerequisites for Oracle database deployment on Azure NetApp Files and Azure compute instance, see link:azure_ora_nfile_usercase.html[Oracle Database Deployment and Protection on Azure NetApp Files^].
+. For additional information for Oracle database deployment on Azure NetApp Files and Azure compute instance, see link:azure_ora_nfile_usercase.html[Oracle Database Deployment and Protection on Azure NetApp Files^].
 
 ====
 
@@ -123,13 +123,9 @@ Deployment requires the following prerequisites.
 [%collapsible]
 
 ====
-. Login to the BlueXP console. BlueXP opens in Canvas and shows an empty working environment with exception of possible Blob storage of public cloud, which may be loaded by default. On the top of the page, you will see your account, workspace, and connector. The connector shows "N/A" as it has yet to be deployed. 
+. Login to the BlueXP console. 
 +
 image:snapctr_svcs_connector_02-canvas.png["Screenshot showing this step in the GUI."]
-
-. For a shared account, it is a best practice to create an individual workspace by clicking *Account* > *Manage Account* > *Workspace* to add a new workspace.
-+ 
-image:snapctr_svcs_connector_02-wspace.png["Screenshot showing this step in the GUI."]
 
 . Click on *Connector* drop down arrow and *Add Connector* to launch the connector provisioning workflow.
 +
@@ -147,7 +143,7 @@ image:snapctr_svcs_connector_05-azure.png["Screenshot showing this step in the G
 +
 image:snapctr_svcs_connector_06-azure.png["Screenshot showing this step in the GUI."]
 
-. Name the connector instance, select *Create* and accept default *Role Name* under *Details*, and choose the subscription for the Azure account.
+. Provide a name for the connector instance, select *Create* and accept default *Role Name* under *Details*, and choose the subscription for the Azure account.
 +
 image:snapctr_svcs_connector_07-azure.png["Screenshot showing this step in the GUI."]
 
@@ -159,7 +155,7 @@ image:snapctr_svcs_connector_08-azure.png["Screenshot showing this step in the G
 +
 image:snapctr_svcs_connector_09-azure.png["Screenshot showing this step in the GUI."]
 
-. Review the summary page and click *Add* to start connector creation. It generally takes about 10 mins to complete deployment. Once completed, the connector instance appears in the Azure VMs dashboard.
+. Review the summary page and click *Add* to start connector creation. It generally takes about 10 mins to complete deployment. Once completed, the connector instance appears in the Azure portal.
 +
 image:snapctr_svcs_connector_10-azure.png["Screenshot showing this step in the GUI."]
 
