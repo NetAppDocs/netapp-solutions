@@ -2,19 +2,18 @@
 sidebar: sidebar
 permalink: databases/snapctr_svcs_ora.html
 keywords: Oracle, Database, SnapCenter, SnapShot, FlexClone, BlueXP, Database Backup, Database Restore, Database Clone
-summary: "The solution provides overview and details for Oracle database backup, restore, clone using NetApp SnapCenter SaaS using BlueXP console." 
+summary: "The solution provides overview and details for Oracle database backup, restore, clone using NetApp SnapCenter SaaS using BlueXP console in Azure cloud." 
 ---
 
-= TR-4964: Oracle Database backup, restore and clone with SnapCenter Services 
+= TR-4964: Oracle Database backup, restore and clone with SnapCenter Services - AWS 
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
 :imagesdir: ./../media/
 
-Allen Cao, Niyaz Mohamed, NetApp
-
 [.lead]
+Allen Cao, Niyaz Mohamed, NetApp
 
 == Purpose
 
@@ -49,13 +48,18 @@ This image provides a detailed picture of Cloud Backup for Application within th
 
 === Hardware and software components
 
+*Hardware*
+
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
-3^| *Hardware*
 | FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone
 | EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge EC2 instances, one as primary DB server and the other as clone DB server 
+|===
 
-3^| *Software*
+*Software*
+
+[width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
+|===
 | RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
 | Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
@@ -67,13 +71,13 @@ This image provides a detailed picture of Cloud Backup for Application within th
 
 * *Connector to be deployed in the same VPC as database and FSx.* When possible, the connector should be deployed in the same AWS VPC, which enables connectivity to the FSx storage and the EC2 compute instance.
 
-* *An AWS IAM policy created for SnapCenter connector.* The policy in JSON format is available in the detailed SnapCenter service documentation. When you launch connector deployment with the BlueXP console, you are prompted to set up the prerequisites. The policy should be assigned to the AWS user account that owns the connector.
+* *An AWS IAM policy created for SnapCenter connector.* The policy in JSON format is available in the detailed SnapCenter service documentation. When you launch connector deployment with the BlueXP console, you are also prompted to set up the prerequisites with details of required permission in JSON format. The policy should be assigned to the AWS user account that owns the connector.
 
-* *The AWS account access key and the SSH key pair created in the AWS account.* The SSH key pair is assigned to the ec2-user for logging into the connector host and then deploying a database plug-in to the EC2 DB server host. The access key grants permission for provisioning the required connector.
+* *The AWS account access key and the SSH key pair created in the AWS account.* The SSH key pair is assigned to the ec2-user for logging into the connector host and then deploying a database plug-in to the EC2 DB server host. The access key grants permission for provisioning the required connector with IAM policy above.
 
-* *A credential added to the BlueXP console setting.* To add Amazon FSx for ONTAP to the BlueXP working environment, a credential that grants permissions to access Amazon FSx for ONTAP from the BlueXP console is set up in the BlueXP console setting. 
+* *A credential added to the BlueXP console setting.* To add Amazon FSx for ONTAP to the BlueXP working environment, a credential that grants BlueXP permissions to access Amazon FSx for ONTAP is set up in the BlueXP console setting. 
 
-* *SnapCenter plug-in deployed to the EC2 database instance host.* SnapCenter services make API calls that are executed by the SnapCenter plug-in on the EC2 database instance host. You must deploy it before setting up the services.
+* *java-11-openjdk installed on the EC2 database instance host.* SnapCenter service installation requires java version 11. It needs to be installed on application host before plugin deployment attempt.
 
 == Solution deployment
 
@@ -89,42 +93,38 @@ video::4b0fd212-7641-46b8-9e55-b01200f9383a[panopto, title="Solution Deployment"
 
 === Prerequisites for SnapCenter service deployment
 [%collapsible]
-
 ====
 Deployment requires the following prerequisites.
 
 . A primary Oracle database server on an EC2 instance with an Oracle database fully deployed and running. 
 
-. A Amazon FSx for ONTAP cluster deployed in AWS that is hosting the database above.
-. An optional database server on an EC2 instance that can be used for testing the cloning of an Oracle database to an alternative host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of production Oracle database.
+. An Amazon FSx for ONTAP cluster deployed in AWS that is hosting the database volumes above.
 
-. If you need help to meet the above prerequisites for Oracle database deployment on Amazon FSx for ONTAP and EC2 compute instance, see link:aws_ora_fsx_ec2_iscsi_asm.html[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^].
+. An optional database server on an EC2 instance that can be used for testing the cloning of an Oracle database to an alternate host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of a production Oracle database.
 
+. If you need help to meet the above prerequisites for Oracle database deployment on Amazon FSx for ONTAP and EC2 compute instance, see link:aws_ora_fsx_ec2_iscsi_asm.html[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^] or white paper link:aws_ora_fsx_ec2_deploy_intro.html[Oracle Database Deployment on EC2 and FSx Best Practices^]
 ====
 
 === Onboarding to BlueXP preparation
 [%collapsible]
-
 ====
 
 . Use the link link:https://console.bluexp.netapp.com/[NetApp BlueXP] to sign up for BlueXP console access.
 
-. To set up BlueXP to manage AWS cloud resources such as Amazon FSx for ONTAP, you should already have an AWS account set up. You can then log into your AWS account to create an IAM policy for granting SnapCenter service access to an AWS account to use for connector deployment.
-
+. Login to your AWS account to create an IAM policy with proper permissions and assign the policy to the AWS account that will be used for BlueXP connector deployment.
++
 image:snapctr_svcs_connector_01-policy.png["Screenshot showing this step in the GUI."]
++
+The policy should be configured with a JSON string that is available in NetApp documentation. The JSON string can also be retrieved from the page when connector provisioning is launched and you are prompted for the prerequisites permissions assignment.
 
-The policy should be configured with a JSON string that is available when connector provisioning is launched and you are prompted as a reminder that an IAM policy has been created and granted to an AWS account that is used for connector deployment. 
-
-. You also need the AWS VPC, a key and secrets for your AWS account, an SSH key for EC2 access, a security group, and so on ready for connector provisioning. 
-
+. You also need the AWS VPC, subnet, security group, an AWS user account access key and secrets, an SSH key for ec2-user, and so on ready for connector provisioning. 
 ====
 
 === Deploy a connector for SnapCenter services
 [%collapsible]
-
 ====
-. Log into the BlueXP console. For a shared account, it is a best practice to create an individual workspace by clicking *Account* > *Manage Account* > *Workspace* to add a new workspace.
- 
+. Login to the BlueXP console. For a shared account, it is a best practice to create an individual workspace by clicking *Account* > *Manage Account* > *Workspace* to add a new workspace.
++ 
 image:snapctr_svcs_connector_02-wspace.png["Screenshot showing this step in the GUI."]
 
 . Click *Add a Connector* to launch the connector provisioning workflow.
@@ -139,35 +139,68 @@ image:snapctr_svcs_connector_04-aws.png["Screenshot showing this step in the GUI
 
 image:snapctr_svcs_connector_05-remind.png["Screenshot showing this step in the GUI."]
 
-. Enter your AWS account authentication access key and secret key.
-
+. Enter your AWS account authentication with *Access Key* and *Secret Key*.
++
 image:snapctr_svcs_connector_06-auth.png["Screenshot showing this step in the GUI."]
 
 . Name the connector instance and select *Create Role* under *Details*.
 
 image:snapctr_svcs_connector_07-details.png["Screenshot showing this step in the GUI."]
 
-. Configure networking with the proper VPC, subnet, and SSH key pair for EC2 access.
-
+. Configure networking with the proper *VPC*, *Subnet*, and SSH *Key Pair* for connector access.
++
 image:snapctr_svcs_connector_08-network.png["Screenshot showing this step in the GUI."]
 
-. Set the security group for the connector.
-
+. Set the *Security Group* for the connector.
++
 image:snapctr_svcs_connector_09-security.png["Screenshot showing this step in the GUI."]
 
 . Review the summary page and click *Add* to start connector creation. It generally takes about 10 mins to complete deployment. Once completed, the connector instance appears in the AWS EC2 dashboard.
 
 image:snapctr_svcs_connector_10-review.png["Screenshot showing this step in the GUI."]
-
-. After the connector is deployed, log into the connector EC2 host as the ec2-user with an SSH key to install the SnapCenter plug-in following these instructions: link:https://docs.netapp.com/us-en/cloud-manager-backup-restore/task-add-host-discover-oracle-databases.html#deploy-the-plug-in-using-script-and-add-host-from-ui-using-manual-option[Deploy the plug-in using script and add host from UI using manual option^].
-
 ====
+
+=== Define a credential in BlueXP for AWS resources access
+[%collapsible]
+====
+
+. First, from AWS EC2 console, create a role in *Identity and Access Management (IAM)* menu *Roles*, *Create role* to start role creation workflow.
++
+image:snapctr_svcs_credential_01-aws.png["Screenshot showing this step in the GUI."]
+
+. In *Select trusted entity* page, choose *AWS account*, *Another AWS account*, and paste in the BlueXP account ID, which can be retrieved from BlueXP console.
++
+image:snapctr_svcs_credential_02-aws.png["Screenshot showing this step in the GUI."]
+
+. Filter permission policies by fsx and add *Permissions policies* to the role.
++
+image:snapctr_svcs_credential_03-aws.png["Screenshot showing this step in the GUI."]
+
+. In *Role details* page, name the role, add a description, then click *Create role*.
++
+image:snapctr_svcs_credential_04-aws.png["Screenshot showing this step in the GUI."]
+
+. Back to BlueXP console, click on setting icon on top right corner of the console to open *Account credentials* page, click *Add credentials* to start credential configuration workflow.
++
+image:snapctr_svcs_credential_05-aws.png["Screenshot showing this step in the GUI."]
+
+. Choose credential location as - *Amazon Web Services - BlueXP*.
++
+image:snapctr_svcs_credential_06-aws.png["Screenshot showing this step in the GUI."]
+
+. Define AWS credentials with proper *Role ARN*, which can be retrieved from AWS IAM role created in step one above. BlueXP *account ID*, which is used for creating AWS IAM role in step one.
++
+image:snapctr_svcs_credential_07-aws.png["Screenshot showing this step in the GUI."]
+
+. Review and *Add*.
+image:snapctr_svcs_credential_08-aws.png["Screenshot showing this step in the GUI."]
+====
+
 === SnapCenter services setup
 [%collapsible]
-
 ====
 
-With the connector deployed, SnapCenter services can now be set up with the following procedure:
+With the connector deployed and the credential added, SnapCenter services can now be set up with the following procedure:
 
 . From *My Working Environment* click *Add working Environment* to discover FSx deployed in AWS.
 
@@ -181,8 +214,8 @@ image:snapctr_svcs_setup_02.png["Screenshot showing this step in the GUI."]
 
 image:snapctr_svcs_setup_03.png["Screenshot showing this step in the GUI."]
 
-. Select the credentials that provides BlueXP with the permissions that it needs to manage FSx for ONTAP. If you have not added credentials, you can add it from the *Settings* menu at the top right corner of the BlueXP console.
-
+. Select the *Credentials Name* that you have created in previous section to grant BlueXP with the permissions that it needs to manage FSx for ONTAP. If you have not added credentials, you can add it from the *Settings* menu at the top right corner of the BlueXP console.
++
 image:snapctr_svcs_setup_04.png["Screenshot showing this step in the GUI."]
 
 . Choose the AWS region where Amazon FSx for ONTAP is deployed, select the FSx cluster that is hosting the Oracle database and click Add.
@@ -213,21 +246,27 @@ image:snapctr_svcs_setup_10.png["Screenshot showing this step in the GUI."]
 
 image:snapctr_svcs_setup_13.png["Screenshot showing this step in the GUI."]
 
-. Provide the Oracle EC2 instance host details to add a host. Check the box to confirm that the plug-in for Oracle on the host has been installed, because you deploy the plug-in after the connector is provisioned.
+. Fill in the AWS EC2 Oracle application host details. Choose *Using SSH* as *Host Installation Type* for one step plugin installation and database discovery. Then, click on *Add SSH Private Key*.
++
+image:snapctr_svcs_setup_14.png["Screenshot showing this step in the GUI."]
 
-image:snapctr_svcs_setup_16.png["Screenshot showing this step in the GUI."]
+. Paste in your ec2-user SSH key for the database EC2 host and click on *Validate* to proceed.
++
+image:snapctr_svcs_setup_14-1.png["Screenshot showing this step in the GUI."]
 
-. Discover the Oracle EC2 host and add it to *Applications*, and any databases on the host are discovered and displayed on the page as well. The database *Protection Status* shows as *Unprotected*.
+. You will be prompted for *Validating fingerprint* to proceed.
++
+image:snapctr_svcs_setup_14-2.png["Screenshot showing this step in the GUI."]
 
+. Click on *Next* to install an Oracle database plugin and discover the Oracle databases on the EC2 host. Discovered databases are added to *Applications*. The database *Protection Status* shows as *Unprotected* when initially discovered.
++
 image:snapctr_svcs_setup_17.png["Screenshot showing this step in the GUI."]
 
 This completes the initial setup of SnapCenter services for Oracle. The next three sections of this document describe Oracle database backup, restore, and clone operations.
-
 ====
 
 === Oracle database backup
 [%collapsible]
-
 ====
 
 . Click the three dots next to the database *Protection Status*, and then click *Polices* to view the default preloaded database protection policies that can be applied to protect your Oracle databases.
@@ -257,12 +296,10 @@ image:snapctr_svcs_bkup_06.png["Screenshot showing this step in the GUI."]
 . The database backups details can be viewed by clicking *View Details* from the menu list. This includes the backup name, backup type, SCN, and backup date. A backup set covers a snapshot for both data volume and log volume. A log volume snapshot takes place right after a database volume snapshot. You can apply a filter if you are looking for a particular backup in a long list.
 
 image:snapctr_svcs_bkup_07.png["Screenshot showing this step in the GUI."]
-
 ====
 
 === Oracle database restore and recovery
 [%collapsible]
-
 ====
 
 . For a database restore, choose the right backup, either by the SCN or backup time. Click the three dots from the database data backup, and then click *Restore* to initiate database restore and recovery. 
@@ -282,12 +319,10 @@ image:snapctr_svcs_restore_03.png["Screenshot showing this step in the GUI."]
 image:snapctr_svcs_restore_05.png["Screenshot showing this step in the GUI."]
 
 image:snapctr_svcs_restore_04.png["Screenshot showing this step in the GUI."]
-
 ====
 
 === Oracle database clone 
 [%collapsible]
-
 ====
 
 To clone a database, launch the clone workflow from the same database backup details page.
@@ -317,7 +352,6 @@ image:snapctr_svcs_clone_07-status.png[Error: Missing Graphic Image]
 image:snapctr_svcs_clone_08-crs.png[Error: Missing Graphic Image]
 
 image:snapctr_svcs_clone_08-db.png[Error: Missing Graphic Image]
-
 ====
 
 == Additional information
