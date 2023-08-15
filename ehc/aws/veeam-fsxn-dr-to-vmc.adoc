@@ -36,7 +36,7 @@ To prevent replication jobs from consuming the entire network bandwidth, WAN acc
 
 When failover is performed, a replicated VM takes over the role of the original VM. Fail over can be performed to the latest state of a replica or to any of its good known restore points. This enables ransomware recovery or isolated testing as needed. In Veeam Backup & Replication, failover and failback are temporary intermediate step that should be further finalized. Veeam Backup & Replication offers multiple options to handle different disaster recovery scenarios.
 
-image:dr-veeam-image1.png["Diagram of DR scenario using Veeam Replication and FSx ONTAP for VMC"]
+image:dr-veeam-fsx-image1.png["Diagram of DR scenario using Veeam Replication and FSx ONTAP for VMC"]
 
 == Solution Deployment
 
@@ -72,19 +72,19 @@ To replicate VMs, follow the below steps:
 * Select the Network remapping (for AWS VMC sites with different networks) check box if segments on VMware Cloud on AWS SDDC do not match that of on-premises site networks.
 * If the IP addressing scheme in on-premises production site differs from the scheme in the AWS VMC site, select the Replica re-IP (for DR sites with different IP addressing scheme) check box.
 +
-image::dr-veeam-image2.png[]
+image::dr-veeam-fsx-image2.png[]
 
 . Select the VMs that needs to be replicated to FSx for ONTAP datastore attached to VMware Cloud on AWS SDDC in the *Virtual Machines* step. The Virtual machines can be placed on vSAN to fill the available vSAN datastore capacity. In a pilot light cluster, the usable capacity of a 3-node cluster will be limited. The rest of the data can be replicated to FSx for ONTAP datastores. Click *Add*, then in the *Add Object* window select the necessary VMs or VM containers and click *Add*. Click *Next*.
 +
-image::dr-veeam-image3.png[]
+image::dr-veeam-fsx-image3.png[]
 
 . After that, select the destination as VMware Cloud on AWS SDDC cluster / host and the appropriate resource pool, VM folder and FSx for ONTAP datastore for VM replicas. Then Click *Next*.
 + 
-image::dr-veeam-image4.png[]
+image::dr-veeam-fsx-image4.png[]
 
 . In the next step, create the mapping between source and destination virtual network as needed.
 +
-image::dr-veeam-image5.png[]
+image::dr-veeam-fsx-image5.png[]
 
 . In the *Job Settings* step, specify the backup repository that will store metadata for VM replicas, retention policy and so on. 
 
@@ -92,17 +92,17 @@ image::dr-veeam-image5.png[]
 
 . At the *Guest Processing* step, select *Enable application-aware processing* option as needed. Click *Next*.
 +
-image::dr-veeam-image6.png[]
+image::dr-veeam-fsx-image6.png[]
 
 . Choose the replication schedule to run the replication job to run on a regular basis.
 
 . At the *Summary* step of the wizard, review details of the replication job. To start the job right after the wizard is closed, select the *Run the job when I click Finish* check box, otherwise leave the check box unselected. Then click *Finish* to close the wizard.
 +
-image::dr-veeam-image7.png[]
+image::dr-veeam-fsx-image7.png[]
 
 Once the replication job starts, the VMs with the suffix specified will be populated on the destination VMC SDDC cluster / host.
 
-image::dr-veeam-image8.png[]
+image::dr-veeam-fsx-image8.png[]
 
 For additional information for Veeam replication, refer to link:https://helpcenter.veeam.com/docs/backup/vsphere/replication_process.html?ver=120[How Replication Works].
 ====
@@ -126,11 +126,11 @@ To create the *Failover Plan*, do the following:
 
 . Next, provide a name and a description to the plan. Pre and Post-failover script can be added as required. For instance, run a script to shutdown VMs before starting the replicated VMs.
 +
-image::dr-veeam-image9.png[]
+image::dr-veeam-fsx-image9.png[]
 
 . Add the VMs to the plan and modify the VM boot order and boot delays to meet the application dependencies.
 +
-image::dr-veeam-image10.png[]
+image::dr-veeam-fsx-image10.png[]
 
 For additional information for creating replication jobs, refer link:https://helpcenter.veeam.com/docs/backup/vsphere/replica_job.html?ver=120[Creating Replication Jobs].
 ====
@@ -144,17 +144,17 @@ NOTE: Make sure network segmentation is in place to avoid IP conflicts during DR
 
 To start the failover plan, simply click in *Failover Plans* tab and right click on the failover plan. Select *Start*. This will failover using the latest restore points of VM replicas. To fail over to specific restore points of VM replicas, select *Start to*. 
 
-image::dr-veeam-image11.png[]
+image::dr-veeam-fsx-image11.png[]
 
-image::dr-veeam-image12.png[]
+image::dr-veeam-fsx-image12.png[]
 
 The state of the VM replica changes from Ready to Failover and VMs will start on the destination VMware Cloud on AWS SDDC cluster / host. 
 
-image::dr-veeam-image13.png[]
+image::dr-veeam-fsx-image13.png[]
 
 Once the failover is complete, the status of the VMs will change to “Failover”.
 
-image::dr-veeam-image14.png[]
+image::dr-veeam-fsx-image14.png[]
 
 NOTE: Veeam Backup & Replication stops all replication activities for the source VM until its replica is returned to the Ready state. 
 
@@ -176,21 +176,21 @@ NOTE: When you perform failback, changes are only transferred but not published.
 
 In this demo, Failback to production was chosen. Failback to the original VM was selected during the Destination step of the wizard and “Power on VM after restoring” check box was enabled.
 
-image::dr-veeam-image15.png[]
+image::dr-veeam-fsx-image15.png[]
 
-image::dr-veeam-image16.png[]
+image::dr-veeam-fsx-image16.png[]
 
 Failback commit is one of the ways to finalize failback operation. When failback is committed, it confirms that the changes sent to the VM which is failed back (the production VM) are working as expected. After the commit operation, Veeam Backup & Replication resumes replication activities for the production VM.
 
 For detailed information about the failback process, refer Veeam documentation for link:https://helpcenter.veeam.com/docs/backup/vsphere/failover_failback.html?ver=120[Failover and Failback for replication].
 
-image::dr-veeam-image17.png[]
+image::dr-veeam-fsx-image17.png[]
 
-image::dr-veeam-image18.png[]
+image::dr-veeam-fsx-image18.png[]
 
 After failback to production is successful, the VMs are all restored back to the original production site.
 
-image::dr-veeam-image19.png[]
+image::dr-veeam-fsx-image19.png[]
 ====
 
 == Conclusion
