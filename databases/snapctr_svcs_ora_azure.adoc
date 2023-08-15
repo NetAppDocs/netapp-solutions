@@ -43,19 +43,24 @@ The testing and validation of this solution was performed in a lab environment t
 
 === Architecture
 
-image::snapctr_svcs_azure_architect.png["This image provides a detailed picture of the Cloud Backup for Application within BlueXP console, including the UI, connector and resources it manages."]
+image::snapctr_svcs_azure_architect.png["This image provides a detailed picture of the BlueXP backup and recovery for applications within BlueXP console, including the UI, connector and resources it manages."]
 
-This image provides a detailed picture of Cloud Backup for Application within the BlueXP console, including the UI, the connector, and the resources it manages.
+This image provides a detailed picture of BlueXP backup and recovery for applications within the BlueXP console, including the UI, the connector, and the resources it manages.
 
 === Hardware and software components
 
-[%autowidth.stretch]
+*Hardware*
+
+[width=100%,cols="30%, 30%, 40%", frame=none, grid=rows]
 |===
-3+^| *Hardware*
 | Azure NetApp Files storage | Premium Service level | Auto QoS type, and 4TB in storage capacity in testing
 | Azure instance for compute | Standard B4ms (4 vcpus, 16 GiB memory) | Two instances deployed, one as primary DB server and the other as clone DB server 
+|===
 
-3+^| *Software*
+*Software*
+
+[width=100%,cols="30%, 30%, 40%", frame=none, grid=rows]
+|===
 | RedHat Linux | Red Hat Enterprise Linux 8.7 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
@@ -84,13 +89,11 @@ To get started, complete the following steps:
 
 * Watch the following video walkthrough
 +
-[pass]
-<iframe src="https://netapp.hosted.panopto.com/Panopto/Pages/Embed.aspx?id=48adf2d8-3f5e-4ab3-b25c-b04a014635ac&autoplay=false&offerviewer=true&showtitle=true&showbrand=true&captions=false&interactivity=all" height="203" width="360" style="border: 1px solid #464646;" allowfullscreen allow="autoplay"></iframe>
- 
+video::48adf2d8-3f5e-4ab3-b25c-b04a014635ac[panopto, title="Video of deployment of Oracle and ANF"]
 
 === Prerequisites for SnapCenter service deployment
-[%collapsible]
 
+[%collapsible]
 ====
 Deployment requires the following prerequisites.
 
@@ -101,14 +104,12 @@ Deployment requires the following prerequisites.
 . A secondary database server on an Azure VM instance that can be used for testing the cloning of an Oracle database to an alternate host for the purpose of supporting a dev/test workload or any use cases that requires a full data set of production Oracle database.
 
 . For additional information for Oracle database deployment on Azure NetApp Files and Azure compute instance, see link:azure_ora_nfile_usercase.html[Oracle Database Deployment and Protection on Azure NetApp Files^].
-
 ====
 
 === Onboarding to BlueXP preparation
+
 [%collapsible]
-
 ====
-
 . Use the link link:https://console.bluexp.netapp.com/[NetApp BlueXP] to sign up for BlueXP console access.
 
 . Create an Azure user account or an Active Directory service principle and grant permissions with role in Azure portal for Azure connector deployment.
@@ -116,12 +117,11 @@ Deployment requires the following prerequisites.
 . To set up BlueXP to manage Azure resources, add a BlueXP credential with details of an Active Directory service principal that BlueXP can use to authenticate with Azure Active Directory (App client ID), a client secret for the service principal application (Client Secret), and the Active Directory ID for your organization (Tenant ID).
 
 . You also need the Azure virtual network, resources group, security group, an SSH key for VM access, etc. ready for connector provisioning and database plugin installation. 
-
 ====
 
 === Deploy a connector for SnapCenter services
-[%collapsible]
 
+[%collapsible]
 ====
 . Login to the BlueXP console. 
 +
@@ -162,12 +162,11 @@ image:snapctr_svcs_connector_10-azure.png["Screenshot showing this step in the G
 . After the connector is deployed, the newly created connector appears under *Connector* drop-down. 
 +
 image:snapctr_svcs_connector_11-azure.png["Screenshot showing this step in the GUI."]
-
 ====
 
 === Define a credential in BlueXP for Azure resources access
-[%collapsible]
 
+[%collapsible]
 ====
 . Click on setting icon on top right corner of BlueXP console to open *Account credentials* page, click *Add credentials* to start credential configuration workflow.
 +
@@ -189,8 +188,8 @@ image:snapctr_svcs_credential_05-azure.png["Screenshot showing this step in the 
 ====
 
 === SnapCenter services setup
-[%collapsible]
 
+[%collapsible]
 ====
 
 With the Azure credential configured, SnapCenter services can now be set up with the following procedures:
@@ -245,14 +244,12 @@ image:snapctr_svcs_setup_18-azure.png["Screenshot showing this step in the GUI."
 image:snapctr_svcs_setup_19-azure.png["Screenshot showing this step in the GUI."]
 
 This completes the initial setup of SnapCenter services for Oracle. The next three sections of this document describe Oracle database backup, restore, and clone operations.
-
 ====
 
 === Oracle database backup
+
 [%collapsible]
-
 ====
-
 . Our test Oracle database in Azure VM is configured with three volumes with an aggregate total storage about 1.6 TiB. This gives context about the timing for the snapshot backup, restore, and clone of a database of this size.
 ....
 [oracle@acao-ora01 ~]$ df -h
@@ -299,14 +296,12 @@ image:snapctr_svcs_bkup_05-azure.png["Screenshot showing this step in the GUI."]
 . Database backup details include the *Backup Name*, *Backup Type*, *SCN*, *RMAN Catalog*, and *Backup Time*. A backup set contains application-consistent snapshots for data volume and log volume respectively. A log volume snapshot takes place right after a database data volume snapshot. You could apply a filter if you are looking for a particular backup in the backup list.
 +
 image:snapctr_svcs_bkup_06-azure.png["Screenshot showing this step in the GUI."]
-
 ====
 
 === Oracle database restore and recovery
+
 [%collapsible]
-
 ====
-
 . For a database restore, click the three-dot drop down menu for the particular database to be restored in *Applications*, then click *Restore* to initiate database restore and recovery workflow. 
 +
 image:snapctr_svcs_restore_01-azure.png["Screenshot showing this step in the GUI."]
@@ -330,14 +325,12 @@ image:snapctr_svcs_restore_05-azure.png["Screenshot showing this step in the GUI
 . From the *Job Monitoring* tab, we observed that it took 2 minutes to run a full database restore and recovery up to date.
 +
 image:snapctr_svcs_restore_06-azure.png["Screenshot showing this step in the GUI."]
-
 ====
 
 === Oracle database clone 
+
 [%collapsible]
-
 ====
-
 Database clone procedures are similar to restore but to an alternate Azure VM with identical Oracle software stack pre-installed and configured.
 
 [NOTE]
@@ -377,7 +370,6 @@ image:snapctr_svcs_clone_06-azure.png[Error: Missing Graphic Image]
 image:snapctr_svcs_clone_07-azure.png[Error: Missing Graphic Image]
 
 This completes the demonstration of an Oracle database backup, restore, and clone in Azure with NetApp BlueXP console using SnapCenter Service.
-
 ====
 
 == Additional information
@@ -388,7 +380,7 @@ To learn more about the information that is described in this document, review t
 +
 link:https://docs.netapp.com/us-en/cloud-manager-setup-admin/index.htmll[https://docs.netapp.com/us-en/cloud-manager-setup-admin/index.html^]
 
-* Cloud Backup documentation
+* BlueXP backup and recovery documentation
 +
 link:https://docs.netapp.com/us-en/cloud-manager-backup-restore/index.html[https://docs.netapp.com/us-en/cloud-manager-backup-restore/index.html^]
 
