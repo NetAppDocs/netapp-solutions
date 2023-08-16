@@ -12,9 +12,6 @@ summary: This page describes the automation around monitoring AWS FSxN and auto-
 :linkattrs:
 :imagesdir: ./../media/
 
-[.lead]
-Author(s): Dhruv Tyagi, Niyaz Mohamed
-
 == Overview: Monitoring and Auto-Resizing FSx for ONTAP via AWS Lambda function
 
 FSx for ONTAP is a first party enterprise-grade cloud storage service available on AWS that provides highly reliable, scalable, high-performing and feature-rich file storage built on the popular NetApp ONTAP file system. 
@@ -37,6 +34,7 @@ The solution provides the following features:
 * Ability to monitor the checks at a regular interval
 * Ability to use the solution with or without internet access
 * Ability to deploy manually or using AWS CloudFormation Template
+* Ability to monitor multiple FSx for ONTAP filesystems in a single VPC
 =====
 
 .Pre-requisites
@@ -63,6 +61,9 @@ image:fsxn-monitoring-resizing-architecture.png[This image depicts the high-leve
 == Solution Deployment
 
 === Automated Deployment
+
+NOTE: Covers single FSx for ONTAP filesystem.  
+
 [%collapsible]
 ====
 Follow the series of steps to complete the automated deployment of this solution:
@@ -81,7 +82,7 @@ git clone https://github.com/NetApp-Automation/fsxn-monitoring-auto-resizing.git
 =====
 . Navigate to AWS Console > *S3* and click on *Create bucket*. Create the bucket with the default settings.
 
-. Once inside the bucket, click on *Upload* > *Add files* and select *Paramiko.zip* and *Requests.zip* from the cloned GitHub repository on your system.
+. Once inside the bucket, click on *Upload* > *Add files* and select *Utilities.zip* from the cloned GitHub repository on your system.
 +
 image:fsxn-monitoring-resizing-s3-upload-zip-files.png[This image depicts the S3 window with zip files being uploaded]
 =====
@@ -140,6 +141,9 @@ image:fsxn-monitoring-resizing-email-2.png[This image depicts the Email Notifica
 ====
 
 === Manual Deployment
+
+NOTE: Supports monitoring multiple FSx for ONTAP filesystems in a single VPC.  
+
 [%collapsible]
 ====
 Follow the series of steps to complete the manual deployment of this solution:
@@ -178,6 +182,7 @@ KMS key source: My current account
 Value: <Enter the password for "fsxadmin" user configured on FSx for ONTAP>
 ----
 Click on *Create parameter*.
+Repeat the above steps for all FSx for ONTAP filesystems to be monitored.
 
 image:fsxn-monitoring-resizing-ssm-parameter.png[This image depicts the SSM parameter creation window on AWS console.]
 
@@ -256,11 +261,11 @@ image:fsxn-monitoring-resizing-add-layer-button.png[This image depicts the add l
 
 . Click on *create a new layer* under *Layer source*
 
-. Create 2 Layers - 1 for Requests and 1 for Paramiko and upload *Requests.zip* and *Paramiko.zip* files. Select *Python 3.9* as the compatible runtime and click on *Create*.
+. Create a Layer and upload *Utilities.zip* file. Select *Python 3.9* as the compatible runtime and click on *Create*.
 +
 image:fsxn-monitoring-resizing-create-layer-paramiko.png[This image depicts the Create New Layer window on AWS console.]
 
-. Navigate back to AWS Lambda *Add Layer* > *Custom Layers* and add the paramiko and requests layer one after the other.
+. Navigate back to AWS Lambda *Add Layer* > *Custom Layers* and add the utilities layer.
 +
 image:fsxn-monitoring-resizing-add-layer-window.png[This image depicts the add layer window on AWS Lambda function console.]
 +
@@ -279,12 +284,12 @@ image:fsxn-monitoring-resizing-layers-added.png[This image depicts the added lay
 +
 |===
 | *Name* | *Type* | *Description*
+| *fsxList* | List | (Required) List of all FSx for ONTAP filesystems to be monitored. 
+Include all the file systems in the list for monitoring and auto resizing.
 | *fsxMgmtIp* | String | (Required) Enter the "Management endpoint - IP address" from the FSx for ONTAP console on AWS.
 | *fsxId* | String | (Required) Enter the "File system ID" from the FSx for ONTAP console on AWS.
 | *username* | String | (Required) Enter the FSx for ONTAP "ONTAP administrator username" from FSx for ONTAP console on AWS. 
 | *resize_threshold* | Integer | (Required) Enter the threshold percentage from 0-100. This threshold will be used to measure Storage Capacity, Volume and LUN usage and when the % use of any increases above this threshold, resize activity will occur.
-| *sender_email* | String | (Required) Enter the email ID registered on SES that will be used by the lambda function to send notification alerts related to monitoring and resizing.
-| *recipient_email* | String | (Required) Enter the email ID on which you want to receive the alert notifications.
 | *fsx_password_ssm_parameter* | String | (Required) Enter the path name used in AWS Parameter Store for storing "fsxadmin" password.
 | *warn_notification* | Bool | (Required) Set this variable to True to receive notification when Storage Capacity/Volume/LUN usage exceeds 75% but is less than threshold.
 | *enable_snapshot_deletion* | Bool | (Required) Set this variable to True to enable volume level snapshot deletion for snapshots older than the value specified in "snapshot_age_threshold_in_days".
@@ -293,6 +298,8 @@ image:fsxn-monitoring-resizing-layers-added.png[This image depicts the added lay
 | *smtp_region* | String | (Optional) If "internet_access" variable is set to False, enter the region in which lambda is deployed. E.g. us-east-1 (in this format)
 | *smtp_username_ssm_parameter* | String | (Optional) If "internet_access" variable is set to False, enter the path name used in AWS Parameter Store for storing the SMTP username.
 | *smtp_password_ssm_parameter* | String | (Optional) If "internet_access" variable is set to False, enter the path name used in AWS Parameter Store for storing the SMTP password. 
+| *sender_email* | String | (Required) Enter the email ID registered on SES that will be used by the lambda function to send notification alerts related to monitoring and resizing.
+| *recipient_email* | String | (Required) Enter the email ID on which you want to receive the alert notifications.
 |===
 +
 image:fsxn-monitoring-resizing-lambda-code.png[This image depicts the lambda code on AWS Lambda function console.]
