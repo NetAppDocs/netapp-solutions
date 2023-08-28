@@ -58,15 +58,27 @@ image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed p
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 |===
 
+=== Oracle Data Guard configuration
+
+[width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
+|===
+3+^| 
+| *Database* | *DB_UNIQUE_NAME* | *Oracle Net Service Name*
+| Primary | db1-NY | db1-NY.demo.netapp.com
+| Physical Standby | db1-LA | db1-LA.demo.netapp.com 
+|===
+
 === Key factors for deployment consideration
 
-* *Oracle VLDB storage layout for RMAN incremental merge.* In our tests and validations, the NFS volume for Oracle incremental backup and merge is allocated from a single FSx file system, which has 4GBps throughput, 160,000 raw SSD IOPS, and 192TiB capacity limit. For deployment over the thresholds, multiple FSx file systems can be concatenated in parallel with multiple NFS mount points to provide higher capacity. 
+* *Oracle Software Requirements.* In general, a physical standby database must have the same Database Home version as the primary database including Patch Set Exceptions (PSEs), Critical Patch Updates (CPUs), and Patch Set Updates (PSUs), unless an Oracle Data Guard Standby-First Patch Apply process is in progress (as described in My Oracle Support note 1265700.1 at link:http://support.oracle.com.[support.oracle.com^]
 
-* *Oracle recoverability using RMAN incremental merge.* The RMAN incremental backup and merge is generally executed at user defined frequency based on your RTO and RPO objectives. If there are total loss of primary data storage and/or archived logs, the data loss can occur. The Oracle database can be recovered up to last incremental backup that is available from FSx database backup image copy. To minimize the data loss, Oracle flash recovery area can be setup on FSx NFS mount point and archived logs are backed up to FSx NFS mount along with database image copy. 
+* *Standby Database Directory Structure Considerations.* If possible, the data files, log files, and control files on the primary and standby systems should have the same names and path names and use Optimal Flexible Architecture (OFA) naming conventions. The archival directories on the standby database should also be identical between sites, including size and structure. This strategy allows other operations such as backups, switchovers, and failovers to execute the same set of steps, reducing the maintenance complexity. 
 
-* *Running Oracle VLDB off FSx NFS file system.* Unlike other bulk storage for database backup, AWS FSx ONTAP is a cloud enabled production grade storage that delivers high level of performance and storage efficiency. Once Oracle VLDB switches over from primary storage to image copy on FSx ONTAP NFS file system, database performance can be maintained at high level while the primary storage failure is addressed. You can take comfort to know that user application experience does not suffer as the result of primary storage failure. 
+* *Force Logging Mode.* To protect against unlogged direct writes in the primary database that cannot be propagated to the standby database, turn on FORCE LOGGING at the primary database before performing data file backups for standby creation. 
 
-* *FlexClone Oracle VLDB image copy of NFS volume for other use cases.* AWS FSx ONTAP FlexClone provides shared copies of the same NFS data volume that are writable. Thus, they can be used for many other use cases while still maintaining the integrity of staging Oracle VLDB image copy even when Oracle database is switched over. This provides tremendous storage cost saving by substantially reducing VLDB storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to database image copy in order to maintain Oracle performance at high level. 
+* *Database Storage Management.* For operational simplicity, Oracle recommends that when you set up Oracle Automatic Storage Management (Oracle ASM) and Oracle Managed Files (OMF) in an Oracle Data Guard configuration that you set it up symmetrically on the primary and standby database(s).  
+
+* *FlexClone Oracle Standby volume for other use cases.* AWS FSx ONTAP FlexClone provides shared copies of the same NFS data volume that are writable. Thus, they can be used for many other use cases while still maintaining the integrity of staging Oracle VLDB image copy even when Oracle database is switched over. This provides tremendous storage cost saving by substantially reducing VLDB storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to database image copy in order to maintain Oracle performance at high level. 
 
 * *EC2 compute instances.* In these tests and validations, we used an AWS EC2 t2.xlarge instance as the Oracle database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workload. You need to size the EC2 instance appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
 
@@ -97,7 +109,7 @@ Deployment requires the following prerequisites.
 
 . An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
 
-. From the AWS EC2 console, you must deploy two EC2 Linux instances, one as the primary Oracle DB server and an optional alternative clone target DB server. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
+. From the AWS EC2 console, you must deploy minimum three EC2 Linux instances, one as the primary Oracle DB server, one as standby Oracle DB server, and an clone target DB server for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
 
 . From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host the NFS volumes that stores the Oracle database standby image copy. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
 
@@ -113,7 +125,7 @@ Ensure that you have allocated at least 50G in EC2 instance root volume in order
 
 ====
 
-=== Provision and export NFS volume to be mounted to EC2 DB instance host
+=== Provision FSx volumes to create ASM disk groups on standby EC2 DB server
 [%collapsible]
 
 ====
@@ -162,36 +174,44 @@ sudo chown oracle:oinstall /nfsfsxn
 
 ====
 
-=== Setup Oracle RMAN incremental merge to image copy on FSx
+=== Prepare the primary database for standby database creation
 [%collapsible]
 
 ====
 
 RMAN incremental merge update the staging database data files image copy continuously at every incremental backup/merge interval. The image copy of database backup will be as up to date as the frequency you execute the incremental backup/merge. So, take into consideration of database performance, your RTO and RPO objectives when deciding the frequency of RMAN incremental backup and merge.
 
-. Login to primary DB server EC2 instance as oracle user
+. Login to primary EC2 DB server as oracle user
 
-. Create an oracopy directory under mount point /nfsfsxn to store oracle data files image copies and archlog directory for Oracle flash recovery area.
+. Enable "Force Logging" mode on primary database with following command via sqlplus.
 +
 [source, cli]
-mkdir /nfsfsxn/oracopy
-+
-[source, cli]
-mkdir /nfsfsxn/archlog
+ALTER DATABASE FORCE LOGGING;
 
-. Login to Oracle database via sqlplus, enable block change tracking for faster incremental backup and change Oracle flash recovery area to FSxN mount if it is currently on primary storage. This allows the RMAN default control file/spfile autobackup and archived logs to be backed up to FSxN NFS mount for recovery.
+. Configure the primary database to receive redo data in the event of failover from primary to standby. The primary database can then quickly transition to the standby role and begin receiving redo data, if necessary. The standby redo log must have at least one more redo log group than the redo log for each redo thread at the redo source database. Repeat the command for each additional redo group.
 +
 [source, cli]
-sqlplus / as sysdba
+alter database add standby logfile thread 1 size 200M;
 +
-From sqlplus prompt, execute following command.
-[source, cli]
-alter database enable block change tracking using file '/nfsfsxn/oracopy/bct_db1.ctf'
+Validate the standby redo log groups created.
 +
 [source, cli]
-alter system set db_recovery_file_dest='/nfsfsxn/archlog/' scope=both;
+SELECT GROUP#,THREAD#,BYTES,STATUS FROM V$STANDBY_LOG;
++
+....
+SQL> SELECT GROUP#,THREAD#,BYTES,STATUS FROM V$STANDBY_LOG;
 
-. Create a RMAN backup and incremental merge script. The script allocates multiple channels for parallel RMAN backup and merge. First execution would generate the initial full baseline image copy. In a complete run, it first purges obsolete backups that are outside of retention window to keep staging area clean. It then switches current log file before merge and backup. The incremental backup follows the merge so that the database image copy is trailing current database state by one backup/merge cycle. The merge and backup order can be reversed for quicker recovery at user's preference. The RMAN script can be integrated into a simple shell script to be executed from crontab on the primary DB server. Ensure control file autobackup is on in RMAN setting. 
+    GROUP#    THREAD#      BYTES STATUS
+---------- ---------- ---------- ----------
+         4          1  209715200 UNASSIGNED
+         5          1  209715200 UNASSIGNED
+         6          1  209715200 UNASSIGNED
+         7          1  209715200 UNASSIGNED
+
+SQL>
+....
+
+. Set primary database initialization parameters
 +
 ....
 vi /home/oracle/rman_bkup_merge.cmd
