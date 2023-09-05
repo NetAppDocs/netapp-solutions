@@ -5,7 +5,7 @@ keywords: Oracle, AWS, FSx ONTAP, FSx, Database, Oracle 19c, Data Guard
 summary: "The solution provides overview and details for configuring Oracle Data Guard using AWS FSx ONTAP as standby site Oracle database storage to reduce licensing and operational cost of Oracle Data Guard HA/DR solution in AWS."   
 ---
 
-= TR-4981: Oracle Data Guard Deployment with AWS FSx ONTAP 
+= TR-4981: Active Data Guard Cost Reduction with AWS FSx ONTAP 
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -49,7 +49,7 @@ image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed p
 |===
 3+^| *Hardware*
 | FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone
-| EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge EC2 instances, one as primary DB server and the other as a clone DB server 
+| EC2 instance for compute | t2.xlarge/4vCPU/16G | Three EC2 T2 xlarge EC2 instances, one as primary DB server, one as standby DB server, and the third as a clone DB server 
 
 3+^| *Software*
 | RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
@@ -58,17 +58,19 @@ image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed p
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 |===
 
-=== Oracle Data Guard configuration
+=== Oracle Data Guard configuration mimic NY to LA DR setup
 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| 
 | *Database* | *DB_UNIQUE_NAME* | *Oracle Net Service Name*
-| Primary | db1-NY | db1-NY.demo.netapp.com
-| Physical Standby | db1-LA | db1-LA.demo.netapp.com 
+| Primary | db1_NY | db1_NY.demo.netapp.com
+| Physical Standby | db1_LA | db1_LA.demo.netapp.com 
 |===
 
 === Key factors for deployment consideration
+
+* *How Oracle Standby DB volume FlexClone Works.* AWS FSx ONTAP FlexClone provides shared copies of the same primary data volumes that are writable. The copies of the primary volume are actually pointers that link back to original data blocks until a new write initiates on the clone. ONTAP then allocated new storage blocks for the new writes. Any read IOs are serviced by original data blocks under active replication. Thus, the clone are very storage efficient that can be used for many other use cases with minimal and incremental new storage allocation for new write IOs. This provides tremendous storage cost saving by substantially reducing Active Data Guard storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to standby FSx storage in order to maintain Oracle performance at high level. 
 
 * *Oracle Software Requirements.* In general, a physical standby database must have the same Database Home version as the primary database including Patch Set Exceptions (PSEs), Critical Patch Updates (CPUs), and Patch Set Updates (PSUs), unless an Oracle Data Guard Standby-First Patch Apply process is in progress (as described in My Oracle Support note 1265700.1 at link:http://support.oracle.com.[support.oracle.com^]
 
@@ -78,20 +80,15 @@ image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed p
 
 * *Database Storage Management.* For operational simplicity, Oracle recommends that when you set up Oracle Automatic Storage Management (Oracle ASM) and Oracle Managed Files (OMF) in an Oracle Data Guard configuration that you set it up symmetrically on the primary and standby database(s).  
 
-* *FlexClone Oracle Standby volume for other use cases.* AWS FSx ONTAP FlexClone provides shared copies of the same NFS data volume that are writable. Thus, they can be used for many other use cases while still maintaining the integrity of staging Oracle VLDB image copy even when Oracle database is switched over. This provides tremendous storage cost saving by substantially reducing VLDB storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to database image copy in order to maintain Oracle performance at high level. 
-
 * *EC2 compute instances.* In these tests and validations, we used an AWS EC2 t2.xlarge instance as the Oracle database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workload. You need to size the EC2 instance appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
 
 * *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi-zone deployment further enhances high availability in the event of failure in a single AWS zone. 
 
 * *FSx storage cluster sizing.* An Amazon FSx for ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
 
-* *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For multiple FSx file systems deployment for a VLDB, dNFS multi-path to different FSx NFS file systems should be properly configured.   
-
-
 == Solution deployment
 
-It is assumed that you already have your Oracle VLDB deployed in AWS EC2 environment within a VPC. If you need help on Oracle deployment in AWS, please refer to following technical reports for help. 
+It is assumed that you already have your Oracle database deployed in AWS EC2 environment within a VPC as the starting point for setting up Data Guard. If you need help on Oracle deployment in AWS, please refer to following technical reports for help. 
 
 * link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_deploy_intro.html[Oracle Database Deployment on EC2 and FSx Best Practices^]
 
@@ -99,7 +96,7 @@ It is assumed that you already have your Oracle VLDB deployed in AWS EC2 environ
 
 * link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_nfs_asm.html[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^]
 
-Your Oracle VLDB can be running either on a FSx ONTAP or any other storage of choices within the AWS EC2 ecosystem. The following section provides step-by-step deployment procedures for setting up RMAN incremental merge to an image copy of an Oracle VLDB that is staging in an NFS mount off AWS FSx ONTAP storage.    
+Your primary Oracle database can be running either on a FSx ONTAP or any other storage of choices within the AWS EC2 ecosystem. The following section provides step-by-step deployment procedures for setting up Oracle Data Guard between a primary EC2 DB server with ASM storage to a standby EC2 DB server with ASM storage.    
 
 === Prerequisites for deployment
 [%collapsible]
