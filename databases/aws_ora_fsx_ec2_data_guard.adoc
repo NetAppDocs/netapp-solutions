@@ -41,7 +41,7 @@ The testing and validation of this solution was performed in an AWS FSx ONTAP an
 
 === Architecture
 
-image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed picture of the Oracle VLDB incremental merge implementation in AWS public cloud with FSxN."]
+image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed picture of the Oracle Data Guard implementation in AWS with FSxN."]
 
 === Hardware and software components
 
@@ -88,7 +88,7 @@ image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed p
 
 == Solution deployment
 
-It is assumed that you already have your Oracle database deployed in AWS EC2 environment within a VPC as the starting point for setting up Data Guard. If you need help on Oracle deployment in AWS, please refer to following technical reports for help. 
+It is assumed that you already have your primary Oracle database deployed in AWS EC2 environment within a VPC as the starting point for setting up Data Guard. The primary database is deployed using Oracle ASM for storage management.  Two ASM disk groups - +DATA and +LOGS are created for Oracle data files, log files, and control file etc. If you need help on Oracle deployment in AWS with ASM, please refer to following technical reports for help. 
 
 * link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_deploy_intro.html[Oracle Database Deployment on EC2 and FSx Best Practices^]
 
@@ -106,9 +106,9 @@ Deployment requires the following prerequisites.
 
 . An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
 
-. From the AWS EC2 console, you must deploy minimum three EC2 Linux instances, one as the primary Oracle DB server, one as standby Oracle DB server, and an clone target DB server for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
+. From the AWS EC2 console, you need to deploy minimum three EC2 Linux instances, one as the primary Oracle DB server, one as standby Oracle DB server, and an clone target DB server for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
 
-. From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host the NFS volumes that stores the Oracle database standby image copy. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
+. From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host Oracle volumes that stores the Oracle standby database copy. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
 
 . Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution. The template can be easily revised for your own deployment requirements.
 +
@@ -122,14 +122,325 @@ Ensure that you have allocated at least 50G in EC2 instance root volume in order
 
 ====
 
-=== Provision FSx volumes to create ASM disk groups on standby EC2 DB server
+=== Prepare the primary database for Data Guard configuration
 [%collapsible]
 
 ====
 
-In this demonstration, we will show how to provision an NFS volume from the command line by login to an FSx cluster via ssh as fsxadmin user through FSx cluster management IP. Alternatively, the volume can be allocated using the AWS FSx console as well. Repeat the procedures on other FSx file systems if more than one FSx file system are set up to accommodate the size of the database. 
+In this demonstration, we have setup a primary Oracle database called db1 on the primary EC2 DB server with two ASM disk groups +DATA and +LOGS in standalone Restart configuration. Following illustrates the detailed procedures for setting up primary database for Data Guard. All steps should be executed as database owner oracle.
 
-. First, provision NFS volume via CLI by logging to the FSx cluster through SSH as the fsxadmin user. Change to your FSx cluster management IP address, which can be retrieved from AWS FSx ONTAP UI console. 
+. Primary database db1 configuration on primary EC2 instance ip-172-30-15-45. The ASM disk groups can be on any type of storage within EC2 ecosystem. 
++
+....
+
+[oracle@ip-172-30-15-45 ~]$ cat /etc/oratab
+
+# This file is used by ORACLE utilities.  It is created by root.sh
+# and updated by either Database Configuration Assistant while creating
+# a database or ASM Configuration Assistant while creating ASM instance.
+
+# A colon, ':', is used as the field terminator.  A new line terminates
+# the entry.  Lines beginning with a pound sign, '#', are comments.
+#
+# Entries are of the form:
+#   $ORACLE_SID:$ORACLE_HOME:<N|Y>:
+#
+# The first and second fields are the system identifier and home
+# directory of the database respectively.  The third field indicates
+# to the dbstart utility that the database should , "Y", or should not,
+# "N", be brought up at system boot time.
+#
+# Multiple entries with the same $ORACLE_SID are not allowed.
+#
+#
++ASM:/u01/app/oracle/product/19.0.0/grid:N
+db1:/u01/app/oracle/product/19.0.0/db1:N
+
+[oracle@ip-172-30-15-45 ~]$ /u01/app/oracle/product/19.0.0/grid/bin/crsctl stat res -t
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DATA.dg
+               ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.LISTENER.lsnr
+               ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.LOGS.dg
+               ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.asm
+               ONLINE  ONLINE       ip-172-30-15-45          Started,STABLE
+ora.ons
+               OFFLINE OFFLINE      ip-172-30-15-45          STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.cssd
+      1        ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.db1.db
+      1        ONLINE  ONLINE       ip-172-30-15-45          Open,HOME=/u01/app/o
+                                                             racle/product/19.0.0
+                                                             /db1,STABLE
+ora.diskmon
+      1        OFFLINE OFFLINE                               STABLE
+ora.driver.afd
+      1        ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.evmd
+      1        ONLINE  ONLINE       ip-172-30-15-45          STABLE
+--------------------------------------------------------------------------------
+
+....
+
+. From sqlplus, enable forced logging on primary.
++
+[command, cli]
+alter database force logging;
+
+. Configure redo transport authentication using Oracle password file - create a pwd file on the primary using orapwd utility if not set and copy over to standby database oracle_home/dbs directory.
+
+. Create standby redo logs on the primary DB with same size as current online log file. Log groups are one more than online log file groups. The primary database can then quickly transition to the standby role and begin receiving redo data, if necessary. 
++
+[command, cli]
+alter database add standby logfile thread 1 size 200M;
++
+....
+Validate after standby logs addition:
+
+SQL> select group#, type, member from v$logfile;
+
+    GROUP# TYPE    MEMBER
+---------- ------- ------------------------------------------------------------
+         3 ONLINE  +DATA/DB1/ONLINELOG/group_3.264.1145821513
+         2 ONLINE  +DATA/DB1/ONLINELOG/group_2.263.1145821513
+         1 ONLINE  +DATA/DB1/ONLINELOG/group_1.262.1145821513
+         4 STANDBY +DATA/DB1/ONLINELOG/group_4.286.1146082751
+         4 STANDBY +LOGS/DB1/ONLINELOG/group_4.258.1146082753
+         5 STANDBY +DATA/DB1/ONLINELOG/group_5.287.1146082819
+         5 STANDBY +LOGS/DB1/ONLINELOG/group_5.260.1146082821
+         6 STANDBY +DATA/DB1/ONLINELOG/group_6.288.1146082825
+         6 STANDBY +LOGS/DB1/ONLINELOG/group_6.261.1146082827
+         7 STANDBY +DATA/DB1/ONLINELOG/group_7.289.1146082835
+         7 STANDBY +LOGS/DB1/ONLINELOG/group_7.262.1146082835
+
+11 rows selected.
+....
+
+. From sqlplus, create a pfile from spfile for editing.
++
+[command, cli]
+create pfile='/home/oracle/initdb1.ora' from spfile;
+
+. Revise the pfile and add following parameters
++
+....
+DB_NAME=db1
+DB_UNIQUE_NAME=db1_NY
+LOG_ARCHIVE_CONFIG='DG_CONFIG=(db1_NY,db1_LA)'
+LOG_ARCHIVE_DEST_1=
+ 'LOCATION=USE_DB_RECOVERY_FILE_DEST 
+  VALID_FOR=(ALL_LOGFILES,ALL_ROLES)
+  DB_UNIQUE_NAME=db1_NY'
+LOG_ARCHIVE_DEST_2=
+ 'SERVICE=db1_LA ASYNC
+  VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE) 
+  DB_UNIQUE_NAME=db1_LA'
+REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE
+FAL_SERVER=db1_LA
+STANDBY_FILE_MANAGEMENT=AUTO
+....
+
+. From sqlplus, create spfile in ASM +DATA directory from revised pfile in /home/oracle directory.
++
+[command, cli]
+create spfile='+DATA' from pfile='/home/oracle/initdb1.ora';
+
+. Locate the newly created spfile under +DATA disk group(using asmcmd utility if necessary). Use srvctl to modify grid to start database from new spfile as shown below.
++
+....
+[oracle@ip-172-30-15-45 db1]$ srvctl config database -d db1
+Database unique name: db1
+Database name: db1
+Oracle home: /u01/app/oracle/product/19.0.0/db1
+Oracle user: oracle
+Spfile: +DATA/DB1/PARAMETERFILE/spfile.270.1145822903
+Password file:
+Domain: demo.netapp.com
+Start options: open
+Stop options: immediate
+Database role: PRIMARY
+Management policy: AUTOMATIC
+Disk Groups: DATA
+Services:
+OSDBA group:
+OSOPER group:
+Database instance: db1
+[oracle@ip-172-30-15-45 db1]$ srvctl modify database -d db1 -spfile +DATA/DB1/PARAMETERFILE/spfiledb1.ora
+[oracle@ip-172-30-15-45 db1]$ srvctl config database -d db1
+Database unique name: db1
+Database name: db1
+Oracle home: /u01/app/oracle/product/19.0.0/db1
+Oracle user: oracle
+Spfile: +DATA/DB1/PARAMETERFILE/spfiledb1.ora
+Password file:
+Domain: demo.netapp.com
+Start options: open
+Stop options: immediate
+Database role: PRIMARY
+Management policy: AUTOMATIC
+Disk Groups: DATA
+Services:
+OSDBA group:
+OSOPER group:
+Database instance: db1
+....
+
+. Modify tnsnames.ora to add db_unique_name for name resolution.
++
+....
+# tnsnames.ora Network Configuration File: /u01/app/oracle/product/19.0.0/db1/network/admin/tnsnames.ora
+# Generated by Oracle configuration tools.
+
+db1_NY =
+  (DESCRIPTION =
+    (ADDRESS = (PROTOCOL = TCP)(HOST = ip-172-30-15-45.ec2.internal)(PORT = 1521))
+    (CONNECT_DATA =
+      (SERVER = DEDICATED)
+      (SID = db1)
+    )
+  )
+
+db1_LA =
+  (DESCRIPTION =
+    (ADDRESS = (PROTOCOL = TCP)(HOST = ip-172-30-15-67.ec2.internal)(PORT = 1521))
+    (CONNECT_DATA =
+      (SERVER = DEDICATED)
+      (SID = db1)
+    )
+  )
+
+LISTENER_DB1 =
+  (ADDRESS = (PROTOCOL = TCP)(HOST = ip-172-30-15-45.ec2.internal)(PORT = 1521))
+....
+
+. Add data guard service name db1_NY_DGMGRL.demo.netapp for primary database to listener.ora file.
+....
+#Backup file is  /u01/app/oracle/crsdata/ip-172-30-15-45/output/listener.ora.bak.ip-172-30-15-45.oracle line added by Agent
+# listener.ora Network Configuration File: /u01/app/oracle/product/19.0.0/grid/network/admin/listener.ora
+# Generated by Oracle configuration tools.
+
+LISTENER =
+  (DESCRIPTION_LIST =
+    (DESCRIPTION =
+      (ADDRESS = (PROTOCOL = TCP)(HOST = ip-172-30-15-45.ec2.internal)(PORT = 1521))
+      (ADDRESS = (PROTOCOL = IPC)(KEY = EXTPROC1521))
+    )
+  )
+
+SID_LIST_LISTENER =
+  (SID_LIST =
+    (SID_DESC =
+      (GLOBAL_DBNAME = db1_NY_DGMGRL.demo.netapp.com)
+      (ORACLE_HOME = /u01/app/oracle/product/19.0.0/db1)
+      (SID_NAME = db1)
+    )
+  )
+
+ENABLE_GLOBAL_DYNAMIC_ENDPOINT_LISTENER=ON              # line added by Agent
+VALID_NODE_CHECKING_REGISTRATION_LISTENER=ON            # line added by Agent
+....
+
+. Shutdown and restart database with srvctl and validate that data guard parameters are now active.
++
+[command, cli]
+srvctl stop database -d db1
++
+[command, cli]
+srvctl start database -d db1
+
+This completes primary database setup for Data Guard.
+
+====
+
+=== Prepare standby EC2 DB server for Data Guard
+[%collapsible]
+
+====
+
+As Data Guard requirements, OS kernel configuration and Oracle software stacks including patch sets on standby EC2 DB server should match with primary EC2 DB server. For easy management and simplicity, the standby EC2 DB server database storage should match with the primary EC2 DB server such as the number and size of ASM disk groups. Following are detail procedures for setting up the standby EC2 DB server for Data Guard. 
+
+. First, review the configuration of the primary database on primary EC2 instance. In this demonstration, we have setup a primary Oracle database called db1 on the primary EC2 DB instance with two ASM disk groups +DATA and +LOGS in standalone Restart configuration. The primary ASM disk groups may be on any type of storage within EC2 ecosystem. 
+
+....
+
+[oracle@ip-172-30-15-45 ~]$ cat /etc/oratab
+
+# This file is used by ORACLE utilities.  It is created by root.sh
+# and updated by either Database Configuration Assistant while creating
+# a database or ASM Configuration Assistant while creating ASM instance.
+
+# A colon, ':', is used as the field terminator.  A new line terminates
+# the entry.  Lines beginning with a pound sign, '#', are comments.
+#
+# Entries are of the form:
+#   $ORACLE_SID:$ORACLE_HOME:<N|Y>:
+#
+# The first and second fields are the system identifier and home
+# directory of the database respectively.  The third field indicates
+# to the dbstart utility that the database should , "Y", or should not,
+# "N", be brought up at system boot time.
+#
+# Multiple entries with the same $ORACLE_SID are not allowed.
+#
+#
++ASM:/u01/app/oracle/product/19.0.0/grid:N
+db1:/u01/app/oracle/product/19.0.0/db1:N
+
+[oracle@ip-172-30-15-45 ~]$ /u01/app/oracle/product/19.0.0/grid/bin/crsctl stat res -t
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DATA.dg
+               ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.LISTENER.lsnr
+               ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.LOGS.dg
+               ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.asm
+               ONLINE  ONLINE       ip-172-30-15-45          Started,STABLE
+ora.ons
+               OFFLINE OFFLINE      ip-172-30-15-45          STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.cssd
+      1        ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.db1.db
+      1        ONLINE  ONLINE       ip-172-30-15-45          Open,HOME=/u01/app/o
+                                                             racle/product/19.0.0
+                                                             /db1,STABLE
+ora.diskmon
+      1        OFFLINE OFFLINE                               STABLE
+ora.driver.afd
+      1        ONLINE  ONLINE       ip-172-30-15-45          STABLE
+ora.evmd
+      1        ONLINE  ONLINE       ip-172-30-15-45          STABLE
+--------------------------------------------------------------------------------
+
+....
+
+. Follow procedures in documentation link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_iscsi_asm.html[TR-4965: Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^] to install and configure grid and Oracle on standby EC2 DB instance to match with primary database. The database storage should be provisioned and allocated to standby EC2 DB instance from FSx ONTAP with same storage capacity as primary EC2 DB instance.
++
+[NOTE]
+
+Stop at step 10 in `Oracle database installation` section. The standby database copy will be instantiated from primary database instead. 
+
+. Follow procedure link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_iscsi_asm.html#provision-and-map-database-volumes-and-luns-to-the-ec2-instance-host[Provision and map database volumes and LUNs to the EC2 instance host^] to provision database volumes from FSx cluster to be presented to standby EC2 DB instance to host Oracle binary and standby database copy.
+
+. Follow procedure link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_iscsi_asm.html#database-storage-configuration[Database storage configuration] to configure storage on standby EC2 DB instance.
+
+. First, logging to the FSx cluster through SSH as the fsxadmin user. Change to your FSx cluster management IP address, which can be retrieved from AWS FSx ONTAP UI console. 
 +
 [source, cli]
 ssh fsxadmin@172.30.15.53
@@ -171,7 +482,7 @@ sudo chown oracle:oinstall /nfsfsxn
 
 ====
 
-=== Prepare the primary database for standby database creation
+=== Prepare the primary database for Data Guard configuration
 [%collapsible]
 
 ====
