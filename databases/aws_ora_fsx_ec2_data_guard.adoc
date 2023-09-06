@@ -17,9 +17,9 @@ Allen Cao, Niyaz Mohamed, NetApp
 [.lead]
 == Purpose
 
-Oracle Data Guard ensures high availability, data protection, and disaster recovery for enterprise data in a primary database and standby database replication configuration. Oracle Active Data Guard empowers users to access standby databases while data replication is active from the primary database to standby databases. Data Guard is a feature of Oracle Database Enterprise Edition. It does not require separate licensing. On the other hand, Active Data Guard is an Oracle Database Enterprise Edition Option therefore requires separate licensing. Multiple standby databases can receive data replication from a primary database in the Active Data Guard setup. However, each additional standby database requires an Active Data Guard license and extra storage as the size of primary database. The optional cost adds up quickly.
+Oracle Data Guard ensures high availability, data protection, and disaster recovery for enterprise data in a primary database and standby database replication configuration. Oracle Active Data Guard empowers users to access standby databases while data replication is active from the primary database to standby databases. Data Guard is a feature of Oracle Database Enterprise Edition. It does not require separate licensing. On the other hand, Active Data Guard is an Oracle Database Enterprise Edition Option therefore requires separate licensing. Multiple standby databases can receive data replication from a primary database in the Active Data Guard setup. However, each additional standby database requires an Active Data Guard license and extra storage as the size of primary database. The operational costs add up quickly.
 
-If you are keen on cutting back cost of your Oracle database operation and are planning to set up an Active Data Guard in AWS, you should consider an alternative. Instead of Active Data Guard, use Data Guard to replicate from primary database to a single copy of physical standby database on AWS FSx ONTAP storage. Subsequently, multiple copies of this standby database can be cloned and opened for read/write access to serve many other use cases such as reporting, development, test etc. The net results effectively deliver functionalities of Active Data Guard while eliminating Active Data Guard license and extra storage cost for each additional standby database. In this documentation, we demonstrate how to setup an Oracle Data Guard with your existing primary database in AWS and place physical standby database on AWS FSx ONTAP storage. The standby database is backed up via snapshot and cloned for read/write access for use cases as desired. 
+If you are keen on cutting back cost of your Oracle database operation and are planning to set up an Active Data Guard in AWS, you should consider an alternative. Instead of Active Data Guard, use Data Guard to replicate from primary database to a single physical standby database on AWS FSx ONTAP storage. Subsequently, multiple copies of this standby database can be cloned and opened for read/write access to serve many other use cases such as reporting, development, test etc. The net results effectively deliver functionalities of Active Data Guard while eliminating Active Data Guard license and extra storage cost for each additional standby database. In this documentation, we demonstrate how to setup an Oracle Data Guard with your existing primary database in AWS and place physical standby database on AWS FSx ONTAP storage. The standby database is backed up via snapshot and cloned for read/write access for use cases as desired. 
 
 This solution addresses the following use cases:
 
@@ -58,7 +58,7 @@ image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed p
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 |===
 
-=== Oracle Data Guard configuration with NY to LA DR setup
+=== Oracle Data Guard configuration with hypothetical NY to LA DR setup
 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
@@ -70,7 +70,7 @@ image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed p
 
 === Key factors for deployment consideration
 
-* *How Oracle Standby DB volume FlexClone Works.* AWS FSx ONTAP FlexClone provides shared copies of the same primary data volumes that are writable. The copies of the primary volume are actually pointers that link back to original data blocks until a new write initiates on the clone. ONTAP then allocated new storage blocks for the new writes. Any read IOs are serviced by original data blocks under active replication. Thus, the clone are very storage efficient that can be used for many other use cases with minimal and incremental new storage allocation for new write IOs. This provides tremendous storage cost saving by substantially reducing Active Data Guard storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to standby FSx storage in order to maintain Oracle performance at high level. 
+* *How Oracle Standby Database FlexClone Works.* AWS FSx ONTAP FlexClone provides shared copies of the same standby database volumes that are writable. The copies of the volumes are actually pointers that link back to original data blocks until a new write initiates on the clone. ONTAP then allocates new storage blocks for the new writes. Any read IOs are serviced by original data blocks under active replication. Thus, the clone are very storage efficient that can be used for many other use cases with minimal and incremental new storage allocation for new write IOs. This provides tremendous storage cost saving by substantially reducing Active Data Guard storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to standby FSx storage in order to maintain Oracle performance at high level. 
 
 * *Oracle Software Requirements.* In general, a physical standby database must have the same Database Home version as the primary database including Patch Set Exceptions (PSEs), Critical Patch Updates (CPUs), and Patch Set Updates (PSUs), unless an Oracle Data Guard Standby-First Patch Apply process is in progress (as described in My Oracle Support note 1265700.1 at link:http://support.oracle.com.[support.oracle.com^]
 
@@ -80,15 +80,15 @@ image::aws_ora_fsx_data_guard_architecture.png["This image provides a detailed p
 
 * *Database Storage Management.* For operational simplicity, Oracle recommends that when you set up Oracle Automatic Storage Management (Oracle ASM) and Oracle Managed Files (OMF) in an Oracle Data Guard configuration that you set it up symmetrically on the primary and standby database(s).  
 
-* *EC2 compute instances.* In these tests and validations, we used an AWS EC2 t2.xlarge instance as the Oracle database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workload. You need to size the EC2 instance appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
+* *EC2 compute instances.* In these tests and validations, we used an AWS EC2 t2.xlarge instance as the Oracle database compute instance. NetApp recommends using a M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workload. You need to size the EC2 instance appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
 
-* *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi-zone deployment further enhances high availability in the event of failure in a single AWS zone. 
+* *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi-zone deployment further enhances high availability in the event of failure in a single AWS zone. 
 
 * *FSx storage cluster sizing.* An Amazon FSx for ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
 
 == Solution deployment
 
-It is assumed that you already have your primary Oracle database deployed in AWS EC2 environment within a VPC as the starting point for setting up Data Guard. The primary database is deployed using Oracle ASM for storage management.  Two ASM disk groups - +DATA and +LOGS are created for Oracle data files, log files, and control file etc. If you need help on Oracle deployment in AWS with ASM, please refer to following technical reports for help. 
+It is assumed that you already have your primary Oracle database deployed in AWS EC2 environment within a VPC as the starting point for setting up Data Guard. The primary database is deployed using Oracle ASM for storage management.  Two ASM disk groups - +DATA and +LOGS are created for Oracle data files, log files, and control file etc. For details on Oracle deployment in AWS with ASM, please refer to following technical reports for help. 
 
 * link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_deploy_intro.html[Oracle Database Deployment on EC2 and FSx Best Practices^]
 
@@ -96,7 +96,7 @@ It is assumed that you already have your primary Oracle database deployed in AWS
 
 * link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_nfs_asm.html[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^]
 
-Your primary Oracle database can be running either on a FSx ONTAP or any other storage of choices within the AWS EC2 ecosystem. The following section provides step-by-step deployment procedures for setting up Oracle Data Guard between a primary EC2 DB server with ASM storage to a standby EC2 DB server with ASM storage.    
+Your primary Oracle database can be running either on an FSx ONTAP or any other storage of choices within the AWS EC2 ecosystem. The following section provides step-by-step deployment procedures for setting up Oracle Data Guard between a primary EC2 DB instance with ASM storage to a standby EC2 DB instance with ASM storage.    
 
 === Prerequisites for deployment
 [%collapsible]
@@ -106,15 +106,14 @@ Deployment requires the following prerequisites.
 
 . An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
 
-. From the AWS EC2 console, you need to deploy minimum three EC2 Linux instances, one as the primary Oracle DB server, one as standby Oracle DB server, and an clone target DB server for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
+. From the AWS EC2 console, you need to deploy minimum three EC2 Linux instances, one as the primary Oracle DB instance, one as standby Oracle DB instance, and an clone target DB instance for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the AWS link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
 
-. From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host Oracle volumes that stores the Oracle standby database copy. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
+. From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host Oracle volumes that stores the Oracle standby database. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
 
 . Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution. The template can be easily revised for your own deployment requirements.
 +
-....
+[source, cli]
 git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
-....
 
 [NOTE]
 
@@ -127,9 +126,9 @@ Ensure that you have allocated at least 50G in EC2 instance root volume in order
 
 ====
 
-In this demonstration, we have setup a primary Oracle database called db1 on the primary EC2 DB server with two ASM disk groups in standalone Restart configuration with data files in ASM disk group +DATA and flash recovery area in ASM disk group +LOGS. Following illustrates the detailed procedures for setting up primary database for Data Guard. All steps should be executed as database owner oracle.
+In this demonstration, we have setup a primary Oracle database called db1 on the primary EC2 DB instance with two ASM disk groups in standalone Restart configuration with data files in ASM disk group +DATA and flash recovery area in ASM disk group +LOGS. Following illustrates the detailed procedures for setting up primary database for Data Guard. All steps should be executed as database owner - oracle user.
 
-. Primary database db1 configuration on primary EC2 instance ip-172-30-15-45. The ASM disk groups can be on any type of storage within EC2 ecosystem. 
+. Primary database db1 configuration on primary EC2 DB instance ip-172-30-15-45. The ASM disk groups can be on any type of storage within EC2 ecosystem. 
 +
 ....
 
@@ -193,19 +192,19 @@ ora.evmd
 
 . From sqlplus, enable forced logging on primary.
 +
-[command, cli]
+[source, cli]
 alter database force logging;
 
 . From sqlplus, enable flashback on primary. Flashback allows easy reinstate primary database as a standby after a failover. 
 +
-[command, cli]
+[source, cli]
 alter database flashback on;
 
-. Configure redo transport authentication using Oracle password file - create a pwd file on the primary using orapwd utility if not set and copy over to standby database oracle_home/dbs directory.
+. Configure redo transport authentication using Oracle password file - create a pwd file on the primary using orapwd utility if not set and copy over to standby database $ORACLE_HOME/dbs directory.
 
 . Create standby redo logs on the primary DB with same size as current online log file. Log groups are one more than online log file groups. The primary database can then quickly transition to the standby role and begin receiving redo data, if necessary. 
 +
-[command, cli]
+[source, cli]
 alter database add standby logfile thread 1 size 200M;
 +
 ....
@@ -232,23 +231,17 @@ SQL> select group#, type, member from v$logfile;
 
 . From sqlplus, create a pfile from spfile for editing.
 +
-[command, cli]
+[source, cli]
 create pfile='/home/oracle/initdb1.ora' from spfile;
 
-. Revise the pfile and add following parameters
+. Revise the pfile and add following parameters.
 +
 ....
 DB_NAME=db1
 DB_UNIQUE_NAME=db1_NY
 LOG_ARCHIVE_CONFIG='DG_CONFIG=(db1_NY,db1_LA)'
-LOG_ARCHIVE_DEST_1=
- 'LOCATION=USE_DB_RECOVERY_FILE_DEST 
-  VALID_FOR=(ALL_LOGFILES,ALL_ROLES)
-  DB_UNIQUE_NAME=db1_NY'
-LOG_ARCHIVE_DEST_2=
- 'SERVICE=db1_LA ASYNC
-  VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE) 
-  DB_UNIQUE_NAME=db1_LA'
+LOG_ARCHIVE_DEST_1='LOCATION=USE_DB_RECOVERY_FILE_DEST VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=db1_NY'
+LOG_ARCHIVE_DEST_2='SERVICE=db1_LA ASYNC VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE) DB_UNIQUE_NAME=db1_LA'
 REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE
 FAL_SERVER=db1_LA
 STANDBY_FILE_MANAGEMENT=AUTO
@@ -256,7 +249,7 @@ STANDBY_FILE_MANAGEMENT=AUTO
 
 . From sqlplus, create spfile in ASM +DATA directory from revised pfile in /home/oracle directory.
 +
-[command, cli]
+[source, cli]
 create spfile='+DATA' from pfile='/home/oracle/initdb1.ora';
 
 . Locate the newly created spfile under +DATA disk group(using asmcmd utility if necessary). Use srvctl to modify grid to start database from new spfile as shown below.
@@ -356,22 +349,22 @@ VALID_NODE_CHECKING_REGISTRATION_LISTENER=ON            # line added by Agent
 
 . Shutdown and restart database with srvctl and validate that data guard parameters are now active.
 +
-[command, cli]
+[source, cli]
 srvctl stop database -d db1
 +
-[command, cli]
+[source, cli]
 srvctl start database -d db1
 
 This completes primary database setup for Data Guard.
 
 ====
 
-=== Prepare standby database and activate Data Guard managed recovery
+=== Prepare standby database and activate Data Guard
 [%collapsible]
 
 ====
 
-Oracle Data Guard requires OS kernel configuration and Oracle software stacks including patch sets on standby EC2 DB instance to match with primary EC2 DB instance. For easy management and simplicity, the standby EC2 DB instance database storage configuration ideally should match with the primary EC2 DB instance as well, such as the number and size of ASM disk groups. Following are detail procedures for setting up the standby EC2 DB instance for Data Guard. All commands should be executed as oracle owner user id.
+Oracle Data Guard requires OS kernel configuration and Oracle software stacks including patch sets on standby EC2 DB instance to match with primary EC2 DB instance. For easy management and simplicity, the standby EC2 DB instance database storage configuration ideally should match with the primary EC2 DB instance as well, such as the name, number and size of ASM disk groups. Following are detail procedures for setting up the standby EC2 DB instance for Data Guard. All commands should be executed as oracle owner user id.
 
 . First, review the configuration of the primary database on primary EC2 instance. In this demonstration, we have setup a primary Oracle database called db1 on the primary EC2 DB instance with two ASM disk groups +DATA and +LOGS in standalone Restart configuration. The primary ASM disk groups may be on any type of storage within EC2 ecosystem. 
 
@@ -380,11 +373,11 @@ Oracle Data Guard requires OS kernel configuration and Oracle software stacks in
 +
 [NOTE]
 
-Stop at step 10 in `Oracle database installation` section. The standby database copy will be instantiated from primary database using dbca database duplication function. 
+Stop at step 10 in `Oracle database installation` section. The standby database will be instantiated from primary database using dbca database duplication function. 
 
-. Once Oracle software is installed and configured, from standby Oracle_Home dbs directory, copy oracle password from primary database.
+. Once Oracle software is installed and configured, from standby $ORACLE_HOME dbs directory, copy oracle password from primary database.
 +
-[command, cli]
+[source, cli]
 scp oracle@172.30.15.45:/u01/app/oracle/product/19.0.0/db1/dbs/orapwdb1 .
 
 . Create tnsnames.ora file with following entries.
@@ -414,7 +407,7 @@ db1_LA =
 
 ....
 
-. Add data guard service name to listener.ora file.
+. Add DB data guard service name to listener.ora file.
 +
 ....
 
@@ -444,15 +437,15 @@ VALID_NODE_CHECKING_REGISTRATION_LISTENER=ON            # line added by Agent
 
 ....
 
-. Set oracle home and path
+. Set oracle home and path.
 +
-[command, cli]
+[source, cli]
 export ORACLE_HOME=/u01/app/oracle/product/19.0.0/db1
 +
-[command, cli]
+[source, cli]
 export PATH=$PATH:$ORACLE_HOME/bin
 
-. Use dbca to instantiate standby database copy from primary database db1.
+. Use dbca to instantiate standby database from primary database db1.
 +
 ....
 
@@ -474,7 +467,7 @@ Look at the log file "/u01/app/oracle/cfgtoollogs/dbca/db1_LA/db1_LA.log" for fu
 
 ....
 
-. Validate duplicate database. Newly duplicated database open in READ ONLY mode initially.
+. Validate duplicated standby database. Newly duplicated standby database open in READ ONLY mode initially.
 +
 ....
 
@@ -574,27 +567,26 @@ NAME
 +DATA/DB1_LA/03C5F0DDF35CA2B6E0632D0F1EAC8B6B/TEMPFILE/temp.291.1146248463
 +DATA/DB1_LA/03C5F1C9B142A2F1E0632D0F1EACF21A/TEMPFILE/temp.292.1146248463
 
-SQL> select member from v$logfile;
+SQL> select group#, type, member from v$logfile order by 2, 1;
 
-MEMBER
---------------------------------------------------------------------------------
-+DATA/DB1_LA/ONLINELOG/group_3.282.1146248355
-+DATA/DB1_LA/ONLINELOG/group_2.281.1146248351
-+DATA/DB1_LA/ONLINELOG/group_1.280.1146248347
-+DATA/DB1_LA/ONLINELOG/group_4.283.1146248357
-+LOGS/DB1_LA/ONLINELOG/group_4.261.1146248359
-+DATA/DB1_LA/ONLINELOG/group_5.284.1146248361
-+LOGS/DB1_LA/ONLINELOG/group_5.262.1146248363
-+DATA/DB1_LA/ONLINELOG/group_6.285.1146248365
-+LOGS/DB1_LA/ONLINELOG/group_6.263.1146248365
-+DATA/DB1_LA/ONLINELOG/group_7.286.1146248367
-+LOGS/DB1_LA/ONLINELOG/group_7.264.1146248369
+    GROUP# TYPE    MEMBER
+---------- ------- ------------------------------------------------------------
+         1 ONLINE  +LOGS/DB1_LA/ONLINELOG/group_1.259.1146248349
+         1 ONLINE  +DATA/DB1_LA/ONLINELOG/group_1.280.1146248347
+         2 ONLINE  +DATA/DB1_LA/ONLINELOG/group_2.281.1146248351
+         2 ONLINE  +LOGS/DB1_LA/ONLINELOG/group_2.258.1146248353
+         3 ONLINE  +DATA/DB1_LA/ONLINELOG/group_3.282.1146248355
+         3 ONLINE  +LOGS/DB1_LA/ONLINELOG/group_3.260.1146248355
+         4 STANDBY +DATA/DB1_LA/ONLINELOG/group_4.283.1146248357
+         4 STANDBY +LOGS/DB1_LA/ONLINELOG/group_4.261.1146248359
+         5 STANDBY +DATA/DB1_LA/ONLINELOG/group_5.284.1146248361
+         5 STANDBY +LOGS/DB1_LA/ONLINELOG/group_5.262.1146248363
+         6 STANDBY +LOGS/DB1_LA/ONLINELOG/group_6.263.1146248365
+         6 STANDBY +DATA/DB1_LA/ONLINELOG/group_6.285.1146248365
+         7 STANDBY +LOGS/DB1_LA/ONLINELOG/group_7.264.1146248369
+         7 STANDBY +DATA/DB1_LA/ONLINELOG/group_7.286.1146248367
 
-MEMBER
---------------------------------------------------------------------------------
-+LOGS/DB1_LA/ONLINELOG/group_1.259.1146248349
-+LOGS/DB1_LA/ONLINELOG/group_2.258.1146248353
-+LOGS/DB1_LA/ONLINELOG/group_3.260.1146248355
+14 rows selected.
 
 SQL> select name, open_mode from v$database;
 
@@ -606,7 +598,7 @@ DB1       READ ONLY
 
 . Restart standby database in `mount` stage and execute following command to activate standby database managed recovery.
 +
-[command, cli]
+[source, cli]
 alter database recover managed standby database disconnect from session;
 +
 ....
@@ -664,13 +656,12 @@ SQL>
 
 ....
 
-This completes the Data Guard setup with managed standby recovery enabled.
+This completes the Data Guard protection setup for db1 from primary to standby with managed standby recovery enabled.
 
 ====
 
 
-
-=== Data Guard Broker configuration 
+=== Setup Data Guard Broker 
 [%collapsible]
  
 ====
@@ -679,7 +670,7 @@ Oracle Data Guard broker is a distributed management framework that automates an
 
 . Start data guard broker on both primary and standby databases with following command via sqlplus.
 +
-[command, cli]
+[source, cli]
 alter system set dg_broker_start=true scope=both;
 
 . From primary database, connect to Data Guard Borker as SYSDBA.
@@ -772,7 +763,7 @@ In the event of a failure, Data Guard Broker can be used to failover primary dat
 
 The key benefit of staging standby database on AWS FSx ONTAP in Data Guard is that it can be FlexCloned to serve many other use cases with minimal additional storage investment. In the following section, we demonstrate how to snapshot and clone the mounted and under recovery standby database volumes on FSx ONTAP for other purposes, such as DEV, TEST, REPORT, etc., using the NetApp SnapCenter tool.
 
-Following are high level procedures to clone a READ/WRITE capable database from the managed physical standby database in Data Guard using SnapCenter. For detail instructions on how to setup and configure SnapCenter, please refer to link:https://docs.netapp.com/us-en/netapp-solutions/databases/hybrid_dbops_snapcenter_usecases.html[Hybrid Cloud Database Solutions with SnapCenter^] relavant Oracle sections.
+Following are high level procedures to clone a READ/WRITE database from the managed physical standby database in Data Guard using SnapCenter. For detail instructions on how to setup and configure SnapCenter, please refer to link:https://docs.netapp.com/us-en/netapp-solutions/databases/hybrid_dbops_snapcenter_usecases.html[Hybrid Cloud Database Solutions with SnapCenter^] relavant Oracle sections.
 
 . We begin with creating a test table and inserting a row into the test table on primary database. We will then validate if the transaction traverse down to standby and finally the clone. 
 +
@@ -831,17 +822,17 @@ db1
 ip-172-30-15-45.ec2.internal
 ....
 
-. Add FSx storage cluster to `Storage Systems` in SnapCenter using FSx cluster management IP and fsxadmin credential. 
+. Add FSx storage cluster to `Storage Systems` in SnapCenter with FSx cluster management IP and fsxadmin credential. 
 +
-image:aws_ora_fsx_data_guard_clone_01["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_01.png["Screenshot showing this step in the GUI."]
 
 . Add AWS ec2-user to `Credential` in `Settings`.
 +
-image:aws_ora_fsx_data_guard_clone_02["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_02.png["Screenshot showing this step in the GUI."]
 
 . Add standby EC2 DB instance and clone EC2 DB instance to `Hosts`.
 +
-image:aws_ora_fsx_data_guard_clone_03["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_03.png["Screenshot showing this step in the GUI."]
 +
 [NOTE]
 
@@ -850,53 +841,53 @@ The clone EC2 DB instance should have similar Oracle software stacks installed a
 
 . Create a backup policy that is tailored for offline/mount full database backup.
 +
-image:aws_ora_fsx_data_guard_clone_04["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_04.png["Screenshot showing this step in the GUI."]
 
 . Apply backup policy to protect standby database in `Resources` tab.
 +
-image:aws_ora_fsx_data_guard_clone_05["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_05.png["Screenshot showing this step in the GUI."]
 
-. Click on database name to open the database backups page. Select a backup to be used for database clone and click on `Clone` button to launch clone procedures. 
+. Click on database name to open the database backups page. Select a backup to be used for database clone and click on `Clone` button to launch clone workflow. 
 +
-image:aws_ora_fsx_data_guard_clone_06["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_06.png["Screenshot showing this step in the GUI."]
 
 . Select `Complete Database Clone` and name the clone instance SID.
 +
-image:aws_ora_fsx_data_guard_clone_07["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_07.png["Screenshot showing this step in the GUI."]
 
-. Select the clone host, which will host the cloned database from standby DB. Accept the default for data files, control files, and redo logs. Two ASM disk groups will be created on the clone host that are corresponding to the disk groups on standby database.
+. Select the clone host, which hosts the cloned database from standby DB. Accept the default for data files, control files, and redo logs. Two ASM disk groups will be created on the clone host that are corresponding to the disk groups on standby database.
 +
-image:aws_ora_fsx_data_guard_clone_08["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_08.png["Screenshot showing this step in the GUI."]
 
-. No database credentials needed for OS based authentication. Match Oracle home setting with what is configured on the clone EC2 database instance. 
+. No database credentials are needed for OS based authentication. Match Oracle home setting with what is configured on the clone EC2 database instance. 
 +
-image:aws_ora_fsx_data_guard_clone_09["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_09.png["Screenshot showing this step in the GUI."]
 
 . Change clone database parameters if needed and specify scripts to run before cloen if any.
 +
-image:aws_ora_fsx_data_guard_clone_10["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_10.png["Screenshot showing this step in the GUI."]
 
 . Enter SQL to run after clone. In the demo, we executed commands to turn off database archive mode for a dev/test/report database. 
 +
-image:aws_ora_fsx_data_guard_clone_11["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_11.png["Screenshot showing this step in the GUI."]
 
 . Configure email notification if desired.
 +
-image:aws_ora_fsx_data_guard_clone_12["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_12.png["Screenshot showing this step in the GUI."]
 
-. Review the summary, click `Finish` to execute the clone.
+. Review the summary, click `Finish` to start the clone.
 +
-image:aws_ora_fsx_data_guard_clone_13["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_13.png["Screenshot showing this step in the GUI."]
 
 . Monitor clone job in `Monitor` tab. We observed that it took around 8 minutes to clone a database about 300GB in database volume size.
 +
-image:aws_ora_fsx_data_guard_clone_14["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_14.png["Screenshot showing this step in the GUI."]
 
 . Validate the clone database from SnapCenter, which is immediately registered in `Resources` tab right after clone operation.
 +
-image:aws_ora_fsx_data_guard_clone_15["Screenshot showing this step in the GUI."]
+image::aws_ora_fsx_data_guard_clone_15.png["Screenshot showing this step in the GUI."]
 
-. Query the clone database from clone EC2 instance. We validated that test transaction that was occurred in primary database had traversed down to clone database. 
+. Query the clone database from clone EC2 instance. We validated that test transaction that occurred in primary database had traversed down to clone database. 
 +
 ....
 [oracle@ip-172-30-15-126 ~]$ export ORACLE_HOME=/u01/app/oracle/product/19.0.0/dev
@@ -952,7 +943,7 @@ SQL>
 ....
 
 
-This completes the clone and validation of a new Oracle database from standgy database in Data Guard on FSx storage for DEV, TEST, REPORT or any other use cases. Multiple Oracle databases can be cloned off the same standby database in Data Guard.
+This completes the clone and validation of a new Oracle database from standby database in Data Guard on FSx storage for DEV, TEST, REPORT or any other use cases. Multiple Oracle databases can be cloned off the same standby database in Data Guard.
 
 ====
 
