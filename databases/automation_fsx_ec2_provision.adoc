@@ -1,0 +1,206 @@
+---
+sidebar: sidebar
+permalink: databases/automation_fsx_ec2_provision.html
+keywords: AWS, FSx ONTAP, EC2
+summary: "The solution provides a Terraform based automation toolkit for provisioning of FSx ONTAP cluster and EC2 compute instance"   
+---
+
+= FSx ONTAP Cluster and EC2 Instance Provision
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+NetApp Solutions Engineering Team
+
+[.lead]
+== Purpose
+
+This toolkit automates the tasks of provisioning of an AWS FSx ONTAP storage cluster and an EC2 compute instance, which can be subsequently used for database deployment. 
+
+
+This solution addresses the following use cases:
+
+* Provision an EC2 compute instance in AWS cloud in a predefined VPC subnet and set ssh key for EC2 instance access as ec2-user.
+* Provision an AWS FSx ONTAP storage cluster in desired availability zones and configure a storage SVM and set cluster admin user fsxadmin password. 
+
+== Audience
+
+This solution is intended for the following people:
+
+* A DBA who manages databases in AWS EC2 environment.
+* A database solution architect who is interested in database deployment in AWS EC2 ecosystem.
+* A storage administrator who manages AWS FSx ONTAP storage that supports databases.
+* An application owner who likes to standup database in AWS EC2 ecosystem.
+
+== License
+
+By accessing, downloading, installing or using the content in this GitHub repository, you agree the terms of the License laid out in link:https://github.com/NetApp/na_ora_hadr_failover_resync/blob/master/LICENSE.TXT[License file^].
+
+[NOTE] 
+
+There are certain restrictions around producing and/or sharing any derivative works with the content in this GitHub repository. Please make sure you read the terms of the License before using the content. If you do not agree to all of the terms, do not access, download or use the content in this repository.
+
+== Solution deployment
+
+=== Prerequisites for deployment
+[%collapsible]
+====
+Deployment requires the following prerequisites.
+
+  An Organization and AWS account has been setup in AWS public cloud
+    An user to run the deployment has been created
+    IAM roles has been configured 
+    IAM roles granted to user to permit provisioning the resources
+
+
+  VPC and security configuration
+    A VPC has been created to host the resources to be provisioned
+    A security group has been configured for the VPC
+    A ssh key pair has been created for EC2 instance access 
+
+  Network configuration
+    Subnets has been created for VPC with network segments assigned 
+    Route tables and network ACL configured 
+    NAT gateways or internet gateways configured for internet access 
+
+====
+
+=== Download the toolkit
+[%collapsible]
+====
+
+[source, cli]
+git clone https://github.com/NetApp/na_aws_fsx_ec2_deploy.git
+
+====
+
+=== Connectivity and authentication
+[%collapsible]
+====
+
+The toolkit is supposed to be executed from an AWS cloud shell. AWS cloud shell is a browser-based shell that makes it easy to securely manage, explore, and interact with your AWS resources. CloudShell is pre-authenticated with your console credentials. Common development and operations tools are pre-installed, so no local installation or configuration is required.
+
+====
+
+=== Terraform provider.tf and main.tf files configuration
+[%collapsible]
+====
+
+The provider.tf defines the provider that Terraform is provisioning resources from via API calls. The main.tf defines the resources and attributes of resources that are to be provisioned. Following are some details:
+
+  provider.tf:
+    terraform {
+      required_providers {
+        aws = {
+          source  = "hashicorp/aws"
+          version = "~> 4.54.0"
+        }
+      }
+    }
+
+  main.tf:
+    resource "aws_instance" "ora_01" {
+      ami                           = var.ami 
+      instance_type                 = var.instance_type
+      subnet_id                     = var.subnet_id
+      key_name                      = var.ssh_key_name
+
+      root_block_device {
+        volume_type                 = "gp3"
+        volume_size                 = var.root_volume_size
+      }
+
+      tags = {
+        Name                        = var.ec2_tag
+      }
+    }
+    ....
+
+====
+
+=== Terraform variables.tf and terraform.tfvars configuration
+[%collapsible]
+====
+
+The variables.tf declares the variables to be used in main.tf. The terraform.tfvars contains the actual values for the variables. Following are some examples:
+
+  variables.tf:
+    ### EC2 instance variables ###
+
+    variable "ami" {
+      type        = string 
+      description = "EC2 AMI image to be deployed"
+    }
+
+    variable "instance_type" {
+      type        = string
+      description = "EC2 instance type"
+    }
+    ....
+
+  terraform.tfvars:
+    # EC2 instance variables
+
+    ami                     = "ami-06640050dc3f556bb" //RedHat 8.6  AMI
+    instance_type           = "t2.micro"
+    ec2_tag                 = "ora_01"
+    subnet_id               = "subnet-04f5fe7073ff514fb"
+    ssh_key_name            = "sufi_new"
+    root_volume_size        = 30
+    ....
+
+====
+
+=== Step by step procedures - executed in sequence
+[%collapsible]
+====
+
+. Install Terraform in AWS cloud shell.
++
+[source,  cli]
+git clone https://github.com/tfutils/tfenv.git ~/.tfenv
++
+[source, cli]
+mkdir ~/bin
++
+[source, cli]
+ln -s ~/.tfenv/bin/* ~/bin/
++
+[source, cli]
+tfenv install
++
+[source, cli]
+tfenv use 1.3.9
+  
+. Download the toolkit from NetApp GitHub public site
++
+[source, cli]
+git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
+  
+. Run init to initialize terraform
++
+[source, cli]
+terraform init
+
+. Output the execution plan
++
+[source, cli]
+terraform plan -out=main.plan
+
+. Apply the execution plan
++
+[source, cli]
+terraform apply "main.plan"
+
+. Run destroy to remove the resources when done
++
+[source, cli]
+terraform destroy 
+  
+====
+
+== Where to find additional information
+
+To learn more about the NetApp solution automation, review the following website link:https://docs.netapp.com/us-en/netapp-solutions/automation/automation_introduction.html[NetApp Solution Automation^]

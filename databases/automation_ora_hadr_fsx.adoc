@@ -17,7 +17,7 @@ NetApp Solutions Engineering Team
 [.lead]
 == Purpose
 
-This toolkit is developed to automate the tasks of setting up and managing a High Availability and Disaster Recovery (HR/DR) environment for Oracle database deployed in AWS cloud with FSx for ONTAP storage and EC2 compute instances.
+This toolkit automates the tasks of setting up and managing a High Availability and Disaster Recovery (HR/DR) environment for Oracle database deployed in AWS cloud with FSx for ONTAP storage and EC2 compute instances.
 
 
 This solution addresses the following use cases:
@@ -85,7 +85,7 @@ git clone https://github.com/NetApp/na_ora_hadr_failover_resync.git
 
 The Ansible playbooks are variable driven. An example global variable file fsx_vars_example.yml is included to demonstrate typical configuration. Following are key considerations:
 
-  ONTAP - retrieve FSx storage parameters using AWS FSx console when both source and target FSx cluster are deployed.
+  ONTAP - retrieve FSx storage parameters using AWS FSx console for both source and target FSx clusters.
     cluster name: source/destination
     cluster management IP: source/destination
     inter-cluster IP: source/destination
@@ -96,8 +96,8 @@ The Ansible playbooks are variable driven. An example global variable file fsx_v
 
   Oracle database volumes - they should have been created from AWS FSx console, volume naming should follow strictly with following standard: 
     Oracle binary: {{ host_name }}_bin, generally one lun/volume
-    Oracle data: {{ host_name }}_data, can be multiple luns/volume, add additional line for each additional lun/volume in variable such as {{ host_name }}_data_01, {{ host_name }}_data_02 ..., the code can handle multiple data lun/volume without change
-    Oracle log: {{ host_name }}_log, can be multiple luns/volume, add additional line for each additional lun/volume in variable such as {{ host_name }}_log_01, {{ host_name }}_log_02 ..., the code can handle multiple data lun/volume without change
+    Oracle data: {{ host_name }}_data, can be multiple luns/volume, add additional line for each additional lun/volume in variable such as {{ host_name }}_data_01, {{ host_name }}_data_02 ...
+    Oracle log: {{ host_name }}_log, can be multiple luns/volume, add additional line for each additional lun/volume in variable such as {{ host_name }}_log_01, {{ host_name }}_log_02 ...
     host_name: as defined in hosts file in root directory, the code is written to be specifically matched up with host name defined in host file.
   
   Linux and DB specific global variables - keep it as is.
@@ -115,7 +115,7 @@ Host variables are defined in host_vars directory named as {{ host_name }}.yml. 
     ansible_host: IP address of database server host
     log_archive_mode: enable archive log archiving (true) or not (false)
     oracle_sid: Oracle instance identifier
-    pdb: default deployment of Oracle in containerized configuration, name pdb_name string and number of pdbs (Oracle allow 3 pdbs free of multitenant license fee)
+    pdb: Oracle in a container configuration, name pdb_name string and number of pdbs (Oracle allows 3 pdbs free of multitenant license fee)
     listener_port: Oracle listener port, default 1521
     memory_limit: set Oracle SGA size, normally up to 75% RAM
     host_datastores_nfs: combining of all Oracle volumes (binary, data, and log) as defined in global vars file. If multi luns/volumes, keep exactly the same number of luns/volumes in host_var file
@@ -130,7 +130,7 @@ Host variables are defined in host_vars directory named as {{ host_name }}.yml. 
 [%collapsible]
 ====
 
-AWS EC2 instance use IP address as host naming by default. If you use different name in hosts file for Ansible, setup host naming resolution in /etc/hosts file for both source and target servers. Following is an example.
+AWS EC2 instance use IP address for host naming by default. If you use different name in hosts file for Ansible, setup host naming resolution in /etc/hosts file for both source and target servers. Following is an example.
 
   127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
   ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
@@ -151,7 +151,7 @@ ansible-playbook -i hosts requirements.yml
 [source, cli]
 ansible-galaxy collection install -r collections/requirements.yml --force
   
-. Setup HA/DR target host.
+. Setup target EC2 DB instance.
 +
 [source, cli]
 ansible-playbook -i hosts ora_dr_setup.yml -u ec2-user --private-key db2.pem -e @vars/fsx_vars.yml
@@ -161,21 +161,21 @@ ansible-playbook -i hosts ora_dr_setup.yml -u ec2-user --private-key db2.pem -e 
 [source, cli]
 ansible-playbook -i hosts ontap_setup.yml -u ec2-user --private-key db2.pem -e @vars/fsx_vars.yml
   
-. Backup Oracle database data via snapshot from crontab.
+. Backup Oracle database data volumes via snapshot from crontab.
 +
 [source, cli]
 10 * * * * cd /home/admin/na_ora_hadr_failover_resync && /usr/bin/ansible-playbook -i hosts ora_replication_cg.yml -u ec2-user --private-key db1.pem -e @vars/fsx_vars.yml >> logs/snap_data_`date +"%Y-%m%d-%H%M%S"`.log 2>&1
 
-. Backup Oracle database archive log via snapshot from crontab.
+. Backup Oracle database archive log volumes via snapshot from crontab.
 +
 [source, cli]
 0,20,30,40,50 * * * * cd /home/admin/na_ora_hadr_failover_resync && /usr/bin/ansible-playbook -i hosts ora_replication_logs.yml -u ec2-user --private-key db1.pem -e @vars/fsx_vars.yml >> logs/snap_log_`date +"%Y-%m%d-%H%M%S"`.log 2>&1
 
-. Run failover and recovery Oracle database on HA/DR host - test and validate HA/DR configuration.
+. Run failover and recover Oracle database on target EC2 DB instance - test and validate HA/DR configuration.
 [source, cli]
 ansible-playbook -i hosts ora_recovery.yml -u ec2-user --private-key db2.pem -e @vars/fsx_vars.yml
 
-. Run resync after failover test - re-establish database volumes snapmirror relationship in HA/DR mode.
+. Run resync after failover test - re-establish database volumes snapmirror relationship in replication mode.
 [source, cli]
 ansible-playbook -i hosts ontap_ora_resync.yml -u ec2-user --private-key db2.pem -e @vars/fsx_vars.yml
 
