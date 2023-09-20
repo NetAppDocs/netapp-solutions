@@ -1,0 +1,60 @@
+---
+sidebar: sidebar
+permalink: ai/ddlnexus_expose_netapp_vols.html
+keywords: NetApp AI, AI, Artificial Intelligence, ML, Machine Learning, NVIDIA, Hybrid, Hybrid Cloud, Hybrid Multicloud, Cloud, AWS, Amazon, Amazon Web Services, FSx for NetApp ONTAP, FSx, NetApp ONTAP, FlexCache, SnapMirror, BlueXP
+summary: Hybrid Multicloud MLOps with Domino Data Lab and NetApp - Expose Existing NetApp Volumes to Domino
+---
+
+= Expose Existing NetApp Volumes to Domino
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+link:nvaie_initial_setup.html[Previous: Initial Setup.]
+
+[.lead]
+This section describes the tasks that need to be performed in order to expose existing NetApp ONTAP NFS volumes to the Domino MLOps platform. These same steps apply both on-premises and in AWS.
+
+== Why Expose NetApp ONTAP Volumes to Domino?
+
+Using NetApp volumes in conjunction with Domino provides the following benefits:
+* You can execute workloads against extremely large datasets by taking advantage of NetApp ONTAP's scale-out capabilities.
+* You can execute workloads across multiple compute nodes without having to copy your data to the individual nodes.
+* You can take advantage of NetApp's hybrid multicloud data movement and sync capabilities in order to access your data across multiple data centers and/or clouds.
+* You want to be able to quickly and easily create a cache of your data in a different data center or cloud.
+
+== Expose Existing NFS Volumes that were not Provisioned by Astra Trident
+
+If your existing NetApp ONTAP NFS volume was not provisioned by Astra Trident, follow the steps outlined in this sub-section.
+
+=== Create PV and PVC in Kubernetes
+
+Note: For on-premises volumes, create the PV and PVC in your on-premises Kubernetes cluster. For Amazon FSx for NetApp ONTAP volumes, create the PV and PVC in Amazon EKS.
+
+First, you must create a persistent volume (PV) and persistent volume claim (PVC) in your Kubernetes cluster. To create the PV and PVC, use the link:https://docs.dominodatalab.com/en/latest/admin_guide/4cdae9/set-up-kubernetes-pv-and-pvc/#_nfs_pvpvc_example[NFS PV/PVC example] from the Domino admin guide and update the values to reflect to your environment. Be sure to specify the correct values for the `namespace`, `nfs.path`, and `nfs.server` fields. Additionally, we recommend giving your PV and PVC unique names that represent that nature of the data that is stored on the corresponding ONTAP NFS volume. For example, if the volume contains images of manufacturing defects, you might name the PV, `pv-mfg-defect-images`, and the PVC, `pvc-mfg-defect-images`.
+
+=== Register External Data Volume in Domino
+
+Next, you must register an external data volume in Domino. To register an external data volume, refer to the link:https://docs.dominodatalab.com/en/latest/admin_guide/9c3564/register-external-data-volumes/[instructions] in the Domino admin guide. When registering the volume, be sure to select "NFS" from the 'Volume Type' drop-down menu. After selecting "NFS", you should see your PVC in the 'Available Volumes' list.
+
+image:ddlnexus_image3.png[Error: Missing Graphic Image]
+
+== Expose Existing Volumes that were Provisioned by Astra Trident
+
+If your existing volume was provisioned by Astra Trident, follow the steps outlined in this sub-section.
+
+=== Edit Existing PVC
+
+If your volume was provisioned by Astra Trident, then you already have a persistent volume claim (PVC) corresponding to your volume. In order to expose this volume to Domino, you must edit the PVC and add the following label to the list of labels in the `metadata.labels` field:
+
+....
+"dominodatalab.com/external-data-volume": "Generic"
+....
+
+=== Register External Data Volume in Domino
+
+Next, you must register an external data volume in Domino. To register an external data volume, refer to the link:https://docs.dominodatalab.com/en/latest/admin_guide/9c3564/register-external-data-volumes/[instructions] in the Domino admin guide. When registering the volume, be sure to select "Generic" from the 'Volume Type' drop-down menu. After selecting "Generic", you should see your PVC in the 'Available Volumes' list.
+
+link:ddlnexus_access_data_hybrid.html[Next: Access the same Data Across Multiple Environments.]
