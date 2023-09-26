@@ -150,10 +150,10 @@ image:sql-awsec2-image3.png[Error: Missing Graphic Image]
 . Use the following SSH command to create volumes:
 
 ....
-Vol create -vserver svm001 -volume vol_awssqlprod01_data -aggregate aggr1 -size 800GB -state online -tiering-policy snapshot-only -percent-snapshot-space 0 -autosize-mode grow -snapshot-policy none -security-style ntfs -aggregate aggr1
+volume create -vserver svm001 -volume vol_awssqlprod01_data -aggregate aggr1 -size 800GB -state online -tiering-policy snapshot-only -percent-snapshot-space 0 -autosize-mode grow -snapshot-policy none -security-style ntfs
 volume modify -vserver svm001 -volume vol_awssqlprod01_data -fractional-reserve 0
 volume modify -vserver svm001 -volume vol_awssqlprod01_data -space-mgmt-try-first vol_grow
-volume snapshot autodelete modify -vserver svm001 -volume vol_awssqlprod01_data -delete-order oldest_first
+volume snapshot autodelete modify -vserver svm001 -volume vol_awssqlprod01_data -delete-order oldest_first -enabled true 
 ....
 
 . Start the iSCSI service with PowerShell using elevated privileges in Windows Servers.
@@ -186,7 +186,8 @@ igroup create -igroup igrp_ws2019sql1 -protocol iscsi -ostype windows -initiator
 . Use the following SSH command to create LUNs:
 
 ....
-lun create -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -size 700GB -ostype windows_2008 -space-reserve enabled -space-allocation enabled lun create -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -size 100GB -ostype windows_2008 -space-reserve enabled -space-allocation enabled 
+lun create -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -vserver svm001 -size 700GB -ostype windows_2008 -space-reserve enabled -space-allocation enabled
+lun create -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -vserver svm001 -size 100GB -ostype windows_2008 -space-reserve enabled -space-allocation enabled 
 ....
 
 image:sql-awsec2-image5.png[Error: Missing Graphic Image]
@@ -197,7 +198,8 @@ image:sql-awsec2-image5.png[Error: Missing Graphic Image]
 
 ....
 lun show
-lun map -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -igroup igrp_awssqlprod01lun map -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -igroup igrp_awssqlprod01
+lun map -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -vserver svm001 -igroup igrp_awssqlprod01
+lun map -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -vserver svm001 -igroup igrp_awssqlprod01
 ....
 
 image:sql-awsec2-image6.png[Error: Missing Graphic Image]
