@@ -5,7 +5,7 @@ keywords: NetApp Solutions, redhat OpenShift, red hat OpenShift, redhat openshif
 summary:
 ---
 
-= Deploy and configure the Red Hat OpenShift Container platform on GCP
+== Deploy and configure the Red Hat OpenShift Container platform on GCP
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -17,7 +17,7 @@ This section describes a high-level workflow of how to set up and manage OpenShi
 
 NOTE: There are several ways of deploying Red Hat OpenShift Container platform clusters in GCP. This high-level description of the setup provides documentation links for the specific method that was used. You can refer to the other methods in the relevant links provided in the link:../rhhc-resources.html[resources section].
 
-Here is a diagram that depicts the clusters deployed on GCP and connected to the data center using a VPN.
+Here is a diagram that shows the clusters deployed on GCP and connected to the data center using a VPN.
 
 image:rhhc-self-managed-gcp.png[]
 
@@ -29,15 +29,13 @@ The setup process can be broken down into the following steps:
 ====
 * Ensure that you have met all the prerequisites stated link:https://docs.openshift.com/container-platform/4.13/installing/installing_gcp/installing-gcp-default.html[here]. 
 
-* For the VPN connectivity between on-premises and GCP the following were set up in the lab environment:
+* For the VPN connectivity between on-premises and GCP, a pfsense VM was created and configured. For instructions, see https://docs.netgate.com/pfsense/en/latest/recipes/ipsec-s2s-psk.html[here].
 
-** Configure a new or an existing pfsense VM for the VPN communication between the on-premises and Google Cloud platform. For instructions, see https://docs.netgate.com/pfsense/en/latest/recipes/ipsec-s2s-psk.html[here].
+** The remote gateway address in pfsense can be configured only after you have created a VPN gateway in Google Cloud Platform.  
 
-*** The remote gateway address in pfsense can be configured only after you have created a VPN gateway in Google Cloud Platform.  
+** The remote network IP addresses for the Phase 2 can be configured only after the OpenShift cluster installation program runs and creates the infrastructure components for the cluster. 
 
-*** The remote network IP addresses for the Phase 2 can be configured only after the installation program runs and creates the infrastructure components for the cluster. 
-
-*** The VPN in Google Cloud can only be configured after the infrastructure components for the cluster are created by the installation program.
+** The VPN in Google Cloud can only be configured after the infrastructure components for the cluster are created by the installation program.
 
 * Now install the OpenShift cluster on GCP.
 
@@ -45,13 +43,14 @@ The setup process can be broken down into the following steps:
 
 ** The installation creates a VPC network in Google Cloud Platform. It also creates a private zone in Cloud DNS and adds A records.
 
-*** Use the CIDR block address of the VPC network to configure the pfsense and establish the VPN connection.
+*** Use the CIDR block address of the VPC network to configure the pfsense and establish the VPN connection. Ensure firewalls are setup correctly.
 
-*** Add the IP address of the Google Cloud DNS shown in the A records in the DNS of the on-premises environment. 
+*** Add A records in the DNS of the on-premises environment using the IP address in the A records of the Google Cloud DNS.
 
 ** The installation of the cluster completes and will provide a kubeconfig file and username and password to login to the console of the cluster.
 
 ====
+
 .Deploy Cloud Volumes ONTAP in GCP using BlueXP. 
 [%collapsible]
 ====
@@ -66,7 +65,7 @@ The setup process can be broken down into the following steps:
 ====
 * There are many methods to deploy Astra Trident as shown https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy.html[here].
 
-* For this project, Astra Trident was installed by deploying Astra Trident Operator manually using thr instructions https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-operator.html[here].
+* For this project, Astra Trident was installed by deploying Astra Trident Operator manually using the instructions https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-operator.html[here].
 
 * Create backend and a storage classes. Refer to instructions link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-postdeployment.html[here]. 
 
@@ -76,11 +75,11 @@ The setup process can be broken down into the following steps:
 [%collapsible]
 ====
 
-* Create a separate KubeConfig file with a cluster role  that contains the minimum permissions necessary for a cluster to be managed by Astra Control. The instructions can be found
-https://docs.netapp.com/us-en/astra-control-center/get-started/setup_overview.html#create-a-cluster-role-kubeconfig[here].
+* Create a separate KubeConfig file with a cluster role that contains the minimum permissions necessary for a cluster to be managed by Astra Control. The instructions can be found
+link:https://docs.netapp.com/us-en/astra-control-center/get-started/setup_overview.html#create-a-cluster-role-kubeconfig[here].
 
-* Follow the instructions here to add the cluster to Astra Control Center.:
-https://docs.netapp.com/us-en/astra-control-center/get-started/setup_overview.html#add-cluster
+* Add the cluster to Astra Control Center following the instructions 
+link:https://docs.netapp.com/us-en/astra-control-center/get-started/setup_overview.html#add-cluster[here]
 
 ====
 
