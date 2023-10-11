@@ -17,7 +17,7 @@ Allen Cao, Niyaz Mohamed, NetApp
 [.lead]
 == Purpose
 
-Enterprises have been running Oracle on VMware in private data centers for decades. VMware Cloud on AWS (VMC) provides a push-button solution to brings VMware’s enterprise-class Software-Defined Data Center software to the AWS Cloud’s dedicated, elastic, bare-metal infrastructure. AWS FSx ONTAP offers a premium storage to VMC and a data fabric that enables customers to run business-critical applications such as Oracle across vSphere®-based private, public and hybrid cloud environments, with optimized access to AWS services.
+Enterprises have been running Oracle on VMware in private data centers for decades. VMware Cloud on AWS (VMC) provides a push-button solution to brings VMware’s enterprise-class Software-Defined Data Center (SDDC) software to the AWS Cloud’s dedicated, elastic, bare-metal infrastructure. AWS FSx ONTAP offers a premium storage to VMC and a data fabric that enables customers to run business-critical applications such as Oracle across vSphere®-based private, public and hybrid cloud environments, with optimized access to AWS services.
 
 In this documentation, we demonstrate on how to deploy and protect an Oracle database in a VMC environment with AWS FSx ONTAP as primary database storage. Oracle database can be deployed to VMC on FSx storage as direct VM guest-mounted luns or NFS-mounted VMware VMDK datastore disks. This technical report focuses on Oracle database deployment as direct guest-mounted FSx storage to VMs in the VMC cluster with the iSCSI protocol and Oracle ASM. We also demonstrate how to use the NetApp SnapCenter UI tool to backup, restore, and clone an Oracle database for dev/test or other use cases for storage-efficient database operation in the VMC on AWS. 
 
@@ -26,7 +26,7 @@ This solution addresses the following use cases:
 
 * Oracle database deployment in VMC on AWS with FSx ONTAP as primary database storage 
 * Oracle database backup and restore in VMC on AWS using NetApp SnapCenter tool 
-* Oracle database clone for dev/test or other use cases in VMC on AWS
+* Oracle database clone for dev/test or other use cases in VMC on AWS using NetApp SnapCenter tool
 
 == Audience
 
@@ -50,20 +50,24 @@ image::aws_ora_fsx_ec2_iscsi_asm_architecture.png["This image provides a detaile
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone
-| EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge EC2 instances, one as primary DB server and the other as a clone DB server 
+| FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone as VMC
+| VMC SDDC cluster | Amazon EC2 i3.metal single node/Intel Xeon E5-2686 CPU,36 cores/512G RAM | 10.37 TB vSAN storage 
 
 3+^| *Software*
-| RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
+| RedHat Linux | RHEL-8.6, 4.18.0-372.9.1.el8.x86_64 kernel | Deployed RedHat subscription for testing
+| Windows Server | 2022 Standard, 10.0.20348 Build 20348 | Hosting SnapCenter server 
 | Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
-| SnapCenter Service | Version |  v2.3.1.2324
+| SnapCenter Server | Version 4.9P1 | Workgroup deployment 
+| BlueXP backup and recovery for VMs | Release 1.0 | Deployed to VMC as an ova vSphere plugin VM
+| VMware vSphere | Version 8.0.1.00300 | VMware Tools, Version: 11365 - Linux, 12352 - Windows 
+| Open JDK | Version 1.8, java-1.8.0-openjdk.x86_64 | Required for running SnapCenter plugin on DB VMs 
 |===
 
 === Key factors for deployment consideration
 
-* *EC2 compute instances.* In these tests and validations, we used an AWS EC2 t2.xlarge instance type for the Oracle database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workloads. You need to size the EC2 instance appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
+* *FSx to VMC connectivity.* When you deploy your SDDC on VMware Cloud on AWS, it is created within an AWS account and a VPC dedicated to your organization and managed by VMware. You must also connect the SDDC to an AWS account belonging to you, called the customer AWS account . This connection allows your SDDC to access AWS services belonging to your customer account. FSx for ONTAP is an AWS service deployed in your customer account. To mount FSx storage to VMs in VMC, the connection between two VPCs via peering is preferred configuration. 
 
 * *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi-zone deployment further enhances high availability in the event of failure in a single AWS zone. 
 
@@ -71,11 +75,11 @@ image::aws_ora_fsx_ec2_iscsi_asm_architecture.png["This image provides a detaile
 
 * *Oracle data and logs layout.* In our tests and validations, we deployed two ASM disk groups for data and logs respectively. Within the +DATA asm disk group, we provisioned four LUNs in a data volume. Within the +LOGS asm disk group, we provisioned two LUNs in a logs volume. In general, multiple LUNs laid out within an Amazon FSx for ONTAP volume provides better performance. 
 
-* *iSCSI configuration.* The EC2 instance database server connects to FSx storage with the iSCSI protocol. EC2 instances generally deploy with a single network interface or ENI. The single NIC interface carries both iSCSI and application traffic. It is important to gauge the Oracle database peek I/O throughput requirement by carefully analyzing the Oracle AWR report in order to choose a right EC2 compute instance that meets both application and iSCSI traffic-throughput requirements. NetApp also recommends allocating four iSCSI connections to both FSx iSCSI endpoints with multipath properly configured.
+* *iSCSI configuration.* The database VMs in VMC SDDC connect to FSx storage with the iSCSI protocol. It is important to gauge the Oracle database peak I/O throughput requirement by carefully analyzing the Oracle AWR report to determine the application and iSCSI traffic-throughput requirements. NetApp also recommends allocating four iSCSI connections to both FSx iSCSI endpoints with multipath properly configured.
 
 * *Oracle ASM redundancy level to use for each Oracle ASM disk group that you create.* Because FSx already mirrors the storage on the FSx cluster level, you should use External Redundancy, which means that the option does not allow Oracle ASM to mirror the contents of the disk group.
 
-* *Database backup.* NetApp provides a SaaS version of SnapCenter software service for database backup, restore, and clone in the cloud that is available through the NetApp BlueXP console UI. NetApp recommends implementing such a service to achieve fast (under a minute) SnapShot backup, quick (few minutes) database restore, and database cloning.    
+* *Database backup.* NetApp provides a SnapCenter software suite for database backup, restore, and clone with an user friendly UI interface. NetApp recommends implementing such a management tool to achieve fast (under a minute) SnapShot backup, quick (minutes) database restore, and database clone.    
 
 == Solution deployment
 
@@ -87,21 +91,23 @@ The following section provides step-by-step deployment procedures.
 
 Deployment requires the following prerequisites.
 
-. An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
+. A software-defined data centers (SDDCs) using VMware Cloud on AWS has been created. For detailed instruction on how to create a SDDC in VMC, please referred to VMware documentation link:https://docs.vmware.com/en/VMware-Cloud-on-AWS/services/com.vmware.vmc-aws.getting-started/GUID-3D741363-F66A-4CF9-80EA-AA2866D1834E.html[Getting Started With VMware Cloud on AWS^]
 
-. From the AWS EC2 console, you must deploy two EC2 Linux instances, one as the primary Oracle DB server and an optional alternative clone target DB server. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
+. An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account. The AWS account has been linked to your VMC SDDC.
 
 . From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host the Oracle database volumes. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
 
-. Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution.
+. Above step can be performed using the following Terraform automation toolkit, which creates an EC2 instance as a jump host for SDDC in VMC access via SSH and an FSx file system. Review the instruction carefully and change the variables to suit your environment before execution.
 +
 ....
 git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
 ....
 
+. Build VMs in VMware SDDC on AWS for hosting your Oracle environment to be deployed in VMC. In our demonstration, we have built two Linux VMs as Oracle DB servers, one Windows server for SnapCenter server, and one optional Linux server as Ansible controller for automated Oracle installation or configuration if desired. 
+
 [NOTE]
 
-Ensure that you have allocated at least 50G in EC2 instance root volume in order to have sufficient space to stage Oracle installation files.
+Ensure that you have allocated at least 50G in Oracle VM root volume in order to have sufficient space to stage Oracle installation files.
 
 ====
 
