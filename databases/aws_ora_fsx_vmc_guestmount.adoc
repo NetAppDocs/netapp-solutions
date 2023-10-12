@@ -17,9 +17,9 @@ Allen Cao, Niyaz Mohamed, NetApp
 [.lead]
 == Purpose
 
-Enterprises have been running Oracle on VMware in private data centers for decades. VMware Cloud on AWS (VMC) provides a push-button solution to brings VMware’s enterprise-class Software-Defined Data Center (SDDC) software to the AWS Cloud’s dedicated, elastic, bare-metal infrastructure. AWS FSx ONTAP offers a premium storage to VMC SDDC and a data fabric that enables customers to run business-critical applications such as Oracle across vSphere®-based private, public and hybrid cloud environments, with optimized access to AWS services.
+Enterprises have been running Oracle on VMware in private data centers for decades. VMware Cloud (VMC) on AWS  provides a push-button solution to bring VMware’s enterprise-class Software-Defined Data Center (SDDC) software to the AWS Cloud’s dedicated, elastic, bare-metal infrastructure. AWS FSx ONTAP offers premium storage to VMC SDDC and a data fabric that enables customers to run business-critical applications such as Oracle across vSphere®-based private, public, and hybrid cloud environments, with optimized access to AWS services. Whether it is an existing or new Oracle workload, VMC on AWS provides a simplified and self-managed Oracle environment on VMware with all the benefits of AWS cloud while deferring all platform management and optimization to VMware.  
 
-In this documentation, we demonstrate on how to deploy and protect an Oracle database in a VMC environment with AWS FSx ONTAP as primary database storage. Oracle database can be deployed to VMC on FSx storage as direct VM guest-mounted luns or NFS-mounted VMware VMDK datastore disks. This technical report focuses on Oracle database deployment as direct guest-mounted FSx storage to VMs in the VMC cluster with the iSCSI protocol and Oracle ASM. We also demonstrate how to use the NetApp SnapCenter UI tool to backup, restore, and clone an Oracle database for dev/test or other use cases for storage-efficient database operation in the VMC on AWS. 
+This documentation demonstrates the deployment and protection of an Oracle database in a VMC environment with AWS FSx ONTAP as primary database storage. Oracle database can be deployed to VMC on FSx storage as direct VM guest-mounted LUNs or NFS-mounted VMware VMDK datastore disks. This technical report focuses on Oracle database deployment as direct guest-mounted FSx storage to VMs in the VMC cluster with the iSCSI protocol and Oracle ASM. We also demonstrate how to use the NetApp SnapCenter UI tool to backup, restore, and clone an Oracle database for dev/test or other use cases for storage-efficient database operation in the VMC on AWS. 
 
 
 This solution addresses the following use cases:
@@ -71,10 +71,10 @@ image::aws_ora_fsx_vmc_architecture.png["This image provides a detailed picture 
 |===
 3+^| 
 | *Server* | *Database* | *DB Storage*
-| ora_01 | cdb1(cdb1_pdb1,cdb1_pdb2,cdb1_pdb3) | VMDK datastore on FSx
-| ora_01 | cdb2(cdb2_pdb) | VMDK datastore on FSx 
-| ora_02 | cdb3(cdb3_pdb1,cdb3_pdb2,cdb3_pdb3) | Direct guest mounted FSx
-| ora_02 | cdb4(cdb4_pdb) | Direct guest mounted FSx
+| ora_01 | cdb1(cdb1_pdb1,cdb1_pdb2,cdb1_pdb3) | VMDK datastore on FSx ONTAP
+| ora_01 | cdb2(cdb2_pdb) | VMDK datastore on FSx ONTAP
+| ora_02 | cdb3(cdb3_pdb1,cdb3_pdb2,cdb3_pdb3) | Direct guest mounted FSx ONTAP
+| ora_02 | cdb4(cdb4_pdb) | Direct guest mounted FSx ONTAP
 |===
 
 === Key factors for deployment consideration
@@ -117,6 +117,8 @@ git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
 
 . Build VMs in VMware SDDC on AWS for hosting your Oracle environment to be deployed in VMC. In our demonstration, we have built two Linux VMs as Oracle DB servers, one Windows server for SnapCenter server, and one optional Linux server as Ansible controller for automated Oracle installation or configuration if desired. 
 
+. Optionally, NetApp also provides number of automation toolkits to run Oracle deployment and configuration when applicable. Refer to link:https://docs.netapp.com/us-en/netapp-solutions/databases/index.html[DB Automation Toolkits^] for more information.
+
 [NOTE]
 
 Ensure that you have allocated at least 50G in Oracle VM root volume in order to have sufficient space to stage Oracle installation files.
@@ -127,90 +129,90 @@ Ensure that you have allocated at least 50G in Oracle VM root volume in order to
 [%collapsible]
 
 ====
-With the prerequisites provisioned, log into the EC2 instance as ec2-user and sudo to root user to configure the Linux kernel for Oracle installation.
+
+With the prerequisites provisioned, login to the Oracle VM as an admin user via SSH and sudo to root user to configure the Linux kernel for Oracle installation. Oracle install files can be staged in an AWS S3 bucket and transferred into the VM. 
 
 . Create a staging directory `/tmp/archive` folder and set the `777` permission.
 +
-....
+[source, cli]
 mkdir /tmp/archive
-
++
+[source, cli]
 chmod 777 /tmp/archive
-....
 
 . Download and stage the Oracle binary installation files and other required rpm files to the `/tmp/archive` directory.
 +
-See the following list of installation files to be stated in `/tmp/archive` on the EC2 instance.
+See the following list of installation files to be stated in `/tmp/archive` on the DB VM.
 +
 ....
-[ec2-user@ip-172-30-15-58 ~]$ ls -l /tmp/archive
-total 10537316
--rw-rw-r--. 1 ec2-user ec2-user      19112 Mar 21 15:57 compat-libcap1-1.10-7.el7.x86_64.rpm
--rw-rw-r--  1 ec2-user ec2-user 3059705302 Mar 21 22:01 LINUX.X64_193000_db_home.zip
--rw-rw-r--  1 ec2-user ec2-user 2889184573 Mar 21 21:09 LINUX.X64_193000_grid_home.zip
--rw-rw-r--. 1 ec2-user ec2-user     589145 Mar 21 15:56 netapp_linux_unified_host_utilities-7-1.x86_64.rpm
--rw-rw-r--. 1 ec2-user ec2-user      31828 Mar 21 15:55 oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
--rw-rw-r--  1 ec2-user ec2-user 2872741741 Mar 21 22:31 p34762026_190000_Linux-x86-64.zip
--rw-rw-r--  1 ec2-user ec2-user 1843577895 Mar 21 22:32 p34765931_190000_Linux-x86-64.zip
--rw-rw-r--  1 ec2-user ec2-user  124347218 Mar 21 22:33 p6880880_190000_Linux-x86-64.zip
--rw-r--r--  1 ec2-user ec2-user     257136 Mar 22 16:25 policycoreutils-python-utils-2.9-9.el8.noarch.rpm
+
+[admin@ora_02 ~]$ ls -l /tmp/archive/
+total 10539364
+-rw-rw-r--. 1 admin  admin         19112 Oct  4 17:04 compat-libcap1-1.10-7.el7.x86_64.rpm
+-rw-rw-r--. 1 admin  admin    3059705302 Oct  4 17:10 LINUX.X64_193000_db_home.zip
+-rw-rw-r--. 1 admin  admin    2889184573 Oct  4 17:11 LINUX.X64_193000_grid_home.zip
+-rw-rw-r--. 1 admin  admin        589145 Oct  4 17:04 netapp_linux_unified_host_utilities-7-1.x86_64.rpm
+-rw-rw-r--. 1 admin  admin         31828 Oct  4 17:04 oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
+-rw-rw-r--. 1 admin  admin    2872741741 Oct  4 17:12 p34762026_190000_Linux-x86-64.zip
+-rw-rw-r--. 1 admin  admin    1843577895 Oct  4 17:13 p34765931_190000_Linux-x86-64.zip
+-rw-rw-r--. 1 admin  admin     124347218 Oct  4 17:13 p6880880_190000_Linux-x86-64.zip
+-rw-rw-r--. 1 admin  admin        257136 Oct  4 17:04 policycoreutils-python-utils-2.9-9.el8.noarch.rpm
+[admin@ora_02 ~]$
+
 ....
 
 . Install Oracle 19c preinstall RPM, which satisfies most kernel configuration requirements.
 +
-....
+[source, cli]
 yum install /tmp/archive/oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
-....
 
 . Download and install the missing `compat-libcap1` in Linux 8.
 +
-....
+[source, cli]
 yum install /tmp/archive/compat-libcap1-1.10-7.el7.x86_64.rpm
-....
 
 . From NetApp, download and install NetApp host utilities.
 +
-....
+[source, cli]
 yum install /tmp/archive/netapp_linux_unified_host_utilities-7-1.x86_64.rpm
-....
 
-. Install `policycoreutils-python-utils`, which is not available in the EC2 instance.
+. Install `policycoreutils-python-utils`.
 +
-....
+[source, cli]
 yum install /tmp/archive/policycoreutils-python-utils-2.9-9.el8.noarch.rpm
-....
 
 . Install open JDK version 1.8.
 +
-....
+[source, cli]
 yum install java-1.8.0-openjdk.x86_64
-....
 
 . Install iSCSI initiator utils.
 +
-....
+[source, cli]
 yum install iscsi-initiator-utils
-....
 
-. Install `sg3_utils`.
+. Install sg3_utils.
 +
-....
+[source, cli]
 yum install sg3_utils
-....
 
-. Install `device-mapper-multipath`.
+. Install device-mapper-multipath.
 +
-....
+[source, cli]
 yum install device-mapper-multipath
-....
 
 . Disable transparent hugepages in the current system.
 +
-....
+[source, cli]
 echo never > /sys/kernel/mm/transparent_hugepage/enabled
-echo never > /sys/kernel/mm/transparent_hugepage/defrag
-....
 +
-Add the following lines in `/etc/rc.local` to disable `transparent_hugepage` after reboot:
+[source, cli]
+echo never > /sys/kernel/mm/transparent_hugepage/defrag
+
+. Add the following lines in `/etc/rc.local` to disable `transparent_hugepage` after reboot.
++
+[source, cli]
+vi /etc/rc.local
 +
 ....
   # Disable transparent hugepages
@@ -224,57 +226,68 @@ Add the following lines in `/etc/rc.local` to disable `transparent_hugepage` aft
 
 . Disable selinux by changing `SELINUX=enforcing` to `SELINUX=disabled`. You must reboot the host to make the change effective.
 +
-....
+[source, cli]
 vi /etc/sysconfig/selinux
-....
 
-. Add the following lines to `limit.conf` to set the file descriptor limit and stack size without quotes `" "`.
+. Add the following lines to `limit.conf` to set the file descriptor limit and stack size.
++
+[source, cli]
+vi /etc/security/limits.conf
 +
 ....
-vi /etc/security/limits.conf
-  "*               hard    nofile          65536"
-  "*               soft    stack           10240"
+
+*               hard    nofile          65536
+*               soft    stack           10240
 ....
 
-. Add swap space to EC2 instance by following this instruction: link:https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^] The exact amount of space to add depends on the size of RAM up to 16G.
+. Add swap space to DB VM if there is no swap space configured with this instruction: link:https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^] The exact amount of space to add depends on the size of RAM up to 16G.
 
 . Change `node.session.timeo.replacement_timeout` in the `iscsi.conf` configuration file from 120 to 5 seconds.
 +
-....
+[source, cli]
 vi /etc/iscsi/iscsid.conf
-....
 
 . Enable and start the iSCSI service on the EC2 instance.
 +
-....
+[source, cli]
 systemctl enable iscsid
++
+[source, cli]
 systemctl start iscsid
-....
 
 . Retrieve the iSCSI initiator address to be used for database LUN mapping.
 +
-....
+[source, cli]
 cat /etc/iscsi/initiatorname.iscsi
-....
 
 . Add the ASM group to be used for the asm sysasm group.
 +
-....
+[source, cli]
 groupadd asm
-....
 
 . Modify the oracle user to add ASM as a secondary group (the oracle user should have been created after Oracle preinstall RPM installation).
 +
-....
+[source, cli]
 usermod -a -G asm oracle
-....
 
 . Stop and disable Linux firewall if it is active.
 +
-....
+[source, cli]
 systemctl stop firewalld
++
+[source, cli]
 systemctl disable firewalld
-....
+
+. Enable password less sudo for admin user by uncomment `# %wheel  ALL=(ALL)       NOPASSWD: ALL` line in /etc/sudoers file. Change the file permission to make the edit.
++
+[source, cli]
+chmod 640 /etc/sudoers
++
+[source, cli]
+vi /etc/sudoers
++
+[source, cli]
+chmod 440 /etc/sudoers
 
 . Reboot the EC2 instance. 
 
