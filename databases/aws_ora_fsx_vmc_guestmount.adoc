@@ -293,188 +293,194 @@ chmod 440 /etc/sudoers
 
 ====
 
-=== Provision and map database volumes and LUNs to the EC2 instance host
+=== Provision and map FSx ONTAP LUNs to the DB VM
 [%collapsible]
 
 ====
 
-Provision three volumes from the command line by login to FSx cluster via ssh as fsxadmin user with FSx cluster management IP to host the Oracle database binary, data, and logs files.
+Provision three volumes from the command line by login to FSx cluster as fsxadmin user via ssh and FSx cluster management IP. Create LUNs within the volumes to host the Oracle database binary, data, and logs files.
 
 . Log into the FSx cluster through SSH as the fsxadmin user.
 +
-....
-ssh fsxadmin@172.30.15.53
-....
+[source, cli]
+ssh fsxadmin@10.49.0.74
 
 . Execute the following command to create a volume for the Oracle binary.
 + 
-....
-vol create -volume ora_01_biny -aggregate aggr1 -size 50G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
-....
+[source, cli]
+vol create -volume ora_02_biny -aggregate aggr1 -size 50G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
 
 . Execute the following command to create a volume for Oracle data.
 +
-....
-vol create -volume ora_01_data -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
-....
+[source, cli]
+vol create -volume ora_02_data -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
 
 . Execute the following command to create a volume for Oracle logs.
 + 
+[source, cli]
+vol create -volume ora_02_logs -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+
+. Validate the volumes created.
++
+[source, cli]
+vol show ora*
++
+Output from the command:
++
 ....
-vol create -volume ora_01_logs -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+FsxId0c00cec8dad373fd1::> vol show ora*
+Vserver   Volume       Aggregate    State      Type       Size  Available Used%
+--------- ------------ ------------ ---------- ---- ---------- ---------- -----
+nim       ora_02_biny  aggr1        online     RW         50GB    22.98GB   51%
+nim       ora_02_data  aggr1        online     RW        100GB    18.53GB   80%
+nim       ora_02_logs  aggr1        online     RW         50GB     7.98GB   83%
 ....
 
 . Create a binary LUN within the database binary volume.
 +
-....
-lun create -path /vol/ora_01_biny/ora_01_biny_01 -size 40G -ostype linux
-....
+[source, cli]
+lun create -path /vol/ora_02_biny/ora_02_biny_01 -size 40G -ostype linux
 
 . Create data LUNs within the database data volume.
 +
-....
-lun create -path /vol/ora_01_data/ora_01_data_01 -size 20G -ostype linux
-
-lun create -path /vol/ora_01_data/ora_01_data_02 -size 20G -ostype linux
-
-lun create -path /vol/ora_01_data/ora_01_data_03 -size 20G -ostype linux
-
-lun create -path /vol/ora_01_data/ora_01_data_04 -size 20G -ostype linux
-....
+[source, cli]
+lun create -path /vol/ora_02_data/ora_02_data_01 -size 20G -ostype linux
++
+[source, cli]
+lun create -path /vol/ora_02_data/ora_02_data_02 -size 20G -ostype linux
++
+[source, cli]
+lun create -path /vol/ora_02_data/ora_02_data_03 -size 20G -ostype linux
++
+[source, cli]
+lun create -path /vol/ora_02_data/ora_02_data_04 -size 20G -ostype linux
 
 . Create log LUNs within the database logs volume.
 +
-....
-lun create -path /vol/ora_01_logs/ora_01_logs_01 -size 40G -ostype linux
-
-lun create -path /vol/ora_01_logs/ora_01_logs_02 -size 40G -ostype linux
-....
+[source, cli]
+lun create -path /vol/ora_02_logs/ora_02_logs_01 -size 40G -ostype linux
++
+[source, cli]
+lun create -path /vol/ora_02_logs/ora_02_logs_02 -size 40G -ostype linux
 
 . Create an igroup for the EC2 instance with the initiator retrieved from step 14 of the EC2 kernel configuration above.
 +
-....
-igroup create -igroup ora_01 -protocol iscsi -ostype linux -initiator iqn.1994-05.com.redhat:f65fed7641c2
-....
+[source, cli]
+igroup create -igroup ora_02 -protocol iscsi -ostype linux -initiator iqn.1994-05.com.redhat:f65fed7641c2
 
 . Map the LUNs to the igroup created above. Increment the LUN ID sequentially for each additional LUN within a volume.
 +
-....
-lun map -path /vol/ora_01_biny/ora_01_biny_01 -igroup ora_01 -vserver svm_ora -lun-id 0
-lun map -path /vol/ora_01_data/ora_01_data_01 -igroup ora_01 -vserver svm_ora -lun-id 1
-lun map -path /vol/ora_01_data/ora_01_data_02 -igroup ora_01 -vserver svm_ora -lun-id 2
-lun map -path /vol/ora_01_data/ora_01_data_03 -igroup ora_01 -vserver svm_ora -lun-id 3
-lun map -path /vol/ora_01_data/ora_01_data_04 -igroup ora_01 -vserver svm_ora -lun-id 4
-lun map -path /vol/ora_01_logs/ora_01_logs_01 -igroup ora_01 -vserver svm_ora -lun-id 5
-lun map -path /vol/ora_01_logs/ora_01_logs_02 -igroup ora_01 -vserver svm_ora -lun-id 6
-....
+[source, cli]
+lun map -path /vol/ora_02_biny/ora_02_biny_01 -igroup ora_02 -vserver svm_ora -lun-id 0
+lun map -path /vol/ora_02_data/ora_02_data_01 -igroup ora_02 -vserver svm_ora -lun-id 1
+lun map -path /vol/ora_02_data/ora_02_data_02 -igroup ora_02 -vserver svm_ora -lun-id 2
+lun map -path /vol/ora_02_data/ora_02_data_03 -igroup ora_02 -vserver svm_ora -lun-id 3
+lun map -path /vol/ora_02_data/ora_02_data_04 -igroup ora_02 -vserver svm_ora -lun-id 4
+lun map -path /vol/ora_02_logs/ora_02_logs_01 -igroup ora_02 -vserver svm_ora -lun-id 5
+lun map -path /vol/ora_02_logs/ora_02_logs_02 -igroup ora_02 -vserver svm_ora -lun-id 6
 
 . Validate the LUN mapping.
 +
-....
+[source, cli]
 mapping show
-....
 +
 This is expected to return:
 +
 ....
-FsxId02ad7bf3476b741df::> mapping show
+FsxId0c00cec8dad373fd1::> mapping show
   (lun mapping show)
 Vserver    Path                                      Igroup   LUN ID  Protocol
 ---------- ----------------------------------------  -------  ------  --------
-svm_ora    /vol/ora_01_biny/ora_01_biny_01           ora_01        0  iscsi
-svm_ora    /vol/ora_01_data/ora_01_data_01           ora_01        1  iscsi
-svm_ora    /vol/ora_01_data/ora_01_data_02           ora_01        2  iscsi
-svm_ora    /vol/ora_01_data/ora_01_data_03           ora_01        3  iscsi
-svm_ora    /vol/ora_01_data/ora_01_data_04           ora_01        4  iscsi
-svm_ora    /vol/ora_01_logs/ora_01_logs_01           ora_01        5  iscsi
-svm_ora    /vol/ora_01_logs/ora_01_logs_02           ora_01        6  iscsi
+nim        /vol/ora_02_biny/ora_02_u01_01            ora_02        0  iscsi
+nim        /vol/ora_02_data/ora_02_u02_01            ora_02        1  iscsi
+nim        /vol/ora_02_data/ora_02_u02_02            ora_02        2  iscsi
+nim        /vol/ora_02_data/ora_02_u02_03            ora_02        3  iscsi
+nim        /vol/ora_02_data/ora_02_u02_04            ora_02        4  iscsi
+nim        /vol/ora_02_logs/ora_02_u03_01            ora_02        5  iscsi
+nim        /vol/ora_02_logs/ora_02_u03_02            ora_02        6  iscsi
 ....
 
 ====
 
-=== Database storage configuration
+=== DB VM storage configuration
 [%collapsible]
 
 ====
-Now, import and set up the FSx storage for the Oracle grid infrastructure and database installation on the EC2 instance host.
+Now, import and set up the FSx storage for the Oracle grid infrastructure and database installation on the VMC database VM.
 
-. Log into the EC2 instance via SSH as the ec2-user with your SSH key and EC2 instance IP address.
-+
-....
-ssh -i ora_01.pem ec2-user@172.30.15.58
-....
+. Login to the DB VM via SSH as the admin user using Putty from Windows jump server.
 
-. Discover the FSx iSCSI endpoints using either SVM iSCSI IP address. Then change to your environment-specific portal address.
+. Discover the FSx iSCSI endpoints using either SVM iSCSI IP address. Change to your environment-specific portal address.
 +
-....
-sudo iscsiadm iscsiadm --mode discovery --op update --type sendtargets --portal 172.30.15.51
-....
+[source, cli]
+sudo iscsiadm iscsiadm --mode discovery --op update --type sendtargets --portal 10.49.0.12
 
 . Establish iSCSI sessions by logging into each target.
 +
-....
+[source, cli]
 sudo iscsiadm --mode node -l all
-....
 +
 The expected output from the command is:
 +
 ....
 [ec2-user@ip-172-30-15-58 ~]$ sudo iscsiadm --mode node -l all
-Logging in to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.51,3260]
-Logging in to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.13,3260]
-Login to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.51,3260] successful.
-Login to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 172.30.15.13,3260] successful.
+Logging in to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 10.49.0.12,3260]
+Logging in to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 10.49.0.186,3260]
+Login to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 10.49.0.12,3260] successful.
+Login to [iface: default, target: iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3, portal: 10.49.0.186,3260] successful.
 ....
 
 . View and validate a list of active iSCSI sessions.
 +
-....
+[souirce, cli]
 sudo iscsiadm --mode session
-....
 +
 Return the iSCSI sessions.
 +
 ....
 [ec2-user@ip-172-30-15-58 ~]$ sudo iscsiadm --mode session
-tcp: [1] 172.30.15.51:3260,1028 iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3 (non-flash)
-tcp: [2] 172.30.15.13:3260,1029 iqn.1992-08.com.netapp:sn.1f795e65c74911edb785affbf0a2b26e:vs.3 (non-flash)
+tcp: [1] 10.49.0.186:3260,1028 iqn.1992-08.com.netapp:sn.545a38bf06ac11ee8503e395ab90d704:vs.3 (non-flash)
+tcp: [2] 10.49.0.12:3260,1029 iqn.1992-08.com.netapp:sn.545a38bf06ac11ee8503e395ab90d704:vs.3 (non-flash)
 ....
 
 . Verify that the LUNs were imported into the host.
 +
-....
+[source, cli]
 sudo sanlun lun show
-....
 +
 This will return a list of Oracle LUNs from FSx.
 +
 ....
 
-[ec2-user@ip-172-30-15-58 ~]$ sudo sanlun lun show
-controller(7mode/E-Series)/                                   device          host                  lun
-vserver(cDOT/FlashRay)        lun-pathname                    filename        adapter    protocol   size    product
+[admin@ora_02 ~]$ sudo sanlun lun show
+controller(7mode/E-Series)/                                                  device          host                  lun
+vserver(cDOT/FlashRay)        lun-pathname                                   filename        adapter    protocol   size    product
+-------------------------------------------------------------------------------------------------------------------------------
+nim                           /vol/ora_02_logs/ora_02_u03_02                 /dev/sdo        host34     iSCSI      20g     cDOT
+nim                           /vol/ora_02_logs/ora_02_u03_01                 /dev/sdn        host34     iSCSI      20g     cDOT
+nim                           /vol/ora_02_data/ora_02_u02_04                 /dev/sdm        host34     iSCSI      20g     cDOT
+nim                           /vol/ora_02_data/ora_02_u02_03                 /dev/sdl        host34     iSCSI      20g     cDOT
+nim                           /vol/ora_02_data/ora_02_u02_02                 /dev/sdk        host34     iSCSI      20g     cDOT
+nim                           /vol/ora_02_data/ora_02_u02_01                 /dev/sdj        host34     iSCSI      20g     cDOT
+nim                           /vol/ora_02_biny/ora_02_u01_01                 /dev/sdi        host34     iSCSI      40g     cDOT
+nim                           /vol/ora_02_logs/ora_02_u03_02                 /dev/sdh        host33     iSCSI      20g     cDOT
+nim                           /vol/ora_02_logs/ora_02_u03_01                 /dev/sdg        host33     iSCSI      20g     cDOT
+nim                           /vol/ora_02_data/ora_02_u02_04                 /dev/sdf        host33     iSCSI      20g     cDOT
+nim                           /vol/ora_02_data/ora_02_u02_03                 /dev/sde        host33     iSCSI      20g     cDOT
+nim                           /vol/ora_02_data/ora_02_u02_02                 /dev/sdd        host33     iSCSI      20g     cDOT
+nim                           /vol/ora_02_data/ora_02_u02_01                 /dev/sdc        host33     iSCSI      20g     cDOT
+nim                           /vol/ora_02_biny/ora_02_u01_01                 /dev/sdb        host33     iSCSI      40g     cDOT
 
-svm_ora                       /vol/ora_01_logs/ora_01_logs_02 /dev/sdn        host3      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_logs/ora_01_logs_01 /dev/sdm        host3      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_03 /dev/sdk        host3      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_04 /dev/sdl        host3      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_01 /dev/sdi        host3      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_02 /dev/sdj        host3      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_biny/ora_01_biny_01 /dev/sdh        host3      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_logs/ora_01_logs_02 /dev/sdg        host2      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_logs/ora_01_logs_01 /dev/sdf        host2      iSCSI      40g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_04 /dev/sde        host2      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_02 /dev/sdc        host2      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_03 /dev/sdd        host2      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_data/ora_01_data_01 /dev/sdb        host2      iSCSI      20g     cDOT
-svm_ora                       /vol/ora_01_biny/ora_01_biny_01 /dev/sda        host2      iSCSI      40g     cDOT
 ....
 
 . Configure the `multipath.conf` file with following default and blacklist entries.
 +
-....
+[source, cli]
 sudo vi /etc/multipath.conf
-
++
+Add following entries:
++
+....
 defaults {
     find_multipaths yes
     user_friendly_names yes
@@ -489,9 +495,8 @@ blacklist {
 
 . Start the multipath service.
 +
-....
+[source, cli]
 sudo systemctl start multipathd
-....
 +
 Now multipath devices appear in the `/dev/mapper` directory.
 +
@@ -510,9 +515,8 @@ crw------- 1 root root 10, 236 Mar 21 18:19 control
 
 . Log into the FSx cluster as the fsxadmin user via SSH to retrieve the serial-hex number for each LUN start with 6c574xxx..., the HEX number start with 3600a0980, which is AWS vendor ID.
 +
-....
+[source, cli]
 lun show -fields serial-hex
-....
 +
 and return as follow:
 +
@@ -520,21 +524,20 @@ and return as follow:
 FsxId02ad7bf3476b741df::> lun show -fields serial-hex
 vserver path                            serial-hex
 ------- ------------------------------- ------------------------
-svm_ora /vol/ora_01_biny/ora_01_biny_01 6c574235472455534e68512d
-svm_ora /vol/ora_01_data/ora_01_data_01 6c574235472455534e685141
-svm_ora /vol/ora_01_data/ora_01_data_02 6c574235472455534e685142
-svm_ora /vol/ora_01_data/ora_01_data_03 6c574235472455534e685143
-svm_ora /vol/ora_01_data/ora_01_data_04 6c574235472455534e685144
-svm_ora /vol/ora_01_logs/ora_01_logs_01 6c574235472455534e685145
-svm_ora /vol/ora_01_logs/ora_01_logs_02 6c574235472455534e685146
+svm_ora /vol/ora_02_biny/ora_02_biny_01 6c574235472455534e68512d
+svm_ora /vol/ora_02_data/ora_02_data_01 6c574235472455534e685141
+svm_ora /vol/ora_02_data/ora_02_data_02 6c574235472455534e685142
+svm_ora /vol/ora_02_data/ora_02_data_03 6c574235472455534e685143
+svm_ora /vol/ora_02_data/ora_02_data_04 6c574235472455534e685144
+svm_ora /vol/ora_02_logs/ora_02_logs_01 6c574235472455534e685145
+svm_ora /vol/ora_02_logs/ora_02_logs_02 6c574235472455534e685146
 7 entries were displayed.
 ....
 
 . Update the `/dev/multipath.conf` file to add a user-friendly name for the multipath device.
 +
-....
+[source, cli]
 sudo vi /etc/multipath.conf
-....
 +
 with following entries:
 +
@@ -542,40 +545,39 @@ with following entries:
 multipaths {
         multipath {
                 wwid            3600a09806c574235472455534e68512d
-                alias           ora_01_biny_01
+                alias           ora_02_biny_01
         }
         multipath {
                 wwid            3600a09806c574235472455534e685141
-                alias           ora_01_data_01
+                alias           ora_02_data_01
         }
         multipath {
                 wwid            3600a09806c574235472455534e685142
-                alias           ora_01_data_02
+                alias           ora_02_data_02
         }
         multipath {
                 wwid            3600a09806c574235472455534e685143
-                alias           ora_01_data_03
+                alias           ora_02_data_03
         }
         multipath {
                 wwid            3600a09806c574235472455534e685144
-                alias           ora_01_data_04
+                alias           ora_02_data_04
         }
         multipath {
                 wwid            3600a09806c574235472455534e685145
-                alias           ora_01_logs_01
+                alias           ora_02_logs_01
         }
         multipath {
                 wwid            3600a09806c574235472455534e685146
-                alias           ora_01_logs_02
+                alias           ora_02_logs_02
         }
 }
 ....
 
 . Reboot the multipath service to verify that the devices under `/dev/mapper` have changed to LUN names versus serial-hex IDs.
 +
-....
+[source, cli]
 sudo systemctl restart multipathd
-....
 +
 Check `/dev/mapper` to return as following:
 +
@@ -583,65 +585,58 @@ Check `/dev/mapper` to return as following:
 [ec2-user@ip-172-30-15-58 ~]$ ls -l /dev/mapper
 total 0
 crw------- 1 root root 10, 236 Mar 21 18:19 control
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_biny_01 -> ../dm-0
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_01 -> ../dm-1
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_02 -> ../dm-2
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_03 -> ../dm-3
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_data_04 -> ../dm-4
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_logs_01 -> ../dm-5
-lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_01_logs_02 -> ../dm-6
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_02_biny_01 -> ../dm-0
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_02_data_01 -> ../dm-1
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_02_data_02 -> ../dm-2
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_02_data_03 -> ../dm-3
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_02_data_04 -> ../dm-4
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_02_logs_01 -> ../dm-5
+lrwxrwxrwx 1 root root       7 Mar 21 20:41 ora_02_logs_02 -> ../dm-6
 ....
 
 . Partition the binary LUN with a single primary partition.
 +
-....
-sudo fdisk /dev/mapper/ora_01_biny_01
-....
+[source, cli]
+sudo fdisk /dev/mapper/ora_02_biny_01
 
 . Format the partitioned binary LUN with an XFS file system.
 +
-....
-sudo mkfs.xfs /dev/mapper/ora_01_biny_01p1
-....
+[source, cli]
+sudo mkfs.xfs /dev/mapper/ora_02_biny_01p1
 
 . Mount the binary LUN to `/u01`.
 +
-....
-sudo mount -t xfs /dev/mapper/ora_01_biny_01p1 /u01
-....
+[source, cli]
+sudo mkdir /u01
++
+[source, cli]
+sudo mount -t xfs /dev/mapper/ora_02_biny_01p1 /u01
 
 . Change `/u01` mount point ownership to the Oracle user and it's asssociated primary group.
 +
-....
+[source, cli]
 sudo chown oracle:oinstall /u01
-....
 
 . Find the UUI of the binary LUN.
 +
-....
-sudo blkid /dev/mapper/ora_01_biny_01p1
-....
+[source, cli]
+sudo blkid /dev/mapper/ora_02_biny_01p1
 
 . Add a mount point to `/etc/fstab`.
 +
-....
+[source, cli]
 sudo vi /etc/fstab
-....
 +
 Add the following line.
 +
 ....
 UUID=d89fb1c9-4f89-4de4-b4d9-17754036d11d       /u01    xfs     defaults,nofail 0       2
 ....
-+
-[NOTE]
-It is important to mount the binary with only the UUID and with the nofail option to avoid possible root-lock issues during EC2-instance reboot.
 
 . As the root user, add the udev rule for Oracle devices.
 +
-....
+[source, cli]
 vi /etc/udev/rules.d/99-oracle-asmdevices.rules
-....
 + 
 Include following entries:
 +
@@ -651,21 +646,18 @@ ENV{DM_NAME}=="ora*", GROUP:="oinstall", OWNER:="oracle", MODE:="660"
 
 . As the root user, reload the udev rules.
 +
-....
+[source, cli]
 udevadm control --reload-rules
-....
 
 . As the root user, trigger the udev rules.
 +
-....
+[source, cli]
 udevadm trigger
-....
 
 . As the root user, reload multipathd.
 +
-....
+[source, cli]
 systemctl restart multipathd
-....
 
 . Reboot the EC2 instance host.
 
