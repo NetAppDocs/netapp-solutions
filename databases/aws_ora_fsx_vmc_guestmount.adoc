@@ -79,7 +79,7 @@ image::aws_ora_fsx_vmc_architecture.png["This image provides a detailed picture 
 
 === Key factors for deployment consideration
 
-* *FSx to VMC connectivity.* When you deploy your SDDC on VMware Cloud on AWS, it is created within an AWS account and a VPC dedicated to your organization and managed by VMware. You must also connect the SDDC to an AWS account belonging to you, called the customer AWS account . This connection allows your SDDC to access AWS services belonging to your customer account. FSx for ONTAP is an AWS service deployed in your customer account. To mount FSx storage to VMs in VMC, the connection between two VPCs via peering is preferred configuration. 
+* *FSx to VMC connectivity.* When you deploy your SDDC on VMware Cloud on AWS, it is created within an AWS account and a VPC dedicated to your organization and managed by VMware. You must also connect the SDDC to an AWS account belonging to you, called the customer AWS account . This connection allows your SDDC to access AWS services belonging to your customer account. FSx for ONTAP is an AWS service deployed in your customer account. Once the VMC SDDC is connected to your customer account, FSx storage is available to VMs in VMC SDDC for direct guest mount. 
 
 * *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. NetApp also recommends deploying FSx for NetApp ONTAP and VMware Cloud on AWS in the same availability zone to achieve better performance and avoid data transfer charges between availability zones.
 
@@ -1296,6 +1296,8 @@ Ensure that the SnapCenter server name can be resolved to IP address from DB VM 
 
 =====
 
+SnapCenter leverages FSx ONTAP volume snapshot for much quicker database backup, restore, or clone compared with traditional RMAN based methodology. The snapshots are application consisitent as the database is put in Oracle backup mode before a snapshot. 
+
 . From `Resources` tab, any databases on the VM are auto discovered after the VM is added to SnapCenter. Initially, the database status shows as `Not protected`.
 +
 image:aws_ora_fsx_vmc_snapctr_06.png["Screenshot showing SnapCenter configuration."]
@@ -1525,12 +1527,151 @@ SQL>
 
 =====
 
+In this example, the same backup sets is used to clone a database on the same VM in a different ORACLE_HOME. The procedures are equally applicable to clone a database from the backup to seperate VM in VMC if needed.
+
+. Open the database cdb3 backup list. From a data backup of choice, click on `Clone` button to lauch database clone workflow.
++
+image:aws_ora_fsx_vmc_snapctr_21.png["Screenshot showing SnapCenter configuration."]
+
+. Name the clone database SID.
++
+image:aws_ora_fsx_vmc_snapctr_22.png["Screenshot showing SnapCenter configuration."]
+
+. Select a VM in VMC as the target database host. Identical Oracle version should have been installed and configured on the host.
++
+image:aws_ora_fsx_vmc_snapctr_23.png["Screenshot showing SnapCenter configuration."]
+
+. Select the proper ORACLE_HOME, user and group on the target host. Keep credential at default.
++
+image:aws_ora_fsx_vmc_snapctr_24.png["Screenshot showing SnapCenter configuration."]
+
+. Change clone database parameters to meet configuration or resources requirements for the clone database.
++
+image:aws_ora_fsx_vmc_snapctr_25.png["Screenshot showing SnapCenter configuration."]
+
+. Choose recovery scope. `Until Cancel` recover the clone up to last available log file in the backup set. 
++
+image:aws_ora_fsx_vmc_snapctr_26.png["Screenshot showing SnapCenter configuration."]
+
+. Review the summary and lauch the clone job.
++
+image:aws_ora_fsx_vmc_snapctr_27.png["Screenshot showing SnapCenter configuration."]
+
+. Monitor the clone job details from montior tab.
++
+image:aws_ora_fsx_vmc_snapctr_28.png["Screenshot showing SnapCenter configuration."]
+
+. Cloned database is immediately registered in SnapCenter.
++
+image:aws_ora_fsx_vmc_snapctr_29.png["Screenshot showing SnapCenter configuration."]
+
+. From DB VM ora_02, the cloned database is also registered in Oracle Restart grid control and the dropped test table is recovered in the close database cdb3tst as shown below.
++
+.....
+
+[oracle@ora_02 ~]$ /u01/app/oracle/product/19.0.0/grid/bin/crsctl stat res -t
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DATA.dg
+               ONLINE  ONLINE       ora_02                   STABLE
+ora.LISTENER.lsnr
+               ONLINE  INTERMEDIATE ora_02                   Not All Endpoints Re
+                                                             gistered,STABLE
+ora.LOGS.dg
+               ONLINE  ONLINE       ora_02                   STABLE
+ora.SC_2090922_CDB3TST.dg
+               ONLINE  ONLINE       ora_02                   STABLE
+ora.asm
+               ONLINE  ONLINE       ora_02                   Started,STABLE
+ora.ons
+               OFFLINE OFFLINE      ora_02                   STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.cdb3.db
+      1        ONLINE  ONLINE       ora_02                   Open,HOME=/u01/app/o
+                                                             racle/product/19.0.0
+                                                             /cdb3,STABLE
+ora.cdb3tst.db
+      1        ONLINE  ONLINE       ora_02                   Open,HOME=/u01/app/o
+                                                             racle/product/19.0.0
+                                                             /cdb4,STABLE
+ora.cdb4.db
+      1        ONLINE  ONLINE       ora_02                   Open,HOME=/u01/app/o
+                                                             racle/product/19.0.0
+                                                             /cdb4,STABLE
+ora.cssd
+      1        ONLINE  ONLINE       ora_02                   STABLE
+ora.diskmon
+      1        OFFLINE OFFLINE                               STABLE
+ora.driver.afd
+      1        ONLINE  ONLINE       ora_02                   STABLE
+ora.evmd
+      1        ONLINE  ONLINE       ora_02                   STABLE
+--------------------------------------------------------------------------------
+
+[oracle@ora_02 ~]$ export ORACLE_HOME=/u01/app/oracle/product/19.0.0/cdb4
+[oracle@ora_02 ~]$ export ORACLE_SID=cdb3tst
+[oracle@ora_02 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Sat Oct 7 08:04:51 2023
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> select name, open_mode from v$database;
+
+NAME      OPEN_MODE
+--------- --------------------
+CDB3TST   READ WRITE
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 CDB3_PDB1                      READ WRITE NO
+         4 CDB3_PDB2                      READ WRITE NO
+         5 CDB3_PDB3                      READ WRITE NO
+SQL> alter session set container=CDB3_PDB1;
+
+Session altered.
+
+SQL> select * from test;
+
+        ID
+----------
+DT
+---------------------------------------------------------------------------
+EVENT
+--------------------------------------------------------------------------------
+         1
+06-OCT-23 03.18.24.000000 PM
+test oracle recovery on guest mounted fsx storage to VMC guest vm ora_02
+
+
+SQL>
+
+.....
+
 =====
 
 
 == Where to find additional information
 
 To learn more about the information described in this document, review the following documents and/or websites:
+
+* VMware Cloud on AWS Documentation
++
+link:https://docs.vmware.com/en/VMware-Cloud-on-AWS/index.html[https://docs.vmware.com/en/VMware-Cloud-on-AWS/index.html^]
 
 * Installing Oracle Grid Infrastructure for a Standalone Server with a New Database Installation 
 +
@@ -1545,7 +1686,5 @@ link:https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/install
 +
 link:https://aws.amazon.com/fsx/netapp-ontap/[https://aws.amazon.com/fsx/netapp-ontap/^]
 
-* Amazon EC2
-+
-link:https://aws.amazon.com/pm/ec2/?trk=36c6da98-7b20-48fa-8225-4784bced9843&sc_channel=ps&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2&ef_id=Cj0KCQiA54KfBhCKARIsAJzSrdqwQrghn6I71jiWzSeaT9Uh1-vY-VfhJixF-xnv5rWwn2S7RqZOTQ0aAh7eEALw_wcB:G:s&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2[https://aws.amazon.com/pm/ec2/?trk=36c6da98-7b20-48fa-8225-4784bced9843&sc_channel=ps&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2&ef_id=Cj0KCQiA54KfBhCKARIsAJzSrdqwQrghn6I71jiWzSeaT9Uh1-vY-VfhJixF-xnv5rWwn2S7RqZOTQ0aAh7eEALw_wcB:G:s&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2^]
+
 
