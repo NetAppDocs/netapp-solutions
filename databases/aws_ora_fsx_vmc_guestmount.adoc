@@ -1098,7 +1098,7 @@ alias cdb4='export ORACLE_HOME=/u01/app/oracle/product/19.0.0/cdb4;export ORACLE
 
 ....
 
-. Validate the CDB/PDB created cdb3.
+. Validate the CDB/PDB created for cdb3.
 +
 [source, cli]
 /home/oracle/.bash_profile
@@ -1166,7 +1166,7 @@ SQL>
 
 ....
 
-. Validate the CDB/PDB created cdb4.
+. Validate the CDB/PDB created for cdb4.
 +
 [source, cli]
 cdb4
@@ -1198,18 +1198,7 @@ SQL> show pdbs
          2 PDB$SEED                       READ ONLY  NO
          3 CDB4_PDB                       READ WRITE NO
 SQL>
-SQL> select name, open_mode from v$database;
 
-NAME      OPEN_MODE
---------- --------------------
-CDB4      READ WRITE
-
-SQL> show pdbs
-
-    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
----------- ------------------------------ ---------- ----------
-         2 PDB$SEED                       READ ONLY  NO
-         3 CDB4_PDB                       READ WRITE NO
 SQL> select name from v$datafile;
 
 NAME
@@ -1269,8 +1258,36 @@ The SnapCenter Plug-in for Oracle Database is a host-side component of the NetAp
 . Download lateset version of SnapCenter software from NetApp support site: link:https://mysupport.netapp.com/site/downloads[NetApp Support Downloads^].
 
 . As administrator, install latest java JDK from link:https://www.java.com/en/[Get Java for desktop applications^] on SnapCenter Windows host.
++
+[NOTE]
 
-. Login to SnapCenter UI as administrator user to configure 
+If Windows server is deployed in a domain environment, add a domain user to local SnapCenter server local adminstrators group and run SnapCenter installation with the domain user. 
+
+. Login to SnapCenter UI via HTTPS port 8846 as installation user to configure SnapCenter for Oracle.
+
+. Update `Hybervisor Settings` in global settings.
++
+image:aws_ora_fsx_vmc_snapctr_01.png["Screenshot showing SnapCenter configuration."]
+
+. Create Oracle database backup policies. Ideally, create a seperate archive log backup policy to allow more frequent backup interval to mininize data loss in the event of a failure.
++
+image:aws_ora_fsx_vmc_snapctr_02.png["Screenshot showing SnapCenter configuration."]
+
+. Add database server `Credential` for SnapCenter access to DB servers. The credential should have sudo priviledge on a Linux host or administrator priviledge on a Windows host. 
++
+image:aws_ora_fsx_vmc_snapctr_03.png["Screenshot showing SnapCenter configuration."]
+
+. Add FSx storage cluster to `Storage Systems` with cluster management IP and authenticated via fsxadmin user ID. 
++
+image:aws_ora_fsx_vmc_snapctr_04.png["Screenshot showing SnapCenter configuration."]
+
+. Add Oracle database VM in VMC to `Hosts` with server credential created in previous step 4.  
++
+image:aws_ora_fsx_vmc_snapctr_05.png["Screenshot showing SnapCenter configuration."]
++
+[NOTE]
+
+Ensure that the SnapCenter server name can be resolved to IP address from DB VM and DB VM name can be resolved to IP address from SnapCenter server. 
 
 =====
 
@@ -1279,12 +1296,227 @@ The SnapCenter Plug-in for Oracle Database is a host-side component of the NetAp
 
 =====
 
+. From `Resources` tab, any databases on the VM are auto discovered after the VM is added to SnapCenter. Initially, the database status shows as `Not protected`.
++
+image:aws_ora_fsx_vmc_snapctr_06.png["Screenshot showing SnapCenter configuration."]
+
+. Create resources group to backup database in a logical grouping such as by DB VM etc. In this example, we created a ora_02_data group to do a full online database backup for all databases on VM ora_02. Resources group ora_02_log performs the backup of archived logs only on the VM. Creating a resources group also defines a schedule to execute the backup.
++
+image:aws_ora_fsx_vmc_snapctr_07.png["Screenshot showing SnapCenter configuration."]
+
+. Resources group backup can also be triggered manually by click on `Back up Now` and execute the backup with the policy defined in resources group.
++
+image:aws_ora_fsx_vmc_snapctr_08.png["Screenshot showing SnapCenter configuration."]
+
+. Backup job can be minitored at `Monitor` tab by click on the running job.
++
+image:aws_ora_fsx_vmc_snapctr_09.png["Screenshot showing SnapCenter configuration."]
+
+. After a successful backup, the database status shows the job status and the most recent backup time. 
++
+image:aws_ora_fsx_vmc_snapctr_10.png["Screenshot showing SnapCenter configuration."]
+
+. Click on database to review the backup sets for each database. 
++
+image:aws_ora_fsx_vmc_snapctr_11.png["Screenshot showing SnapCenter configuration."]
+
 =====
 
 ==== Database recovery
 [%collapsible]
 
 =====
+
+SnapCenter provides number of restore and recovery options for Oracle database from snapshot backup. In this example, we demonstrate a point in time restore and recovery to restore a purged table by mistake. On VM ora_02, two databases cdb3, cdb4 share the same +DATA and +LOGS disk groups. Database restoration for one database does not impact the availablity of the other database. 
+
+. First, create a test table and insert a row into table to validate a point in time recovery.
++
+.....
+
+[oracle@ora_02 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Fri Oct 6 14:15:21 2023
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> select name, open_mode from v$database;
+
+NAME      OPEN_MODE
+--------- --------------------
+CDB3      READ WRITE
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 CDB3_PDB1                      READ WRITE NO
+         4 CDB3_PDB2                      READ WRITE NO
+         5 CDB3_PDB3                      READ WRITE NO
+SQL>
+
+
+SQL> alter session set container=cdb3_pdb1;
+
+Session altered.
+
+SQL> create table test (id integer, dt timestamp, event varchar(100));
+
+Table created.
+
+SQL> insert into test values(1, sysdate, 'test oracle recovery on guest mounted fsx storage to VMC guest vm ora_02');
+
+1 row created.
+
+SQL> commit;
+
+Commit complete.
+
+SQL> select * from test;
+
+        ID
+----------
+DT
+---------------------------------------------------------------------------
+EVENT
+--------------------------------------------------------------------------------
+         1
+06-OCT-23 03.18.24.000000 PM
+test oracle recovery on guest mounted fsx storage to VMC guest vm ora_02
+
+
+SQL> select current_timestamp from dual;
+
+CURRENT_TIMESTAMP
+---------------------------------------------------------------------------
+06-OCT-23 03.18.53.996678 PM -07:00
+
+.....
+
+. We ran a manual snapshot backup from SnapCenter. Then dropped the table.
++
+.....
+
+SQL> drop table test;
+
+Table dropped.
+
+SQL> commit;
+
+Commit complete.
+
+SQL> select current_timestamp from dual;
+
+CURRENT_TIMESTAMP
+---------------------------------------------------------------------------
+06-OCT-23 03.26.30.169456 PM -07:00
+
+SQL> select * from test;
+select * from test
+              *
+ERROR at line 1:
+ORA-00942: table or view does not exist
+
+.....
+
+. From backup set created from last step, take a note of the SCN number of log backup. Click on `Restore` to launch restore and recovery workflow.
++
+image:aws_ora_fsx_vmc_snapctr_12.png["Screenshot showing SnapCenter configuration."]
+
+. Choose restore scope.
++
+image:aws_ora_fsx_vmc_snapctr_13.png["Screenshot showing SnapCenter configuration."]
+
+. Choose recovery scope to the SCN from last full database backup. 
++
+image:aws_ora_fsx_vmc_snapctr_14.png["Screenshot showing SnapCenter configuration."]
+
+. Specify any optional pre-scripts to run.
++
+image:aws_ora_fsx_vmc_snapctr_15.png["Screenshot showing SnapCenter configuration."]
+
+. Specify any optional after-script to run.
++
+image:aws_ora_fsx_vmc_snapctr_16.png["Screenshot showing SnapCenter configuration."]
+
+. Send a job report if desired.
++
+image:aws_ora_fsx_vmc_snapctr_17.png["Screenshot showing SnapCenter configuration."]
+
+. Review the summary and click on `Finish` to lauch the restore and recovery.
++
+image:aws_ora_fsx_vmc_snapctr_18.png["Screenshot showing SnapCenter configuration."]
+
+. From Oracle Restart grid control, we observed that while cdb3 is under restore and recovery cdb4 is online and available.
++
+image:aws_ora_fsx_vmc_snapctr_19.png["Screenshot showing SnapCenter configuration."]
+
+. From `Monitor` tab, open the job to review the details.
++
+image:aws_ora_fsx_vmc_snapctr_20.png["Screenshot showing SnapCenter configuration."]
+
+. From DB VM ora_02, validate the dropped table is recovered after a successful recovery.
++
+.....
+
+[oracle@ora_02 bin]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Fri Oct 6 17:01:28 2023
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> select name, open_mode from v$database;
+
+NAME      OPEN_MODE
+--------- --------------------
+CDB3      READ WRITE
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 CDB3_PDB1                      READ WRITE NO
+         4 CDB3_PDB2                      READ WRITE NO
+         5 CDB3_PDB3                      READ WRITE NO
+SQL> alter session set container=CDB3_PDB1;
+
+Session altered.
+
+SQL> select * from test;
+
+        ID
+----------
+DT
+---------------------------------------------------------------------------
+EVENT
+--------------------------------------------------------------------------------
+         1
+06-OCT-23 03.18.24.000000 PM
+test oracle recovery on guest mounted fsx storage to VMC guest vm ora_02
+
+
+SQL> select current_timestamp from dual;
+
+CURRENT_TIMESTAMP
+---------------------------------------------------------------------------
+06-OCT-23 05.02.20.382702 PM -07:00
+
+SQL>
+
+.....
 
 =====
 
