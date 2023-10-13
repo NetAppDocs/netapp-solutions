@@ -95,7 +95,7 @@ image::aws_ora_fsx_vmc_architecture.png["This image provides a detailed picture 
 
 == Solution deployment
 
-The following sections provide step-by-step procedures for Oracle 19c deployment in VMC on AWS with direct mounted FSx ONTAP storage to DB VM in a Restart configuration with Oracle ASM as database volume manager.     
+The following sections provide step-by-step procedures for Oracle 19c deployment in VMC on AWS with direct mounted FSx ONTAP storage to DB VM in a single node Restart configuration with Oracle ASM as database volume manager.     
 
 === Prerequisites for deployment
 [%collapsible]
@@ -263,7 +263,7 @@ systemctl start iscsid
 [source, cli]
 cat /etc/iscsi/initiatorname.iscsi
 
-. Add the ASM group to be used for the asm sysasm group.
+. Add the asm group to be used for the asm sysasm group.
 +
 [source, cli]
 groupadd asm
@@ -371,7 +371,7 @@ lun create -path /vol/ora_02_logs/ora_02_logs_02 -size 40G -ostype linux
 [source, cli]
 igroup create -igroup ora_02 -protocol iscsi -ostype linux -initiator iqn.1994-05.com.redhat:f65fed7641c2
 
-. Map the LUNs to the igroup created above. Increment the LUN ID sequentially for each additional LUN within a volume.
+. Map the LUNs to the igroup created above. Increment the LUN ID sequentially for each additional LUN.
 +
 [source, cli]
 lun map -path /vol/ora_02_biny/ora_02_biny_01 -igroup ora_02 -vserver svm_ora -lun-id 0
@@ -1030,9 +1030,9 @@ Look at the log file "/u01/app/oracle/cfgtoollogs/dbca/cdb3/cdb3.log" for furthe
 
 ....
 
-. Repeat the same procedures from step 2 to create a cdb4 in a seperate ORACLE_HOME /u01/app/oracle/product/19.0.0/cdb4 with a single PDB.
+. Repeat the same procedures from step 2 to create a container database cdb4 in a seperate ORACLE_HOME /u01/app/oracle/product/19.0.0/cdb4 with a single PDB.
 
-. As Oracle user, validate Oracle Restart HA services after DB creation.
+. As Oracle user, validate Oracle Restart HA services after DB creation that all databases (cdb3, cdb4) are registered with HA services.
 +
 [source, cli]
 /u01/app/oracle/product/19.0.0/grid/crsctl stat res -t
@@ -1101,7 +1101,7 @@ alias cdb4='export ORACLE_HOME=/u01/app/oracle/product/19.0.0/cdb4;export ORACLE
 . Validate the CDB/PDB created for cdb3.
 +
 [source, cli]
-/home/oracle/.bash_profile
+cdb3
 +
 ....
 
@@ -1241,7 +1241,7 @@ alter database archivelog;
 [source, cli]
 alter database open;
 
-This completes Oracle 19c version 19.18 Restart deployment on an Amazon FSx for ONTAP storage and VMC DB VM. If desired, NetApp recommends relocating the Oracle control file and online log files to the +LOGS disk group. 
+This completes Oracle 19c version 19.18 Restart deployment on an Amazon FSx for ONTAP storage and a VMC DB VM. If desired, NetApp recommends relocating the Oracle control file and online log files to the +LOGS disk group. 
 
 ====
 
@@ -1253,15 +1253,15 @@ This completes Oracle 19c version 19.18 Restart deployment on an Amazon FSx for 
 
 =====
 
-The SnapCenter Plug-in for Oracle Database is a host-side component of the NetApp SnapCenter Software that enables application-aware data protection management of Oracle databases. For detailed information on NetApp SnapCenter plugin for Oracle, refer to this documentation link:https://docs.netapp.com/us-en/snapcenter/protect-sco/concept_what_you_can_do_with_the_snapcenter_plug_in_for_oracle_database.html[What can you do with the Plug-in for Oracle Database^]. The following provides high level steps to setup SnapCenter for Oracle database backup, recovery, and clone. 
+SnapCenter reles on a host-side plug-in on database VM to perform application-aware data protection management activities. For detailed information on NetApp SnapCenter plugin for Oracle, refer to this documentation link:https://docs.netapp.com/us-en/snapcenter/protect-sco/concept_what_you_can_do_with_the_snapcenter_plug_in_for_oracle_database.html[What can you do with the Plug-in for Oracle Database^]. The following provides high level steps to setup SnapCenter for Oracle database backup, recovery, and clone. 
 
 . Download lateset version of SnapCenter software from NetApp support site: link:https://mysupport.netapp.com/site/downloads[NetApp Support Downloads^].
 
-. As administrator, install latest java JDK from link:https://www.java.com/en/[Get Java for desktop applications^] on SnapCenter Windows host.
+. As administrator, install latest java JDK from link:https://www.java.com/en/[Get Java for desktop applications^] on SnapCenter server Windows host.
 +
 [NOTE]
 
-If Windows server is deployed in a domain environment, add a domain user to local SnapCenter server local adminstrators group and run SnapCenter installation with the domain user. 
+If Windows server is deployed in a domain environment, add a domain user to SnapCenter server local adminstrators group and run SnapCenter installation with the domain user. 
 
 . Login to SnapCenter UI via HTTPS port 8846 as installation user to configure SnapCenter for Oracle.
 
@@ -1273,7 +1273,7 @@ image:aws_ora_fsx_vmc_snapctr_01.png["Screenshot showing SnapCenter configuratio
 +
 image:aws_ora_fsx_vmc_snapctr_02.png["Screenshot showing SnapCenter configuration."]
 
-. Add database server `Credential` for SnapCenter access to DB servers. The credential should have sudo priviledge on a Linux host or administrator priviledge on a Windows host. 
+. Add database server `Credential` for SnapCenter access to DB VM. The credential should have sudo priviledge on a Linux VM or administrator priviledge on a Windows VM. 
 +
 image:aws_ora_fsx_vmc_snapctr_03.png["Screenshot showing SnapCenter configuration."]
 
@@ -1281,10 +1281,10 @@ image:aws_ora_fsx_vmc_snapctr_03.png["Screenshot showing SnapCenter configuratio
 +
 image:aws_ora_fsx_vmc_snapctr_04.png["Screenshot showing SnapCenter configuration."]
 
-. Add Oracle database VM in VMC to `Hosts` with server credential created in previous step 4.  
+. Add Oracle database VM in VMC to `Hosts` with server credential created in previous step 6.  
 +
 image:aws_ora_fsx_vmc_snapctr_05.png["Screenshot showing SnapCenter configuration."]
-+
+
 [NOTE]
 
 Ensure that the SnapCenter server name can be resolved to IP address from DB VM and DB VM name can be resolved to IP address from SnapCenter server. 
@@ -1329,7 +1329,7 @@ image:aws_ora_fsx_vmc_snapctr_11.png["Screenshot showing SnapCenter configuratio
 
 =====
 
-SnapCenter provides number of restore and recovery options for Oracle database from snapshot backup. In this example, we demonstrate a point in time restore and recovery to restore a purged table by mistake. On VM ora_02, two databases cdb3, cdb4 share the same +DATA and +LOGS disk groups. Database restoration for one database does not impact the availablity of the other database. 
+SnapCenter provides number of restore and recovery options for Oracle database from snapshot backup. In this example, we demonstrate a point in time restoration to recover a dropped table by mistake. On VM ora_02, two databases cdb3, cdb4 share the same +DATA and +LOGS disk groups. Database restoration for one database does not impact the availablity of the other database. 
 
 . First, create a test table and insert a row into table to validate a point in time recovery.
 +
@@ -1401,7 +1401,7 @@ CURRENT_TIMESTAMP
 
 .....
 
-. We ran a manual snapshot backup from SnapCenter. Then dropped the table.
+. We run a manual snapshot backup from SnapCenter. Then drop the table.
 +
 .....
 
@@ -1427,7 +1427,7 @@ ORA-00942: table or view does not exist
 
 .....
 
-. From backup set created from last step, take a note of the SCN number of log backup. Click on `Restore` to launch restore and recovery workflow.
+. From backup set created from last step, take a note of the SCN number of log backup. Click on `Restore` to launch restore-recover workflow.
 +
 image:aws_ora_fsx_vmc_snapctr_12.png["Screenshot showing SnapCenter configuration."]
 
@@ -1435,7 +1435,7 @@ image:aws_ora_fsx_vmc_snapctr_12.png["Screenshot showing SnapCenter configuratio
 +
 image:aws_ora_fsx_vmc_snapctr_13.png["Screenshot showing SnapCenter configuration."]
 
-. Choose recovery scope to the SCN from last full database backup. 
+. Choose recovery scope up to the log SCN from last full database backup. 
 +
 image:aws_ora_fsx_vmc_snapctr_14.png["Screenshot showing SnapCenter configuration."]
 
@@ -1451,11 +1451,11 @@ image:aws_ora_fsx_vmc_snapctr_16.png["Screenshot showing SnapCenter configuratio
 +
 image:aws_ora_fsx_vmc_snapctr_17.png["Screenshot showing SnapCenter configuration."]
 
-. Review the summary and click on `Finish` to lauch the restore and recovery.
+. Review the summary and click on `Finish` to lauch the restoration and recovery.
 +
 image:aws_ora_fsx_vmc_snapctr_18.png["Screenshot showing SnapCenter configuration."]
 
-. From Oracle Restart grid control, we observed that while cdb3 is under restore and recovery cdb4 is online and available.
+. From Oracle Restart grid control, we observe that while cdb3 is under restoration and recovery cdb4 is online and available.
 +
 image:aws_ora_fsx_vmc_snapctr_19.png["Screenshot showing SnapCenter configuration."]
 
@@ -1549,7 +1549,7 @@ image:aws_ora_fsx_vmc_snapctr_24.png["Screenshot showing SnapCenter configuratio
 +
 image:aws_ora_fsx_vmc_snapctr_25.png["Screenshot showing SnapCenter configuration."]
 
-. Choose recovery scope. `Until Cancel` recover the clone up to last available log file in the backup set. 
+. Choose recovery scope. `Until Cancel` recovers the clone up to last available log file in the backup set. 
 +
 image:aws_ora_fsx_vmc_snapctr_26.png["Screenshot showing SnapCenter configuration."]
 
@@ -1565,7 +1565,7 @@ image:aws_ora_fsx_vmc_snapctr_28.png["Screenshot showing SnapCenter configuratio
 +
 image:aws_ora_fsx_vmc_snapctr_29.png["Screenshot showing SnapCenter configuration."]
 
-. From DB VM ora_02, the cloned database is also registered in Oracle Restart grid control and the dropped test table is recovered in the close database cdb3tst as shown below.
+. From DB VM ora_02, the cloned database is also registered in Oracle Restart grid control and the dropped test table is recovered in the cloned database cdb3tst as shown below.
 +
 .....
 
@@ -1661,6 +1661,8 @@ test oracle recovery on guest mounted fsx storage to VMC guest vm ora_02
 SQL>
 
 .....
+
+This completes demonstraton of SnapCenter backup, restore, clone Oracle database in VMC SDDC on AWS.
 
 =====
 
