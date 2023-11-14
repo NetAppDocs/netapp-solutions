@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
-permalink: automation_ora_asa_iscsi.html
+permalink: databases/automation_ora_asa_iscsi.html
 keywords: Database, Oracle, ASA, ONTAP, NetApp ASA
 summary: "The solution provides overview and details for automated Oracle deployment and protection in NetApp ASA array as primary database storage with iSCSI protocol and Oracle database configured in standalone ReStart using asm as volume manager." 
 ---
 
-= TR-4983: Simplified, automated Oracle deployment on NetApp ASA with iSCSI
+= TR-4983: Simplified, Automated Oracle Deployment on NetApp ASA with iSCSI
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -19,7 +19,7 @@ Allen Cao, Niyaz Mohamed, NetApp
 
 NetApp ASA systems deliver modern solutions to your SAN infrastructure. They simplify at scale and enable you to accelerate your business-critical applications such as database, make sure that your data is always available (99.9999% uptime), and reduce TCO and carbon footprint. The NetApp ASA systems include A-Series models designed for the most performance-demanding applications, and C-Series models optimized for cost-effective, large-capacity deployments. Together, the ASA A-Series and C-Series systems deliver exceptional performance to improve customer experience and reduce time to results, keep business-critical data available, protected, and secure, and provide more effective capacity for any workload, backed by the industry’s most effective guarantee.
 
-This documentation demonstrates simplified deployment of Oracle databases in a SAN environment built with ASA systems using automation. The Oracle database is deployed in a standalone ReStart configuration with iSCSI protocol for access and Oracle ASM for storage management on ASA storage array. We also demonstrate how to use the NetApp SnapCenter UI tool to backup, restore, and clone an Oracle database for dev/test or other use cases for storage-efficient database operation in NetApp ASA systems. 
+This documentation demonstrates simplified deployment of Oracle databases in a SAN environment built with ASA systems using Ansible automation. The Oracle database is deployed in a standalone ReStart configuration with iSCSI protocol for data access and Oracle ASM for storage management on ASA storage array. We also demonstrate how to use the NetApp SnapCenter UI tool to backup, restore, and clone an Oracle database for dev/test or other use cases for storage-efficient database operation in NetApp ASA systems. 
 
 
 This solution addresses the following use cases:
@@ -32,7 +32,7 @@ This solution addresses the following use cases:
 
 This solution is intended for the following people:
 
-* A DBA who would like to deploy Oracle in NetApp ASA systems as primary database storage.
+* A DBA who would like to deploy Oracle in NetApp ASA systems.
 * A database solution architect who would like to test Oracle workloads in NetApp ASA systems.
 * The storage administrator who would like to deploy and manage an Oracle database on NetApp ASA systems.
 * The application owner who would like to stand up an Oracle database in NetApp ASA systems.
@@ -50,8 +50,8 @@ image::automation_ora_asa_iscsi_archit.png["This image provides a detailed pictu
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone as VMC
-| VMC SDDC cluster | Amazon EC2 i3.metal single node/Intel Xeon E5-2686 CPU,36 cores/512G RAM | 10.37 TB vSAN storage 
+| NetApp ASA A400 | Version 9.13.1P1 | 2 NS224 shelves, 48 NVMe AFF drives with total 69.3 TiB capacity
+| UCSB-B200-M4 |  | Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz | 4-node VMware ESXi cluster 
 
 3+^| *Software*
 | RedHat Linux | RHEL-8.6, 4.18.0-372.9.1.el8.x86_64 kernel | Deployed RedHat subscription for testing
@@ -60,42 +60,35 @@ image::automation_ora_asa_iscsi_archit.png["This image provides a detailed pictu
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 | SnapCenter Server | Version 4.9P1 | Workgroup deployment 
-| BlueXP backup and recovery for VMs | Release 1.0 | Deployed as an ova vSphere plugin VM
-| VMware vSphere | Version 8.0.1.00300 | VMware Tools, Version: 11365 - Linux, 12352 - Windows 
+| VMware vSphere Hypervisor | version 6.5.0.20000 | VMware Tools, Version: 11365 - Linux, 12352 - Windows 
 | Open JDK | Version java-1.8.0-openjdk.x86_64 | SnapCenter plugin requirement on DB VMs 
 |===
 
-=== Oracle Database configuration in VMC on AWS
+=== Oracle Database configuration in lab environment
 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| 
 | *Server* | *Database* | *DB Storage*
-| ora_01 | cdb1(cdb1_pdb1,cdb1_pdb2,cdb1_pdb3) | VMDK datastore on FSx ONTAP
-| ora_01 | cdb2(cdb2_pdb) | VMDK datastore on FSx ONTAP
-| ora_02 | cdb3(cdb3_pdb1,cdb3_pdb2,cdb3_pdb3) | Direct guest mounted FSx ONTAP
-| ora_02 | cdb4(cdb4_pdb) | Direct guest mounted FSx ONTAP
+| ora_01 | cdb1(cdb1_pdb1,cdb1_pdb2,cdb1_pdb3) | iSCSI luns on ASA A400
+| ora_02 | cdb3(cdb3_pdb1,cdb3_pdb2,cdb3_pdb3) | iSCSI luns on ASA A400
 |===
 
 === Key factors for deployment consideration
 
-* *FSx to VMC connectivity.* When you deploy your SDDC on VMware Cloud on AWS, it is created within an AWS account and a VPC dedicated to your organization and managed by VMware. You must also connect the SDDC to an AWS account belonging to you, called the customer AWS account . This connection allows your SDDC to access AWS services belonging to your customer account. FSx for ONTAP is an AWS service deployed in your customer account. Once the VMC SDDC is connected to your customer account, FSx storage is available to VMs in VMC SDDC for direct guest mount. 
+* *Oracle database storage layout.* In this automated Oracle deployment, we provision four database volumes to host Oracle binary, data, and logs by default. We then create two ASM disk groups from data and logs luns. Within the +DATA asm disk group, we provision two data luns in a volume on each ASA A400 cluster node. Within the +LOGS asm disk group, we create two luns in a logs volume on a single ASA A400 node. Multiple luns laid out within an ONTAP volume provides better performance in general. 
 
-* *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. NetApp also recommends deploying FSx for NetApp ONTAP and VMware Cloud on AWS in the same availability zone to achieve better performance and avoid data transfer charges between availability zones.
+* *Multiple DB servers deployment.* The automation solution can deploys an Oracle container database to multiple DB servers in a single Ansible playbook run. Regardless of the number of DB servers, the playbook execution remains the same. In the event of multi-DB server deployments, the playbook builds with an algorithm to place database luns on dual controllers of ASA A400 optimally. The binary and logs luns of odd number DB server in server hosts index place on controller 1. The binary and logs luns of even number DB server in the server hosts index place on controller 2. The DB data luns evenly distribute to two controllers. Oracle ASM combines the data luns on two controllers into a single ASM disk group to fully utilize the processing power of both controllers. 
 
-* *FSx storage cluster sizing.* An Amazon FSx for ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
+* *iSCSI configuration.* The database VMs connect to ASA storage with the iSCSI protocol for storage access. You should configure dual paths on each controller node for redundancy and setup iSCSI multi-path on the DB server for  multi-path storage access. Enable jumbo frame on storage network to maximize performance and throughput. 
 
-* *Oracle data and logs layout.* In our tests and validations, we deployed two ASM disk groups for data and logs respectively. Within the +DATA asm disk group, we provisioned four LUNs in a data volume. Within the +LOGS asm disk group, we provisioned two LUNs in a logs volume. In general, multiple LUNs laid out within an Amazon FSx for ONTAP volume provides better performance. 
-
-* *iSCSI configuration.* The database VMs in VMC SDDC connect to FSx storage with the iSCSI protocol. It is important to gauge the Oracle database peak I/O throughput requirement by carefully analyzing the Oracle AWR report to determine the application and iSCSI traffic-throughput requirements. NetApp also recommends allocating four iSCSI connections to both FSx iSCSI endpoints with multipath properly configured.
-
-* *Oracle ASM redundancy level to use for each Oracle ASM disk group that you create.* Because FSx already mirrors the storage on the FSx cluster level, you should use External Redundancy, which means that the option does not allow Oracle ASM to mirror the contents of the disk group.
+* *Oracle ASM redundancy level to use for each Oracle ASM disk group that you create.* Because the ASA A400 configure storage in RAID DP for data protection at the cluster disk level, you should use `External Redundancy`, which means that the option does not allow Oracle ASM to mirror the contents of the disk group.
 
 * *Database backup.* NetApp provides a SnapCenter software suite for database backup, restore, and clone with an user friendly UI interface. NetApp recommends implementing such a management tool to achieve fast (under a minute) SnapShot backup, quick (minutes) database restore, and database clone.    
 
 == Solution deployment
 
-The following sections provide step-by-step procedures for Oracle 19c deployment in VMC on AWS with direct mounted FSx ONTAP storage to DB VM in a single node Restart configuration with Oracle ASM as database volume manager.     
+The following sections provide step-by-step procedures for automated Oracle 19c deployment and protection in NetApp ASA A400 with directly mounted database luns via iSCSI to DB VM in a single node Restart configuration with Oracle ASM as database volume manager.     
 
 === Prerequisites for deployment
 [%collapsible]
