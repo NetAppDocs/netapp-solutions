@@ -133,8 +133,8 @@ Ensure that you have allocated at least 50G in Oracle VM root volume in order to
 Ansible playbook executes database installation and configuration tasks with predefined parameters. For this Oracle automation solution, there are three user defined parameter files that needs user inputs before playbook execution.
 
 * hosts - define targets that the automation playbook is running against.
-* vars.yml - global variable file that defines variables that apply to all targets.
-* host_name.yml - local variable file that defines variables that apply only to local target. In our use case, these are the Oracle DB servers. 
+* vars/vars.yml - global variable file that defines variables that apply to all targets.
+* host_vars/host_name.yml - local variable file that defines variables that apply only to a local target. In our use case, these are the Oracle DB servers. 
 
 In additional to these user defined variable files, there are number of default variable files that contains default parameters that do not require change unless necessary. Following sections show how the user defined variable files are configured. 
 
@@ -170,17 +170,17 @@ There are total five playbooks in automation toolkit. Each performs different ta
       1-ansible_requirements.yml - setup Ansible controller with required libs and collections.
       2-linux_config.yml - execute Linux kernel configuration on Oracle DB servers.
       3-ontap_config.yml - configure ONTAP for Oracle database including creation of SVM, data volumes/luns provision, host igroup setup etc.  
-      4-oracle_config.yml - install and configure Oracle on DB servers for grid infrastructure and container database creation. 
+      4-oracle_config.yml - install and configure Oracle on DB servers for grid infrastructure and create container database. 
       5-destroy.yml - optional to undo the environment to dismantle all. 
 
 There are three options to run the playbooks with following commands. 
 
-. Execute all playbook in one run.
+. Execute all playbooks in one combined run.
 +
 [source, cli]
 ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml
 
-. Execute playbooks one at a time with the number of sequence from 1-4.
+. Execute playbooks one at a time with the number sequence from 1-4.
 +
 [source, cli]] 
 ansible-playbook -i hosts 1-ansible_requirements.yml -u admin -e @vars/vars.yml
@@ -194,7 +194,7 @@ ansible-playbook -i hosts 3-ontap_config.yml -u admin -e @vars/vars.yml
 [source, cli]
 ansible-playbook -i hosts 4-oracle_config.yml -u admin -e @vars/vars.yml
 
-. Execute all playbook with a tag.
+. Execute 0-all_playbook.yml with a tag.
 +
 [source, cli]
 ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t ansible_requirements
@@ -221,6 +221,132 @@ ansible-playbook -i hosts 5-destroy.yml -u admin -e @vars/vars.yml
 
 ====
 
+After playbook run, login to Oracle DB server as oracle user to validate that Oracle grid infrastructure and database are created successfully. 
+
+. Validate the grid infrastructure and resources created.
++
+....
+
+[oracle@ora_01 ~]$ df -h
+Filesystem                    Size  Used Avail Use% Mounted on
+devtmpfs                      7.7G   40K  7.7G   1% /dev
+tmpfs                         7.8G  1.1G  6.7G  15% /dev/shm
+tmpfs                         7.8G  312M  7.5G   4% /run
+tmpfs                         7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/mapper/rhel-root          44G   38G  6.8G  85% /
+/dev/sda1                    1014M  258M  757M  26% /boot
+tmpfs                         1.6G   12K  1.6G   1% /run/user/42
+tmpfs                         1.6G  4.0K  1.6G   1% /run/user/1000
+/dev/mapper/ora_01_biny_01p1   40G   21G   20G  52% /u01
+[oracle@ora_01 ~]$ asm
+[oracle@ora_01 ~]$ crsctl stat res -t
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DATA.dg
+               ONLINE  ONLINE       ora_01                   STABLE
+ora.LISTENER.lsnr
+               ONLINE  INTERMEDIATE ora_01                   Not All Endpoints Re
+                                                             gistered,STABLE
+ora.LOGS.dg
+               ONLINE  ONLINE       ora_01                   STABLE
+ora.asm
+               ONLINE  ONLINE       ora_01                   Started,STABLE
+ora.ons
+               OFFLINE OFFLINE      ora_01                   STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.cssd
+      1        ONLINE  ONLINE       ora_01                   STABLE
+ora.diskmon
+      1        OFFLINE OFFLINE                               STABLE
+ora.driver.afd
+      1        ONLINE  ONLINE       ora_01                   STABLE
+ora.evmd
+      1        ONLINE  ONLINE       ora_01                   STABLE
+ora.ntap1.db
+      1        ONLINE  ONLINE       ora_01                   Open,HOME=/u01/app/o
+                                                             racle/product/19.0.0
+                                                             /NTAP1,STABLE
+--------------------------------------------------------------------------------
+[oracle@ora_01 ~]$
+
+....
++
+[NOTE]
+
+Ignore the `Not All Endpoints Registered` in State details. This is resulted from conflict of manual and dynamic database registration with listener and can be safely ignored. 
+
+. Validate ASM filter driver is working as expected.
++
+....
+
+[oracle@ora_01 ~]$ asmcmd
+ASMCMD> lsdg
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  4194304    327680   318644                0          318644              0             N  DATA/
+MOUNTED  EXTERN  N         512             512   4096  4194304     81920    78880                0           78880              0             N  LOGS/
+ASMCMD> lsdsk
+Path
+AFD:ORA_01_DAT1_01
+AFD:ORA_01_DAT1_03
+AFD:ORA_01_DAT1_05
+AFD:ORA_01_DAT1_07
+AFD:ORA_01_DAT2_02
+AFD:ORA_01_DAT2_04
+AFD:ORA_01_DAT2_06
+AFD:ORA_01_DAT2_08
+AFD:ORA_01_LOGS_01
+AFD:ORA_01_LOGS_02
+ASMCMD> afd_state
+ASMCMD-9526: The AFD state is 'LOADED' and filtering is 'ENABLED' on host 'ora_01'
+ASMCMD>
+
+....
+
+. Login to Oracle Enterprise Manager Express to validate database
++
+image::automation_ora_asa_em_01.png["This image provides login screen for Oracle Enterprise Manager Express"]
+image::automation_ora_asa_em_02.png["This image provides container database view from Oracle Enterprise Manager Express"]
++
+....
+Enable additional port from sqlplus for login to individual container database or PDBs.
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 NTAP1_PDB1                     READ WRITE NO
+         4 NTAP1_PDB2                     READ WRITE NO
+         5 NTAP1_PDB3                     READ WRITE NO
+SQL> alter session set container=NTAP1_PDB1;
+
+Session altered.
+
+SQL> select dbms_xdb_config.gethttpsport() from dual;
+
+DBMS_XDB_CONFIG.GETHTTPSPORT()
+------------------------------
+                             0
+
+SQL> exec DBMS_XDB_CONFIG.SETHTTPSPORT(5501);
+
+PL/SQL procedure successfully completed.
+
+SQL> select dbms_xdb_config.gethttpsport() from dual;
+
+DBMS_XDB_CONFIG.GETHTTPSPORT()
+------------------------------
+                          5501
+
+login to NTAP1_PDB1 from port 5501.
+....
++
+image::automation_ora_asa_em_03.png["This image provides PDB database view from Oracle Enterprise Manager Express"]
 
 ====
 
@@ -232,6 +358,8 @@ ansible-playbook -i hosts 5-destroy.yml -u admin -e @vars/vars.yml
 [%collapsible]
 
 ====
+
+Refer to TR-XXX section `Oracle backup, restore, and clone with SnapCenter` for details on how to setup SnapCenter and execute the database backup, restore, and clone workflow.
 
 ====
 
