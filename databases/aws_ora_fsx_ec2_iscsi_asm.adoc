@@ -17,7 +17,7 @@ Allen Cao, Niyaz Mohamed, NetApp
 [.lead]
 == Purpose
 
-ASM (Automatic Storage Management) is a popular Oracle storage volume manager that is employed in many Oracle installations. It is also Oracle's recommended storage management solution. It provides an alternative to conventional volume managers and file systems. Since Oracle version 11g, ASM has been packaged with grid infrastructure rather than a database. As a result, in order to utilize Oracle ASM for storage management without RAC, you must install Oracle grid infrastructure in a standalone server, also known as Oracle Restart. Doing so certainly adds more complexity in an otherwise simpler Oracle database deployment. However, as the name implies, when Oracle is deployed in Restart mode, any failed Oracle services are restarted after a host reboot without user intervention, which provides a certain degree of high availability or HA functionality.
+ASM (Automatic Storage Management) is a popular Oracle storage volume manager employed in many Oracle installations. It is also Oracle's recommended storage management solution. It provides an alternative to conventional volume managers and file systems. Since Oracle version 11g, ASM packaged with grid infrastructure rather than a database. As a result, in order to utilize Oracle ASM for storage management without RAC, you must install Oracle grid infrastructure in a standalone server, also known as Oracle Restart. Doing so certainly adds more complexity in Oracle database deployment. However, as the name implies, when Oracle deployed in Restart mode, failed Oracle services restarted automatically by grid infrastructure or after a host reboot without user intervention, which provides a certain degree of high availability or HA functionality.
 
 In this documentation, we demonstrate how to deploy an Oracle database with the iSCSI protocol and Oracle ASM in an Amazon FSx for ONTAP storage environment with EC2 compute instances. We also demonstrate how to use the NetApp SnapCenter service through the NetApp BlueXP console to backup, restore, and clone your Oracle database for dev/test or other use cases for storage-efficient database operation in the AWS public cloud.  
 
@@ -70,7 +70,7 @@ image::aws_ora_fsx_ec2_iscsi_asm_architecture.png["This image provides a detaile
 
 * *Oracle data and logs layout.* In our tests and validations, we deployed two ASM disk groups for data and logs respectively. Within the +DATA asm disk group, we provisioned four LUNs in a data volume. Within the +LOGS asm disk group, we provisioned two LUNs in a logs volume. In general, multiple LUNs laid out within an Amazon FSx for ONTAP volume provides better performance. 
 
-* *iSCSI configuration.* The EC2 instance database server connects to FSx storage with the iSCSI protocol. EC2 instances generally deploy with a single network interface or ENI. The single NIC interface carries both iSCSI and application traffic. It is important to gauge the Oracle database peek I/O throughput requirement by carefully analyzing the Oracle AWR report in order to choose a right EC2 compute instance that meets both application and iSCSI traffic-throughput requirements. NetApp also recommends allocating four iSCSI connections to both FSx iSCSI endpoints with multipath properly configured.
+* *iSCSI configuration.* The EC2 instance database server connects to FSx storage with the iSCSI protocol. EC2 instances generally deploy with a single network interface or ENI. The single NIC interface carries both iSCSI and application traffic. It is important to gauge the Oracle database peak I/O throughput requirement by carefully analyzing the Oracle AWR report in order to choose a right EC2 compute instance that meets both application and iSCSI traffic-throughput requirements. NetApp also recommends allocating four iSCSI connections to both FSx iSCSI endpoints with multipath properly configured.
 
 * *Oracle ASM redundancy level to use for each Oracle ASM disk group that you create.* Because FSx already mirrors the storage on the FSx cluster level, you should use External Redundancy, which means that the option does not allow Oracle ASM to mirror the contents of the disk group.
 
@@ -238,7 +238,7 @@ systemctl start iscsid
 cat /etc/iscsi/initiatorname.iscsi
 ....
 
-. Add the ASM group to be used for the asm sysasm group
+. Add the ASM group to be used for the asm sysasm group.
 +
 ....
 groupadd asm
@@ -248,6 +248,13 @@ groupadd asm
 +
 ....
 usermod -a -G asm oracle
+....
+
+. Stop and disable Linux firewall if it is active.
++
+....
+systemctl stop firewalld
+systemctl disable firewalld
 ....
 
 . Reboot the EC2 instance. 
@@ -756,7 +763,7 @@ unset ORACLE_BASE
 . Log into the EC2 instance as the Oracle user and extract the patch in the `/tmp/archive` folder. 
 +
 ....
-unzip p34762026_190000_Linux-x86-64.zip
+unzip /tmp/archive/p34762026_190000_Linux-x86-64.zip -d /tmp/archive
 ....
 
 . From grid home /u01/app/oracle/product/19.0.0/grid and as the oracle user, launch `gridSetup.sh` for grid infrastructure installation.
@@ -921,6 +928,8 @@ templateName=General_Purpose.dbc
 sysPassword="yourPWD"
 systemPassword="yourPWD"
 dbsnmpPassword="yourPWD"
+datafileDestination=+DATA
+recoveryAreaDestination=+LOGS
 storageType=ASM
 diskGroupName=DATA
 characterSet=AL32UTF8
@@ -1060,12 +1069,12 @@ SQL> show pdbs
 SQL>
 ....
 
-. Set the DB recovery location to the +LOGS disk group.
+. Set the DB recovery destination size to the +LOGS disk group size.
 +
 ....
+
 alter system set db_recovery_file_dest_size = 80G scope=both;
 
-alter system set db_recovery_file_dest = '+LOGS' scope=both;
 ....
 
 . Log into the database with sqlplus and enable archive log mode.
