@@ -81,25 +81,23 @@ We use *fsxn-ontap* as the name for the *FSxN private S3 bucket name*.
 Please use the *storage virtual machine name* for the *-vserver* argument.
 ```bash
 vserver object-store-server create -vserver fsxn-svm-demo -object-store-server fsx_s3 -is-http-enabled true -is-https-enabled false
- 
+
 vserver object-store-server user create -vserver fsxn-svm-demo -user s3user
- 
+
 vserver object-store-server group create -name s3group -users s3user -policies FullAccess
- 
+
 vserver object-store-server bucket create fsxn-ontap -vserver fsxn-svm-demo -type nas -nas-path /vol1
 ```
-
 image:mlops_fsxn_integration_18.png[Error: Jupyter Lab terminal output]
 . Execute the below commands to retrieve the endpoint IP and credentials for FSxN private S3.
 +
 ```bash
 network interface show -vserver fsxn-svm-demo -lif nfs_smb_management_1
- 
+
 set adv
- 
+
 vserver object-store-server user show
 ```
-
 . Keep the endpoint IP and credential for future use.
 image:mlops_fsxn_integration_19.png[Error: Jupyter Lab terminal]
 
@@ -119,30 +117,30 @@ aws_access_key_id: str = 'PB7XA31OKDPKTEXMK0S2'                         # Please
 aws_secret_access_key: str = 'N06DwX7OgBnb5X569dr10JicACYuHfDy3_hmsn7M' # Please get this credential from ONTAP
 fsx_endpoint_ip: str = '172.31.255.251'                                 # Please get this IP address from FSXN
 # -------- Manual configurations --------
- 
+
 # Workaround
 ## Permission patch
 !mkdir -p vol1
 !sudo mount -t nfs $fsx_endpoint_ip:/vol1 /home/ec2-user/SageMaker/vol1
 !sudo chmod 777 /home/ec2-user/SageMaker/vol1
- 
+
 ## Authentication for FSxN as a Private S3 Bucket
 !aws configure set aws_access_key_id $aws_access_key_id
 !aws configure set aws_secret_access_key $aws_secret_access_key
- 
+
 ## Upload file to the FSxN Private S3 Bucket
 %%capture
 local_file_path: str = <Your local file path>
- 
+
 !aws s3 cp --endpoint-url http://$fsx_endpoint_ip /home/ec2-user/SageMaker/$local_file_path  s3://$bucket_name/$local_file_path
- 
+
 # Read data from FSxN Private S3 bucket
 ## Initialize a s3 resource client
 import boto3
- 
+
 # Get session info
 region_name = boto3.session.Session().region_name
- 
+
 # Initialize Fsxn S3 bucket object
 # --- Start integrating SageMaker with FSXN ---
 # This is the only code change we need to incorporate SageMaker with FSXN
@@ -159,10 +157,10 @@ s3_client: boto3.client = boto3.resource(
     )
 )
 # --- End integrating SageMaker with FSXN ---
- 
+
 ## Read file byte content
 bucket = s3_client.Bucket(bucket_name)
- 
+
 binary_data = bucket.Object(data.filename).get()['Body']
 ```
 This concludes the integration between FSxN and the SageMaker instance.
