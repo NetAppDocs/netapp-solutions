@@ -15,9 +15,9 @@ summary: This post provides a guide on configuring FSxN as a private S3 bucket u
 
 [.lead]
 *Author(s):* 
-Ken Jian, Senior Data & Applied Scientist, NetApp  
-Muneem Shahriar, Principal Data & Applied Scientist, NetApp
-Mesfin Dema, Director of Research and Data Science, NetApp
+<Author 1>, Data Scientist, NetApp
+<Author 2>, Data Scientist, NetApp
+<Author 3>, Data Scientist, NetApp
 
 == Introduction
 
@@ -79,6 +79,7 @@ image:mlops_fsxn_integration_17.png[Error: Jupyter Lab terminal]
 We use *fsxn-ontap* as the name for the *FSxN private S3 bucket name*. 
 Please use the *storage virtual machine name* for the *-vserver* argument.
 +
+// start ONTAP bucket configuration
 ```bash
 vserver object-store-server create -vserver fsxn-svm-demo -object-store-server fsx_s3 -is-http-enabled true -is-https-enabled false
  
@@ -88,9 +89,11 @@ vserver object-store-server group create -name s3group -users s3user -policies F
  
 vserver object-store-server bucket create fsxn-ontap -vserver fsxn-svm-demo -type nas -nas-path /vol1
 ```
+// end ONTAP bucket configuration
 image:mlops_fsxn_integration_18.png[Error: Jupyter Lab terminal output]
 . Execute the below commands to retrieve the endpoint IP and credentials for FSxN private S3.
 +
+// start ONTAP NFS configuration
 ```bash
 network interface show -vserver fsxn-svm-demo -lif nfs_smb_management_1
  
@@ -98,6 +101,7 @@ set adv
  
 vserver object-store-server user show
 ```
+// end ONTAP NFS configuration
 . Keep the endpoint IP and credential for future use.
 image:mlops_fsxn_integration_19.png[Error: Jupyter Lab terminal]
 
@@ -107,6 +111,8 @@ image:mlops_fsxn_integration_20.png[Error: Open a new Jupyter notebook]
 . Use the below code as a work around solution to upload files to FSxN private S3 bucket.
 For a comprehensive code example please refer to this notebook.
 link:./../media/mlops_fsxn_integration_0.ipynb[fsxn_demo.ipynb]
++
+// start Python access code
 ```python
 # Setup configurations
 # -------- Manual configurations --------
@@ -162,6 +168,7 @@ bucket = s3_client.Bucket(bucket_name)
  
 binary_data = bucket.Object(data.filename).get()['Body']
 ```
+// end Python access code
 This concludes the integration between FSxN and the SageMaker instance.
 
 == Useful debugging checklist
