@@ -1,0 +1,390 @@
+---
+sidebar: sidebar
+permalink: databases/automation_ora_aws-fsx_iscsi.html
+keywords: Database, Oracle, AWS, FSx, ONTAP, Automation
+summary: "The solution provides overview and details for automated Oracle deployment and protection in Amazon FSx ONTAP as primary database storage with iSCSI protocol and Oracle database configured in standalone ReStart using Oracle asm as volume manager." 
+---
+
+= TR-: Simplified and Automated Oracle Deployment on Amazon FSx ONTAP with iSCSI
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+Allen Cao, Niyaz Mohamed, NetApp
+
+[.lead]
+== Purpose
+
+NetApp ASA systems deliver modern solutions to your SAN infrastructure. They simplify at scale and enable you to accelerate your business-critical applications such as databases, make sure that your data is always available (99.9999% uptime), and reduce TCO and carbon footprint. The NetApp ASA systems include A-Series models designed for the most performance-demanding applications and C-Series models optimized for cost-effective, large-capacity deployments. Together, the ASA A-Series and C-Series systems deliver exceptional performance to improve customer experience and reduce time to results, keep business-critical data available, protected, and secure, and provide more effective capacity for any workload, backed by the industry’s most effective guarantee.
+
+This documentation demonstrates the simplified deployment of Oracle databases in a SAN environment built with ASA systems using Ansible automation. The Oracle database is deployed in a standalone ReStart configuration with iSCSI protocol for data access and Oracle ASM for storage management on the ASA storage array. We also demonstrate how to use the NetApp SnapCenter UI tool to backup, restore, and clone an Oracle database for dev/test or other use cases for storage-efficient database operation in NetApp ASA systems. 
+
+
+This solution addresses the following use cases:
+
+* Automated Oracle database deployment in NetApp ASA systems as primary database storage 
+* Oracle database backup and restore in NetApp ASA systems using NetApp SnapCenter tool 
+* Oracle database clone for dev/test or other use cases in NetApp ASA systems using NetApp SnapCenter tool
+
+== Audience
+
+This solution is intended for the following people:
+
+* A DBA who would like to deploy Oracle in NetApp ASA systems.
+* A database solution architect who would like to test Oracle workloads in NetApp ASA systems.
+* A storage administrator who would like to deploy and manage an Oracle database on NetApp ASA systems.
+* An application owner who would like to stand up an Oracle database in NetApp ASA systems.
+
+== Solution test and validation environment
+
+The testing and validation of this solution were performed in a lab setting that might not match the final deployment environment. See the section <<Key Factors for Deployment Consideration>> for more information. 
+
+=== Architecture
+
+image::automation_ora_asa_iscsi_archit.png["This image provides a detailed picture of the Oracle deployment configuration in AWS public cloud with iSCSI and ASM."]
+
+=== Hardware and software components
+
+[width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
+|===
+3+^| *Hardware*
+| NetApp ASA A400 | Version 9.13.1P1 | 2 NS224 shelves, 48 NVMe AFF drives with total 69.3 TiB capacity
+| UCSB-B200-M4 | Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz | 4-node VMware ESXi cluster 
+
+3+^| *Software*
+| RedHat Linux | RHEL-8.6, 4.18.0-372.9.1.el8.x86_64 kernel | Deployed RedHat subscription for testing
+| Windows Server | 2022 Standard, 10.0.20348 Build 20348 | Hosting SnapCenter server 
+| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
+| Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
+| Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
+| SnapCenter Server | Version 4.9P1 | Workgroup deployment 
+| VMware vSphere Hypervisor | version 6.5.0.20000 | VMware Tools, Version: 11365 - Linux, 12352 - Windows 
+| Open JDK | Version java-1.8.0-openjdk.x86_64 | SnapCenter plugin requirement on DB VMs 
+|===
+
+=== Oracle database configuration in the lab environment
+
+[width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
+|===
+3+^| 
+| *Server* | *Database* | *DB Storage*
+| ora_01 | NTAP1(NTAP1_PDB1,NTAP1_PDB2,NTAP1_PDB3) | iSCSI luns on ASA A400
+| ora_02 | NTAP2(NTAP2_PDB1,NTAP2_PDB2,NTAP2_PDB3) | iSCSI luns on ASA A400
+|===
+
+=== Key factors for deployment consideration
+
+* *Oracle database storage layout.* In this automated Oracle deployment, we provision four database volumes to host Oracle binary, data, and logs by default. We then create two ASM disk groups from data and logs luns. Within the +DATA asm disk group, we provision two data luns in a volume on each ASA A400 cluster node. Within the +LOGS asm disk group, we create two luns in a log volume on a single ASA A400 node. Multiple luns laid out within an ONTAP volume provides better performance in general. 
+
+* *Multiple DB servers deployment.* The automation solution can deploy an Oracle container database to multiple DB servers in a single Ansible playbook run. Regardless of the number of DB servers, the playbook execution remains the same. In the event of multi-DB server deployments, the playbook builds with an algorithm to place database luns on dual controllers of ASA A400 optimally. The binary and logs luns of odd number DB server in server hosts index place on controller 1. The binary and logs luns of even number DB server in the server hosts index place on controller 2. The DB data luns evenly distributed to two controllers. Oracle ASM combines the data luns on two controllers into a single ASM disk group to fully utilize the processing power of both controllers. 
+
+* *iSCSI configuration.* The database VMs connect to ASA storage with the iSCSI protocol for storage access. You should configure dual paths on each controller node for redundancy and set up iSCSI multi-path on the DB server for multi-path storage access. Enable jumbo frame on storage network to maximize performance and throughput. 
+
+* *Oracle ASM redundancy level to use for each Oracle ASM disk group that you create.* Because the ASA A400 configures storage in RAID DP for data protection at the cluster disk level, you should use `External Redundancy`, which means that the option does not allow Oracle ASM to mirror the contents of the disk group.
+
+* *Database backup.* NetApp provides a SnapCenter software suite for database backup, restore, and cloning with a user-friendly UI interface. NetApp recommends implementing such a management tool to achieve fast (under a minute) SnapShot backup, quick (minutes) database restore, and database clone.    
+
+== Solution deployment
+
+The following sections provide step-by-step procedures for automated Oracle 19c deployment and protection in NetApp ASA A400 with directly mounted database luns via iSCSI to DB VM in a single node Restart configuration with Oracle ASM as database volume manager.     
+
+=== Prerequisites for deployment
+[%collapsible]
+====
+
+Deployment requires the following prerequisites.
+
+. It is assumed that the NetApp ASA storage array has been installed and configured. This includes iSCSI broadcast domain, LACP interface groups a0a on both controller nodes, iSCSI VLAN ports (a0a-<iscsi-a-vlan-id>, a0a-<iscsi-b-vlan-id>) on both controller nodes. The following link provides detailed step-by-step instructions if help is needed. link:https://docs.netapp.com/us-en/ontap-systems/asa400/install-detailed-guide.html[Detailed guide - ASA A400^]
+
+. Provision a Linux VM as an Ansible controller node with the latest version of Ansible and Git installed. Refer to the following link for details: link:https://review.docs.netapp.com/us-en/netapp-solutions_acao_ora_vmc/automation/getting-started.html[Getting Started with NetApp solution automation^] in section - `Setup the Ansible Control Node for CLI deployments on RHEL / CentOS` or `Setup the Ansible Control Node for CLI deployments on Ubuntu / Debian`. 
+
+. Clone a copy of the NetApp Oracle deployment automation toolkit for iSCSI. 
++
+[source, cli]
+git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_iscsi.git
+
+. Provision a Windows server to run the NetApp SnapCenter UI tool with the latest version. Refer to the following link for details: link:https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^]
+
+. Build two RHEL Oracle DB servers either bare metal or virtualized VM. Create an admin user on DB servers with sudo without password privilege and enable SSH private/public key authentication between Ansible host and Oracle DB server hosts. Stage following Oracle 19c installation files on DB servers /tmp/archive directory.
++
+      installer_archives:
+        - "LINUX.X64_193000_grid_home.zip"
+        - "p34762026_190000_Linux-x86-64.zip"
+        - "LINUX.X64_193000_db_home.zip"
+        - "p34765931_190000_Linux-x86-64.zip"
+        - "p6880880_190000_Linux-x86-64.zip"
++
+[NOTE]
+
+Ensure that you have allocated at least 50G in Oracle VM root volume to have sufficient space to stage Oracle installation files.
+
+. Watch the following video:
++
+video::79095731-6b02-41d5-9fa1-b0c00100d055[panopto, title="Simplified and automated Oracle deployment on NetApp ASA with iSCSI", width=360]
+
+====
+
+=== Automation parameter files
+[%collapsible]
+
+====
+
+Ansible playbook executes database installation and configuration tasks with predefined parameters. For this Oracle automation solution, there are three user-defined parameter files that need user input before playbook execution.
+
+* hosts - define targets that the automation playbook is running against.
+* vars/vars.yml - the global variable file that defines variables that apply to all targets.
+* host_vars/host_name.yml - the local variable file that defines variables that apply only to a local target. In our use case, these are the Oracle DB servers. 
+
+In addition to these user-defined variable files, there are several default variable files that contain default parameters that do not require change unless necessary. The following sections show how the user-defined variable files are configured.  
+
+====
+
+=== Parameter files configuration
+[%collapsible]
+
+====
+
+. Ansible target `hosts` file configuration:
++
+include::../_include/automation_ora_asa_iscsi_hosts.adoc[]
+
+. Global `vars/vars.yml` file configuration
++
+include::../_include/automation_ora_asa_iscsi_vars.adoc[]
+
+. Local DB server `host_vars/host_name.yml` configuration
++
+include::../_include/automation_ora_asa_iscsi_host_vars.adoc[]
+
+====
+
+=== Playbook execution
+[%collapsible]
+
+====
+
+There are a total of five playbooks in the automation toolkit. Each performs different task blocks and serves different purposes.
+
+      0-all_playbook.yml - execute playbooks from 1-4 in one playbook run.
+      1-ansible_requirements.yml - set up Ansible controller with required libs and collections.
+      2-linux_config.yml - execute Linux kernel configuration on Oracle DB servers.
+      3-ontap_config.yml - configure ONTAP for Oracle database including the creation of SVM, data volumes/luns provision, host igroup setup, etc.  
+      4-oracle_config.yml - install and configure Oracle on DB servers for grid infrastructure and create a container database. 
+      5-destroy.yml - optional to undo the environment to dismantle all. 
+
+There are three options to run the playbooks with the following commands. 
+
+. Execute all playbooks in one combined run.
++
+[source, cli]
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml
+
+. Execute playbooks one at a time with the number sequence from 1-4.
++
+[source, cli]] 
+ansible-playbook -i hosts 1-ansible_requirements.yml -u admin -e @vars/vars.yml
++
+[source, cli] 
+ansible-playbook -i hosts 2-linux_config.yml -u admin -e @vars/vars.yml
++
+[source, cli]
+ansible-playbook -i hosts 3-ontap_config.yml -u admin -e @vars/vars.yml
++
+[source, cli]
+ansible-playbook -i hosts 4-oracle_config.yml -u admin -e @vars/vars.yml
+
+. Execute 0-all_playbook.yml with a tag.
++
+[source, cli]
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t ansible_requirements
++
+[source, cli]
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t linux_config
++
+[source, cli]
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t ontap_config
++
+[source, cli]
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t oracle_config
+
+. Undo the environment
++
+[source, cli]
+ansible-playbook -i hosts 5-destroy.yml -u admin -e @vars/vars.yml
+
+
+====
+
+=== Post execution validation
+[%collapsible]
+
+====
+
+After the playbook run, login to the Oracle DB server as oracle user to validate that Oracle grid infrastructure and database are created successfully. Following is an example of Oracle database validation on host ora_01. 
+
+. Validate the grid infrastructure and resources created.
++
+....
+
+[oracle@ora_01 ~]$ df -h
+Filesystem                    Size  Used Avail Use% Mounted on
+devtmpfs                      7.7G   40K  7.7G   1% /dev
+tmpfs                         7.8G  1.1G  6.7G  15% /dev/shm
+tmpfs                         7.8G  312M  7.5G   4% /run
+tmpfs                         7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/mapper/rhel-root          44G   38G  6.8G  85% /
+/dev/sda1                    1014M  258M  757M  26% /boot
+tmpfs                         1.6G   12K  1.6G   1% /run/user/42
+tmpfs                         1.6G  4.0K  1.6G   1% /run/user/1000
+/dev/mapper/ora_01_biny_01p1   40G   21G   20G  52% /u01
+[oracle@ora_01 ~]$ asm
+[oracle@ora_01 ~]$ crsctl stat res -t
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DATA.dg
+               ONLINE  ONLINE       ora_01                   STABLE
+ora.LISTENER.lsnr
+               ONLINE  INTERMEDIATE ora_01                   Not All Endpoints Re
+                                                             gistered,STABLE
+ora.LOGS.dg
+               ONLINE  ONLINE       ora_01                   STABLE
+ora.asm
+               ONLINE  ONLINE       ora_01                   Started,STABLE
+ora.ons
+               OFFLINE OFFLINE      ora_01                   STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.cssd
+      1        ONLINE  ONLINE       ora_01                   STABLE
+ora.diskmon
+      1        OFFLINE OFFLINE                               STABLE
+ora.driver.afd
+      1        ONLINE  ONLINE       ora_01                   STABLE
+ora.evmd
+      1        ONLINE  ONLINE       ora_01                   STABLE
+ora.ntap1.db
+      1        ONLINE  ONLINE       ora_01                   Open,HOME=/u01/app/o
+                                                             racle/product/19.0.0
+                                                             /NTAP1,STABLE
+--------------------------------------------------------------------------------
+[oracle@ora_01 ~]$
+
+....
++
+[NOTE]
+
+Ignore the `Not All Endpoints Registered` in State details. This results from a conflict of manual and dynamic database registration with the listener and can be safely ignored.  
+
+. Validate ASM filter driver is working as expected.
++
+....
+
+[oracle@ora_01 ~]$ asmcmd
+ASMCMD> lsdg
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  4194304    327680   318644                0          318644              0             N  DATA/
+MOUNTED  EXTERN  N         512             512   4096  4194304     81920    78880                0           78880              0             N  LOGS/
+ASMCMD> lsdsk
+Path
+AFD:ORA_01_DAT1_01
+AFD:ORA_01_DAT1_03
+AFD:ORA_01_DAT1_05
+AFD:ORA_01_DAT1_07
+AFD:ORA_01_DAT2_02
+AFD:ORA_01_DAT2_04
+AFD:ORA_01_DAT2_06
+AFD:ORA_01_DAT2_08
+AFD:ORA_01_LOGS_01
+AFD:ORA_01_LOGS_02
+ASMCMD> afd_state
+ASMCMD-9526: The AFD state is 'LOADED' and filtering is 'ENABLED' on host 'ora_01'
+ASMCMD>
+
+....
+
+. Login to Oracle Enterprise Manager Express to validate database.
++
+image::automation_ora_asa_em_01.png["This image provides login screen for Oracle Enterprise Manager Express"]
+image::automation_ora_asa_em_02.png["This image provides container database view from Oracle Enterprise Manager Express"]
++
+....
+Enable additional port from sqlplus for login to individual container database or PDBs.
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 NTAP1_PDB1                     READ WRITE NO
+         4 NTAP1_PDB2                     READ WRITE NO
+         5 NTAP1_PDB3                     READ WRITE NO
+SQL> alter session set container=NTAP1_PDB1;
+
+Session altered.
+
+SQL> select dbms_xdb_config.gethttpsport() from dual;
+
+DBMS_XDB_CONFIG.GETHTTPSPORT()
+------------------------------
+                             0
+
+SQL> exec DBMS_XDB_CONFIG.SETHTTPSPORT(5501);
+
+PL/SQL procedure successfully completed.
+
+SQL> select dbms_xdb_config.gethttpsport() from dual;
+
+DBMS_XDB_CONFIG.GETHTTPSPORT()
+------------------------------
+                          5501
+
+login to NTAP1_PDB1 from port 5501.
+....
++
+image::automation_ora_asa_em_03.png["This image provides PDB database view from Oracle Enterprise Manager Express"]
+
+====
+
+
+
+
+
+=== Oracle backup, restore, and clone with SnapCenter
+[%collapsible]
+
+====
+
+Refer to TR-4979 link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_vmc_guestmount.html#oracle-backup-restore-and-clone-with-snapcenter[Simplified, self-managed Oracle in VMware Cloud on AWS with guest-mounted FSx ONTAP^] section `Oracle backup, restore, and clone with SnapCenter` for details on how to setup SnapCenter and execute the database backup, restore, and clone workflow.
+
+====
+
+
+== Where to find additional information
+
+To learn more about the information described in this document, review the following documents and/or websites:
+
+* NETAPP ASA: ALL-FLASH SAN ARRAY
++
+link:https://www.netapp.com/data-storage/all-flash-san-storage-array/[https://www.netapp.com/data-storage/all-flash-san-storage-array/^]
+
+* Installing Oracle Grid Infrastructure for a Standalone Server with a New Database Installation 
++
+link:https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/installing-oracle-grid-infrastructure-for-a-standalone-server-with-a-new-database-installation.html#GUID-0B1CEE8C-C893-46AA-8A6A-7B5FAAEC72B3[https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/installing-oracle-grid-infrastructure-for-a-standalone-server-with-a-new-database-installation.html#GUID-0B1CEE8C-C893-46AA-8A6A-7B5FAAEC72B3^]
+
+*  Installing and Configuring Oracle Database Using Response Files
++
+link:https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/installing-and-configuring-oracle-database-using-response-files.html#GUID-D53355E9-E901-4224-9A2A-B882070EDDF7[https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/installing-and-configuring-oracle-database-using-response-files.html#GUID-D53355E9-E901-4224-9A2A-B882070EDDF7^]
+
+
+* Use Red Hat Enterprise Linux 8.2 with ONTAP
++
+link:https://docs.netapp.com/us-en/ontap-sanhost/hu_rhel_82.html#all-san-array-configurations[https://docs.netapp.com/us-en/ontap-sanhost/hu_rhel_82.html#all-san-array-configurations^]
+
+
+
