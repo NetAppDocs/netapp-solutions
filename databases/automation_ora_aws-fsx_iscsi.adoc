@@ -5,7 +5,7 @@ keywords: Database, Oracle, AWS, FSx, ONTAP, Automation
 summary: "The solution provides overview and details for automated Oracle deployment and protection in Amazon FSx ONTAP as primary database storage with iSCSI protocol and Oracle database configured in standalone ReStart using Oracle asm as volume manager." 
 ---
 
-= TR-: Simplified and Automated Oracle Deployment on Amazon FSx ONTAP with iSCSI
+= Simplified and Automated Oracle Deployment on Amazon FSx ONTAP with iSCSI
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -106,7 +106,9 @@ Deployment requires the following prerequisites.
 [source, cli]
 git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
 
-. Provision an EC2 Linux instance as the Ansible controller node with the latest version of Ansible and Git installed. Refer to the following link for details: link:https://docs.netapp.com/us-en/netapp-solutions/automation/getting-started.html[Getting Started with NetApp solution automation^] in section - `Setup the Ansible Control Node for CLI deployments on RHEL / CentOS` or `Setup the Ansible Control Node for CLI deployments on Ubuntu / Debian`. 
+. Provision an EC2 Linux instance as the Ansible controller node with the latest version of Ansible and Git installed. Refer to the following link for details: link:https://docs.netapp.com/us-en/netapp-solutions/automation/getting-started.html[Getting Started with NetApp solution automation^] in section - 
+`Setup the Ansible Control Node for CLI deployments on RHEL / CentOS` or 
+`Setup the Ansible Control Node for CLI deployments on Ubuntu / Debian`. 
 
 . Provision a Windows server to run the NetApp SnapCenter UI tool with the latest version. Refer to the following link for details: link:https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^]
 
@@ -143,9 +145,9 @@ Ansible playbook executes database installation and configuration tasks with pre
 
 * hosts - define targets that the automation playbook is running against.
 * vars/vars.yml - the global variable file that defines variables that apply to all targets.
-* host_vars/host_name.yml - the local variable file that defines variables that apply only to a local target. In our use case, these are the Oracle DB servers. 
+* host_vars/host_name.yml - the local variable file that defines variables that apply only to a named target. In our use case, these are the Oracle DB servers. 
 
-In addition to these user-defined variable files, there are several default variable files that contain default parameters that do not require change unless necessary. The following sections show how the user-defined variable files are configured.  
+In addition to these user-defined variable files, there are several default variable files that contain default parameters that do not require change unless necessary. The following sections show how to configure the user-defined variable files.  
 
 ====
 
@@ -178,7 +180,7 @@ There are a total of five playbooks in the automation toolkit. Each performs dif
       0-all_playbook.yml - execute playbooks from 1-4 in one playbook run.
       1-ansible_requirements.yml - set up Ansible controller with required libs and collections.
       2-linux_config.yml - execute Linux kernel configuration on Oracle DB servers.
-      3-ontap_config.yml - configure ONTAP for Oracle database including the creation of SVM, data volumes/luns provision, host igroup setup, etc.  
+      3-ontap_config.yml - configure ONTAP svm/volumes/luns for Oracle database and grant DB server access to luns.  
       4-oracle_config.yml - install and configure Oracle on DB servers for grid infrastructure and create a container database. 
       5-destroy.yml - optional to undo the environment to dismantle all. 
 
@@ -187,40 +189,40 @@ There are three options to run the playbooks with the following commands.
 . Execute all playbooks in one combined run.
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml
+ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml
 
 . Execute playbooks one at a time with the number sequence from 1-4.
 +
 [source, cli]] 
-ansible-playbook -i hosts 1-ansible_requirements.yml -u admin -e @vars/vars.yml
+ansible-playbook -i hosts 1-ansible_requirements.yml -u ec2-user -e @vars/vars.yml
 +
 [source, cli] 
-ansible-playbook -i hosts 2-linux_config.yml -u admin -e @vars/vars.yml
+ansible-playbook -i hosts 2-linux_config.yml -u ec2-user -e @vars/vars.yml
 +
 [source, cli]
-ansible-playbook -i hosts 3-ontap_config.yml -u admin -e @vars/vars.yml
+ansible-playbook -i hosts 3-ontap_config.yml -u ec2-user -e @vars/vars.yml
 +
 [source, cli]
-ansible-playbook -i hosts 4-oracle_config.yml -u admin -e @vars/vars.yml
+ansible-playbook -i hosts 4-oracle_config.yml -u ec2-user -e @vars/vars.yml
 
 . Execute 0-all_playbook.yml with a tag.
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t ansible_requirements
+ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml -t ansible_requirements
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t linux_config
+ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml -t linux_config
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t ontap_config
+ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml -t ontap_config
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t oracle_config
+ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml -t oracle_config
 
 . Undo the environment
 +
 [source, cli]
-ansible-playbook -i hosts 5-destroy.yml -u admin -e @vars/vars.yml
+ansible-playbook -i hosts 5-destroy.yml -u ec2-user -e @vars/vars.yml
 
 
 ====
@@ -461,7 +463,7 @@ image::automation_ora_aws-fsx_iscsi_em_03.png["This image provides container dat
 
 ====
 
-Refer to TR-4979 link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_vmc_guestmount.html#oracle-backup-restore-and-clone-with-snapcenter[Simplified, self-managed Oracle in VMware Cloud on AWS with guest-mounted FSx ONTAP^] section `Oracle backup, restore, and clone with SnapCenter` for details on setting up SnapCenter and executing the database backup, restore, and clone workflow.
+Refer to TR-4979 link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_vmc_guestmount.html#oracle-backup-restore-and-clone-with-snapcenter[Simplified, self-managed Oracle in VMware Cloud on AWS with guest-mounted FSx ONTAP^] section `Oracle backup, restore, and clone with SnapCenter` for details on setting up SnapCenter and executing the database backup, restore, and clone workflows.
 
 ====
 
