@@ -4,7 +4,6 @@ permalink: data-analytics/kafka-nfs-netapp-solution-for-silly-rename-issue-in-nf
 keywords: solution, posix, xfs, ext4, rebalancing
 summary: "This section describes the silly rename issue and the changes required for the NFS server and the NFS client to address the issue."
 ---
-
 = NetApp solution for silly rename issue for NFS to Kafka workloads
 :hardbreaks:
 :nofooter:
@@ -18,8 +17,6 @@ summary: "This section describes the silly rename issue and the changes required
 // 2023-01-30 15:54:43.114101
 //
 
-link:kafka-nfs-introduction.html[Previous: Introduction.]
-
 [.lead]
 Kafka is built with the assumption that the underlying filesystem is POSIX compliant: for example, XFS or Ext4. Kafka resource rebalancing removes files while the application is still using them. A POSIX-compliant file system allows unlink to proceed. However, it only removes the file after all references to the file are gone. If the underlying filesystem is network attached, then the NFS client intercepts the unlink calls and manages the workflow. Because there are pending opens on the file being unlinked, the NFS client sends a rename request to the NFS server and, on the last close of the unlinked file, issues a remove operation on the renamed file. This behavior is commonly referred to as NFS silly rename, and it is orchestrated by the NFS client.
 
@@ -31,5 +28,3 @@ The following changes are required for the NFS server and the NFS client to addr
 * *Changes to NFS server.* The NFS server keeps track of opens. Unlinking on an existing open file is now managed by the server to match POSIX semantics. When the last open is closed, The NFS server then initiates the actual removal of the file and thus avoids the silly rename process. The ONTAP NFS server has implemented this capability in its latest release, ONTAP 9.12.1.
 
 With the above changes to the NFS client and server, Kafka can safely reap all the benefits of network-attached NFS storage.
-
-link:kafka-nfs-functional-validation-silly-rename-fix.html[Next: Functional validation - Silly rename fix.]
