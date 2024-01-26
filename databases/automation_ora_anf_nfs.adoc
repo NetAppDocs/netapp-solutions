@@ -17,7 +17,7 @@ Allen Cao, Niyaz Mohamed, NetApp
 [.lead]
 == Purpose
 
-Running performance-intensive and latency-sensitive Oracle workloads in the cloud can be challenging. Azure NetApp Files makes it easy for enterprise line-of-business (LOB) and storage professionals to migrate and run demanding Oracle workloads without code change. Azure NetApp Files is widely used as the underlying shared file-storage service in various scenarios, such as new deployment or migration (lift and shift) of Oracle databases from on-premises to Azure.
+Running performance-intensive and latency-sensitive Oracle workloads in the cloud can be challenging. Azure NetApp Files (ANF) makes it easy for enterprise line-of-business (LOB) and storage professionals to migrate and run demanding Oracle workloads without code change. Azure NetApp Files is widely used as the underlying shared file-storage service in various scenarios, such as new deployment or migration (lift and shift) of Oracle databases from on-premises to Azure.
 
 This documentation demonstrates the simplified deployment of Oracle databases in Azure NetApp files via NFS mounts using Ansible automation. The Oracle database deploys in a container database (CDB) and pluggable databases (PDB) configuration with Oracle dNFS protocol enabled to boost performance. Furthermore, the on-premises Oracle single instance database or PDB can be migrated into a newly deployed container database in Azure using automated PDB relocation methodology with minimal service interruption. It also provides information on fast Oracle database backup, restore, and clone with NetApp SnapCenter UI tool in Azure Cloud. 
 
@@ -49,17 +49,17 @@ image::automation_ora_aws-fsx_iscsi_archit.png["This image provides a detailed p
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| Amazon FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone
-| EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge EC2 instances for concurrent deployment 
+| Azure NetApp Files | Current offering in Azure by Microsoft | One capacity pool with Premium service level 
+| Azure instance for compute | Standard_B4ms - 4 vCPUs, 16GiB | Two virtual machine instances for concurrent deployment 
 
 3+^| *Software*
-| RedHat Linux | RHEL-8.6, 4.18.0-372.9.1.el8.x86_64 kernel | Deployed RedHat subscription for testing
+| RedHat Linux | RHEL Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
 | Windows Server | 2022 Standard, 10.0.20348 Build 20348 | Hosting SnapCenter server 
-| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
-| SnapCenter Server | Version 4.9P1 | Workgroup deployment 
-| Open JDK | Version java-1.8.0-openjdk.x86_64 | SnapCenter plugin requirement on DB VMs 
+| SnapCenter Server | Version 5.0 | Workgroup deployment 
+| Open JDK | Version java-11-openjdk | SnapCenter plugin requirement on DB VMs 
+| NFS | Version 3.0 | Oracle dNFS enabled
 |===
 
 === Oracle database configuration in the lab environment
@@ -68,25 +68,25 @@ image::automation_ora_aws-fsx_iscsi_archit.png["This image provides a detailed p
 |===
 3+^| 
 | *Server* | *Database* | *DB Storage*
-| ora_01 | NTAP1(NTAP1_PDB1,NTAP1_PDB2,NTAP1_PDB3) | iSCSI luns on Amazon FSx ONTAP file system
-| ora_02 | NTAP2(NTAP2_PDB1,NTAP2_PDB2,NTAP2_PDB3) | iSCSI luns on Amazon FSx ONTAP file system
+| ora-01 | NTAP1(NTAP1_PDB1,NTAP1_PDB2,NTAP1_PDB3) | /u01, /u02, /u03 NFS mounts on ANF capacity pool
+| ora-02 | NTAP2(NTAP2_PDB1,NTAP2_PDB2,NTAP2_PDB3) | /u02, /u02, /u03 NFS mounts on ANF capacity pool
 |===
 
 === Key factors for deployment consideration
 
-* *Oracle database storage layout.* In this automated Oracle deployment, we provision four database volumes to host Oracle binary, data, and logs by default. A single lun in a volume allocates to Oracle binary. We then create two ASM disk groups from data and logs luns. Within the +DATA asm disk group, we provision two data volumes with two luns in a volume. Within the +LOGS asm disk group, we create two luns in a log volume. Multiple luns laid out within an ONTAP volume provides better performance in general. 
+* *Oracle database storage layout.* In this automated Oracle deployment, we provision three database volumes for each database to host Oracle binary, data, and logs by default. The volumes are mounted on Oracle DB server as /u01 - binary, /u02 - data, /u03 - logs via NFS. Dual control files are configured on /u02 and /u03 mount points for redundancy. 
 
-* *Multiple DB servers deployment.* The automation solution can deploy an Oracle container database to multiple DB servers in a single Ansible playbook run. Regardless of the number of DB servers, the playbook execution remains the same. You can deploy multiple container databases to a single EC2 instance with different database instance IDs (Oracle SID). But ensure there is sufficient memory on the host to support deployed databases.  
+* *Multiple DB servers deployment.* The automation solution can deploy an Oracle container database to multiple DB servers in a single Ansible playbook run. Regardless of the number of DB servers, the playbook execution remains the same. You can deploy multiple container databases to a single VM instance with different database instance IDs (Oracle SID). But ensure there is sufficient memory on the host to support deployed databases.  
 
-* *iSCSI configuration.* The EC2 instance database server connects to FSx storage with the iSCSI protocol. EC2 instances generally deploy with a single network interface or ENI. The single NIC interface carries both iSCSI and application traffic. It is important to gauge the Oracle database peak I/O throughput requirement by carefully analyzing the Oracle AWR report in order to choose the right EC2 compute instance that meets both application and iSCSI traffic-throughput requirements. NetApp also recommends allocating four iSCSI connections to both FSx iSCSI endpoints with multipath properly configured.
+* *dNFS configuration.* By using dNFS (available since Oracle 11g), an Oracle database running on an Azure Virtual Machine can drive significantly more I/O than the native NFS client. Automated Oracle deployment configures dNFS on NFSv3 by default.
 
-* *Oracle ASM redundancy level to use for each Oracle ASM disk group that you create.* Because the Amazon FSx ONTAP is HA enabled for data protection at the cluster disk level, you should use `External Redundancy`, which means that the option does not allow Oracle ASM to mirror the contents of the disk group.
+* *Allocate large size volume to speed up deployment.* ANF file system IO throughput is regulated based on the size of volume. For initial deployment, allocate large size volumes can speed up the deployment. The volumes subsequently can be downsized dynamically without application impact.
 
 * *Database backup.* NetApp provides a SnapCenter software suite for database backup, restore, and cloning with a user-friendly UI interface. NetApp recommends implementing such a management tool to achieve fast (under a minute) SnapShot backup, quick (minutes) database restore, and database clone.    
 
 == Solution deployment
 
-The following sections provide step-by-step procedures for automated Oracle 19c deployment and protection on Amazon FSx ONTAP file system with directly mounted database luns via iSCSI to EC2 instance VM in a single node Restart configuration with Oracle ASM as database volume manager.     
+The following sections provide step-by-step procedures for automated Oracle 19c deployment and database migration on Azure NetApp Files with directly mounted database volumes via NFS to Azure VMs.     
 
 === Prerequisites for deployment
 [%collapsible]
