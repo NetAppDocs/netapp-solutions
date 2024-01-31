@@ -50,11 +50,12 @@ image::automation_ora_anf_nfs_archit.png["This image provides a detailed picture
 |===
 3+^| *Hardware*
 | Azure NetApp Files | Current offering in Azure by Microsoft | One capacity pool with Premium service level 
-| Azure instance for compute | Standard_B4ms - 4 vCPUs, 16GiB | Two virtual machine instances for concurrent deployment 
+| Azure VM for DB server | Standard_B4ms - 4 vCPUs, 16GiB | Two Linux virtual machine instances for concurrent deployment 
+| Azure VM for SnapCenter | Standard_B4ms - 4 vCPUs, 16GiB | One Windows virtual machine instance 
 
 3+^| *Software*
 | RedHat Linux | RHEL Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
-| Windows Server | 2022 Standard, 10.0.20348 Build 20348 | Hosting SnapCenter server 
+| Windows Server | 2022 DataCenter; Azure Edition Hotpatch - x64 Gen2 | Hosting SnapCenter server 
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 | SnapCenter Server | Version 5.0 | Workgroup deployment 
@@ -94,44 +95,40 @@ The following sections provide step-by-step procedures for automated Oracle 19c 
 
 Deployment requires the following prerequisites.
 
-. An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
+. An Azure account has been set up, and the necessary VNet and network segments have been created within your Azure account.
 
-. From the AWS EC2 console, deploy EC2 Linux instances as Oracle DB servers. Enable SSH private/public key authentication for ec2-user. See the architecture diagram in the previous section for details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
-
-. From the AWS FSx console, provision an Amazon FSx ONTAP file system that meets the requirements. Review the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
-
-. Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution. The template can be easily revised for your own deployment requirements.
-+
-[source, cli]
-git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
-
-. Provision an EC2 Linux instance as the Ansible controller node with the latest version of Ansible and Git installed. Refer to the following link for details: link:https://docs.netapp.com/us-en/netapp-solutions/automation/getting-started.html[Getting Started with NetApp solution automation^] in section - 
-`Setup the Ansible Control Node for CLI deployments on RHEL / CentOS` or 
-`Setup the Ansible Control Node for CLI deployments on Ubuntu / Debian`. 
-
-. Provision a Windows server to run the NetApp SnapCenter UI tool with the latest version. Refer to the following link for details: link:https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^]
-
-. Clone a copy of the NetApp Oracle deployment automation toolkit for iSCSI. 
-+
-[source, cli]
-git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_iscsi.git
-
-. Stage following Oracle 19c installation files on EC2 instances /tmp/archive directory.
-+
-      installer_archives:
-        - "LINUX.X64_193000_grid_home.zip"
-        - "p34762026_190000_Linux-x86-64.zip"
-        - "LINUX.X64_193000_db_home.zip"
-        - "p34765931_190000_Linux-x86-64.zip"
-        - "p6880880_190000_Linux-x86-64.zip"
+. From the Azure cloud portal, deploy Azure Linux VMs as Oracle DB servers. Create an Azure NetApp Files capacity pool and database volumes for Oracle database. Enable VM SSH private/public key authentication for azureuser to DB servers. See the architecture diagram in the previous section for details about the environment setup. Also referred to link:https://docs.netapp.com/us-en/netapp-solutions/databases/azure_ora_nfile_procedures.html[Step-by-Step Oracle deployment procedures on Azure VM and Azure NetApp Files^] for detailed information.
 +
 [NOTE]
 
-Ensure that you have allocated at least 50G in Oracle VM root volume to have sufficient space to stage Oracle installation files.
+For Azure VMs deployed with local disk redundancy, ensure that you have allocated at least 128G in VM root disk to have sufficient space to stage Oracle installation files and add OS swap file.
+
+. From the Azure cloud portal, provision a Windows server to run the NetApp SnapCenter UI tool with the latest version. Refer to the following link for details: link:https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^]
+
+. Provision a Linux VM as the Ansible controller node with the latest version of Ansible and Git installed. Refer to the following link for details: link:https://docs.netapp.com/us-en/netapp-solutions/automation/getting-started.html[Getting Started with NetApp solution automation^] in section - 
+`Setup the Ansible Control Node for CLI deployments on RHEL / CentOS` or 
+`Setup the Ansible Control Node for CLI deployments on Ubuntu / Debian`. 
++
+[NOTE]
+
+The Ansible controller node can locate either on-premisses or in Azure cloud as far as it can reach Azure DB VMs via ssh port.  
+
+. Clone a copy of the NetApp Oracle deployment automation toolkit for NFS. 
++
+[source, cli]
+git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_nfs.git
+
+. Stage following Oracle 19c installation files on Azure DB VM /tmp/archive directory with 777 permission.
++
+      installer_archives:
+        - "LINUX.X64_193000_db_home.zip"
+        - "p34765931_190000_Linux-x86-64.zip"
+        - "p6880880_190000_Linux-x86-64.zip"
+
 
 . Watch the following video:
 +
-video::81e389a0-d9b8-495c-883b-b0d701710847[panopto, title="Simplified and automated Oracle deployment on Amazon FSx ONTAP with iSCSI", width=360]
+video::81e389a0-d9b8-495c-883b-b0d701710847[panopto, title="Simplified and automated Oracle deployment on Azure NetApp Files with NFS", width=360]
 
 ====
 
@@ -157,11 +154,11 @@ In addition to these user-defined variable files, there are several default vari
 
 . Ansible target `hosts` file configuration:
 +
-include::../_include/automation_ora_aws-fsx_iscsi_hosts.adoc[]
+include::../_include/automation_ora_anf_nfs_hosts.adoc[]
 
 . Global `vars/vars.yml` file configuration
 +
-include::../_include/automation_ora_aws-fsx_iscsi_vars.adoc[]
+include::../_include/automation_ora_anf_nfs_vars.adoc[]
 
 . Local DB server `host_vars/host_name.yml` configuration such as ora_01.yml, ora_02.yml ...
 +
@@ -179,49 +176,42 @@ There are a total of five playbooks in the automation toolkit. Each performs dif
       0-all_playbook.yml - execute playbooks from 1-4 in one playbook run.
       1-ansible_requirements.yml - set up Ansible controller with required libs and collections.
       2-linux_config.yml - execute Linux kernel configuration on Oracle DB servers.
-      3-ontap_config.yml - configure ONTAP svm/volumes/luns for Oracle database and grant DB server access to luns.  
-      4-oracle_config.yml - install and configure Oracle on DB servers for grid infrastructure and create a container database. 
+      4-oracle_config.yml - install and configure Oracle on DB servers and create a container database. 
       5-destroy.yml - optional to undo the environment to dismantle all. 
 
 There are three options to run the playbooks with the following commands. 
 
-. Execute all playbooks in one combined run.
+. Execute all deployment playbooks in one combined run.
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml
+ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml
 
-. Execute playbooks one at a time with the number sequence from 1-4.
+. Execute playbooks one at a time with the number sequence from 1-5.
 +
 [source, cli]] 
-ansible-playbook -i hosts 1-ansible_requirements.yml -u ec2-user -e @vars/vars.yml
+ansible-playbook -i hosts 1-ansible_requirements.yml -u azureuser -e @vars/vars.yml
 +
 [source, cli] 
-ansible-playbook -i hosts 2-linux_config.yml -u ec2-user -e @vars/vars.yml
+ansible-playbook -i hosts 2-linux_config.yml -u azureuser -e @vars/vars.yml
 +
 [source, cli]
-ansible-playbook -i hosts 3-ontap_config.yml -u ec2-user -e @vars/vars.yml
-+
-[source, cli]
-ansible-playbook -i hosts 4-oracle_config.yml -u ec2-user -e @vars/vars.yml
+ansible-playbook -i hosts 4-oracle_config.yml -u azureuser -e @vars/vars.yml
 
 . Execute 0-all_playbook.yml with a tag.
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml -t ansible_requirements
+ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml -t ansible_requirements
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml -t linux_config
+ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml -t linux_config
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml -t ontap_config
-+
-[source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u ec2-user -e @vars/vars.yml -t oracle_config
+ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml -t oracle_config
 
 . Undo the environment
 +
 [source, cli]
-ansible-playbook -i hosts 5-destroy.yml -u ec2-user -e @vars/vars.yml
+ansible-playbook -i hosts 5-destroy.yml -u azureuser -e @vars/vars.yml
 
 
 ====
