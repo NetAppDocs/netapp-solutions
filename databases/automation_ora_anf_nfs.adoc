@@ -101,7 +101,7 @@ Deployment requires the following prerequisites.
 +
 [NOTE]
 
-For Azure VMs deployed with local disk redundancy, ensure that you have allocated at least 128G in VM root disk to have sufficient space to stage Oracle installation files and add OS swap file.
+For Azure VMs deployed with local disk redundancy, ensure that you have allocated at least 128G in VM root disk to have sufficient space to stage Oracle installation files and add OS swap file. Ensure the database volume naming follows the VMname-u01, VMname-u02, and VMname-u03 convention.
 
 . From the Azure cloud portal, provision a Windows server to run the NetApp SnapCenter UI tool with the latest version. Refer to the following link for details: link:https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^]
 
@@ -221,23 +221,137 @@ ansible-playbook -i hosts 5-destroy.yml -u azureuser -e @vars/vars.yml
 
 ====
 
-After the playbook run, login to the Oracle DB server as oracle user to validate that Oracle grid infrastructure and database are created successfully. Following is an example of Oracle database validation on host ora_01. 
+After the playbook run, login to the Oracle DB server VM to validate that Oracle is installed and configured and a container database is created successfully. Following is an example of Oracle database validation on host ora-01. 
 
-. Validate Oracle container database on EC2 instance
+. Validate NFS mounts
 +
 ....
 
-[admin@ansiblectl na_oracle_deploy_iscsi]$ ssh -i ora_01.pem ec2-user@172.30.15.40
-Last login: Fri Dec  8 17:14:21 2023 from 10.61.180.18
-[ec2-user@ip-172-30-15-40 ~]$ uname -a
-Linux ip-172-30-15-40.ec2.internal 4.18.0-372.9.1.el8.x86_64 #1 SMP Fri Apr 15 22:12:19 EDT 2022 x86_64 x86_64 x86_64 GNU/Linux
+[azureuser@ora-01 ~]$ cat /etc/fstab
 
-[ec2-user@ip-172-30-15-40 ~]$ sudo su
-[root@ip-172-30-15-40 ec2-user]# su - oracle
-Last login: Fri Dec  8 16:25:52 UTC 2023 on pts/0
-[oracle@ip-172-30-15-40 ~]$ sqlplus / as sysdba
+#
+# /etc/fstab
+# Created by anaconda on Thu Sep 14 11:04:01 2023
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk/'.
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
+#
+# After editing this file, run 'systemctl daemon-reload' to update systemd
+# units generated from this file.
+#
+/dev/mapper/rootvg-rootlv /                       xfs     defaults        0 0
+UUID=268633bd-f9bb-446d-9a1d-8fca4609a1e1 /boot                   xfs     defaults        0 0
+UUID=89D8-B037          /boot/efi               vfat    defaults,uid=0,gid=0,umask=077,shortname=winnt 0 2
+/dev/mapper/rootvg-homelv /home                   xfs     defaults        0 0
+/dev/mapper/rootvg-tmplv /tmp                    xfs     defaults        0 0
+/dev/mapper/rootvg-usrlv /usr                    xfs     defaults        0 0
+/dev/mapper/rootvg-varlv /var                    xfs     defaults        0 0
+/mnt/swapfile swap swap defaults 0 0
+172.30.136.68:/ora-01-u01 /u01 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
+172.30.136.68:/ora-01-u02 /u02 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
+172.30.136.68:/ora-01-u03 /u03 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
 
-SQL*Plus: Release 19.0.0.0.0 - Production on Fri Dec 8 18:18:20 2023
+[azureuser@ora-01 ~]$ df -h
+Filesystem                 Size  Used Avail Use% Mounted on
+devtmpfs                   7.7G     0  7.7G   0% /dev
+tmpfs                      7.8G     0  7.8G   0% /dev/shm
+tmpfs                      7.8G  8.6M  7.7G   1% /run
+tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/mapper/rootvg-rootlv   22G   17G  5.8G  74% /
+/dev/mapper/rootvg-usrlv    10G  2.0G  8.1G  20% /usr
+/dev/mapper/rootvg-varlv   8.0G  890M  7.2G  11% /var
+/dev/sda1                  496M  106M  390M  22% /boot
+/dev/mapper/rootvg-homelv 1014M   40M  975M   4% /home
+/dev/sda15                 495M  5.9M  489M   2% /boot/efi
+/dev/mapper/rootvg-tmplv    12G  8.4G  3.7G  70% /tmp
+tmpfs                      1.6G     0  1.6G   0% /run/user/54321
+172.30.136.68:/ora-01-u01  500G   11G  490G   3% /u01
+172.30.136.68:/ora-01-u03  250G  1.2G  249G   1% /u03
+172.30.136.68:/ora-01-u02  250G  7.1G  243G   3% /u02
+tmpfs                      1.6G     0  1.6G   0% /run/user/1000
+
+....
+
+. Validate Oracle listener
++
+....
+
+[azureuser@ora-01 ~]$ sudo su
+[root@ora-01 azureuser]# su - oracle
+Last login: Thu Feb  1 16:13:44 UTC 2024
+[oracle@ora-01 ~]$ lsnrctl status listener.ntap1
+
+LSNRCTL for Linux: Version 19.0.0.0.0 - Production on 01-FEB-2024 16:25:37
+
+Copyright (c) 1991, 2022, Oracle.  All rights reserved.
+
+Connecting to (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ora-01.internal.cloudapp.net)(PORT=1521)))
+STATUS of the LISTENER
+------------------------
+Alias                     LISTENER.NTAP1
+Version                   TNSLSNR for Linux: Version 19.0.0.0.0 - Production
+Start Date                01-FEB-2024 16:13:49
+Uptime                    0 days 0 hr. 11 min. 49 sec
+Trace Level               off
+Security                  ON: Local OS Authentication
+SNMP                      OFF
+Listener Parameter File   /u01/app/oracle/product/19.0.0/NTAP1/network/admin/listener.ora
+Listener Log File         /u01/app/oracle/diag/tnslsnr/ora-01/listener.ntap1/alert/log.xml
+Listening Endpoints Summary...
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=ora-01.hr2z2nbmhnqutdsxgscjtuxizd.jx.internal.cloudapp.net)(PORT=1521)))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=ipc)(KEY=EXTPROC1521)))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcps)(HOST=ora-01.hr2z2nbmhnqutdsxgscjtuxizd.jx.internal.cloudapp.net)(PORT=5500))(Security=(my_wallet_directory=/u01/app/oracle/product/19.0.0/NTAP1/admin/NTAP1/xdb_wallet))(Presentation=HTTP)(Session=RAW))
+Services Summary...
+Service "104409ac02da6352e063bb891eacf34a.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "104412c14c2c63cae063bb891eacf64d.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "1044174670ad63ffe063bb891eac6b34.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "NTAP1.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "NTAP1XDB.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "ntap1_pdb1.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "ntap1_pdb2.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "ntap1_pdb3.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+The command completed successfully
+
+....
+
+. Validate Oracle database and dNFS 
++
+....
+
+[oracle@ora-01 ~]$ cat /etc/oratab
+#
+# This file is used by ORACLE utilities.  It is created by root.sh
+# and updated by either Database Configuration Assistant while creating
+# a database or ASM Configuration Assistant while creating ASM instance.
+
+# A colon, ':', is used as the field terminator.  A new line terminates
+# the entry.  Lines beginning with a pound sign, '#', are comments.
+#
+# Entries are of the form:
+#   $ORACLE_SID:$ORACLE_HOME:<N|Y>:
+#
+# The first and second fields are the system identifier and home
+# directory of the database respectively.  The third field indicates
+# to the dbstart utility that the database should , "Y", or should not,
+# "N", be brought up at system boot time.
+#
+# Multiple entries with the same $ORACLE_SID are not allowed.
+#
+#
+NTAP1:/u01/app/oracle/product/19.0.0/NTAP1:Y
+
+
+[oracle@ora-01 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Thu Feb 1 16:37:51 2024
 Version 19.18.0.0.0
 
 Copyright (c) 1982, 2022, Oracle.  All rights reserved.
@@ -265,28 +379,28 @@ SQL> select name from v$datafile;
 
 NAME
 --------------------------------------------------------------------------------
-+DATA/NTAP1/DATAFILE/system.257.1155055419
-+DATA/NTAP1/DATAFILE/sysaux.258.1155055463
-+DATA/NTAP1/DATAFILE/undotbs1.259.1155055489
-+DATA/NTAP1/86B637B62FE07A65E053F706E80A27CA/DATAFILE/system.266.1155056241
-+DATA/NTAP1/86B637B62FE07A65E053F706E80A27CA/DATAFILE/sysaux.267.1155056241
-+DATA/NTAP1/DATAFILE/users.260.1155055489
-+DATA/NTAP1/86B637B62FE07A65E053F706E80A27CA/DATAFILE/undotbs1.268.1155056241
-+DATA/NTAP1/0C03AAFA7C6FD2E5E063280F1EACFBE0/DATAFILE/system.272.1155057059
-+DATA/NTAP1/0C03AAFA7C6FD2E5E063280F1EACFBE0/DATAFILE/sysaux.273.1155057059
-+DATA/NTAP1/0C03AAFA7C6FD2E5E063280F1EACFBE0/DATAFILE/undotbs1.271.1155057059
-+DATA/NTAP1/0C03AAFA7C6FD2E5E063280F1EACFBE0/DATAFILE/users.275.1155057075
+/u02/oradata/NTAP1/system01.dbf
+/u02/oradata/NTAP1/sysaux01.dbf
+/u02/oradata/NTAP1/undotbs01.dbf
+/u02/oradata/NTAP1/pdbseed/system01.dbf
+/u02/oradata/NTAP1/pdbseed/sysaux01.dbf
+/u02/oradata/NTAP1/users01.dbf
+/u02/oradata/NTAP1/pdbseed/undotbs01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb1/system01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb1/sysaux01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb1/undotbs01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb1/users01.dbf
 
 NAME
 --------------------------------------------------------------------------------
-+DATA/NTAP1/0C03AC0089ACD352E063280F1EAC12BD/DATAFILE/system.277.1155057075
-+DATA/NTAP1/0C03AC0089ACD352E063280F1EAC12BD/DATAFILE/sysaux.278.1155057075
-+DATA/NTAP1/0C03AC0089ACD352E063280F1EAC12BD/DATAFILE/undotbs1.276.1155057075
-+DATA/NTAP1/0C03AC0089ACD352E063280F1EAC12BD/DATAFILE/users.280.1155057091
-+DATA/NTAP1/0C03ACEABA54D386E063280F1EACE573/DATAFILE/system.282.1155057091
-+DATA/NTAP1/0C03ACEABA54D386E063280F1EACE573/DATAFILE/sysaux.283.1155057091
-+DATA/NTAP1/0C03ACEABA54D386E063280F1EACE573/DATAFILE/undotbs1.281.1155057091
-+DATA/NTAP1/0C03ACEABA54D386E063280F1EACE573/DATAFILE/users.285.1155057105
+/u02/oradata/NTAP1/NTAP1_pdb2/system01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb2/sysaux01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb2/undotbs01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb2/users01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb3/system01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb3/sysaux01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb3/undotbs01.dbf
+/u02/oradata/NTAP1/NTAP1_pdb3/users01.dbf
 
 19 rows selected.
 
@@ -294,165 +408,70 @@ SQL> select name from v$controlfile;
 
 NAME
 --------------------------------------------------------------------------------
-+DATA/NTAP1/CONTROLFILE/current.261.1155055529
-+LOGS/NTAP1/CONTROLFILE/current.256.1155055529
+/u02/oradata/NTAP1/control01.ctl
+/u03/orareco/NTAP1/control02.ctl
 
 SQL> select member from v$logfile;
 
 MEMBER
 --------------------------------------------------------------------------------
-+DATA/NTAP1/ONLINELOG/group_3.264.1155055531
-+LOGS/NTAP1/ONLINELOG/group_3.259.1155055539
-+DATA/NTAP1/ONLINELOG/group_2.263.1155055531
-+LOGS/NTAP1/ONLINELOG/group_2.257.1155055539
-+DATA/NTAP1/ONLINELOG/group_1.262.1155055531
-+LOGS/NTAP1/ONLINELOG/group_1.258.1155055539
+/u03/orareco/NTAP1/onlinelog/redo03.log
+/u03/orareco/NTAP1/onlinelog/redo02.log
+/u03/orareco/NTAP1/onlinelog/redo01.log
 
-6 rows selected.
+SQL> select svrname, dirname, nfsversion from v$dnfs_servers;
 
-SQL> exit
-Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
-Version 19.18.0.0.0
-
-....
-
-. Validate Oracle listener.
-+
-....
-
-[oracle@ip-172-30-15-40 ~]$ lsnrctl status listener
-
-LSNRCTL for Linux: Version 19.0.0.0.0 - Production on 08-DEC-2023 18:20:24
-
-Copyright (c) 1991, 2022, Oracle.  All rights reserved.
-
-Connecting to (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ip-172-30-15-40.ec2.internal)(PORT=1521)))
-STATUS of the LISTENER
-------------------------
-Alias                     LISTENER
-Version                   TNSLSNR for Linux: Version 19.0.0.0.0 - Production
-Start Date                08-DEC-2023 16:26:09
-Uptime                    0 days 1 hr. 54 min. 14 sec
-Trace Level               off
-Security                  ON: Local OS Authentication
-SNMP                      OFF
-Listener Parameter File   /u01/app/oracle/product/19.0.0/grid/network/admin/listener.ora
-Listener Log File         /u01/app/oracle/diag/tnslsnr/ip-172-30-15-40/listener/alert/log.xml
-Listening Endpoints Summary...
-  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=ip-172-30-15-40.ec2.internal)(PORT=1521)))
-  (DESCRIPTION=(ADDRESS=(PROTOCOL=ipc)(KEY=EXTPROC1521)))
-  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcps)(HOST=ip-172-30-15-40.ec2.internal)(PORT=5500))(Security=(my_wallet_directory=/u01/app/oracle/product/19.0.0/NTAP1/admin/NTAP1/xdb_wallet))(Presentation=HTTP)(Session=RAW))
-Services Summary...
-Service "+ASM" has 1 instance(s).
-  Instance "+ASM", status READY, has 1 handler(s) for this service...
-Service "+ASM_DATA" has 1 instance(s).
-  Instance "+ASM", status READY, has 1 handler(s) for this service...
-Service "+ASM_LOGS" has 1 instance(s).
-  Instance "+ASM", status READY, has 1 handler(s) for this service...
-Service "0c03aafa7c6fd2e5e063280f1eacfbe0.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "0c03ac0089acd352e063280f1eac12bd.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "0c03aceaba54d386e063280f1eace573.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "NTAP1.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "NTAP1XDB.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "ntap1_pdb1.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "ntap1_pdb2.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "ntap1_pdb3.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-The command completed successfully
-
-....
-
-. Validate the grid infrastructure and resources created.
-+
-....
-
-[oracle@ip-172-30-15-40 ~]$ asm
-[oracle@ip-172-30-15-40 ~]$ crsctl check has
-CRS-4638: Oracle High Availability Services is online
-[oracle@ip-172-30-15-40 ~]$ crsctl stat res -t
+SVRNAME
 --------------------------------------------------------------------------------
-Name           Target  State        Server                   State details
+DIRNAME
 --------------------------------------------------------------------------------
-Local Resources
---------------------------------------------------------------------------------
-ora.DATA.dg
-               ONLINE  ONLINE       ip-172-30-15-40          STABLE
-ora.LISTENER.lsnr
-               ONLINE  ONLINE       ip-172-30-15-40          STABLE
-ora.LOGS.dg
-               ONLINE  ONLINE       ip-172-30-15-40          STABLE
-ora.asm
-               ONLINE  ONLINE       ip-172-30-15-40          Started,STABLE
-ora.ons
-               OFFLINE OFFLINE      ip-172-30-15-40          STABLE
---------------------------------------------------------------------------------
-Cluster Resources
---------------------------------------------------------------------------------
-ora.cssd
-      1        ONLINE  ONLINE       ip-172-30-15-40          STABLE
-ora.diskmon
-      1        OFFLINE OFFLINE                               STABLE
-ora.driver.afd
-      1        ONLINE  ONLINE       ip-172-30-15-40          STABLE
-ora.evmd
-      1        ONLINE  ONLINE       ip-172-30-15-40          STABLE
-ora.ntap1.db
-      1        ONLINE  ONLINE       ip-172-30-15-40          Open,HOME=/u01/app/o
-                                                             racle/product/19.0.0
-                                                             /NTAP1,STABLE
---------------------------------------------------------------------------------
+NFSVERSION
+----------------
+172.30.136.68
+/ora-01-u02
+NFSv3.0
 
-....
+172.30.136.68
+/ora-01-u03
+NFSv3.0
 
-. Validate Oracle ASM.
-+
-....
+SVRNAME
+--------------------------------------------------------------------------------
+DIRNAME
+--------------------------------------------------------------------------------
+NFSVERSION
+----------------
 
-[oracle@ip-172-30-15-40 ~]$ asmcmd
-ASMCMD> lsdg
-State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
-MOUNTED  EXTERN  N         512             512   4096  4194304    163840   155376                0          155376              0             N  DATA/
-MOUNTED  EXTERN  N         512             512   4096  4194304     81920    80972                0           80972              0             N  LOGS/
-ASMCMD> lsdsk
-Path
-AFD:ORA_01_DAT1_01
-AFD:ORA_01_DAT1_03
-AFD:ORA_01_DAT2_02
-AFD:ORA_01_DAT2_04
-AFD:ORA_01_LOGS_01
-AFD:ORA_01_LOGS_02
-ASMCMD> afd_state
-ASMCMD-9526: The AFD state is 'LOADED' and filtering is 'ENABLED' on host 'ip-172-30-15-40.ec2.internal'
-ASMCMD> exit
+172.30.136.68
+/ora-01-u01
+NFSv3.0
 
 ....
 
 . Login to Oracle Enterprise Manager Express to validate database.
 +
-image::automation_ora_aws-fsx_iscsi_em_01.png["This image provides login screen for Oracle Enterprise Manager Express"]
-image::automation_ora_aws-fsx_iscsi_em_02.png["This image provides container database view from Oracle Enterprise Manager Express"]
-image::automation_ora_aws-fsx_iscsi_em_03.png["This image provides container database view from Oracle Enterprise Manager Express"]
+image::automation_ora_anf_nfs_em_01.png["This image provides login screen for Oracle Enterprise Manager Express"]
+image::automation_ora_anf_nfs_em_02.png["This image provides container database view from Oracle Enterprise Manager Express"]
+
 
 
 ====
 
+=== Migrate Oracle database to Azure
+[%collapsible]
 
+====
 
+Oracle database migration from on-premises to the cloud can be challenging. Using the right strategy and automation can smooth the process and minimize service interruption and downtime. Follow this detailed instruction link:https://docs.netapp.com/us-en/netapp-solutions/databases/azure_ora_nfile_migration.html#converting-a-single-instance-non-cdb-to-a-pdb-in-a-multitenant-cdb[Database migration from on-premises to Azure cloud^] to guide your database migration journey. 
 
+====
 
 === Oracle backup, restore, and clone with SnapCenter
 [%collapsible]
 
 ====
 
-Refer to TR-4979 link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_vmc_guestmount.html#oracle-backup-restore-and-clone-with-snapcenter[Simplified, self-managed Oracle in VMware Cloud on AWS with guest-mounted FSx ONTAP^] section `Oracle backup, restore, and clone with SnapCenter` for details on setting up SnapCenter and executing the database backup, restore, and clone workflows.
+NetApp recommends SnapCenter UI tool to manage Oracle database deployed in Azure cloud. A detailed solution documentation will be available shortly.
 
 ====
 
