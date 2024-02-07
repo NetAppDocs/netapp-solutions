@@ -71,20 +71,20 @@ image::automation_ora_anf_nfs_archit.png["This image provides a detailed picture
 3+^| 
 | *Server* | *Database* | *DB Storage*
 | ora-01 | NTAP1(NTAP1_PDB1,NTAP1_PDB2,NTAP1_PDB3) | /u01, /u02, /u03 NFS mounts on ANF capacity pool
-| ora-02 | NTAP2(NTAP2_PDB1,NTAP2_PDB2,NTAP2_PDB3) | /u02, /u02, /u03 NFS mounts on ANF capacity pool
+| ora-02 | NTAP2(NTAP2_PDB1,NTAP2_PDB2,NTAP2_PDB3) | /u01, /u02, /u03 NFS mounts on ANF capacity pool
 |===
 
 === Key factors for deployment consideration
 
 * *Oracle database storage layout.* In this automated Oracle deployment, we provision three database volumes for each database to host Oracle binary, data, and logs by default. The volumes are mounted on Oracle DB server as /u01 - binary, /u02 - data, /u03 - logs via NFS. Dual control files are configured on /u02 and /u03 mount points for redundancy. 
 
-* *Multiple DB servers deployment.* The automation solution can deploy an Oracle container database to multiple DB servers in a single Ansible playbook run. Regardless of the number of DB servers, the playbook execution remains the same. You can deploy multiple container databases to a single VM instance with different database instance IDs (Oracle SID). But ensure there is sufficient memory on the host to support deployed databases.  
+* *Multiple DB servers deployment.* The automation solution can deploy an Oracle container database to multiple DB servers in a single Ansible playbook run. Regardless of the number of DB servers, the playbook execution remains the same. You can deploy multiple container databases to a single VM instance by repeating the deployment with different database instance IDs (Oracle SID). But ensure there is sufficient memory on the host to support deployed databases.  
 
 * *dNFS configuration.* By using dNFS (available since Oracle 11g), an Oracle database running on an Azure Virtual Machine can drive significantly more I/O than the native NFS client. Automated Oracle deployment configures dNFS on NFSv3 by default.
 
 * *Allocate large size volume to speed up deployment.* ANF file system IO throughput is regulated based on the size of volume. For initial deployment, allocate large size volumes can speed up the deployment. The volumes subsequently can be downsized dynamically without application impact.
 
-* *Database backup.* NetApp provides a SnapCenter software suite for database backup, restore, and cloning with a user-friendly UI interface. NetApp recommends implementing such a management tool to achieve fast (under a minute) SnapShot backup, quick (minutes) database restore, and database clone.    
+* *Database backup.* NetApp provides a SnapCenter software suite for database backup, restore, and cloning with a user-friendly UI interface. NetApp recommends implementing such a management tool to achieve fast (under a minute) snapshot backup, quick (minutes) database restore, and database clone.    
 
 == Solution deployment
 
@@ -193,7 +193,7 @@ There are three options to run the playbooks with the following commands.
 [source, cli]
 ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml
 
-. Execute playbooks one at a time with the number sequence from 1-5.
+. Execute playbooks one at a time with the number sequence from 1-4.
 +
 [source, cli]] 
 ansible-playbook -i hosts 1-ansible_requirements.yml -u azureuser -e @vars/vars.yml
@@ -469,7 +469,7 @@ image::automation_ora_anf_nfs_em_02.png["This image provides container database 
 
 ====
 
-Oracle database migration from on-premises to the cloud can be challenging. Using the right strategy and automation can smooth the process and minimize service interruption and downtime. Follow this detailed instruction link:https://docs.netapp.com/us-en/netapp-solutions/databases/azure_ora_nfile_migration.html#converting-a-single-instance-non-cdb-to-a-pdb-in-a-multitenant-cdb[Database migration from on-premises to Azure cloud^] to guide your database migration journey. 
+Oracle database migration from on-premises to the cloud is a heavy-lifting. Using the right strategy and automation can smooth the process and minimize service interruption and downtime. Follow this detailed instruction link:https://docs.netapp.com/us-en/netapp-solutions/databases/azure_ora_nfile_migration.html#converting-a-single-instance-non-cdb-to-a-pdb-in-a-multitenant-cdb[Database migration from on-premises to Azure cloud^] to guide your database migration journey. 
 
 ====
 
