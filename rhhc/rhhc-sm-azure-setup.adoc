@@ -1,0 +1,146 @@
+---
+sidebar: sidebar
+permalink: rhhc/rhhc-sm-azure-setup.html
+keywords: NetApp Solutions, redhat OpenShift, red hat OpenShift, redhat openshift container platform, ocp, openshift container platform, Advanced Cluster Management, ACM, Hub Cluster, containers, container workloads, VMware, customer managed storage, ONTAP, Azure, Azure Cloud.
+summary:
+---
+
+== Deploy and configure the Red Hat OpenShift Container platform on Azure
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+This section describes a high-level workflow of how to set up and manage OpenShift Clusters in Azure and deploy stateful applications on them. It shows the use of NetApp Cloud Volumes ONTAP storage with the help of Astra Trident/Astra Control Provisioner to provide persistent volumes. Details are provided about the use of Astra Control Center to perform data protection and migration activities for the stateful applications.
+
+Here is a diagram that shows the clusters deployed on Azure and connected to the data center using a VPN.
+
+image:rhhc-self-managed-azure.png[]
+
+NOTE: There are several ways of deploying Red Hat OpenShift Container platform clusters in Azure. This high-level description of the setup provides documentation links for the specific method that was used. You can refer to the other methods in the relevant links provided in the link:../rhhc-resources.html[resources section].
+
+The setup process can be broken down into the following steps:
+
+.Install an OCP cluster on Azure from the CLI.
+[%collapsible]
+====
+* Ensure that you have met all the prerequisites stated link:https://docs.openshift.com/container-platform/4.13/installing/installing_azure/installing-azure-vnet.html[here]. 
+
+* Create a VPN, subnets and network security groups and a private DNS zone. Create VPN gateway and site-to-site VPN Connection. 
+
+* For the VPN connectivity between on-premises and Azure, a pfsense VM was created and configured. For instructions, see link:https://docs.netgate.com/pfsense/en/latest/recipes/ipsec-s2s-psk.html[here].
+
+* Obtain the installation program and the pull secret and deploy the cluster following the steps provided  in the documentation link:https://docs.openshift.com/container-platform/4.13/installing/installing_azure/installing-azure-vnet.html[here].
+
+* The installation of the cluster completes and will provide a kubeconfig file and username and password to login to the console of the cluster.
+
+A sample install-config.yaml file is given below.
+
+....
+apiVersion: v1
+baseDomain: sddc.netapp.com
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  platform:
+    azure:
+      encryptionAtHost: false
+      osDisk:
+        diskSizeGB: 512
+        diskType: "StandardSSD_LRS"
+      type: Standard_D2s_v3
+      ultraSSDCapability: Disabled
+      #zones:
+      #- "1"
+      #- "2"
+      #- "3"
+  replicas: 3
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  platform:
+    azure:
+      encryptionAtHost: false
+      osDisk:
+        diskSizeGB: 1024
+        diskType: Premium_LRS
+      type: Standard_D8s_v3
+      ultraSSDCapability: Disabled
+  replicas: 3
+metadata:
+  creationTimestamp: null
+  name: azure-cluster
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - 172.30.0.0/16
+platform:
+  azure:
+    baseDomainResourceGroupName: ocp-base-domain-rg
+    cloudName: AzurePublicCloud
+    computeSubnet: ocp-subnet2
+    controlPlaneSubnet: ocp-subnet1
+    defaultMachinePlatform:
+      osDisk:
+        diskSizeGB: 1024
+        diskType: "StandardSSD_LRS"
+      ultraSSDCapability: Disabled
+    networkResourceGroupName: ocp-nc-us-rg
+    #outboundType: UserDefinedRouting
+    region: northcentralus
+    resourceGroupName: ocp-cluster-ncusrg
+    virtualNetwork: ocp_vnet_ncus
+publish: Internal
+pullSecret: 
+....
+
+====
+.Deploy Cloud Volumes ONTAP in Azure using BlueXP. 
+[%collapsible]
+====
+* Install a connector in in Azure. Refer to instructions https://docs.netapp.com/us-en/bluexp-setup-admin/task-install-connector-azure-bluexp.html[here]. 
+
+* Deploy a CVO instance in Azure using the connector. Refer to instructions link:https://docs.netapp.com/us-en/bluexp-cloud-volumes-ontap/task-getting-started-azure.html [here.]
+
+====
+.Install Astra Control Provisioner in the OCP Cluster in Azure
+[%collapsible]
+====
+* For this project, Astra Control Provisioner (ACP) was installed on all the clusters (on-prem cluster, on-prem cluster where Astra Control Center is deployed and the cluster in Azure). Learn more about the Astra Control Provisioner link:https://docs.netapp.com/us-en/astra-control-center/release-notes/whats-new.html#7-november-2023-23-10-0[here].
+
+* Create backend and a storage classes. Refer to instructions link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-postdeployment.html[here]. 
+
+====
+.Add the OCP cluster on Azure to the Astra Control Center.
+[%collapsible]
+====
+
+* Create a separate KubeConfig file with a cluster role that contains the minimum permissions necessary for a cluster to be managed by Astra Control. The instructions can be found
+link:https://docs.netapp.com/us-en/astra-control-center/get-started/setup_overview.html#create-a-cluster-role-kubeconfig[here].
+
+* Add the cluster to Astra Control Center following the instructions 
+link:https://docs.netapp.com/us-en/astra-control-center/get-started/setup_overview.html#add-cluster[here]
+
+====
+.Using CSI Topology feature of Trident for multi-zone architectures
+
+Cloud providers, today, enable Kubernetes/OpenShift cluster administrators to spawn nodes of the clusters that are zone based. Nodes can be located in different availability zones within a region, or across various regions. To facilitate the provisioning of volumes for workloads in a multi-zone architecture, Astra Trident uses CSI Topology. Using the CSI Topology feature, access to volumes can be limited to a subset of nodes, based on regions and availability zones. Refer link:https://docs.netapp.com/us-en/trident/trident-use/csi-topology.html[here] for additional details. 
+
+NOTE: Kubernetes supports two volume binding modes: 
+- When **_VolumeBindingMode_ is set to _Immediate_** (default), Astra Trident creates the volume without any topology awareness. Persistent Volumes are created without having any dependency on the requesting pod’s scheduling requirements.
+- When **_VolumeBindingMode_ set to _WaitForFirstConsumer_**, the creation and binding of a Persistent Volume for a PVC is delayed until a pod that uses the PVC is scheduled and created. This way, volumes are created to meet the scheduling constraints that are enforced by topology requirements.
+Astra Trident storage backends can be designed to selectively provision volumes based on availability zones (Topology-aware backend). For StorageClasses that make use of such a backend, a volume would only be created if requested by an application that is scheduled in a supported region/zone. (Topology-aware StorageClass)
+Refer link:https://docs.netapp.com/us-en/trident/trident-use/csi-topology.html[here] for additional details. 
+
+[underline]#*Demonstration Video*#
+
+video::1546191b-bc46-42eb-ac34-b0d60142c58d[panopto, title="Using Astra Control for Failover and Failback of applications", width=360]

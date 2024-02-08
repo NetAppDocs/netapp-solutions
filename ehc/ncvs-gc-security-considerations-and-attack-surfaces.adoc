@@ -1,0 +1,155 @@
+---
+sidebar: sidebar
+permalink: ehc/ncvs-gc-security-considerations-and-attack-surfaces.html
+keywords: secure logins, cluster administration, upgrades, data at-rest, mitigation
+summary: The first step in understanding how to secure your data is identifying the risks and potential attack surfaces.
+---
+= Security considerations and attack surfaces
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-05-09 14:20:40.896351
+//
+
+[.lead]
+The first step in understanding how to secure your data is identifying the risks and potential attack surfaces. 
+
+These include (but are not limited to) the following:
+
+* Administration and logins
+* Data at rest
+* Data in flight
+* Network and firewalls
+* Ransomware, malware, and viruses
+
+Understanding attack surfaces can help you to better secure your environments. Cloud Volumes Service in Google Cloud already considers many of these topics and implements security functionality by default, without any administrative interaction.
+
+== Ensuring secure logins
+
+When securing your critical infrastructure components, it is imperative to make sure that only approved users can log in and manage your environments. If bad actors breach your administrative credentials, then they have the keys to the castle and can do anything they want—change configurations, delete volumes and backups, create backdoors, or disable Snapshot schedules.
+
+Cloud Volumes Service for Google Cloud provides protection against unauthorized administrative logins through the obfuscation of storage as a service (StaaS). Cloud Volumes Service is completely maintained by the cloud provider with no availability to login externally. All setup and configuration operations are fully automated, so a human administrator never has to interact with the systems except in very rare circumstances.
+
+If login is required, Cloud Volumes Service in Google Cloud secures logins by maintaining a very short list of trusted administrators that have access to log in to the systems. This gatekeeping helps reduce the number of potential bad actors with access. Additionally, the Google Cloud networking hides the systems behind layers of network security and exposes only what is needed to the outside world. For information about the Google Cloud, Cloud Volumes Service architecture, see the section link:ncvs-gc-cloud-volumes-service-architecture.html[“Cloud Volumes Service architecture.”]
+
+== Cluster administration and upgrades
+
+Two areas with potential security risks include cluster administration (what happens if a bad actor has admin access) and upgrades (what happens if a software image is compromised).
+
+=== Storage administration protection
+
+Storage provided as a service removes the added risk of exposure to administrators by removing that access to end users outside of the cloud data center. Instead, the only configuration done is for the data access plane by customers. Each tenant manages their own volumes, and no tenant can reach other Cloud Volumes Service instances. The service is managed by automation, with a very small list of trusted administrators given access to the systems through the processes covered in the section link:ncvs-gc-service-operation.html[“Service operation.”]
+
+The CVS-Performance service type offers cross-region replication as an option to provide data protection to a different region in the event of a region failure. In those cases, Cloud Volumes Service can be failed over to the unaffected region to maintain data access.
+
+=== Service upgrades
+
+Updates help protect vulnerable systems. Each update provides security enhancements and bug fixes that minimize attack surfaces. Software updates are downloaded from centralized repositories and are validated before the updates are allowed to verify that official images are used and that the upgrades are not compromised by bad actors.
+
+With Cloud Volumes Service, updates are handled by the cloud provider teams, which removes risk exposure for administrator teams by providing experts well versed in configuration and upgrades that have automated and fully tested the process. Upgrades are nondisruptive, and Cloud Volumes Service maintains the latest updates for best overall results.
+
+For information about the administrator team that performs these service upgrades, see the section link:ncvs-gc-service-operation.html[“Service operation.”]
+
+== Securing data at-rest
+
+Data-at-rest encryption is important to protect sensitive data in the event of a disk that is stolen, returned, or repurposed. Data in Cloud Volumes Service is protected at rest by using software-based encryption.
+
+* Google-generated keys are used for CVS-SW.
+* For CVS-Performance, the per-volume keys are stored in a key manager built into Cloud Volumes Service, which uses NetApp ONTAP CryptoMod to generate AES-256 encryption keys. CryptoMod is listed on the CMVP FIPS 140-2 validated modules list. See https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4144[FIPS 140-2 Cert #4144^].
+
+Starting in November 2021, preview Customer-managed Encryption (CMEK) functionality was made available for CVS-Performance. This functionality allows you to encrypt the per-volume keys with per-project, per-region master-keys that are hosted in Google Key Management Service (KMS). KMS enables you to attach external key managers.
+
+For details about how to configure KMS for CVS-Performance, https://cloud.google.com/architecture/partners/netapp-cloud-volumes/customer-managed-keys?hl=en_US[see the Cloud Volumes Service documentation^].
+
+For more information about architecture, see the section link:ncvs-gc-cloud-volumes-service-architecture.html[“Cloud Volumes Service architecture.”]
+
+=== Securing data in-flight
+
+In addition to securing data at rest, you must also be able to secure data when it is in flight between the Cloud Volumes Service instance and a client or replication target.  Cloud Volumes Service provides encryption for in-flight data over NAS protocols by using encryption methods such as SMB encryption using Kerberos, the signing/sealing of packets, and NFS Kerberos 5p for end-to-end encryption of data transfers.
+
+Replication of Cloud Volumes Service volumes uses TLS 1.2, which takes advantage of AES-GCM encryption methods.
+
+Most insecure in-flight protocols such as telnet, NDMP, and so on are disabled by default. DNS, however, is not encrypted by Cloud Volumes Service (no DNS Sec support) and should be encrypted by using external network encryption when possible. See the section link:ncvs-gc-data-encryption-in-transit.html[“Data encryption in transit”] for more information about securing data in-flight.
+
+For information about NAS protocol encryption, see the section link:ncvs-gc-data-encryption-in-transit.html#nas-protocols[“NAS protocols.”]
+
+== Users and groups for NAS permissions
+
+Part of securing your data in the cloud involves proper user and group authentication, where the users accessing the data are verified as real users in the environment and the groups contain valid users. These users and groups provide initial share and export access, as well as permission validation for files and folders in the storage system.
+
+Cloud Volumes Service uses standard Active Directory-based Windows user and group authentication for SMB shares and Windows-style permissions. The service can also leverage UNIX identity providers such as LDAP for UNIX users and groups for NFS exports, NFSv4 ID validation, Kerberos authentication,  and NFSv4 ACLs.
+
+[NOTE]
+Currently only Active Directory LDAP is supported with Cloud Volumes Service for LDAP functionality.
+
+== Detection, prevention and mitigation of ransomware, malware, and viruses
+
+Ransomware, malware,  and viruses are a persistent threat to administrators, and detection, prevention, and mitigation of those threats are always top of mind for enterprise organizations. A single ransomware event on a critical dataset can potentially cost millions of dollars, so it is beneficial to do what you can to minimize the risk.
+
+Although Cloud Volumes Service currently doesn’t include native detection or prevention measures, such as antivirus protection or https://www.netapp.com/blog/prevent-ransomware-spread-ONTAP/[automatic ransomware detection^], there are ways to quickly recover from a ransomware event by enabling regular Snapshot schedules. Snapshot copies are immutable and read only pointers to changed blocks in the file system, are near instantaneous, have minimal impact on performance,  and only use up space when data is changed or deleted.  You can set schedules for Snapshot copies to match your desired acceptable recovery point objective (RPO)/recovery time objective (RTO) and can keep up to 1,024 Snapshot copies per volume.
+
+Snapshot support is included at no additional cost (beyond data storage charges for changed blocks/data retained by Snapshot copies) with Cloud Volumes Service and,  in the event of a ransomware attack, can be used to roll back to a Snapshot copy before the attack occurred. Snapshot restores take just seconds to complete, and you then can get back to serving data as normal. For more information, see https://www.netapp.com/pdf.html?item=/media/16716-sb-3938pdf.pdf&v=202093745[The NetApp Solution for Ransomware^].
+
+Preventing ransomware from affecting your business requires a multilayered approach that includes one or more of the following:
+
+* Endpoint protection
+* Protection against external threats through network firewalls
+* Detection of data anomalies
+* Multiple backups (onsite and offsite) of critical datasets
+* Regular restore tests of backups
+* Immutable read-only NetApp Snapshot copies
+* Multifactor authentication for critical infrastructure
+* Security audits of system logins
+
+This list is far from exhaustive but is a good blueprint to follow when dealing with the potential of ransomware attacks. Cloud Volumes Service in Google Cloud provides several ways to protect against ransomware events and reduce their effects.
+
+=== Immutable Snapshot copies
+
+Cloud Volumes Service natively provides immutable read-only Snapshot copies that are taken on a customizable schedule for quick point-in-time recovery in the event of data deletion or if an entire volume has been victimized by a ransomware attack. Snapshot restores to previous good Snapshot copies are fast and minimize data loss based on the retention period of your Snapshot schedules and RTO/RPO. The performance effect with Snapshot technology is negligible.
+
+Because Snapshot copies in Cloud Volumes Service are read-only, they cannot be infected by ransomware unless the ransomware has proliferated into the dataset unnoticed and Snapshot copies have been taken of the data infected by ransomware. This is why you must also consider ransomware detection based on data anomalies. Cloud Volumes Service does not currently provide detection natively, but you can use external monitoring software.
+
+=== Backups and restores
+
+Cloud Volumes Service provides standard NAS client backup capabilities (such as backups over NFS or SMB).
+
+* CVS-Performance offers cross-region volume replication to other CVS-Performance volumes. For more information, see https://cloud.google.com/architecture/partners/netapp-cloud-volumes/volume-replication?hl=en_US[volume replication^] in the Cloud Volumes Service documentation.
+* CVS-SW offers service-native volume backup/restore capabilities. For more information, see https://cloud.google.com/architecture/partners/netapp-cloud-volumes/back-up?hl=en_US[cloud backup^] in the Cloud Volumes Service documentation.
+
+Volume replication provides an exact copy of the source volume for fast failover in the case of a disaster, including ransomware events.
+
+=== Cross-region replication
+
+CVS-Performance enables you to securely replicate volumes across Google Cloud regions for data protection and archive use cases by using TLS1.2 AES 256 GCM encryption on a NetApp-controlled backend service network using specific interfaces used for replication running on Google’s network. A primary (source) volume contains the active production data and replicates to a secondary (destination) volume to provide an exact replica of the primary dataset.
+
+Initial replication transfers all blocks, but updates only transmit the changed blocks in a primary volume. For instance, if a 1TB database that resides on a primary volume is replicated to the secondary volume, then 1TB of space is transferred on the initial replication. If that database has a few hundred rows (hypothetically, a few MB) that change between the initialization and the next update, only the blocks with the changed rows are replicated to the secondary (a few MB). This helps to make sure that the transfer times remain low and keeps replication charges down.
+
+All permissions on files and folders are replicated to the secondary volume,  but share access permissions (such as export policies and rules or SMB shares and share ACLs) must be handled separately. In the case of a site failover, the destination site should leverage the same name services and Active Directory domain connections to provide consistent handling of user and group identities and permissions. You can use a secondary volume as a failover target in the event of a disaster by breaking the replication relationship, which converts the secondary volume to read-write.
+
+Volume replicas are read-only, which provides an immutable copy of data offsite for quick recovery of data in instances where a virus has infected data or ransomware has encrypted the primary dataset. Read-only data won’t be encrypted, but, if the primary volume is affected and replication occurs, the infected blocks also replicate. You can use older, non-affected Snapshot copies to recover, but SLAs might fall out of range of the promised RTO/RPO depending on how quickly an attack is detected.
+
+In addition, you can prevent malicious administrative actions, such as volume deletions, Snapshot deletions, or Snapshot schedule changes,  with cross-region replication (CRR) management in Google Cloud. This is done by creating custom roles that separate volume administrators, who can delete source volumes but not break mirrors and therefore cannot delete destination volumes, from CRR administrators, who cannot perform any volume operations. See https://cloud.google.com/architecture/partners/netapp-cloud-volumes/security-considerations?hl=en_US[Security Considerations^] in the Cloud Volumes Service documentation for permissions allowed by each administrator group.
+
+=== Cloud Volumes Service backup
+
+Although Cloud Volumes Service provides high data durability, external events can cause data loss. In the event of a security event such as a virus or ransomware, backups and restores become critical for resumption of data access in a timely manner. An administrator might accidentally delete a Cloud Volumes Service volume. Or users simply want to retain backup versions of their data for many months and keeping the extra Snapshot copy space inside the volume becomes a cost challenge. Although Snapshot copies should be the preferred way to keep backup versions for the last few weeks to restore lost data from them, they are sitting inside the volume and are lost if the volume goes away.
+
+For all these reasons, NetApp Cloud Volumes Service offers backup services through https://cloud.google.com/architecture/partners/netapp-cloud-volumes/back-up?hl=en_US[Cloud Volumes Service backup^].
+
+Cloud Volumes Service backup generates a copy of the volume on Google Cloud Storage (GCS). It only backs up the actual data stored within the volume, not the free space. It works as incremental forever, meaning it transfers the volume content once and from there on continues backing up changed data only. Compared to classical backup concepts with multiple full backups, it saves large amounts of backup storage, reducing cost. Because the monthly price of backup space is lower compared to a volume, it is an ideal place to keep backup versions longer.
+
+Users can use a Cloud Volumes Service backup to restore any backup version to the same or a different volume within the same region. If the source volume is deleted, the backup data is retained and needs to be managed (for example, deleted) independently.
+
+Cloud Volumes Service backup is built into Cloud Volumes Service as option. Users can decide which volumes to protect by activating Cloud Volumes Service backup on a per-volume basis. See the https://cloud.google.com/architecture/partners/netapp-cloud-volumes/back-up?hl=en_US[Cloud Volumes Service backup documentation^] for information about backups, the https://cloud.google.com/architecture/partners/netapp-cloud-volumes/resource-limits-quotas?hl=en_US[number of maximum backup versions supported^], scheduling, and https://cloud.google.com/architecture/partners/netapp-cloud-volumes/costs?hl=en_US[pricing^].
+
+All backup data of a project is stored within a GCS bucket, which is managed by the service and not visible to the user. Each project uses a different bucket. Currently, the buckets are in same region as the Cloud Volumes Service volumes, but more options are being discussed. Consult the documentation for the latest status.
+
+Data transport from a Cloud Volumes Service bucket to GCS uses service-internal Google networks with HTTPS and TLS1.2. Data is encrypted at-rest with Google-managed keys.
+
+To manage Cloud Volumes Service backup (creating, deleting, and restoring backups), a user must have the https://cloud.google.com/architecture/partners/netapp-cloud-volumes/security-considerations?hl=en_US[roles/netappcloudvolumes.admin^] role.
