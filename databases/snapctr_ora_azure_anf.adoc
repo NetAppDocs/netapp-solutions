@@ -2,7 +2,7 @@
 sidebar: sidebar
 permalink: databases/snapctr_ora_azure_anf.html
 keywords: Database, Oracle, Azure, ANF, Ansible, Automation
-summary: "The solution provides overview and details for automated Oracle deployment in Microsoft Azure NetApp Files as primary database storage with NFS protocol and Oracle database is deployed as container database with dNFS enabled." 
+summary: "The solution provides overview and details for automated Oracle deployment in Microsoft Azure NetApp Files as primary database storage with NFS protocol and Oracle database is deployed as container database with dNFS enabled. Database deployed in Azure is protected using SnapCenter UI tool for simplified database management" 
 ---
 
 = TR-4988: Oracle Database Backup, Recovery, and Clone on ANF with SnapCenter
@@ -17,15 +17,14 @@ Allen Cao, Niyaz Mohamed, NetApp
 [.lead]
 == Purpose
 
-Running performance-intensive and latency-sensitive Oracle workloads in the cloud can be challenging. Azure NetApp Files (ANF) makes it easy for enterprise line-of-business (LOB) and storage professionals to migrate and run demanding Oracle workloads without code change. Azure NetApp Files is widely used as the underlying shared file-storage service in various scenarios, such as new deployment or migration (lift and shift) of Oracle databases from on-premises to Azure.
+NetApp SnapCenter software is an easy-to-use enterprise platform to securely coordinate and manage data protection across applications, databases, and file systems. It simplifies backup, restore, and clone lifecycle management by offloading these tasks to application owners without sacrificing the ability to oversee and regulate activity on the storage systems. By leveraging storage-based data management, it enables increased performance and availability, as well as reduced testing and development times.
 
-This documentation demonstrates the simplified deployment of Oracle databases in Azure NetApp files via NFS mounts using Ansible automation. The Oracle database deploys in a container database (CDB) and pluggable databases (PDB) configuration with Oracle dNFS protocol enabled to boost performance. Furthermore, the on-premises Oracle single instance database or PDB can be migrated into a newly deployed container database in Azure using automated PDB relocation methodology with minimal service interruption. It also provides information on fast Oracle database backup, restore, and clone with NetApp SnapCenter UI tool in Azure Cloud. 
-
+In TR-4987 link:https://docs.netapp.com/us-en/netapp-solutions/databases/automation_ora_anf_nfs.html[Simplified, Automated Oracle Deployment on Azure NetApp Files with NFS^], we demonstrated automated Oracle deployment in Azure cloud, in this documentation we showcase Oracle database protection and management on Azure NetApp Files (ANF) in Azure cloud with a very user-friendly SnapCenter UI interface. 
 
 This solution addresses the following use cases:
 
-* Automated Oracle container database deployment on Azure NetApp files  
-* Automated Oracle database migration between on-premisses and Azure cloud 
+* Backup and recovery Oracle database deployed on ANF in Azure cloud with SnapCenter  
+* Manage database snapshot and clone copies to accelerate application development and improve data lifecycle management
 
 == Audience
 
@@ -76,16 +75,16 @@ image::automation_ora_anf_nfs_archit.png["This image provides a detailed picture
 
 === Key factors for deployment consideration
 
-* *Oracle database storage layout.* In this automated Oracle deployment, we provision three database volumes for each database to host Oracle binary, data, and logs by default. The volumes are mounted on Oracle DB server as /u01 - binary, /u02 - data, /u03 - logs via NFS. Dual control files are configured on /u02 and /u03 mount points for redundancy. 
+* *SnapCenter deployment.* SnapCenter can deploy in a Windows domain or Workgroup environment. For domain-based deployment, the domain user account should be a domain administrator account, or the domain user belongs to the local administrator's group on the SnapCenter hosting server.    
 
-* *Multiple DB servers deployment.* The automation solution can deploy an Oracle container database to multiple DB servers in a single Ansible playbook run. Regardless of the number of DB servers, the playbook execution remains the same. You can deploy multiple container databases to a single VM instance by repeating the deployment with different database instance IDs (Oracle SID). But ensure there is sufficient memory on the host to support deployed databases.  
+* *Name resolution.* SnapCenter server needs to resolve the name to the IP address for each managed target database server host. Each target database server host must resolve the SnapCenter server name to the IP address. If a DNS server is unavailable, add naming to local host files for resolution.  
 
-* *dNFS configuration.* By using dNFS (available since Oracle 11g), an Oracle database running on an Azure Virtual Machine can drive significantly more I/O than the native NFS client. Automated Oracle deployment configures dNFS on NFSv3 by default.
+* *Resource group configuration.* Resource group in SnapCenter is a logical grouping of similar resources that can be backed up together. Thus, it simplifies and reduces the number of backup jobs in a large database environment. 
 
-* *Allocate large size volume to speed up deployment.* ANF file system IO throughput is regulated based on the size of volume. For initial deployment, allocate large size volumes can speed up the deployment. The volumes subsequently can be downsized dynamically without application impact.
+* *Separate full database and archive log backup.* Full database backup includes data volumes and log volumes consistent group snapshots. A full database snapshot incurs higher storage consumption and should execute less frequently than an archive log-only backup, which consumes less storage and improves RPO. There is also a limit (1023) on the number of snapshot backups on a volume.
 
-* *Database backup.* NetApp provides a SnapCenter software suite for database backup, restore, and cloning with a user-friendly UI interface. NetApp recommends implementing such a management tool to achieve fast (under a minute) snapshot backup, quick (minutes) database restore, and database clone.    
-
+* *A.* ANF file system IO throughput is regulated based on the size of volume. For initial deployment, allocate large size volumes can speed up the deployment. The volumes subsequently can be downsized dynamically without application impact.
+  
 == Solution deployment
 
 The following sections provide step-by-step procedures for automated Oracle 19c deployment and database migration on Azure NetApp Files with directly mounted database volumes via NFS to Azure VMs.     
