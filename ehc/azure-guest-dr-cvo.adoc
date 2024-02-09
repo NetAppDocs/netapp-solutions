@@ -1,0 +1,378 @@
+---
+sidebar: sidebar
+permalink: ehc/azure-guest-dr-cvo.html
+keywords: tr4935, 4935, azure, avs, jetstream, guest connect, dr, disaster recovery
+summary: Disaster recovery to cloud is a resilient and cost-effective way of protecting workloads against site outages and data corruption events such as ransomware. With NetApp SnapMirror, on-premises VMware workloads that use guest-connected storage can be replicated to NetApp Cloud Volumes ONTAP running in Azure.
+---
+
+= Disaster Recovery with CVO and AVS (guest-connected storage)
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-07-12 13:55:37.537410
+//
+
+[.lead]
+== Overview
+Authors: Ravi BCB and Niyaz Mohamed, NetApp
+
+Disaster recovery to cloud is a resilient and cost-effective way of protecting workloads against site outages and data corruption events such as ransomware. With NetApp SnapMirror, on-premises VMware workloads that use guest-connected storage can be replicated to NetApp Cloud Volumes ONTAP running in Azure. This covers application data; however, what about the actual VMs themselves. Disaster recovery should cover all dependent components, including virtual machines, VMDKs, application data, and more. To accomplish this, SnapMirror along with Jetstream can be used to seamlessly recover workloads replicated from on-premises to Cloud Volumes ONTAP while using vSAN storage for VM VMDKs.
+
+This document provides a step-by-step approach for setting up and performing disaster recovery that uses NetApp SnapMirror, JetStream, and the Azure VMware Solution (AVS).
+
+image:dr-cvo-avs-image1.png[Error: Missing Graphic Image]
+
+== Assumptions
+
+This document focuses on in-guest storage for application data (also known as guest connected), and we assume that the on-premises environment is using SnapCenter for application-consistent backups.
+
+[NOTE]
+This document applies to any third-party backup or recovery solution. Depending on the solution used in the environment, follow best practices to create backup policies that meet organizational SLAs.
+
+For connectivity between the on-premises environment and the Azure virtual network, use the express route global reach or a virtual WAN with a VPN gateway. Segments should be created based on the on-premises vLAN design.
+
+[NOTE]
+There are multiple options for connecting on-premises datacenters to Azure, which prevents us from outlining a specific workflow in this document. Refer to the Azure documentation for the appropriate on-premises-to-Azure connectivity method.
+
+== Deploying the DR Solution
+=== Solution Deployment Overview
+
+. Make sure that application data is backed up using SnapCenter with the necessary RPO requirements.
+. Provision Cloud Volumes ONTAP with the correct instance size using Cloud manager within the appropriate subscription and virtual network.
+.. Configure SnapMirror for the relevant application volumes.
+.. Update the backup policies in SnapCenter to trigger SnapMirror updates after the scheduled jobs.
+. Install the JetStream DR software in the on-premises data center and start protection for virtual machines.
+. Install JetStream DR software in the Azure VMware Solution private cloud.
+. During a disaster event, break the SnapMirror relationship using Cloud Manager and trigger failover of virtual machines to Azure NetApp Files or to vSAN datastores in the designated AVS DR site.
+.. Reconnect the ISCSI LUNs and NFS mounts for the application VMs.
+. Invoke failback to the protected site by reverse resyncing SnapMirror after the primary site has been recovered.
+
+=== Deployment Details
+
+.Configure CVO on Azure and replicate volumes to CVO
+[%collapsible]
+=====
+The first step is to configure Cloud Volumes ONTAP on Azure (https://docs.netapp.com/us-en/netapp-solutions/ehc/azure-guest.html[Link^]) and replicate the desired volumes to Cloud Volumes ONTAP with the desired frequencies and snapshot retentions.
+
+image:dr-cvo-avs-image2.png[Error: Missing Graphic Image]
+=====
+
+.Configure AVS hosts and CVO data access
+[%collapsible]
+=====
+Two important factors to consider when deploying the SDDC are the size of the SDDC cluster in the Azure VMware solution and how long to keep the SDDC in service. These two key considerations for a disaster recovery solution help reduce the overall operational costs. The SDDC can be as small as three hosts, all the way up to a multi-host cluster in a full-scale deployment.
+
+The decision to deploy an AVS cluster is primarily based on the RPO/RTO requirements. With the Azure VMware solution, the SDDC can be provisioned just in time in preparation for either testing or an actual disaster event. An SDDC deployed just in time saves on ESXi host costs when you are not dealing with a disaster. However, this form of deployment affects the RTO by a few of hours while SDDC is being provisioned.
+
+The most common deployed option is to have SDDC running in an always-on, pilot-light mode of operation. This option provides a small footprint of three hosts that are always available, and it also speeds up recovery operations by providing a running baseline for simulation activities and compliance checks, thus avoiding the risk of operational drift between the production and DR sites. The pilot-light cluster can be scaled up quickly to the desired level when needed to handle an actual DR event.
+
+To configure AVS SDDC (be it on-demand or in pilot-light mode), see https://docs.netapp.com/us-en/netapp-solutions/ehc/azure-setup.html[Deploy and configure the Virtualization Environment on Azure^]. As a prerequisite, verify that the guest VMs residing on the AVS hosts are able to consume data from Cloud Volumes ONTAP after connectivity has been established.
+
+After Cloud Volumes ONTAP and AVS have been configured properly, begin configuring Jetstream to automate the recovery of on-premises workloads to AVS (VMs with application VMDKs and VMs with in-guest storage) by using the VAIO mechanism and by leveraging SnapMirror for application volumes copies to Cloud Volumes ONTAP.
+=====
+
+.Install JetStream DR in on-premises datacenter
+[%collapsible]
+=====
+JetStream DR software consists of three major components: the JetStream DR Management Server Virtual Appliance (MSA), the DR Virtual Appliance (DRVA), and host components (I/O filter packages). The MSA is used to install and configure host components on the compute cluster and then to administer JetStream DR software. The installation process is as follows:
+
+. Check the prerequisites.
+. Run the Capacity Planning Tool for resource and configuration recommendations.
+. Deploy the JetStream DR MSA to each vSphere host in the designated cluster.
+. Launch the MSA using its DNS name in a browser.
+. Register the vCenter server with the MSA.
+. After JetStream DR MSA has been deployed and the vCenter Server has been registered, navigate to the JetStream DR plug-in with the vSphere Web Client. This can be done by navigating to Datacenter > Configure > JetStream DR.
++
+image:dr-cvo-avs-image3.png[Error: Missing Graphic Image]
+
+. From the JetStream DR interface, complete the following tasks:
+.. Configure the cluster with the I/O filter package.
++
+image:dr-cvo-avs-image4.png[Error: Missing Graphic Image]
+
+.. Add the Azure Blob storage located at the recovery site.
++
+image:dr-cvo-avs-image5.png[Error: Missing Graphic Image]
+
+. Deploy the required number of DR Virtual Appliances (DRVAs) from the Appliances tab.
++
+[NOTE]
+Use the capacity planning tool to estimate the number of DRVAs required.
++
+image:dr-cvo-avs-image6.png[Error: Missing Graphic Image]
++
+image:dr-cvo-avs-image7.png[Error: Missing Graphic Image]
+
+. Create replication log volumes for each DRVA using the VMDK from the datastores available or the independent shared iSCSI storage pool.
++
+image:dr-cvo-avs-image8.png[Error: Missing Graphic Image]
+
+. From the Protected Domains tab, create the required number of protected domains using information about the Azure Blob Storage site, the DRVA instance, and the replication log. A protected domain defines a specific VM or set of application VMs within the cluster that are protected together and assigned a priority order for failover/failback operations.
++
+image:dr-cvo-avs-image9.png[Error: Missing Graphic Image]
++
+image:dr-cvo-avs-image10.png[Error: Missing Graphic Image]
+
+. Select the VMs to be protected and group the VMs into applications groups based on dependency. Application definitions allow you to group sets of VMs into logical groups that contain their boot orders, boot delays, and optional application validations that can be executed upon recovery.
++
+[NOTE]
+Make sure that the same protection mode is used for all VMs in a protected domain.
++
+[NOTE]
+Write-Back(VMDK) mode offers higher performance.
++
+image:dr-cvo-avs-image11.png[Error: Missing Graphic Image]
+
+. Make sure that replication log volumes are placed on high- performance storage.
++
+image:dr-cvo-avs-image12.png[Error: Missing Graphic Image]
+
+. After you are done, click Start Protection for the protected domain. This starts data replication for the selected VMs to the designated Blob store.
++
+image:dr-cvo-avs-image13.png[Error: Missing Graphic Image]
+
+. After replication is completed, the VM protection status is marked as Recoverable.
++
+image:dr-cvo-avs-image14.png[Error: Missing Graphic Image]
++
+[NOTE]
+Failover runbooks can be configured to group the VMs (called a recovery group), set the boot order sequence, and modify the CPU/memory settings along with the IP configurations.
+
+. Click Settings and then click the runbook Configure link to configure the runbook group.
++
+image:dr-cvo-avs-image15.png[Error: Missing Graphic Image]
+
+. Click the Create Group button to begin creating a new runbook group.
++
+[NOTE]
+If needed, in the lower portion of the screen, apply custom pre-scripts and post-scripts to automatically run prior to and following operation of the runbook group. Make sure that the Runbook scripts are residing on the management server.
++
+image:dr-cvo-avs-image16.png[Error: Missing Graphic Image]
+
+. Edit the VM settings as required. Specify the parameters for recovering the VMs, including the boot sequence, the boot delay (specified in seconds), the number of CPUs, and the amount of memory to allocate. Change the boot sequence of the VMs by clicking the up or down arrows. Options are also provided to Retain MAC.
++
+image:dr-cvo-avs-image17.png[Error: Missing Graphic Image]
+
+. Static IP addresses can be manually configured for the individual VMs of the group. Click the NIC View link of a VM to manually configure its IP address settings.
++
+image:dr-cvo-avs-image18.png[Error: Missing Graphic Image]
+
+. Click the Configure button to save NIC settings for the respective VMs.
++
+image:dr-cvo-avs-image19.png[Error: Missing Graphic Image]
++
+image:dr-cvo-avs-image20.png[Error: Missing Graphic Image]
+
+The status of both the failover and failback runbooks is now listed as Configured. Failover and failback runbook groups are created in pairs using the same initial group of VMs and settings. If necessary, the settings of any runbook group can be individually customized by clicking its respective Details link and making changes.
+=====
+
+.Install JetStream DR for AVS in private cloud
+[%collapsible]
+=====
+A best practice for a recovery site (AVS) is to create a three-node pilot-light cluster in advance. This allows the recovery site infrastructure to be preconfigured, including the following:
+
+* Destination networking segments, firewalls, services like DHCP and DNS, and so on
+* Installation of JetStream DR for AVS
+* Configuration of ANF volumes as datastores and more
+
+JetStream DR supports a near-zero RTO mode for mission-critical domains. For these domains, destination storage should be preinstalled. ANF is a recommended storage type in this case.
+
+[NOTE]
+Network configuration including segment creation should be configured on the AVS cluster to match on-premises requirements.
+
+[NOTE]
+Depending on the SLA and RTO requirements, you can use continuous failover or regular (standard) failover mode. For near-zero RTO, you should start continuous rehydration at the recovery site.
+
+. To install JetStream DR for AVS on an Azure VMware Solution private cloud, use the Run command. From the Azure portal, go to Azure VMware solution, select the private cloud, and select Run command > Packages > JSDR.Configuration.
++
+[NOTE]
+The default CloudAdmin user of the Azure VMware Solution doesn't have sufficient privileges to install JetStream DR for AVS. The Azure VMware Solution enables simplified and automated installation of JetStream DR by invoking the Azure VMware Solution Run command for JetStream DR.
++
+The following screenshot shows installation using a DHCP-based IP address.
++
+image:dr-cvo-avs-image21.png[Error: Missing Graphic Image]
+
+. After JetStream DR for AVS installation is complete, refresh the browser. To access the JetStream DR UI, go to SDDC Datacenter > Configure > JetStream DR.
++
+image:dr-cvo-avs-image22.png[Error: Missing Graphic Image]
+
+. From the JetStream DR interface, complete the following tasks:
+.. Add the Azure Blob Storage account that was used to protect the on-premises cluster as a storage site and then run the Scan Domains option.
+.. In the pop-up dialog window that appears, select the protected domain to import and then click its Import link.
++
+image:dr-cvo-avs-image23.png[Error: Missing Graphic Image]
+
+. The domain is imported for recovery. Go to the Protected Domains tab and verify that the intended domain has been selected or choose the desired one from the Select Protected Domain menu. A list of the recoverable VMs in the protected domain is displayed.
++
+image:dr-cvo-avs-image24.png[Error: Missing Graphic Image]
+
+. After the protected domains are imported, deploy DRVA appliances.
++
+[NOTE]
+These steps can also be automated using CPT- created plans.
+
+. Create replication log volumes using available vSAN or ANF datastores.
+. Import the protected domains and configure the recovery VA to use an ANF datastore for VM placements.
++
+image:dr-cvo-avs-image25.png[Error: Missing Graphic Image]
++
+[NOTE]
+Make sure that DHCP is enabled on the selected segment and that enough IPs are available. Dynamic IPs are temporarily used while domains are recovering. Each recovering VM (including continuous rehydration) requires an individual dynamic IP. After recovery is complete, the IP is released and can be reused.
+
+. Select the appropriate failover option (continuous failover or failover). In this example, continuous rehydration (continuous failover) is selected.
++
+[NOTE]
+Although Continuous Failover and Failover modes differ on when configuration is performed, both failover modes are configured using the same steps. Failover steps are configured and performed together in response to a disaster event. Continuous failover can be configured at any time and then allowed to run in the background during normal system operation. After a disaster event has occurred, continuous failover is completed to immediately transfer ownership of the protected VMs to the recovery site (near-zero RTO).
++
+image:dr-cvo-avs-image26.png[Error: Missing Graphic Image]
+
+The continuous failover process begins, and its progress can be monitored from the UI. Clicking the blue icon in the Current Step section exposes a pop-up window showing details of the current step of the failover process.
+=====
+
+.Failover and Failback
+[%collapsible]
+=====
+
+. After a disaster occurs in the protected cluster of the on-premises environment (partial or complete failure), you can trigger the failover for VMs using Jetstream after breaking the SnapMirror relationship for the respective application volumes.
++
+image:dr-cvo-avs-image27.png[Error: Missing Graphic Image]
++
+image:dr-cvo-avs-image28.png[Error: Missing Graphic Image]
++
+[NOTE]
+This step can easily be automated to facilitate the recovery process.
+
+. Access the Jetstream UI on AVS SDDC (destination side) and trigger the failover option to complete failover. The task bar shows progress for failover activities.
++
+In the dialog window that appears when completing failover, the failover task can be specified as planned or assumed to be forced.
++
+image:dr-cvo-avs-image29.png[Error: Missing Graphic Image]
++
+image:dr-cvo-avs-image30.png[Error: Missing Graphic Image]
++
+Forced failover assumes the primary site is no longer accessible and ownership of the protected domain should be directly assumed by the recovery site.
++
+image:dr-cvo-avs-image31.png[Error: Missing Graphic Image]
++
+image:dr-cvo-avs-image32.png[Error: Missing Graphic Image]
+
+. After continuous failover is complete, a message appears confirming completion of the task. When the task is complete, access the recovered VMs to configure ISCSI or NFS sessions.
++
+[NOTE]
+The failover mode changes to Running in Failover and the VM status is Recoverable. All the VMs of the protected domain are now running at the recovery site in the state specified by the failover runbook settings.
++
+[NOTE]
+To verify the failover configuration and infrastructure, JetStream DR can be operated in test mode (Test Failover option) to observe the recovery of virtual machines and their data from the object store into a test recovery environment. When a failover procedure is executed in test mode, its operation resembles an actual failover process.
++
+image:dr-cvo-avs-image33.png[Error: Missing Graphic Image]
+
+. After the virtual machines are recovered, use storage disaster recovery for in-guest storage. To demonstrate this process, SQL server is used in this example.
+. Log into the recovered SnapCenter VM on AVS SDDC and enable DR mode.
+.. Access the SnapCenter UI using the browserN.
++
+image:dr-cvo-avs-image34.png[Error: Missing Graphic Image]
+
+.. In the Settings page, navigate to Settings > Global Settings > Disaster Recovery.
+.. Select Enable Disaster Recovery.
+.. Click Apply.
++
+image:dr-cvo-avs-image35.png[Error: Missing Graphic Image]
+
+.. Verify whether the DR job is enabled by clicking Monitor > Jobs.
++
+[NOTE]
+NetApp SnapCenter 4.6 or later should be used for storage disaster recovery. For previous versions, application-consistent snapshots (replicated using SnapMirror) should be used and manual recovery should be executed in case previous backups must be recovered in the disaster recovery site.
+
+. Make sure that the SnapMirror relationship is broken.
++
+image:dr-cvo-avs-image36.png[Error: Missing Graphic Image]
+
+. Attach the LUN from Cloud Volumes ONTAP to the recovered SQL guest VM with same drive letters.
++
+image:dr-cvo-avs-image37.png[Error: Missing Graphic Image]
+
+. Open iSCSI Initiator, clear the previous disconnected session and add the new target along with multipath for the replicated Cloud Volumes ONTAP volumes.
++
+image:dr-cvo-avs-image38.png[Error: Missing Graphic Image]
+
+. Make sure that all the disks are connected using the same drive letters that were used prior to DR.
++
+image:dr-cvo-avs-image39.png[Error: Missing Graphic Image]
+
+. Restart the MSSQL server service.
++
+image:dr-cvo-avs-image40.png[Error: Missing Graphic Image]
+
+. Make sure that the SQL resources are back online.
++
+image:dr-cvo-avs-image41.png[Error: Missing Graphic Image]
++
+[NOTE]
+In the case of NFS, attach the volumes using the mount command and update the `/etc/fstab` entries.
+
++
+At this point, operations can be run and business continues normally.
++
+[NOTE]
+On the NSX-T end, a separate dedicated tier-1 gateway can be created for simulating failover scenarios. This ensures that all workloads can communicate with each other but that no traffic can route in or out of the environment, so that any triage, containment, or hardening tasks can be performed without risk of cross-contamination. This operation is outside of the scope of this document, but it can easily be achieved for simulating isolation.
+
+After the primary site is up and running again, you can perform failback. VM protection is resumed by Jetstream and the SnapMirror relationship must be reversed.
+
+. Restore the on-premises environment. Depending on the type of disaster incident, it might be necessary to restore and/or verify the configuration of the protected cluster. If necessary, JetStream DR software might need to be reinstalled.
+. Access the restored on-premises environment, go to the Jetstream DR UI, and select the appropriate protected domain. After the protected site is ready for failback, select the Failback option in the UI.
++
+[NOTE]
+The CPT-generated failback plan can also be used to initiate the return of the VMs and their data from the object store back to the original VMware environment.
+
++
+image:dr-cvo-avs-image42.png[Error: Missing Graphic Image]
++
+[NOTE]
+Specify the maximum delay after pausing the VMs in the recovery site and restarting them in the protected site. The time need to complete this process includes the completion of replication after stopping failover VMs, the time needed to clean the recovery site, and the time needed to recreate VMs in the protected site. NetApp recommends 10 minutes.
+
++
+image:dr-cvo-avs-image43.png[Error: Missing Graphic Image]
+
+. Complete the failback process and then confirm the resumption of VM protection and data consistency.
++
+image:dr-cvo-avs-image44.png[Error: Missing Graphic Image]
+
+. After the VMs are recovered, disconnect the secondary storage from the host and connect to the primary storage.
++
+image:dr-cvo-avs-image45.png[Error: Missing Graphic Image]
++
+image:dr-cvo-avs-image46.png[Error: Missing Graphic Image]
+
+. Restart the MSSQL server service.
+. Verify that the SQL resources are back online.
++
+image:dr-cvo-avs-image47.png[Error: Missing Graphic Image]
++
+[NOTE]
+To failback to the primary storage, make sure that the relationship direction remains the same as it was before the failover by performing a reverse resync operation.
+
++
+[NOTE]
+To retain the roles of primary and secondary storage after the reverse resync operation, perform the reverse resync operation again.
+
+This process is applicable to other applications like Oracle, similar database flavors, and any other applications using guest-connected storage.
+
+As always, test the steps involved for recovering the critical workloads before porting them into production.
+=====
+
+== Benefits of this solution
+
+* Uses the efficient and resilient replication of SnapMirror.
+* Recovers to any available points in time with ONTAP snapshot retention.
+* Full automation is available for all required steps to recover hundreds to thousands of VMs, from the storage, compute, network, and application validation steps.
+* SnapCenter uses cloning mechanisms that do not change the replicated volume.
+** This avoids the risk of data corruption for volumes and snapshots.
+** Avoids replication interruptions during DR test workflows.
+** Leverages the DR data for workflows beyond DR, such as dev/test, security testing, patch and upgrade testing, and remediation testing.
+* CPU and RAM optimization can help lower cloud costs by enabling recovery to smaller compute clusters.
