@@ -1,0 +1,63 @@
+---
+sidebar: sidebar
+permalink: ehc/ncvs-gc-how-cloud-volumes-service-in-google-cloud-secures-your-data.html
+keywords: secure, architecture, tenancy model, identity management, control plane, security hardening, encryption, zero trust, ransomware
+summary: Cloud Volumes Service in Google Cloud provides a multitude of ways to natively secure your data.
+---
+= How Cloud Volumes Service in Google Cloud secures your data
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-05-09 14:20:40.886892
+//
+
+[.lead]
+Cloud Volumes Service in Google Cloud provides a multitude of ways to natively secure your data.
+
+== Secure architecture and tenancy model
+
+Cloud Volumes Service provides a secure architecture in Google Cloud by segmenting the service management (control plane) and the data access (data plane) across different endpoints so that neither can impact the other (see the section link:ncvs-gc-cloud-volumes-service-architecture.html[“Cloud Volumes Service architecture”]). It uses Google's https://cloud.google.com/vpc/docs/private-services-access?hl=en_US[private services access^] (PSA) framework to provide the service. This framework distinguishes between the service producer, which is provided and operated by NetApp, and the service consumer, which is a Virtual Private Cloud (VPC) in a customer project, hosting the clients that want to access Cloud Volumes Service file shares.
+
+In this architecture, tenants (see the section link:ncvs-gc-cloud-volumes-service-architecture.html#tenancy-model[“Tenancy model”]) are defined as Google Cloud projects that are completely isolated from each other unless explicitly connected by the user. Tenants allow complete isolation of data volumes, external name services, and other essential pieces of the solution from other tenants using the Cloud Volumes Service volume platform. Because the Cloud Volumes Service platform is connected through VPC peering, that isolation applies to it also. You can enable sharing of Cloud Volumes Service volumes between multiple projects by using a shared-VPC (see the section link:ncvs-gc-cloud-volumes-service-architecture.html#tenancy-model#shared-vpcs[“Shared VPCs”]). You can apply access controls to SMB shares and NFS exports to limit who or what can view or modify datasets.
+
+== Strong identity management for the control plane
+
+In the control plane where Cloud Volumes Service configuration takes place, identity management is managed by using https://cloud.google.com/iam/docs/overview[Identity Access Management (IAM)^]. IAM is a standard service that enables you to control authentication (logins) and authorization (permissions) to Google Cloud project instances. All configuration is performed with Cloud Volumes Service APIs over a secure HTTPS transport using TLS 1.2 encryption, and authentication is performed by using JWT tokens for added security. The Google console UI for Cloud Volumes Service translates user input into Cloud Volumes Service API calls.
+
+== Security hardening - Limiting attack surfaces
+
+Part of effective security is limiting the number of attack surfaces available in a service. Attack surfaces can include a variety of things, including data at-rest, in-flight transfers, logins, and the datasets themselves.
+
+A managed service removes some of the attack surfaces inherently in its design. Infrastructure management, as described in the section link:ncvs-gc-service-operation.html[“Service operation,”] is handled by a dedicated team and is automated to reduce the number of times a human actually touches configurations, which helps reduce the number of intentional and unintentional errors. Networking is fenced off so that only necessary services can access one another. Encryption is baked into the data storage and only the data plane needs security attention from Cloud Volumes Service administrators. By hiding most of the management behind an API interface, security is achieved by limiting the attack surfaces.
+
+== Zero Trust model
+
+Historically, IT security philosophy has been to trust but verify, and manifested as relying solely on external mechanisms (such as firewalls and intrusion detection systems) to mitigate threats. However, attacks and breaches evolved to bypass the verification in environments through phishing, social engineering, insider threats and other methods that provide the verification to enter networks and wreak havoc.
+
+Zero Trust has become a new methodology in security, with the current mantra being “trust nothing while still verifying everything.” Therefore, nothing is allowed access by default. This mantra is enforced in a variety of ways, including standard firewalls and intrusion detection systems (IDS) and also with the following methods:
+
+* Strong authentication methods (such as AES-encrypted Kerberos or JWT tokens)
+* Single strong sources of identities (such as Windows Active Directory, Lightweight Directory Access Protocol (LDAP), and Google IAM)
+* Network segmentation and secure multitenancy (only tenants are allowed access by default)
+* Granular access controls with Least Privileged Access policies
+* Small exclusive lists of dedicated, trusted administrators with digital audit and paper trails
+
+Cloud Volumes Service running in Google Cloud adheres to the Zero Trust model by implementing the "trust nothing, verify everything" stance.
+
+== Encryption
+
+Encrypt data at-rest (see the section link:ncvs-gc-data-encryption-at-rest.html[“Data encryption at rest”]) by using XTS-AES-256 ciphers with NetApp Volume Encryption (NVE) and in-flight with link:ncvs-gc-data-encryption-in-transit.html#nas-protocols#smb-encryption[“SMB encryption”] or NFS Kerberos 5p support. Rest easy knowing cross-region replication transfers are protected by TLS 1.2 encryption (see the section link:ncvs-gc-security-considerations-and-attack-surfaces.html#detection,-prevention-and-mitigation-of-ransomeware,-malware,-and-viruses#cross-region-replication[“Cross-region replication”]). In addition, Google networking also provides encrypted communications (see the section link:ncvs-gc-data-encryption-in-transit.html[“Data encryption in transit”]) for an added layer of protection against attacks. For more information about transport encryption, see the section link:ncvs-gc-data-encryption-in-transit.html#google-cloud-network[“Google Cloud network”].
+
+== Data protection and backups
+
+Security isn’t just about the prevention of attacks. It is also about how we recover from attacks if or when they occur. This strategy includes data protection and backups. Cloud Volumes Service provides methods to replicate to other regions in case of outages (see the section link:ncvs-gc-security-considerations-and-attack-surfaces.html#detection,-prevention-and-mitigation-of-ransomeware,-malware,-and-viruses#cross-region-replication[“Cross-region replication”]) or if a dataset is affected by a ransomware attack. It can also perform asynchronous backups of data to locations outside of the Cloud Volumes Service instance by using link:ncvs-gc-security-considerations-and-attack-surfaces.html#detection,-prevention-and-mitigation-of-ransomeware,-malware,-and-viruses#cloud-volumes-service-backup[Cloud Volumes Service backup]. With regular backups, mitigation of security events can take less time and save money and angst for administrators.
+
+== Fast ransomware mitigation with industry leading Snapshot copies
+
+In addition to data protection and backups, Cloud Volumes Service provides support for immutable Snapshot copies (see the section link:ncvs-gc-security-considerations-and-attack-surfaces.html#detection,-prevention-and-mitigation-of-ransomeware,-malware,-and-viruses#immutable-snapshot-copies[“Immutable Snapshot copies”]) of volumes that allow recovery from ransomware attacks (see the section link:ncvs-gc-service-operation.html[“Service operation”]) within seconds of discovering the issue and with minimal disruption. Recovery time and effects depend on the Snapshot schedule, but you can create Snapshot copies that provide as little as one-hour deltas in ransomware attacks. Snapshot copies have a negligible effect on performance and capacity usage and are a low-risk, high-reward approach to protecting your datasets.
