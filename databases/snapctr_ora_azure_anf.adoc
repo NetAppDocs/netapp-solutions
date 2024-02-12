@@ -208,50 +208,53 @@ A NetApp snapshot backup creates a point-in-time image of the database volumes t
 
 . Navigating to `Resources` tab, which lists the databases discovered once SnapCenter plugin installed on database VM. Initially, the `Overall Status` of database shows as `Not protected`.  
 +
-image::snapctr_ora_azure_anf_backup_01.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_01.png["This image provides database backup for SnapCenter server"]
 
 . Click on `View` drop-down  to change to `Resource Group`. Click on `Add` sign on the right to add a Resource Group.
 +
-image::snapctr_ora_azure_anf_backup_02.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_02.png["This image provides database backup for SnapCenter server"]
 
 . Name your resource group, tags, and any custom naming.
 +
-image::snapctr_ora_azure_anf_backup_03.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_03.png["This image provides database backup for SnapCenter server"]
 
 . Add resources to your `Resource Group`. Grouping of similar resources can simplify database management in a large environment.
 +
-image::snapctr_ora_azure_anf_backup_04.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_04.png["This image provides database backup for SnapCenter server"]
 
 . Select the backup policy and set a schedule by click on '+' sign under `Configure Schedules`.
 +
-image::snapctr_ora_azure_anf_backup_05.png["This image provides database backup for SnapCenter server"]image::snapctr_ora_azure_anf_backup_06.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_05.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_06.png["This image provides database backup for SnapCenter server"]
 
 . If backup verification is not configured in policy, leave verification schedule as is. 
-+ image::snapctr_ora_azure_anf_backup_07.png["This image provides database backup for SnapCenter server"]
++ 
+image::snapctr_ora_azure_anf_bkup_07.png["This image provides database backup for SnapCenter server"]
   
 . In order to email a backup report and notification, a SMTP mail server is needed in the environment. Or leave it black if a mail server is not setup.
 +
-image::snapctr_ora_azure_anf_backup_08.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_08.png["This image provides database backup for SnapCenter server"]
 
 . Summary of new resource group.
 +
-image::snapctr_ora_azure_anf_backup_09.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_09.png["This image provides database backup for SnapCenter server"]
 
 . Repeat the above procedures to create a database archive log only backup with corresponding backup policy.
 +
-image::snapctr_ora_azure_anf_backup_10_1.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_10_1.png["This image provides database backup for SnapCenter server"]
 
 . Click on a resource group to reveal the resources it includes. Besides the scheduled backup job, an one-off backup can be triggered by click on `Backup Now`.
-image::snapctr_ora_azure_anf_backup_10.png["This image provides database backup for SnapCenter server"]
-image::snapctr_ora_azure_anf_backup_11.png["This image provides database backup for SnapCenter server"]
-
-. Click on the running job to open a monitoring window, which allow the operator to view the job status in real-time.
 +
-image::snapctr_ora_azure_anf_backup_12.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_10.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_11.png["This image provides database backup for SnapCenter server"]
 
-Snapshot backup set appears under database topology once a successful backup job finishes. A full database backup set includes a snapshot of the database data volumes and a snapshot of the database log volumes. A log-only backup only contains a snapshot of the database log volumes. 
+. Click on the running job to open a monitoring window, which allows the operator to track the job progress in real-time.
 +
-image::snapctr_ora_azure_anf_backup_13.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_bkup_12.png["This image provides database backup for SnapCenter server"]
+
+. A snapshot backup set appears under database topology once a successful backup job finishes. A full database backup set includes a snapshot of the database data volumes and a snapshot of the database log volumes. A log-only backup contains only a snapshot of the database log volumes. 
++
+image::snapctr_ora_azure_anf_bkup_13.png["This image provides database backup for SnapCenter server"]
 
 ====
 
@@ -260,48 +263,39 @@ image::snapctr_ora_azure_anf_backup_13.png["This image provides database backup 
 
 ====
 
-There are a total of five playbooks in the automation toolkit. Each performs different task blocks and serves different purposes.
+Database recovery via SnapCenter restores a snapshot copy of the database volume image point-in-time. The database is then rolled forward to a chosen point as allowed by available archive logs. The following section demonstrates the workflow of database recovery with SnapCenter UI. 
 
-      0-all_playbook.yml - execute playbooks from 1-4 in one playbook run.
-      1-ansible_requirements.yml - set up Ansible controller with required libs and collections.
-      2-linux_config.yml - execute Linux kernel configuration on Oracle DB servers.
-      4-oracle_config.yml - install and configure Oracle on DB servers and create a container database. 
-      5-destroy.yml - optional to undo the environment to dismantle all. 
+. From `Resource` tab, open the database `Primary Backup(s)` page. Choose the snapshot of database data volume, then click on `Restore` button to launch database recovery workflow. Note the SCN number in the backup sets if you like to run the recovery by Oracle SCN.
++
+image::snapctr_ora_azure_anf_restore_01.png["This image provides database restore for SnapCenter server"]
 
-There are three options to run the playbooks with the following commands. 
+. Select `Restore Scope`. For a container database, SnapCenter is flexible to perform a full container database (All Datafiles), pluggable databases, or tablespaces level restore. 
++
+image::snapctr_ora_azure_anf_restore_02.png["This image provides database restore for SnapCenter server"]
 
-. Execute all deployment playbooks in one combined run.
+. Select `Recovery Scope`. All logs mean to apply all available archive logs in the backup set. Point-in-time recovery by SCN or timestamp are also available.
 +
-[source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml
+image::snapctr_ora_azure_anf_restore_03.png["This image provides database restore for SnapCenter server"] 
 
-. Execute playbooks one at a time with the number sequence from 1-4.
+. The `PreOps` allows execution of scripts against database before restore/recovery operation.
 +
-[source, cli]] 
-ansible-playbook -i hosts 1-ansible_requirements.yml -u azureuser -e @vars/vars.yml
-+
-[source, cli] 
-ansible-playbook -i hosts 2-linux_config.yml -u azureuser -e @vars/vars.yml
-+
-[source, cli]
-ansible-playbook -i hosts 4-oracle_config.yml -u azureuser -e @vars/vars.yml
+image::snapctr_ora_azure_anf_restore_04.png["This image provides database restore for SnapCenter server"]
 
-. Execute 0-all_playbook.yml with a tag.
+. The `PostOps` allows execution of scripts against database after restore/recovery operation.
 +
-[source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml -t ansible_requirements
-+
-[source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml -t linux_config
-+
-[source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml -t oracle_config
+image::snapctr_ora_azure_anf_restore_05.png["This image provides database restore for SnapCenter server"]
 
-. Undo the environment
+. Notification via email if desired.
 +
-[source, cli]
-ansible-playbook -i hosts 5-destroy.yml -u azureuser -e @vars/vars.yml
+image::snapctr_ora_azure_anf_restore_06.png["This image provides database restore for SnapCenter server"]
 
+. Job summary
++
+image::snapctr_ora_azure_anf_restore_07.png["This image provides database restore for SnapCenter server"]
+
+. Click on running job to open `Job Details` window. The job status can also be opened and viewed from the `Monitor` tab.
++
+image::snapctr_ora_azure_anf_restore_08.png["This image provides database restore for SnapCenter server"]
 
 ====
 
