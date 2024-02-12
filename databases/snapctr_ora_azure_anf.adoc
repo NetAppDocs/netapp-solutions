@@ -147,7 +147,7 @@ video::960fb370-c6e0-4406-b6d5-b110014130e8[panopto, title="Oracle Database Back
 
 ====
 
-We recommend to go through online SnapCenter software documentation before proceeding to SnapCenter installation and configuration: link:https://docs.netapp.com/us-en/snapcenter/index.html[SnapCenter Software documentation^]. Following provides a high level summary of steps for installation and setup of SnapCenter software for Oracle on Azure ANF. 
+We recommend to go through online link:https://docs.netapp.com/us-en/snapcenter/index.html[SnapCenter Software documentation^] before proceeding to SnapCenter installation and configuration: . Following provides a high level summary of steps for installation and setup of SnapCenter software for Oracle on Azure ANF. 
 
 . From SnapCenter Windows server, download and install latest java JDK from link:https://www.java.com/en/[Get Java for desktop applications^].
 
@@ -165,7 +165,7 @@ image::snapctr_ora_azure_anf_setup_02.png["This image provides online menu for S
 +
 image::snapctr_ora_azure_anf_setup_03.png["This image provides Hypervisor Settings for SnapCenter server"] 
 
-. If needed, adjust `Session Timeout` to the desired interval.
+. If needed, adjust `Session Timeout` for SnapCenter UI to the desired interval.
 +
 image::snapctr_ora_azure_anf_setup_04.png["This image provides Session Timeout for SnapCenter server"]
 
@@ -173,7 +173,7 @@ image::snapctr_ora_azure_anf_setup_04.png["This image provides Session Timeout f
 +
 image::snapctr_ora_azure_anf_setup_06.png["This image provides Settings-Users and Access for SnapCenter server"]
 
-. Roles tab list the built-in roles that can be assigned to different SnapCenter users. Custom roles also can be created by admin user with desired privileges.
+. The `Roles` tab list the built-in roles that can be assigned to different SnapCenter users. Custom roles also can be created by admin user with desired privileges.
 +
 image::snapctr_ora_azure_anf_setup_07.png["This image provides Roles for SnapCenter server"] 
 
@@ -204,17 +204,54 @@ image::snapctr_ora_azure_anf_setup_05.png["This image provides Settings-Policies
 
 ====
 
-. Ansible target `hosts` file configuration:
-+
-include::../_include/automation_ora_anf_nfs_hosts.adoc[]
+A NetApp snapshot backup creates a point-in-time image of the database volumes that you can use to restore in case of a system failure or data loss. Snapshot backups take very little time, usually less than a minute. The backup image consumes minimal storage space and incurs negligible performance overhead because it records only changes to files since the last snapshot copy was made. Following section demonstrates the implementation of snapshots for Oracle database backup in SnapCenter. 
 
-. Global `vars/vars.yml` file configuration
+. Navigating to `Resources` tab, which lists the databases discovered once SnapCenter plugin installed on database VM. Initially, the `Overall Status` of database shows as `Not protected`.  
 +
-include::../_include/automation_ora_anf_nfs_vars.adoc[]
+image::snapctr_ora_azure_anf_backup_01.png["This image provides database backup for SnapCenter server"]
 
-. Local DB server `host_vars/host_name.yml` configuration such as ora_01.yml, ora_02.yml ...
+. Click on `View` drop-down  to change to `Resource Group`. Click on `Add` sign on the right to add a Resource Group.
 +
-include::../_include/automation_ora_asa_iscsi_host_vars.adoc[]
+image::snapctr_ora_azure_anf_backup_02.png["This image provides database backup for SnapCenter server"]
+
+. Name your resource group, tags, and any custom naming.
++
+image::snapctr_ora_azure_anf_backup_03.png["This image provides database backup for SnapCenter server"]
+
+. Add resources to your `Resource Group`. Grouping of similar resources can simplify database management in a large environment.
++
+image::snapctr_ora_azure_anf_backup_04.png["This image provides database backup for SnapCenter server"]
+
+. Select the backup policy and set a schedule by click on '+' sign under `Configure Schedules`.
++
+image::snapctr_ora_azure_anf_backup_05.png["This image provides database backup for SnapCenter server"]image::snapctr_ora_azure_anf_backup_06.png["This image provides database backup for SnapCenter server"]
+
+. If backup verification is not configured in policy, leave verification schedule as is. 
++ image::snapctr_ora_azure_anf_backup_07.png["This image provides database backup for SnapCenter server"]
+  
+. In order to email a backup report and notification, a SMTP mail server is needed in the environment. Or leave it black if a mail server is not setup.
++
+image::snapctr_ora_azure_anf_backup_08.png["This image provides database backup for SnapCenter server"]
+
+. Summary of new resource group.
++
+image::snapctr_ora_azure_anf_backup_09.png["This image provides database backup for SnapCenter server"]
+
+. Repeat the above procedures to create a database archive log only backup with corresponding backup policy.
++
+image::snapctr_ora_azure_anf_backup_10_1.png["This image provides database backup for SnapCenter server"]
+
+. Click on a resource group to reveal the resources it includes. Besides the scheduled backup job, an one-off backup can be triggered by click on `Backup Now`.
+image::snapctr_ora_azure_anf_backup_10.png["This image provides database backup for SnapCenter server"]
+image::snapctr_ora_azure_anf_backup_11.png["This image provides database backup for SnapCenter server"]
+
+. Click on the running job to open a monitoring window, which allow the operator to view the job status in real-time.
++
+image::snapctr_ora_azure_anf_backup_12.png["This image provides database backup for SnapCenter server"]
+
+Snapshot backup set appears under database topology once a successful backup job finishes. A full database backup set includes a snapshot of the database data volumes and a snapshot of the database log volumes. A log-only backup only contains a snapshot of the database log volumes. 
++
+image::snapctr_ora_azure_anf_backup_13.png["This image provides database backup for SnapCenter server"]
 
 ====
 
