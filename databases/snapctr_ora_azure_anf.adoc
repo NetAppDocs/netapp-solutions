@@ -289,7 +289,7 @@ image::snapctr_ora_azure_anf_restore_05.png["This image provides database restor
 +
 image::snapctr_ora_azure_anf_restore_06.png["This image provides database restore for SnapCenter server"]
 
-. Job summary
+. Restore job summary
 +
 image::snapctr_ora_azure_anf_restore_07.png["This image provides database restore for SnapCenter server"]
 
@@ -304,7 +304,164 @@ image::snapctr_ora_azure_anf_restore_08.png["This image provides database restor
 
 ====
 
+Database clone via SnapCenter is accomplished by creating a new volume from a snapshot of a volume. The system uses the snapshot information to clone a new volume using the data on the volume when the snapshot was taken. More importantly, it is quick (a few minutes) and efficient compared with other methods to make a cloned copy of the production database to support development or testing. Thus, dramatically improve your database application lifecycle management. The following section demonstrates the workflow of database clone with SnapCenter UI.
 
+. From `Resource` tab, open the database `Primary Backup(s)` page. Choose the snapshot of database data volume, then click on `clone` button to launch database clone workflow.
++
+image::snapctr_ora_azure_anf_clone_01.png["This image provides database clone for SnapCenter server"]
+
+. Name the clone database SID. Optionally, for a container database, clone can be done at PDB level as well.
++
+image::snapctr_ora_azure_anf_clone_02.png["This image provides database clone for SnapCenter server"]
+
+. Select the DB server where you want to place your cloned database copy. Keep the default file locations unless you want to name them differently.
++
+image::snapctr_ora_azure_anf_clone_03.png["This image provides database clone for SnapCenter server"]
+
+. Identical Oracle software stack as in source database should have been installed and configured on clone DB host. Keep the default credential but change `Oracle Home Settings` to match with settings on clone DB host.
++
+image::snapctr_ora_azure_anf_clone_04.png["This image provides database clone for SnapCenter server"]
+
+. The `PreOps` allows execution of scripts before clone operation. Database parameters can be adjusted to meet a clone DB needs as versus a production database, such as reduced SGA target.  
++
+image::snapctr_ora_azure_anf_clone_05.png["This image provides database clone for SnapCenter server"]
+
+. The `PostOps` allows execution of scripts against database after clone operation. Clone database recovery can be SCN, timestamp based, or Until cancel (rolling forward database to last archived log in backup set).
++
+image::snapctr_ora_azure_anf_clone_06.png["This image provides database clone for SnapCenter server"]
+
+. Notification via email if desired.
++
+image::snapctr_ora_azure_anf_clone_07.png["This image provides database clone for SnapCenter server"]
+
+. Clone job summary.
++
+image::snapctr_ora_azure_anf_clone_08.png["This image provides database clone for SnapCenter server"]
+
+. Click on running job to open `Job Details` window. The job status can also be opened and viewed from the `Monitor` tab.
++
+image::snapctr_ora_azure_anf_clone_09.png["This image provides database restore for SnapCenter server"]
+
+. Cloned database registers with SnapCenter immediately.
++
+image::snapctr_ora_azure_anf_clone_10.png["This image provides database restore for SnapCenter server"]
+
+. Validate clone database on DB server host. For a cloned development database, database archive mode should be turned off.
++
+....
+
+[azureuser@ora-02 ~]$ sudo su
+[root@ora-02 azureuser]# su - oracle
+Last login: Tue Feb  6 16:26:28 UTC 2024 on pts/0
+
+[oracle@ora-02 ~]$ uname -a
+Linux ora-02 4.18.0-372.9.1.el8.x86_64 #1 SMP Fri Apr 15 22:12:19 EDT 2022 x86_64 x86_64 x86_64 GNU/Linux
+[oracle@ora-02 ~]$ df -h
+Filesystem                                       Size  Used Avail Use% Mounted on
+devtmpfs                                         7.7G     0  7.7G   0% /dev
+tmpfs                                            7.8G     0  7.8G   0% /dev/shm
+tmpfs                                            7.8G   49M  7.7G   1% /run
+tmpfs                                            7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/mapper/rootvg-rootlv                         22G   17G  5.6G  75% /
+/dev/mapper/rootvg-usrlv                          10G  2.0G  8.1G  20% /usr
+/dev/mapper/rootvg-homelv                       1014M   40M  975M   4% /home
+/dev/sda1                                        496M  106M  390M  22% /boot
+/dev/mapper/rootvg-varlv                         8.0G  958M  7.1G  12% /var
+/dev/sda15                                       495M  5.9M  489M   2% /boot/efi
+/dev/mapper/rootvg-tmplv                          12G  8.4G  3.7G  70% /tmp
+tmpfs                                            1.6G     0  1.6G   0% /run/user/54321
+172.30.136.68:/ora-02-u03                        250G  2.1G  248G   1% /u03
+172.30.136.68:/ora-02-u01                        100G   10G   91G  10% /u01
+172.30.136.68:/ora-02-u02                        250G  7.5G  243G   3% /u02
+tmpfs                                            1.6G     0  1.6G   0% /run/user/1000
+tmpfs                                            1.6G     0  1.6G   0% /run/user/0
+172.30.136.68:/ora-01-u02-Clone-020624161543077  250G  8.2G  242G   4% /u02_ntap1dev
+
+[oracle@ora-02 ~]$ cat /etc/oratab
+#
+# This file is used by ORACLE utilities.  It is created by root.sh
+# and updated by either Database Configuration Assistant while creating
+# a database or ASM Configuration Assistant while creating ASM instance.
+
+# A colon, ':', is used as the field terminator.  A new line terminates
+# the entry.  Lines beginning with a pound sign, '#', are comments.
+#
+# Entries are of the form:
+#   $ORACLE_SID:$ORACLE_HOME:<N|Y>:
+#
+# The first and second fields are the system identifier and home
+# directory of the database respectively.  The third field indicates
+# to the dbstart utility that the database should , "Y", or should not,
+# "N", be brought up at system boot time.
+#
+# Multiple entries with the same $ORACLE_SID are not allowed.
+#
+#
+NTAP2:/u01/app/oracle/product/19.0.0/NTAP2:Y
+# SnapCenter Plug-in for Oracle Database generated entry (DO NOT REMOVE THIS LINE)
+ntap1dev:/u01/app/oracle/product/19.0.0/NTAP2:N
+
+
+[oracle@ora-02 ~]$ export ORACLE_SID=ntap1dev
+[oracle@ora-02 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Tue Feb 6 16:29:02 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> select name, open_mode, log_mode from v$database;
+
+NAME      OPEN_MODE            LOG_MODE
+--------- -------------------- ------------
+NTAP1DEV  READ WRITE           ARCHIVELOG
+
+
+SQL> shutdown immediate;
+Database closed.
+Database dismounted.
+ORACLE instance shut down.
+SQL> startup mount;
+ORACLE instance started.
+
+Total System Global Area 3221223168 bytes
+Fixed Size                  9168640 bytes
+Variable Size             654311424 bytes
+Database Buffers         2550136832 bytes
+Redo Buffers                7606272 bytes
+Database mounted.
+
+SQL> alter database noarchivelog;
+
+Database altered.
+
+SQL> alter database open;
+
+Database altered.
+
+SQL> select name, open_mode, log_mode from v$database;
+
+NAME      OPEN_MODE            LOG_MODE
+--------- -------------------- ------------
+NTAP1DEV  READ WRITE           NOARCHIVELOG
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 NTAP1_PDB1                     MOUNTED
+         4 NTAP1_PDB2                     MOUNTED
+         5 NTAP1_PDB3                     MOUNTED
+
+SQL> alter pluggable database all open;
+
+....
 
 
 ====
