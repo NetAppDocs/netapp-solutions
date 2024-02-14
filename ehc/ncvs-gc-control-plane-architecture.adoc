@@ -1,0 +1,63 @@
+---
+sidebar: sidebar
+permalink: ehc/ncvs-gc-control-plane-architecture.html
+keywords: identity, access, management, authorization, permission, service accounts, cloud volumes service api, jwt tokens
+summary: All management actions to Cloud Volumes Service are done through API. Cloud Volumes Service management integrated into the GCP Cloud Console also uses the Cloud Volumes Service API.
+---
+= Control plane architecture
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2022-05-09 14:20:40.935365
+//
+
+[.lead]
+All management actions to Cloud Volumes Service are done through API. Cloud Volumes Service management integrated into the GCP Cloud Console also uses the Cloud Volumes Service API.
+
+== Identity and Access Management
+
+Identity and Access Management (https://cloud.google.com/iam/docs/overview[IAM^]) is a standard service that enables you to control authentication (logins) and authorization (permissions) to Google Cloud project instances. Google IAM provides a full audit trail of permissions authorization and removal. Currently Cloud Volumes Service does not provide control plane auditing.
+
+=== Authorization/permission overview
+
+IAM offers built-in, granular permissions for Cloud Volumes Service. You can find a https://cloud.google.com/architecture/partners/netapp-cloud-volumes/security-considerations?hl=en_US[complete list of granular permissions here^].
+
+IAM also offers two predefined roles called `netappcloudvolumes.admin` and `netappcloudvolumes.viewer`. These roles can be assigned to specific users or service accounts.
+
+Assign appropriate roles and permission to allow IAM users to manage Cloud Volumes Service.
+
+Examples for using granular permissions include the following:
+
+* Build a custom role with only get/list/create/update permissions so that users cannot delete volumes.
+* Use a custom role with only `snapshot.*` permissions to create a service account that is used to build application- consistent Snapshot integration.
+* Build a custom role to delegate `volumereplication.*` to specific users.
+
+=== Service accounts
+
+To make Cloud Volumes Service API calls through scripts or https://registry.terraform.io/providers/NetApp/netapp-gcp/latest/docs[Terraform^], you must create a service account with the `roles/netappcloudvolumes.admin` role. You can use this service account to generate the JWT tokens required to authenticate Cloud Volumes Service API requests in two different ways:
+
+* Generate a JSON key and use Google APIs to derive a JWT token from it. This is the simplest approach, but it involves manual secrets (the JSON key) management.
+* Use https://cloud.google.com/iam/docs/impersonating-service-accounts[Service account impersonation^] with `roles/iam.serviceAccountTokenCreator`. The code (script, Terraform, and so on.) runs with https://google.aip.dev/auth/4110[Application Default Credentials^] and impersonates the service account to gain its permissions. This approach reflects Google security best practices.
+
+See https://cloud.google.com/architecture/partners/netapp-cloud-volumes/api?hl=en_US[Creating your service account and private key^] in the Google cloud documentation for more information.
+
+== Cloud Volumes Service API
+
+Cloud Volumes Service API uses a REST-based API by using HTTPS (TLSv1.2) as the underlying network transport. You can find the latest API definition https://cloudvolumesgcp-api.netapp.com/swagger.json[here^] and information about how to use the API at https://cloud.google.com/architecture/partners/netapp-cloud-volumes/api?hl=en_US[Cloud Volumes APIs in the Google cloud documentation^].
+
+The API endpoint is operated and secured by NetApp using standard HTTPS (TLSv1.2) functionality.
+
+=== JWT tokens
+
+Authentication to the API is performed with JWT bearer tokens (https://datatracker.ietf.org/doc/html/rfc7519[RFC-7519^]). Valid JWT tokens must be obtained by using Google Cloud IAM authentication. This must be done by fetching a token from IAM by providing a service account JSON key.
+
+== Audit logging
+
+Currently, no user-accessible control plane audit logs are available.
+
