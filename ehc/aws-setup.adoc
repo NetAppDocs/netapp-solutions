@@ -1,0 +1,151 @@
+---
+sidebar: sidebar
+permalink: ehc/aws-setup.html
+keywords: NetApp Solutions, amazon, aws, vmc, vmware managed cloud, enterprise, hybrid, cloud, config, configuration,
+summary:
+---
+
+= Deploy and configure the Virtualization Environment on AWS
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+As with on-premises, planning VMware Cloud on AWS is critical for a successful production-ready environment for creating VMs and migration.
+
+This section describes how to set up and manage VMware Cloud on AWS SDDC and use it in combination with the available options for connecting NetApp storage.
+
+NOTE: In-guest storage is currently the only supported method of connecting Cloud Volumes ONTAP (CVO) to AWS VMC.
+
+The setup process can be broken down into the following steps:
+
+.Deploy and configure VMware Cloud for AWS
+[%collapsible]
+====
+
+link:https://www.vmware.com/products/vmc-on-aws.html[VMware Cloud on AWS] provides for a cloud native experience for VMware based workloads in the AWS ecosystem. Each VMware Software-Defined Data Center (SDDC) runs in an Amazon Virtual Private Cloud (VPC) and provides a full VMware stack (including vCenter Server), NSX-T software-defined networking, vSAN software-defined storage, and one or more ESXi hosts that provide compute and storage resources to your workloads.
+
+This section describes how to set up and manage VMware Cloud on AWS and use it in combination with Amazon FSx for NetApp ONTAP and/or Cloud Volumes ONTAP on AWS with in-guest storage.
+
+NOTE: In-guest storage is currently the only supported method of connecting Cloud Volumes ONTAP (CVO) to AWS VMC.
+
+The setup process can be broken down into three parts:
+
+.Register for an AWS Account
+[%collapsible]
+=====
+Register for an link:https://aws.amazon.com/[Amazon Web Services Account].
+
+You need an AWS account to get started, assuming there isn’t one created already. New or existing, you need administrative privileges in the account for many steps in this procedure. See this link:https://docs.aws.amazon.com/general/latest/gr/aws-security-credentials.html[link] for more information regarding AWS credentials.
+=====
+
+.Register for a My VMware Account
+[%collapsible]
+=====
+Register for a link:https://customerconnect.vmware.com/home[My VMware] account.
+
+For access to VMware’s cloud portfolio (including VMware Cloud on AWS), you need a VMware customer account or a My VMware account. If you have not already done so, create a VMware account link:https://customerconnect.vmware.com/account-registration[here].
+=====
+
+.Provision SDDC in VMware Cloud
+[%collapsible]
+=====
+After the VMware account is configured and proper sizing is performed, deploying a Software-Defined Data Center is the obvious next step for using the VMware Cloud on AWS service. To create an SDDC, pick an AWS region to host it, give the SDDC a name, and specify how many ESXi hosts you want the SDDC to contain. If you don't already have an AWS account, you can still create a starter configuration SDDC that contains a single ESXi host.
+
+. Log into the VMware Cloud Console using your existing or newly created VMware credentials.
++
+image:aws-config-1.png[]
+
+. Configure the AWS region, deployment, and host type and the SDDC name:
++
+image:aws-config-2.png[]
+
+. Connect to the desired AWS account and execute the AWS Cloud Formation stack.
++
+image:aws-config-3.png[]
+image:aws-config-4.png[]
+image:aws-config-5.png[]
+image:aws-config-6.png[]
++
+NOTE: Single-host configuration is used in this validation.
+
+. Select the desired AWS VPC to connect the VMC environment with.
++
+image:aws-config-7.png[]
+
+. Configure the VMC Management Subnet; this subnet contains VMC-managed services like vCenter, NSX, and so on. Do not choose an overlapping address space with any other networks that need connectivity to the SDDC environment. Finally, follow the recommendations for CIDR size notated below.
++
+image:aws-config-8.png[]
+
+. Review and acknowledge the SDDC configuration, and then click deploy the SDDC.
++
+image:aws-config-9.png[]
++
+The deployment process typically takes approximately two hours to complete.
++
+image:aws-config-10.png[]
+
+. After completion, the SDDC is ready for use.
++
+image:aws-config-11.png[]
+
+For a step-by-step guide on SDDC deployment, see link:https://docs.vmware.com/en/VMware-Cloud-on-AWS/services/com.vmware.vmc-aws-operations/GUID-EF198D55-03E3-44D1-AC48-6E2ABA31FF02.html[Deploy an SDDC from the VMC Console].
+=====
+====
+
+.Connect VMware Cloud to FSx ONTAP
+[%collapsible]
+====
+
+To connect VMware Cloud to FSx ONTAP, complete the following steps:
+
+. With VMware Cloud deployment completed and connected to AWS VPC, you must deploy Amazon FSx for NetApp ONTAP into a new VPC rather than the original connected VPC (see the screenshot below). FSx (NFS and SMB floating IPs) is not accessible if it is deployed in the connected VPC. Keep in mind that ISCSI endpoints like Cloud Volumes ONTAP work just fine from the connected VPC.
++
+image:aws-connect-fsx-1.png[]
+
+. Deploy an additional VPC in the same region, and then deploy Amazon FSx for NetApp ONTAP into the new VPC.
++
+Configuration of an SDDC group in the VMware Cloud console enables the networking configuration options required to connect to the new VPC where FSx is deployed. In step 3, verify that “Configuring VMware Transit Connect for your group will incur charges per attachment and data transfers” is checked, and then choose Create Group. The process can take a few minutes to complete.
++
+image:aws-connect-fsx-2.png[]
+image:aws-connect-fsx-3.png[]
+image:aws-connect-fsx-4.png[]
+
+. Attach the newly created VPC to the just created SDDC group. Select the External VPC tab and follow the link:https://docs.vmware.com/en/VMware-Cloud-on-AWS/services/com.vmware.vmc-aws-operations/GUID-A3D03968-350E-4A34-A53E-C0097F5F26A9.html[instructions for attaching an External VPC] to the group. This process can take 10 to 15 minutes to complete.
++
+image:aws-connect-fsx-5.png[]
+image:aws-connect-fsx-6.png[]
+
+. As part of the external VPC process, you are prompted through the AWS console to a new shared resource via the Resource Access Manager. The shared resource is the link:https://aws.amazon.com/transit-gateway[AWS Transit Gateway] managed by VMware Transit Connect.
++
+image:aws-connect-fsx-7.png[]
+image:aws-connect-fsx-8.png[]
+
+. Create the Transit Gateway Attachment.
++
+image:aws-connect-fsx-9.png[]
+
+. Back on the VMC Console, Accept the VPC attachment. This process can take approximately 10 minutes to complete.
++
+image:aws-connect-fsx-10.png[]
+
+. While in the External VPC tab, click the edit icon in the Routes column and add in the following required routes:
++
+* A route for the floating IP range for Amazon FSx for NetApp ONTAP link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/supported-fsx-clients.html[floating IPs].
+* A route for the floating IP range for Cloud Volumes ONTAP (if applicable).
+* A route for the newly created external VPC address space.
++
+image:aws-connect-fsx-11.png[]
+
+. Finally, allow bidirectional traffic link:https://docs.vmware.com/en/VMware-Cloud-on-AWS/services/com.vmware.vmc-aws-operations/GUID-DE330202-D63D-408A-AECF-7CDC6ADF7EAC.html[firewall rules] for access to FSx/CVO. Follow these link:https://docs.vmware.com/en/VMware-Cloud-on-AWS/services/com.vmware.vmc-aws-operations/GUID-DE330202-D63D-408A-AECF-7CDC6ADF7EAC.html[detailed steps] for compute gateway firewall rules for SDDC workload connectivity.
++
+image:aws-connect-fsx-12.png[]
+
+. After the firewall groups are configured for both the Management and Compute gateway, the vCenter can be accessed as follows:
++
+image:aws-connect-fsx-13.png[]
+
+The next step is to verify that Amazon FSx ONTAP or Cloud Volumes ONTAP is configured depending on your requirements and that the volumes are provisioned to offload storage components from vSAN to optimize the deployment.
+====
