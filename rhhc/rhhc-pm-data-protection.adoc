@@ -65,8 +65,7 @@ video::01dd455e-7f5a-421c-b501-b01200fa91fd[panopto, title="Snapshot/Restore for
 11.	Restore from a snapshot using ACS.
 12.	Verify your app has been restored form the snapshot.
 
-
-==== **1. Create an admin user and login to the cluster**
+==== **Create an admin user and login to the cluster**
 
 Access the ROSA cluster by creating an admin user  with the following command : (You need to create an admin user only if you did not create one at the time of installation)
 
@@ -88,12 +87,12 @@ Install Astra Trident (latest version) on the ROSA cluster. To do this, you can 
 
 image:rhhc-trident-project-create.png[]
 
-Then from the Developer view, create a Helm chart repository. For the URL field use `https://netapp.github.io/trident-helm-chart`. Then create a helm release for Trident operator.
+Then from the Developer view, create a Helm chart repository. For the URL field use `'https://netapp.github.io/trident-helm-chart'`. Then create a helm release for Trident operator.
 
 image:rhhc-helm-repo-create.png[]
 image:rhhc-helm-release-create.png[]
 
-Verify all trident pods were running by going back to the Administrator view on the console and selecting pods in the trident project.
+Verify all trident pods are running by going back to the Administrator view on the console and selecting pods in the trident project.
 
 image:rhhc-trident-installed.png[]
 
@@ -101,12 +100,13 @@ image:rhhc-trident-installed.png[]
 
 Use the yaml files shown below to create a trident backend object, storage class object and the Volumesnapshot object. Be sure to provide the credentials to your Amazon FSx for NetApp ONTAP file system you created, the management LIF and the vserver name of your file system in the configuration yaml for the backend. To get those details, go to the AWS console for Amazon FSx and select the file system, navigate to the Administration tab. Also, click on update to set the password for the `fsxadmin` user.
 
-Note: You can use the command line to create the objects or create them with the yaml files from the hybrid cloud console. 
+NOTE: You can use the command line to create the objects or create them with the yaml files from the hybrid cloud console. 
 
 image:rhhc-fsx-details.png[]
 
 **Trident Backend Configuration**
-[source]
+[source,yaml]
+----
 apiVersion: v1
 kind: Secret
 metadata:
@@ -128,9 +128,11 @@ spec:
   svm: fsx
   credentials:
     name: backend-tbc-ontap-nas-secret
+----
 
 **Storage Class**
-[source, cli]
+[source,yaml]
+----
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -142,14 +144,18 @@ parameters:
   provisioningType: "thin"
   snapshots: "true"
 allowVolumeExpansion: true
+----
 
 **snapshot class**
+[source,yaml]
+----
 apiVersion: snapshot.storage.k8s.io/v1 
 kind: VolumeSnapshotClass
 metadata:
   name: trident-snapshotclass
 driver: csi.trident.netapp.io
 deletionPolicy: Delete
+----
 
 Verify that the backend, storage class and the trident-snapshotclass objects are created by issuing the commands shown below.
 
@@ -157,7 +163,8 @@ image:rhhc-tbc-sc-verify.png[]
 
 At this time, an important modification you need to make is to set ontap-nas as the default storage class instead of gp3 so that the postgresql app you deploy later can use the default storage class. In the Openshift console of your cluster, under Storage select StorageClasses. Edit the annotation of the current default class to be false and add the annotation storageclass.kubernetes.io/is-default-class set to  true for the ontap-nas storage class.
 
-image:change-default-sc.png[]
+image:rhhc-change-default-sc.png[]
+
 image:rhhc-default-sc.png[]
 
 ==== **5. Deploy a postgresql application on the cluster**
