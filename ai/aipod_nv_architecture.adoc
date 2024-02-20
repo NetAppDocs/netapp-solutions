@@ -1,0 +1,50 @@
+---
+sidebar: sidebar
+permalink: ai/aipod_nv_architecture.html
+keywords: NetApp AI, AI, Artificial Intelligence, ML, Machine Learning, NVIDIA, NVIDIA AI Enterprise, NVIDIA BasePOD, NVIDIA DGX
+summary: NetApp AI Pod with NVIDIA DGX Systems - Architecture
+---
+
+= NetApp AI Pod with NVIDIA DGX Systems - Architecture
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+link:aipod_nv_sw_components.html[Previous: ONTAP AI - Software Components.]
+
+This reference architecture leverages separate fabrics for compute cluster interconnect and storage access, with options for NDR200 and HDR200 Infiniband (IB)connectivity between compute nodes. DGX H100 systems come with ConnectX-7 cards pre-installed for NDR IB connectivity, while DGX A100 systems may use ConnectX-6 or ConnectX-7 cards for HDR or NDR connectivity respectively. 
+
+== ONTAP AI with DGX H100 systems
+
+The drawing below shows the overall solution topology when using DGX H100 systems with ONTAP AI. 
+
+image:oai_H100_topo.png[Error: Missing Graphic Image]
+
+In this configuration the compute cluster network uses a pair of QM9700 NDR IB switches, which are connected together for high availability. Each DGX H100 system is connected to the switches using eight NDR200 connections, with even-numbered ports connected to one switch and odd-numbered ports connected to the other switch. 
+
+For storage system access, in-band management and client access, a pair of SN4600 Ethernet switches is used. The switches are connected with inter-switch links and configured with multiple VLANs to isolate the various traffic types. For larger deployments the ethernet network can be expanded to a leaf-spine configuration by adding additional switch pairs for a spine and additional leaves as needed. Each DGX A100 system is provisioned with two dual-ported ConnectX-6 cards for ethernet and storage traffic, and for this solution all four ports are connected to the SN4600 Ethernet switches at 200 Gbps. One port from each card is configured into a LACP MLAG bond with one port connected to each switch, and VLANs for in-band management, client access, and user-level storage access are hosted on this bond. The other port on each card is used independently in separate dedicated RoCE storage VLANs for connectivity to the AFF A800 storage system, and these ports support high-performance storage access using NFS v3, NFSv4.x with pNFS, and NFS over RDMA. 
+
+In addition to the compute interconnect and high-speed ethernet networks, all of the physical devices are also connected to one or more SN2201 Ethernet switches for out of band management.  For more details on DGX A100 system connectivity please refer to the link:https://nvdam.widen.net/s/nfnjflmzlj/nvidia-dgx-basepod-reference-architecture[NVIDIA BasePOD documentation]. 
+
+== ONTAP AI with DGX A100 systems
+
+The drawing below shows the overall solution topology when using DGX A100 systems and an HDR compute fabric with ONTAP AI. 
+
+image:oai_A100_topo.png[Error: Missing Graphic Image]
+
+In this configuration the compute cluster network uses a pair of QM8700 HDR IB switches, which are connected together for high availability. Each DGX A100 system is connected to the switches using four single-ported ConnectX-6 cards at 200 Gbps, with even-numbered ports connected to one switch and odd-numbered ports connected to the other switch. 
+
+For storage system access, in-band management and client access, a pair of SN4600 Ethernet switches is used. The switches are connected with inter-switch links and configured with multiple VLANs to isolate the various traffic types. For larger deployments the ethernet network can be expanded to a leaf-spine configuration by adding additional switch pairs for a spine and additional leaves as needed. Each DGX A100 system is provisioned with two dual-ported ConnectX-6 cards for ethernet and storage traffic, and for this solution all four ports are connected to the SN4600 Ethernet switches at 200 Gbps. One port from each card is configured into a LACP MLAG bond with one port connected to each switch, and VLANs for in-band management, client access, and user-level storage access are hosted on this bond. The other port on each card is used independently in separate dedicated RoCE storage VLANs for connectivity to the AFF A800 storage system, and these ports support high-performance storage access using NFS v3, NFSv4.x with pNFS, and NFS over RDMA. 
+
+In addition to the compute interconnect and high-speed ethernet networks, all of the physical devices are also connected to one or more SN2201 Ethernet switches for out of band management.  For more details on DGX A100 system connectivity please refer to the link:https://nvdam.widen.net/s/nfnjflmzlj/nvidia-dgx-basepod-reference-architecture[NVIDIA BasePOD documentation]. 
+
+== Management plane servers
+
+This reference architecture also includes five CPU-based servers for management plane uses. Two of these systems are used as the head nodes for Base Command Manager for cluster deployment and management. The other three systems are used to provide additional cluster services such as Kubernetes master nodes or login nodes for deployments utilizing Slurm for job scheduling. Deployments utilizing Kubernetes can leverage the NetApp Astra Trident CSI driver to provide automated provisioning and data services with persistent storage for both management and AI workloads on the AFF A800 storage system. 
+
+Each server is physically connected to both the IB switches and ethernet switches to enable cluster deployment and management, and configured with NFS mounts to the storage system via the management SVM for storage of cluster management artifacts as described earlier. 
+
+ 
+link:aipod_nv_storage.html[Next: NetApp AI Pod with NVIDIA DGX Systems - Storage System Design and Sizing Guidance.]
