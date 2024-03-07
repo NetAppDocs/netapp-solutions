@@ -1,0 +1,85 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-n_use_case_openshift_virtualization_vm_migration_using_mtv
+.html
+keywords: OpenShift, OCP, Astra Trident, NetApp ONTAP, Red Hat OpenShift, OpenShift Virtualization, Migration Toolkit for OpenShift Virtualization, MTV, CNV, Container Native Virtualization, Red Hat OpenShift Virtualization
+summary: Red Hat OpenShift Virtualization with NetApp ONTAP
+---
+= Workflows: Red Hat OpenShift Virtualization with NetApp ONTAP
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+== Migration of VM from VMware to OpenShift Virtualization using Migration Toolkit for Virtualization
+
+In this section, we will see how to use the Migration Toolkit for Virtualization (MTV) to migrate virtual machines from VMware to OpenShift Virtualization running on OpenShift Container platform that is integrated with NetApp ONTAP storage using Astra Trident. 
+
+This following video shows a demonstration of the migration of the RHEL VM from VMware to OpenShift Virtualization using ontap-san for persistent storage. 
+
+video::ba7ed462-a208-4e5a-b4f0-b12b015dc18d[panopto, title="Using Red Hat MTV to migrate VMs to OpenShift Virtualization with NetApp ONTAP Storage", width=360]
+
+=== Prerequisites
+
+==== *On VMware*
+* A RHEL 9 VM using rhel 9.3 with the following configurations were installed:
+** CPU: 2, Memory: 20 GB, Hard disk: 20 GB 
+** user credentials: root user and an admin user credentials 
+* After the VM was ready, postgresql server was installed with
+** 2 databases, 1 table and 1 row in the table were added. Refer to the link:https://access.redhat.com/documentation/fr-fr/red_hat_enterprise_linux/9/html/configuring_and_using_database_servers/installing-postgresql_using-postgresql[instructionsfor installing postgresql server and creating database and table entries].
+
+==== *On OpenShift Cluster*
+The following installations were completed before installing MTV.
+
+* OpenShift Cluster 4.13.34 
+* Astra Trident 23.10
+* Multipath on the cluster nodes enabled for iSCSI (for ontap-san storage class). See the provided yaml to create a daemon set that enables iSCSI on each node in the cluster. 
+* Trident backend and Storage class for ontap SAN using iSCSI. See the provided yaml files for trident backend and storage class.
+* OpenShift Virtualization 
+
+==== *Install MTV*
+Now you can install the Migration Toolkit for virtualization (MTV). Refer to the instructions provided link:https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization/2.5/html/installing_and_using_the_migration_toolkit_for_virtualization/installing-the-operator[here] to help with the installation.
+
+The Migration Toolkit for Virtualization (MTV) user interface is integrated into the OpenShift web console.
+You can refer link:https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization/2.5/html/installing_and_using_the_migration_toolkit_for_virtualization/migrating-vms-web-console#mtv-ui_mtv[here] to start using the user interface for various tasks.
+
+*Source Provider*
+In order to migrate the RHEL VM from VMware to OpenShift Virtualization, you need to first create the source provider for VMware. Refer to the instructions link:https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization/2.5/html/installing_and_using_the_migration_toolkit_for_virtualization/migrating-vms-web-console#adding-providers[here] to create the source provider.
+
+You need the following to create your VMware source provider:
+
+* VCenter url
+* VCenter Credentials
+* VCenter server thumbprint
+* VDDK image in a repository
+
+NOTE: The Migration Toolkit for Virtualization (MTV) uses the VMware Virtual Disk Development Kit (VDDK) SDK to accelerate transferring virtual disks from VMware vSphere. Therefore, creating a VDDK image, although optional, is highly recommended.
+To make use of this feature, you download the VMware Virtual Disk Development Kit (VDDK), build a VDDK image, and push the VDDK image to your image registry.
+
+Follow the instructions provided link:https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization/2.5/html/installing_and_using_the_migration_toolkit_for_virtualization/prerequisites#creating-vddk-image_mtv[here] to create and push the VDDK image to a registry accessible from the OpenShift Cluster.
+
+*Destination provider*
+
+The host cluster is automatically added as the OpenShift virtualization provider is the source provider.
+
+*Migration Plan*
+
+Follow the instructions provided link:https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization/2.5/html/installing_and_using_the_migration_toolkit_for_virtualization/migrating-vms-web-console#creating-migration-plan_mtv[here] to create a migration plan. 
+
+While creating a plan, you need to create the following if not already created:
+* A network mapping to map the source network to the target network.
+* A storage mapping to map the source datastore to the target storage class. For this you can choose ontap-san storage class.
+Once the migration plan is created, the status of the plan should show *Ready* and you should now be able to *Start* the plan.
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_ready.png[]
+
+Clicking on Start will run through a sequence of steps to complete the migration of the VM.
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_complete.png[]
+
+When all steps are completed, you can see the migrated VMs  by clicking on the virtual machines under Virtualization in the left-side  navigation menu.
+Instructions to access the virtual machines are provided link:https://docs.openshift.com/container-platform/4.13/virt/virtual_machines/virt-accessing-vm-consoles.html[here].
+
+You can log into the virtual machine and verify the contents of the posgresql databases. The databases, tables and the entries in the table should be the same as what was created on the source VM. 
+
