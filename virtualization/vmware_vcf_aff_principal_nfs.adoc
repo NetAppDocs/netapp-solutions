@@ -21,9 +21,10 @@ In this scenario we will demonstrate how to configure NFS datastores as principa
 
 This scenario covers the following high level steps:
 
-* Verify networking for the ONTAP storage virtual machine (SVM) and create a logical interface (lif), if necessary, to carry the NFS traffic.
+* Verify networking for the ONTAP storage virtual machine (SVM) and that a logical interface (LIF), is present to carry the NFS traffic.
 * Create an export policy to allow the ESXi hosts access to the NFS volume.
 * Create an NFS volume on the ONTAP storage system.
+* Create a Network Pool for NFS and vMotion traffic in VCF Cloud Manager.
 * During VI Workload Domain deployment configuration, specify the information to connect to the NFS volume.
 * Monitor the storage validation and workload domain deployment.
 * Verify that the NFS datastore was created. 
@@ -31,49 +32,41 @@ This scenario covers the following high level steps:
 === Prerequisites
 This scenario requires the following components and configurations:
 
-* VCF installation and access to the Cloud Manager interface.
+* NetApp AFF storage system with a storage virtual machine (SVM) configured to allow NFS traffic.
+* Logical interface (LIF) has been created on the IP network that is to carry NFS traffic and is associated with the SVM.
+* VCF management domain deployment is complete and the Cloud Manager interface is accessible.
 * 4 x ESXi hosts commissioned within Cloud Manager and ready for Workload Domain deployment.
 * IP addresses reserved for NFS storage traffic on the VLAN or network segment established for this purpose.
 
-For information on configuring ONTAP storage system refer to the link:https://docs.netapp.com/us-en/ontap/ [ONTAP 9 Documentation] center.
+[NOTE]
+When deploying a VI Workload Domain, VCF validates connectivity to the NFS Server. This is done using the management adapter on the ESXi hosts before any additional vmkernel adapter is added with the NFS IP address. Therefore, it is necessary to ensure that either 1) the management network is routable to the NFS Server, or 2) a LIF for the management network has been added to the SVM hosting the NFS datastore volume, to ensure that the validation can proceed.
+
+For information on configuring ONTAP storage system refer to the link:https://docs.netapp.com/us-en/ontap[ONTAP 9 Documentation] center.
 
 For information on configuring VCF refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation].
 
 === Deployment Steps
 To deploy a VI Workload Domain with an NFS datastore as principal storage, complete the following steps:
 
-.Verify Networking for SVM
+.Verify networking for ONTAP SVM
 [%collapsible]
 ==== 
-Begin by logging into the BlueXP web console and navigating to the Canvas.
+Verify that the required logical interfaces have been established for the network that will carry NFS traffic between the ONTAP storage cluster and VI Workload Domain.
 
-. Drag and drop the source (primary) ONTAP storage system onto the destination (secondary) ONTAP storage system.
+. From ONTAP System Manager navigate to *Storage VMs* in the lefthand menu and click on the SVM to be used for NFS traffic. On the *Overview* tab, under *NETWORK IP INTERFACES*, click on the numeric to the right of *NFS*. In the list verify that the required LIF IP addresses are listed.
 +
-image::bxp-scv-hybrid-41.png[Drag and drop storage systems]
+image:vmware-vcf-aff-image03.png[Verify LIFs for SVM]
 
-. From the menu that appears select *Replication*.
-+
-image::bxp-scv-hybrid-42.png[Select replication]
+Alternately, verify the LIFs associated with an SVM from the ONTAP CLI with the following command:
 
-. On the *Destination Peering Setup* page select the destination Intercluster LIFs to be used for the connection between storage systems.
-+
-image::bxp-scv-hybrid-43.png[Choose Intercluster LIFs]
-====
+[source, cli]
+network interface show -vserver <SVM_NAME>
 
-.Create Network Pool in Cloud Manager
-[%collapsible]
-==== 
-Begin by logging into the BlueXP web console and navigating to the Canvas.
+. Verify that the ESXi host can communicate to the ONTAP NFS Server. Log into the ESXi host via SSH and ping the SVM LIF:
 
-. Drag and drop the source (primary) ONTAP storage system onto the destination (secondary) ONTAP storage system.
-+
-image::bxp-scv-hybrid-41.png[Drag and drop storage systems]
+[source, cli]
+vmkping <IP Address>
 
-. From the menu that appears select *Replication*.
-+
-image::bxp-scv-hybrid-42.png[Select replication]
-
-. On the *Destination Peering Setup* page select the destination Intercluster LIFs to be used for the connection between storage systems.
-+
-image::bxp-scv-hybrid-43.png[Choose Intercluster LIFs]
+[NOTE]
+When deploying a VI Workload Domain, VCF validates connectivity to the NFS Server. This is done using the management adapter on the ESXi hosts before any additional vmkernel adapter is added with the NFS IP address. Therefore, it is necessary to ensure that either 1) the management network is routable to the NFS Server, or 2) a LIF for the management network has been added to the SVM hosting the NFS datastore volume, to ensure that the validation can proceed.
 ====
