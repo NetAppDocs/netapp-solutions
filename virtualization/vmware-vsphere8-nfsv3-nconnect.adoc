@@ -14,32 +14,32 @@ summary:
 
 == Overview
 [.lead]
-Customers using NFS version 3 Datastore can now increase the number of connections to NFS server thus maximizing the utilization of high speed network interface cards.
-The high bandwidth network interface cards are becoming as typical configuration for compute servers and vSphere administrators are often challenged with maximum utilization of Datastores. The NFS nconnect feature is available on ONTAP from version 9.8 and the nconnect feature on vSphere is generally available with vSphere 8 Update 2 for NFSv3 Datastore. 
-The nconnect feature enables more connections to NFS Datastore which enables to deliver more throughput.
+Starting with VMware vSphere 8.0 U1 (as Tech-preview), the nconnect feature enables multiple TCP connections for NFS v3 datastore volumes to achieve more throughput.  Customers using NFS version 3 datastore can now increase the number of connections to NFS server thus maximizing the utilization of high speed network interface cards.
+
+NOTE: The feature is generally available with 8.0 U2, Refer storage section on link:https://docs.vmware.com/en/VMware-vSphere/8.0/rn/vsphere-esxi-802-release-notes/index.html[Release notes of VMware vSphere 8.0 Update 2]
 
 == Use cases
 
 * Host more virtual machines per NFS datastore on the same host.
-* Boost NFS Datastore performance.
+* Boost NFS datastore performance.
 * Provide an option to offer service at a higher tier for VM and Container based applications.
 
 == Technical details
 
-The purpose of nconnect is to provide multiple TCP connections per NFS Datastore on a vSphere host. This helps increase parallelism and performance for NFS Datastores.  In ONTAP, when an NFS mount is established, a Connection ID (CID) iscreated. That CID provides up to 128 concurrent in-flight operations. When that number is exceeded by the client, ONTAP enacts a form of flow control until it can free up some available resources as other operations complete. These pauses usually are only a few microseconds, but over the course of millions of operations, those can add up and create performance issues. Nconnect can take the 128 limit and multiply it by the number of nconnect sessions on the client, which provides more concurrent operations per CID and can potentially add performance benefits. For additional details, please refer link:https://www.netapp.com/media/10720-tr-4067.pdf[NFS best practice and implementation guide]
+The purpose of nconnect is to provide multiple TCP connections per NFS datastore on a vSphere host. This helps increase parallelism and performance for NFS datastores.  In ONTAP, when an NFS mount is established, a Connection ID (CID) iscreated. That CID provides up to 128 concurrent in-flight operations. When that number is exceeded by the client, ONTAP enacts a form of flow control until it can free up some available resources as other operations complete. These pauses usually are only a few microseconds, but over the course of millions of operations, those can add up and create performance issues. Nconnect can take the 128 limit and multiply it by the number of nconnect sessions on the client, which provides more concurrent operations per CID and can potentially add performance benefits. For additional details, please refer link:https://www.netapp.com/media/10720-tr-4067.pdf[NFS best practice and implementation guide]
 
 
 === Default NFSv3 Datastore
 
-To address the performance limitations of single connection of NFS Datastore, additional Datastores are mounted or additional hosts are added to increase the connection.
+To address the performance limitations of single connection of NFS datastore, additional datastores are mounted or additional hosts are added to increase the connection.
 
-image::vmware-vsphere8-nfsv3-wo-nconnect.png[NFSv3 Datastore without nconnect feature]
+image::vmware-vsphere8-nfsv3-wo-nconnect.png[NFSv3 datastore without nconnect feature]
 
 === With nConnect NFSv3 Datastore
 
-Once the NFS Datastore is created using ONTAP Tools or with other options, the number of connection per NFSv3 Datastore can be modified using vSphere CLI, PowerCLI or govc tool. To avoid performance concerns along with vMotion, keep the number of connections same for the NFS Datastore on all vSphere hosts that are part of the vSphere Cluster.
+Once the NFS datastore is created using ONTAP Tools or with other options, the number of connection per NFSv3 datastore can be modified using vSphere CLI, PowerCLI, govc tool or other API options. To avoid performance concerns along with vMotion, keep the number of connections same for the NFS datastore on all vSphere hosts that are part of the vSphere Cluster.
 
-image::vmware-vsphere8-nfsv3-nconnect.png[NFSv3 Datastore with nconnect feature enabled]
+image::vmware-vsphere8-nfsv3-nconnect.png[NFSv3 datastore with nconnect feature enabled]
 
 == Pre-requisite
 
@@ -54,7 +54,7 @@ To utilize the nconnect feature, the following dependencies should be met.
 
 == Update number of connection to NFS Datastore
 
-A single TCP connection is used when a NFS Datastore is created with ONTAP Tools or with vCenter. To increase the number of connections, vSphere CLI can be used. The reference command is shown below.
+A single TCP connection is used when a NFS datastore is created with ONTAP Tools or with vCenter. To increase the number of connections, vSphere CLI can be used. The reference command is shown below.
 [source, bash]
 ----
 # Increase the number of connections while creating the datastore.
@@ -103,4 +103,4 @@ The maximum number of connections supported on ONTAP is depended on storage plat
 
 As the number of connections per NFSv3 datastore is increased, the number of NFS datastores that can be mounted on that vSphere host decreases. The total number of connections supported per vSphere host is 256. Check link:https://kb.vmware.com/s/article/91481[VMware KB article 91481] for datastore limts per vSphere host.
 
-NOTE: vVol Datastore does not support nConnect feature. But, protocol endpoints counts towards the connection limit. A protocol endpoint is created for each data lif of SVM when vVol datastore is created.
+NOTE: vVol datastore does not support nConnect feature. But, protocol endpoints counts towards the connection limit. A protocol endpoint is created for each data lif of SVM when vVol datastore is created.
