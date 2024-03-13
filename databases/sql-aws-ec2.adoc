@@ -127,15 +127,15 @@ To create volumes and LUNs for SQL Server, complete the following steps:
 . Open the Amazon FSx console at https://console.aws.amazon.com/fsx/
 
 . Create an Amazon FSx for the NetApp ONTAP file system using the Standard Create option under Creation Method. This allows you to define FSxadmin and vsadmin credentials.
-+
+
 image:sql-awsec2-image1.png[Error: Missing Graphic Image]
 
 . Specify the password for fsxadmin.
-+
+
 image:sql-awsec2-image2.png[Error: Missing Graphic Image]
 
 . Specify the password for SVMs.
-+
+
 image:sql-awsec2-image3.png[Error: Missing Graphic Image]
 
 . Create volumes by following the step listed in https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-volumes.html[Creating a volume on FSx for NetApp ONTAP^].
@@ -148,7 +148,7 @@ image:sql-awsec2-image3.png[Error: Missing Graphic Image]
 * Tempdb is a system database used by Microsoft SQL Server as a temporary workspace, especially for I/O intensive DBCC CHECKDB operations. Therefore, place this database on a dedicated volume. In large environments in which volume count is a challenge, you can consolidate tempdb into fewer volumes and store it in the same volume as other system databases after careful planning. Data protection for tempdb is not a high priority because this database is recreated every time Microsoft SQL Server is restarted. 
 
 . Use the following SSH command to create volumes:
-+
+
 ....
 vol create -vserver svm001 -volume vol_awssqlprod01_data -aggregate aggr1 -size 800GB -state online -tiering-policy snapshot-only -percent-snapshot-space 0 -autosize-mode grow -snapshot-policy none -security-style ntfs 
 volume modify -vserver svm001 -volume vol_awssqlprod01_data -fractional-reserve 0
@@ -157,59 +157,59 @@ volume snapshot autodelete modify -vserver svm001 -volume vol_awssqlprod01_data 
 ....
 
 . Start the iSCSI service with PowerShell using elevated privileges in Windows Servers.
-+
+
 ....
 Start-service -Name msiscsi 
 Set-Service -Name msiscsi -StartupType Automatic
 ....
 
 . Install Multipath-IO with PowerShell using elevated privileges in Windows Servers.
-+
+
 ....
  Install-WindowsFeature -name Multipath-IO -Restart
 ....
 
 . Find the Windows initiator Name with PowerShell using elevated privileges in Windows Servers.
-+
+
 ....
 Get-InitiatorPort | select NodeAddress
 ....
-+
+
 image:sql-awsec2-image4.png[Error: Missing Graphic Image]
 
 . Connect to Storage virtual machines (SVM) using putty and create an iGroup.
-+
+
 ....
 igroup create -igroup igrp_ws2019sql1 -protocol iscsi -ostype windows -initiator iqn.1991-05.com.microsoft:ws2019-sql1.contoso.net
 ....
 
 . Use the following SSH command to create LUNs:
-+
+
 ....
 lun create -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -size 700GB -ostype windows_2008 -space-allocation enabled lun create -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -size 100GB -ostype windows_2008 -space-allocation enabled
 ....
-+
+
 image:sql-awsec2-image5.png[Error: Missing Graphic Image]
 
 . To achieve I/O alignment with the OS partitioning scheme, use windows_2008 as the recommended LUN type. Refer https://docs.netapp.com/us-en/ontap/san-admin/io-misalignments-properly-aligned-luns-concept.html[here^] for additional information.
 
 . Use the following SSH command to the map igroup to the LUNs that you just created.
-+
+
 ....
 lun show
 lun map -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -igroup igrp_awssqlprod01lun map -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -igroup igrp_awssqlprod01
 ....
-+
+
 image:sql-awsec2-image6.png[Error: Missing Graphic Image]
 
 . For a shared disk that uses the Windows Failover Cluster, run an SSH command to map the same LUN to the igroup that belong to all servers that participate in the Windows Failover Cluster.
 
 . Connect Windows Server to an SVM with an iSCSI target. Find the target IP address from AWS Portal.
-+
+
 image:sql-awsec2-image7.png[Error: Missing Graphic Image]
 
 . From Server Manager and the Tools menu,  select the iSCSI Initiator. Select the Discovery tab and then select Discover Portal. Supply the iSCSI IP address from previous step and select Advanced. From Local Adapter, select Microsoft iSCSI Initiator. From Initiator IP, select the IP of the server. Then select OK to close all windows.
-+
+
 image:sql-awsec2-image8.png[Error: Missing Graphic Image]
 
 . Repeat step 12 for the second iSCSI IP from the SVM.
@@ -219,12 +219,12 @@ image:sql-awsec2-image8.png[Error: Missing Graphic Image]
 image:sql-awsec2-image9.png[Error: Missing Graphic Image]
 
 . For best performance, add more sessions; NetApp recommends creating five iSCSI sessions. Select *Properties *> *Add session *> *Advanced* and repeat step 12.
-+
+
 ....
 $TargetPortals = ('10.2.1.167', '10.2.2.12')
 foreach ($TargetPortal in $TargetPortals) {New-IscsiTargetPortal -TargetPortalAddress $TargetPortal}
 ....
-+
+
 image:sql-awsec2-image10.png[Error: Missing Graphic Image]
 
 *Best practices*
@@ -234,7 +234,7 @@ image:sql-awsec2-image10.png[Error: Missing Graphic Image]
 * Make sure that the allocation unit size is set to 64K for partitions when formatting the LUNs
 
 . Run the following PowerShell command to make sure that the iSCSI session is persisted.
-+
+
 ....
 $targets = Get-IscsiTarget
 foreach ($target in $targets)
@@ -242,20 +242,20 @@ foreach ($target in $targets)
 Connect-IscsiTarget -IsMultipathEnabled $true -NodeAddress $target.NodeAddress -IsPersistent $true
 }
 ....
-+
+
 image:sql-awsec2-image11.png[Error: Missing Graphic Image]
 
 . Initialize disks with the following PowerShell command.
-+
+
 ....
 $disks = Get-Disk | where PartitionStyle -eq raw
 foreach ($disk in $disks) {Initialize-Disk $disk.Number}
 ....
-+
+
 image:sql-awsec2-image12.png[Error: Missing Graphic Image]
 
 . Run the Create Partition and Format Disk commands with PowerShell.
-+
+
 ....
 New-Partition -DiskNumber 1 -DriveLetter F -UseMaximumSize
 Format-Volume -DriveLetter F -FileSystem NTFS -AllocationUnitSize 65536
@@ -341,15 +341,15 @@ Follow the https://docs.netapp.com/us-en/snapcenter/install/task_install_the_sna
 After Installing SnapCenter, complete the following steps to set it up.
 
 . To set up credentials, select *Settings* > *New* and then enter the credential information.
-+
+
 image:sql-awsec2-image14.png[Error: Missing Graphic Image]
 
 . Add the storage system by selecting Storage Systems > New and the provide the appropriate FSx for ONTAP storage information.
-+
+
 image:sql-awsec2-image15.png[Error: Missing Graphic Image]
 
 . Add hosts by selecting *Hosts* > *Add*, and then provide the host information. SnapCenter automatically installs the Windows and SQL Server plug-in. This process might take some time.
-+
+
 image:sql-awsec2-image16.png[Error: Missing Graphic Image]
 
 After all Plug-ins are installed, you must configure the log directory. This is the location where the transaction log backup resides. You can configure the log directory by selecting the host and then select configure the log directory.
@@ -420,13 +420,13 @@ One of the major benefits of using FSx ONTAP with SQL Server on EC2 is its abili
 Complete the following steps to restore an individual database to a specific point in time or up to the minute with SnapCenter.
 
 . Select Resources and then select the database that you would like to restore.
-+
+
 image:sql-awsec2-image24.png[Error: Missing Graphic Image]
 
 . Select the backup name that the database needs to be restored from and then select restore.
 . Follow the *Restore* pop-up windows to restore the database.
 . Select *Monitor* to verify that the restore process is successful.
-+
+
 image:sql-awsec2-image25.png[Error: Missing Graphic Image]
 ====
 
@@ -493,12 +493,12 @@ The following step are used to clone databases to the new SQL server instance ru
 . Select Resource > View Instance, and then select Refresh Resource.
 . Select Resources, and then the database that you would like to clone.
 . Select the backup name that you would like to clone, and then select Clone.
-+
+
 image:sql-awsec2-image26.png[Error: Missing Graphic Image]
 
 . Follow the Clone from Backup instructions by providing the new SQL Server instance on EC2 and instance name to finish the clone process.
 . Select Monitor to make sure that cloning is completed.
-+
+
 image:sql-awsec2-image27.png[Error: Missing Graphic Image]
 =====
 ====
