@@ -17,19 +17,24 @@ Author: Ravi BCB, Josh Powell
 == vVol datastore as principal storage for VI Workload Domains
 
 === Scenario Overview
-In this scenario we will demonstrate how to configure a vVols datastore as principal storage for the deployment of a VI Workload Domain in VCF. Where appropriate we will refer to external documentation for the steps that must be performed in VCF's SDDC Manager, and cover those steps that are specific to the storage configuration portion.
+In this scenario we will demonstrate how to configure a vVols datastore as principal storage for the deployment of a VI Workload Domain in VCF. A vVols container must be prepared in advance of deploying the Workload Domain. To do this ONTAP tools for VMware vSphere is installed in the VCF Management Domain and the Swagger API tool is used to create the vVols container.
+
+Where appropriate we will refer to external documentation for the steps that must be performed in VCF's SDDC Manager, and only cover those steps that are specific to the storage configuration portion.
 
 For more information on using vVols storage with VCF refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/5.1/vcf-admin/GUID-28A95C3D-1344-4579-A562-BEE5D07AAD2F.html[vVols Storage with VMware Cloud Foundation]. 
+
+For information on using ONTAP tools in VCF mode refer to link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/deploy/vmware_cloud_foundation_mode_deployment.html[VMware Cloud Foundation mode of deployment for ONTAP tools].  
 
 This scenario covers the following high level steps:
 
 * Verify networking for the ONTAP storage virtual machine (SVM) and that a logical interface (LIF), is present to carry NFS traffic.
 * Create an export policy to allow the ESXi hosts access to the NFS volume.
-* Create an NFS volume on the ONTAP storage system.
+* Deploy ONTAP tools for VMware vSphere (VCF mode) in the VCF Management Domain.
+* Use the swagger API in ONTAP tools to………………
 * Create a Network Pool for NFS and vMotion traffic in SDDC Manager.
 * During VI Workload Domain deployment configuration, specify the information to connect to the NFS volume.
 * Monitor the storage validation and workload domain deployment.
-* Verify that the NFS datastore was created. 
+* Verify that the NFS datastore was created.
 
 === Prerequisites
 This scenario requires the following components and configurations:
@@ -48,94 +53,56 @@ For information on configuring ONTAP storage systems refer to the link:https://d
 For information on configuring VCF refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation].
 
 === Deployment Steps
-To deploy a VI Workload Domain with an NFS datastore as principal storage, complete the following steps:
+To deploy a VI Workload Domain with a vVols datastore as principal storage, complete the following steps:
 
-.Verify networking for ONTAP SVM
+.Deploy ONTAP tools for VMware vSphere
 [%collapsible]
 ==== 
-Verify that the required logical interfaces have been established for the network that will carry NFS traffic between the ONTAP storage cluster and VI Workload Domain.
+ONTAP tools for VMware vSphere (OTV) is deployed as a VM appliance and provides an integrated vCenter UI for managing ONTAP storage. In this solution OTV is deployed in VCF mode which does not automatically register the plugin with vCenter and provides a swagger API interface to create the vVols container. 
 
-. From ONTAP System Manager navigate to *Storage VMs* in the lefthand menu and click on the SVM to be used for NFS traffic. On the *Overview* tab, under *NETWORK IP INTERFACES*, click on the numeric to the right of *NFS*. In the list verify that the required LIF IP addresses are listed.
+Complete the following steps to Deploy ONTAP tools for VMware vSphere:
+
+. Obtain the ONTAP tools OVA image from the link:https://mysupport.netapp.com/site/products/all/details/otv/downloads-tab[NetApp Support site] and download to a local folder.
+
+. Log into the vCenter appliance for the VCF Management Domain.
+
+. From the vCenter appliance interface right-click on the management cluster and select *Deploy OVF Template…*
 +
-image:vmware-vcf-aff-image03.png[Verify LIFs for SVM]
+image:vmware-vcf-aff-image21.png[Deploy OVF Template...]
 
-Alternately, verify the LIFs associated with an SVM from the ONTAP CLI with the following command:
+. In the *Deploy OVF Template* wizard click the *Local file* radio button and select the ONTAP tools OVA file downloaded in the previous step.
++
+image:vmware-vcf-aff-image22.png[Select OVA file]
 
-[source, cli]
-network interface show -vserver <SVM_NAME>
+. For steps 2 through 5 of the wizard select a name and folder for the VM, select the compute resource, review the details, and accept the license agreement.
 
-. Verify that the ESXi hosts can communicate to the ONTAP NFS Server. Log into the ESXi host via SSH and ping the SVM LIF:
+. For the storage location of the configuration and disk files, select the vSAN datastore of the VCF Management Domain cluster.
++
+image:vmware-vcf-aff-image23.png[Select OVA file]
 
-[source, cli]
-vmkping <IP Address>
+. On the Select network page select the network used for management traffic.
++
+image:vmware-vcf-aff-image24.png[Select network]
 
-[NOTE]
-When deploying a VI Workload Domain, VCF validates connectivity to the NFS Server. This is done using the management adapter on the ESXi hosts before any additional vmkernel adapter is added with the NFS IP address. Therefore, it is necessary to ensure that either 1) the management network is routable to the NFS Server, or 2) a LIF for the management network has been added to the SVM hosting the NFS datastore volume, to ensure that the validation can proceed.
+. On the Customize template page fill out all required information:
+* Password to be used for administrative access to OTV.
+* NTP server IP address.
+* OTV maintenance account password.
+* OTV Derby DB password.
+* Check the box to *Enable VMware Cloud Foundation (VCF)*.
+* FQDN or IP address of the vCenter appliance and provide credentials for vCenter.
+* Provide the required network properties fields.
+
+Click Next  to continue.
+
+image:vmware-vcf-aff-image25.png[Customize OTV template 1]
+
+image:vmware-vcf-aff-image26.png[Customize OTV template 2]
+
+9. Review all information on the Ready to complete  page and the click Finish to begin deploying the OTV appliance.
 ====
 
-.Create Export Policy for sharing NFS volume
-[%collapsible]
-==== 
-Create an export policy in ONTAP System Manager to define access control for NFS volumes.
 
-. In ONTAP System Manager click on *Storage VMs* in the lefthand menu and select an SVM from the list.
-
-. On the *Settings* tab locate *Export Policies* and click on the arrow to access.
-+
-image:vmware-vcf-aff-image06.png[Access Export Policies]
-
-. In the *New export policy* window add a name for the policy, click on the *Add new rules* button and then on the *+Add* button to begin adding a new rule.
-+
-image:vmware-vcf-aff-image07.png[New export policy]
-
-. Fill in the IP Addresses, IP address range, or network that you wish to include in the rule. Uncheck the *SMB/Cifs* and *FlexCache* boxes and make selections for the access details below. Selecting the UNIX boxes is sufficient for ESXi host access.
-+
-image:vmware-vcf-aff-image08.png[Save new rule]
-+
-[NOTE]
-When deploying a VI Workload Domain, VCF validates connectivity to the NFS Server. This is done using the management adapter on the ESXi hosts before any additional vmkernel adapter is added with the NFS IP address. Therefore, it is necessary to ensure that the export policy includes the VCF management network in order to allow the validation to proceed.
-
-. Once all rules have been entered click on the *Save* button to save the new Export Policy.
-====
-
-.Create NFS volume
-[%collapsible]
-==== 
-Create an NFS volume on the ONTAP storage system to be used as a datastore in the Workload Domain deployment.
-
-. From ONTAP System Manager navigate to *Storage > Volumes*  in the lefthand menu and click on *+Add* to create a new volume.
-+
-image:vmware-vcf-aff-image09.png[Add new volume]
-
-. Add a name for the volume, fill out the desired capacity and selection the storage VM that will host the volume. Click on *More Options*  to continue.
-+
-image:vmware-vcf-aff-image10.png[Add volume details]
-
-. Under Access Permissions, select the Export Policy which includes the VCF management network or IP address and NFS network IP addresses that will be used for both validation of the NFS Server and NFS traffic.
-+
-image:vmware-vcf-aff-image11.png[Add volume details]
-+
-[NOTE]
-When deploying a VI Workload Domain, VCF validates connectivity to the NFS Server. This is done using the management adapter on the ESXi hosts before any additional vmkernel adapter is added with the NFS IP address. Therefore, it is necessary to ensure that either 1) the management network is routable to the NFS Server, or 2) a LIF for the management network has been added to the SVM hosting the NFS datastore volume, to ensure that the validation can proceed.
-
-. Alternately, ONTAP Volumes can be created in the ONTAP CLI. For more information refer to the link:https://docs.netapp.com/us-en/ontap-cli-9141//lun-create.html[lun create] command in the ONTAP commands documentation.
-====
-
-.Create Network Pool in SDDC Manager
-[%collapsible]
-==== 
-In VCF Cloud Manager a Network Pool must be created before commissioning the ESXi hosts, as preparation for deploying them in a VI Workload Domain. The Network Pool must include the network information and IP address range(s) for VMkernel adapters to be used for communication with the NFS server.
-
-. From the Cloud Manager web interface navigate to *Network Settings* in the lefthand menu and click on the *+ Create Network Pool* button.
-+
-image:vmware-vcf-aff-image04.png[Create Network Pool]
-
-. Fill out a name for the Network Pool, select the check box for NFS and fill out all networking details. Repeat this for the vMotion network information.
-+
-image:vmware-vcf-aff-image05.png[Network Pool Configuration]
-
-. Click the *Save* button to complete creating the Network Pool.
-====
 
 
 
