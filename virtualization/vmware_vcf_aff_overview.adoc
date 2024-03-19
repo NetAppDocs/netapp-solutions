@@ -1,7 +1,7 @@
 ---
 sidebar: sidebar
 permalink: virtualization/vmware_vcf_aff_overview.html
-keywords: netapp, vmware, cloud, foundation, vcf, asff, all-flash, nfs, vvol, vvols, array, ontap tools, otv
+keywords: netapp, vmware, cloud, foundation, vcf, aff, all-flash, nfs, vvol, vvols, array, ontap tools, otv, sddc
 summary:
 ---
 
@@ -15,7 +15,7 @@ summary:
 Author: Ravi BCB, Josh Powell
 
 == VMware Cloud Foundation with NetApp AFF Arrays
-VMware Cloud Foundation (VCF) is an integrated data center (SDDC) platform that provides a complete stack of software-defined infrastructure for running enterprise applications in a hybrid cloud environment. It combines compute, storage, networking, and management capabilities into a unified platform, offering a consistent operational experience across private and public clouds.
+VMware Cloud Foundation (VCF) is an integrated software defined data center (SDDC) platform that provides a complete stack of software-defined infrastructure for running enterprise applications in a hybrid cloud environment. It combines compute, storage, networking, and management capabilities into a unified platform, offering a consistent operational experience across private and public clouds.
 
 This document provides information on storage options available for VMware Cloud Foundation using the NetApp All-Flash AFF storage system. Supported storage options are covered with specific instruction for creating workload domains with NFS and vVol datastores as principal storage as well as a range of supplemental storage options.
 
@@ -25,14 +25,17 @@ Use cases covered in this documentation:
 * Storage options for customers seeking uniform environments across both private and public clouds.
 * Automated solution for deploying virtual infrastructure for workload domains.
 * Scalable storage solution tailored to meet evolving needs, even when not aligned directly with compute resource requirements.
+* Deploy VCF VI Workload Domains using ONTAP as principal storage (NFS, vVol).
+* Deploy supplemental storage to VI Workload Domains using ONTAP Tools for VMware vSphere.
 
 === Audience
 
 This solution is intended for the following people: 
 
-* Customers looking for more flexible storage options for VMware environments that are designed to maximize TCO.
+* Solution architects looking for more flexible storage options for VMware environments that are designed to maximize TCO.
+* Solution architects looking for VCF storage options that provide data protection and disaster recovery options with the major cloud providers.
 * Storage administrators wanting to understand how to configure VCF with principal and supplemental storage.
-* Customers looking for VCF storage options that provide data protection and disaster recovery options with the major cloud providers.
+
 
 == Technology Overview
 The VCF with NetApp AFF solution is comprised of the following major components:
@@ -42,9 +45,13 @@ VMware Cloud Foundation extends VMware’s vSphere hypervisor offerings by combi
 
 The VCF solution supports both native Kubernetes and virtual machine-based workloads. Key services such as VMware vSphere, VMware vSAN, VMware NSX-T Data Center, and VMware vRealize Cloud Management are integral components of the VCF package. When combined, these services establish a software-defined infrastructure capable of efficiently managing compute, storage, networking, security, and cloud management.
 
-VCF is comprised of a single management domain and up to 24 VI Workload Domains..... (to be continued)
+VCF is comprised of a single management domain and up to 24 VI Workload Domains that represent a unit of application-ready infrastructure. A workload domain is comprised of one or more vSphere clusters managed by a single vCenter instance.
 
 image:vmware-vcf-aff-image02.png[VCF Architecture]
+
+For more information on VCF architecture and planning, refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/5.1/vcf-design/GUID-A550B597-463F-403F-BE9A-BFF3BECB9523.html[Architecture Models and Workload Domain Types in VMware Cloud Foundation].
+
+'''
 
 ==== VCF Storage Options
 VMware divides storage options for VCF into Principal and Supplemental storage. The VCF Management Domain must use vSAN as its Principal storage. However, there are many supplemental storage options for the Management Domain and both principal and supplemental storage options available for VI Workload Domains.
@@ -57,25 +64,34 @@ Principal Storage refers to any type of storage that can be directly connected t
 *Supplemental Storage for Management and Workload Domains*
 Supplemental storage is the storage type that can be added to the management or workload domains at any time after the cluster has been created. Supplemental storage represents the widest range of supported storage options, all of which are supported on NetApp AFF arrays.
 
+Additional documentation resources for VMware Cloud Foundation:
+* link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation]
+* link:https://docs.vmware.com/en/VMware-Cloud-Foundation/5.1/vcf-design/GUID-2156EC66-BBBB-4197-91AD-660315385D2E.html[Supported Storage Types for VMware Cloud Foundation]
+* link:https://docs.vmware.com/en/VMware-Cloud-Foundation/5.1/vcf-admin/GUID-2C4653EB-5654-45CB-B072-2C2E29CB6C89.html[Managing Storage in VMware Cloud Foundation]
+
+'''
+
 === NetApp All-Flash Storage Arrays
-NetApp AFF (All Flash FAS) arrays are high-performance storage solutions designed to leverage the speed and efficiency of flash technology. AFF arrays incorporate integrated data management features such as including snapshot-based backups, replication, thin provisioning, and data protection capabilities.
+NetApp AFF (All Flash FAS) arrays are high-performance storage solutions designed to leverage the speed and efficiency of flash technology. AFF arrays incorporate integrated data management features such as snapshot-based backups, replication, thin provisioning, and data protection capabilities.
 
 NetApp AFF arrays utilize the ONTAP storage operating system, offering comprehensive storage protocol support for all storage options compatible with VCF, all within a unified architecture.
 
-NetApp AFF storage arrays are available in the highest performant A-Series and a QLC flash-based C-Series. Both series use NVMe flash drives.
+NetApp AFF storage arrays are available in the highest performing A-Series and a QLC flash-based C-Series. Both series use NVMe flash drives.
 
 For more information on NetApp AFF A-Series storage arrays see the link:https://www.netapp.com/data-storage/aff-a-series/[NetApp AFF A-Series] landing page.
 
 For more information on NetApp C-Series storage arrays see the link:https://www.netapp.com/data-storage/aff-c-series/[NetApp AFF C-Series] landing page.
+
+'''
 
 === NetApp ONTAP Tools for VMware vSphere
 ONTAP Tools for VMware vSphere (OTV) allows administrators to manage NetApp storage directly from within the vSphere Client. ONTAP Tools allows you to deploy and manage datastores, as well as provision vVol datastores.
 
 ONTAP Tools allows mapping of datastores to storage capability profiles which determine a set of storage system attributes. This allows the creation of datastores with specific attributes such as storage performance and QoS.
 
-ONTAP Tools also includes a VMware vSphere APIs for Storage Awareness (VASA) Provider for ONTAP storage systems which enables the provisioning of VMware Virtual Volumes (vVols) datastores, creation and use of storage capability profiles, compliance verification, and performance monitoring.
+ONTAP Tools also includes a *VMware vSphere APIs for Storage Awareness (VASA) Provider* for ONTAP storage systems which enables the provisioning of VMware Virtual Volumes (vVols) datastores, creation and use of storage capability profiles, compliance verification, and performance monitoring.
 
-For more information on NetApp ONTAP tools for VMware see the link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/index.html[ONTAP tools for VMware vSphere Documentation] page.
+For more information on NetApp ONTAP tools see the link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/index.html[ONTAP tools for VMware vSphere Documentation] page.
 
 == Solution Overview
 In the scenarios presented in this documentation we will demonstrate how to use ONTAP storage systems as principal storage for VCF VI Workload Domain deployments. In addition, we will install and use ONTAP Tools for VMware vSphere to configure supplemental datastores for VI Workload Domains.
