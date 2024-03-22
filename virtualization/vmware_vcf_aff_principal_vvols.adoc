@@ -53,7 +53,10 @@ For information on configuring ONTAP storage systems refer to the link:https://d
 For information on configuring VCF refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation].
 
 === Deployment Steps
-To deploy a VI Workload Domain with a vVols datastore as principal storage, complete the following steps:
+The steps for deploying a VI Workload Domain with a vVols datastore as principal storage can be divided into two separate groups. Steps related to creating a vVols container with ONTAP Tools for VMware vSphere, and steps to be completed in VCF SDDC Manager.
+
+==== Create vVols container with ONTAP Tools
+Complete the following steps to create a vVols container on the ONTAP storage system.
 
 .Deploy ONTAP tools for VMware vSphere
 [%collapsible]
@@ -101,6 +104,65 @@ image:vmware-vcf-aff-image26.png[Customize OTV template 2]
 
 9. Review all information on the Ready to complete  page and the click Finish to begin deploying the OTV appliance.
 ====
+
+.Obtain VCF appliance-api-token from Swagger UI
+[%collapsible]
+==== 
+There are multiple steps that must be completed using the Swagger-UI. The first is to obtain the VCF appliance-api-token.
+
+. Access the Swagger user interface by navigating to https://otv_ip:8143/api/rest/swagger-ui.html in a web browser.
+
+. Scroll down to *User Authentication: APIs for user authentication* and select *Post /2.0/VCF/user/login*.
++
+image:vmware-vcf-aff-image27.png[Post /2.0/VCF/user/login]
+
+. Under *Parameter content type*, switch the content type to *application/json*.
+
+. Under *vcfLoginRequest*, enter in the OTV appliance’s username and password.
++
+image:vmware-vcf-aff-image28.png[Enter OTV username and password]
+
+. Click on the *Try it out!* button and, under *Response Header*, copy the *"authorization":* text string.
++
+image:vmware-vcf-aff-image29.png[copy authorization response header]
+====
+
+.Obtain public SSL certificate of ONTAP storage system
+[%collapsible]
+==== 
+The next step is to obtain the public SSL certificate of the ONTAP storage system using Swagger UI.
+
+. In the Swagger UI locate *Security: APIs related to certificates* and select *Get /3.0/security/certificates/{host}/server-certificate*.
++
+image:vmware-vcf-aff-image30.png[Get /3.0/security/certificates/{host}/server-certificate]
+
+. In the *appliance-api-token* field paste in the text string obtained in the previous step.
+
+. In the *host* field type in the IP address of the ONTAP storage system from which you intend to obtain the public SSL certificate.
++
+image:vmware-vcf-aff-image31.png[copy public ssl certificate]
+====
+
+.Add Storage to ONTAP tools from Swagger UI
+[%collapsible]
+====
+Add the ONTAP storage system to OTV using the VCF appliance-api-token and ONTAP public SSL certificate.
+
+. In the Swagger UI scroll to Storage Systems: APIs related to storage systems and select Post /3.0/storage/clusters.
+
+. In the appliance-api-token fill in the VCF token that was obtained in a previous. Note, that the token will expire eventually so it may be necessary to obtain a new token periodically.
+
+. In the *controllerRequest* text box provide the ONTAP storage system IP address, username, password, and the public SSL certificate obtained in the previous step.
++
+image:vmware-vcf-aff-image32.png[provide info to add storage system]
+
+. Click on the *Try it out!*  button to add the storage system to OTV. 
+
+
+
+
+
+
 
 
 
