@@ -1,6 +1,6 @@
 ---
 sidebar: sidebar
-permalink: databases/aws_ora_anf_inc_merge.html
+permalink: databases/azure_ora_anf_inc_merge.html
 keywords: Oracle, Azure, ANF, Database, Oracle 19c, NFS, dNFS, VLDB, RMAN, Incremental Merge
 summary: "The solution provides overview and details for quick recovery of Oracle VLDB deployed to Azure VM compute instance with NFS mount on Azure NetApp Files capacity pool to stage a standby database copy that is incrementally merged constantly via RMAN." 
 ---
@@ -19,65 +19,60 @@ Allen Cao, Niyaz Mohamed, NetApp
 
 Recovering a Very Large Database (VLDB) in Oracle using the Oracle Recovery Manager (RMAN) backup tool can be a highly challenging task. The database restoration process from backup media in the event of a failure can be time-consuming, delaying the database recovery and potentially impacting your Service Level Agreement (SLA) significantly. However, starting from version 10g, Oracle introduced a RMAN feature that allows users to create staged image copies of the Oracle database data files on additional disk storage located on the DB server host. These image copies can be incrementally updated using RMAN on a daily basis. In the case of a failure, the Database Administrator (DBA) can swiftly switch the Oracle database from the failed media to the image copy, eliminating the need for a complete database media restore. The result is a greatly improved SLA, albeit at the cost of doubling the required database storage. 
 
-If you are keen on SLA for your VLDB and contemplating moving the Oracle database to a public cloud such as AWS, you could set up a similar database protection structure using resources such as AWS FSx ONTAP for staging your standby database image copy. In this documentation, we demonstrate how to provision and export an NFS file system from AWS FSx ONTAP to be mounted on an Oracle database server for staging a standby database copy for quick recovery in the event of a primary storage failure. 
-
-Better yet, we also show how you could leverage NetApp FlexClone to create a copy of the same staging NFS file system for other use cases such as standing up a dev/test Oracle environment with this same standby database image copy without additional storage investment. 
+If you are keen on SLA for your VLDB and contemplating moving the Oracle database to a public cloud such as Azure, you could set up a similar database protection structure using resources such as Azure NetApp Files (ANF) for staging your standby database image copy. In this documentation, we demonstrate how to provision and export an NFS file system from ANF capacity pool to be mounted on an Oracle database server for staging a standby database copy for quick recovery in the event of a primary storage failure. 
 
 This solution addresses the following use cases:
 
-* An Oracle VLDB image copy incremental merge via RMAN on NFS mount point off AWS FSx ONTAP storage.  
-* Quick recovery of an Oracle VLDB by switching to database image copy on FSx ONTAP storage in the event of failure.
-* Clone FSx ONTAP NFS file system volume storing an Oracle VLDB image copy to be used for standing up another database instance for other use cases. 
+* An Oracle VLDB image copy incremental merge via RMAN on NFS mount point off Microsoft ANF capacity pool storage.  
+* Quick recovery of an Oracle VLDB by switching to database image copy on ANF storage in the event of failure on the same Azure database server VM.
+* Quick recovery of an Oracle VLDB by switching to database image copy on ANF storage in the event of failure on a standby Azure database server VM.
+ 
 
 == Audience
 
 This solution is intended for the following people:
 
-* A DBA who set up Oracle VLDB image copy incremental merge via RMAN in AWS for faster database recovery.
-* A database solution architect who tests Oracle workloads in the AWS public cloud.
-* A storage administrator who manages Oracle databases deployed to AWS FSx ONTAP storage.
-* An application owner who would like to stand up Oracle databases in AWS FSx/EC2 environment.
+* A DBA who set up Oracle VLDB image copy incremental merge via RMAN in Azure for faster database recovery.
+* A database solution architect who tests Oracle workloads in the Azure public cloud.
+* A storage administrator who manages Oracle databases deployed to ANF capacity pool storage.
+* An application owner who would like to stand up Oracle databases in Azure cloud environment.
 
 == Solution test and validation environment
 
-The testing and validation of this solution was performed in an AWS FSx ONTAP and EC2 environment that might not match the final deployment environment. For more information, see the section <<Key Factors for Deployment Consideration>>.
+The testing and validation of this solution was performed in a Microsoft ANF capacity pool storage and Azure VM compute environment that might not match the final deployment environment. For more information, see the section <<Key Factors for Deployment Consideration>>.
 
 === Architecture
 
-image::aws_ora_fsx_ec2_vldb_architecture.png["This image provides a detailed picture of the Oracle VLDB incremental merge implementation in AWS public cloud with FSxN."]
+image::aws_ora_fsx_ec2_vldb_architecture.png["This image provides a detailed picture of the Oracle VLDB incremental merge implementation in Azure public cloud with ANF."]
 
 === Hardware and software components
 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone
-| EC2 instance for compute | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge EC2 instances, one as primary DB server and the other as a clone DB server 
+| ANF storage | Current version offered by Microsoft | 2 TiB ANF capacity pool storage with Premium service level
+| Azure VM for DB server | Standard_B4ms - 4 vCPUs, 16GiB | 2 VMs, one as primary DB server and the other as a standby  
 
 3+^| *Software*
-| RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
-| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
+| RedHat Linux | RHEL Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
+| NFS | Version 3.0 | Oracle dNFS enabled
 |===
 
 === Key factors for deployment consideration
 
-* *Oracle VLDB storage layout for RMAN incremental merge.* In our tests and validations, the NFS volume for Oracle incremental backup and merge is allocated from a single FSx file system, which has 4GBps throughput, 160,000 raw SSD IOPS, and 192TiB capacity limit. For deployment over the thresholds, multiple FSx file systems can be concatenated in parallel with multiple NFS mount points to provide higher capacity. 
+* *Oracle VLDB storage layout for RMAN incremental merge.* In our tests and validations, the NFS volume for Oracle incremental backup and merge is allocated from a single ANF capacity pool, which has 100 TiB per volume, and 1000 TiB total capacity limit. For deployment over the thresholds, multiple volumes, and ANF capacity pools can be concatenated in parallel with multiple NFS mount points to provide higher capacity. 
 
-* *Oracle recoverability using RMAN incremental merge.* The RMAN incremental backup and merge is generally executed at user defined frequency based on your RTO and RPO objectives. If there are total loss of primary data storage and/or archived logs, the data loss can occur. The Oracle database can be recovered up to last incremental backup that is available from FSx database backup image copy. To minimize the data loss, Oracle flash recovery area can be setup on FSx NFS mount point and archived logs are backed up to FSx NFS mount along with database image copy. 
+* *Oracle recoverability using RMAN incremental merge.* The RMAN incremental backup and merge is generally executed at user defined frequency based on your RTO and RPO objectives. If there are total loss of primary data storage and/or archived logs, the data loss can occur. The Oracle database can be recovered up to last incremental backup that is available from ANF database backup image copy. To minimize the data loss, Oracle flash recovery area can be setup on ANF NFS mount point and archived logs are backed up to ANF NFS mount along with database image copy. 
 
-* *Running Oracle VLDB off FSx NFS file system.* Unlike other bulk storage for database backup, AWS FSx ONTAP is a cloud enabled production grade storage that delivers high level of performance and storage efficiency. Once Oracle VLDB switches over from primary storage to image copy on FSx ONTAP NFS file system, database performance can be maintained at high level while the primary storage failure is addressed. You can take comfort to know that user application experience does not suffer as the result of primary storage failure. 
+* *Running Oracle VLDB off ANF NFS file system.* Unlike other bulk storage for database backup, Microsoft ANF is a cloud enabled production grade storage that delivers high level of performance and storage efficiency. Once Oracle VLDB switches over from primary storage to image copy on ANF NFS file system, database performance can be maintained at high level while the primary storage failure is addressed. You can take comfort to know that user application experience does not suffer as the result of primary storage failure. 
 
-* *FlexClone Oracle VLDB image copy of NFS volume for other use cases.* AWS FSx ONTAP FlexClone provides shared copies of the same NFS data volume that are writable. Thus, they can be used for many other use cases while still maintaining the integrity of staging Oracle VLDB image copy even when Oracle database is switched over. This provides tremendous storage cost saving by substantially reducing VLDB storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to database image copy in order to maintain Oracle performance at high level. 
+* *Azure compute instances.* In these tests and validations, we used Standard_B4ms Azure VMs as the Oracle database servers. There are other Azure VMs that may be optimized and better suited for database workload. You also need to size the Azure VM appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
 
-* *EC2 compute instances.* In these tests and validations, we used an AWS EC2 t2.xlarge instance as the Oracle database compute instance. NetApp recommends using an M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workload. You need to size the EC2 instance appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
+* *ANF capacity pool service level.* ANF capacity pool offers three service level: Standard, Premium, Ultra. By default, an auto QoS applies to a volume created within a capacity pool, which restricts the throughput on the volume. The throughput on a volume can be manually adjusted based on the size of capacity pool and service level.      
 
-* *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi-zone deployment further enhances high availability in the event of failure in a single AWS zone. 
-
-* *FSx storage cluster sizing.* An Amazon FSx for ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
-
-* *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For multiple FSx file systems deployment for a VLDB, dNFS multi-path to different FSx NFS file systems should be properly configured.   
+* *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For multiple ANF capacity pools deployment for a VLDB, dNFS multi-paths to different ANF capacity pools storage should be properly configured.   
 
 
 == Solution deployment
