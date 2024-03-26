@@ -19,13 +19,13 @@ Allen Cao, Niyaz Mohamed, NetApp
 
 Recovering a Very Large Database (VLDB) in Oracle using the Oracle Recovery Manager (RMAN) backup tool can be a highly challenging task. The database restoration process from backup media in the event of a failure can be time-consuming, delaying the database recovery and potentially impacting your Service Level Agreement (SLA) significantly. However, starting from version 10g, Oracle introduced a RMAN feature that allows users to create staged image copies of the Oracle database data files on additional disk storage located on the DB server host. These image copies can be incrementally updated using RMAN on a daily basis. In the case of a failure, the Database Administrator (DBA) can swiftly switch the Oracle database from the failed media to the image copy, eliminating the need for a complete database media restore. The result is a greatly improved SLA, albeit at the cost of doubling the required database storage. 
 
-If you are keen on SLA for your VLDB and contemplating moving the Oracle database to a public cloud such as Azure, you could set up a similar database protection structure using resources such as Azure NetApp Files (ANF) for staging your standby database image copy. In this documentation, we demonstrate how to provision and export an NFS file system from ANF capacity pool to be mounted on an Oracle database server for staging a standby database copy for quick recovery in the event of a primary storage failure. 
+If you are keen on SLA for your VLDB and contemplating moving the Oracle database to a public cloud such as Azure, you could set up a similar database protection structure using resources such as Microsoft Azure NetApp Files (ANF) for staging your standby database image copy. In this documentation, we demonstrate how to provision and export an NFS file system from ANF capacity pool to be mounted on an Oracle database server for staging a standby database copy for quick recovery in the event of a primary storage failure. 
 
 This solution addresses the following use cases:
 
 * An Oracle VLDB image copy incremental merge via RMAN on NFS mount point off Microsoft ANF capacity pool storage.  
-* Quick recovery of an Oracle VLDB by switching to database image copy on ANF storage in the event of failure on the same Azure database server VM.
-* Quick recovery of an Oracle VLDB by switching to database image copy on ANF storage in the event of failure on a standby Azure database server VM.
+* Quick recovery of an Oracle VLDB in the event of failure on the same Azure database server VM.
+* Quick recovery of an Oracle VLDB in the event of failure on a standby Azure database server VM.
  
 
 == Audience
@@ -77,15 +77,13 @@ image::aws_ora_fsx_ec2_vldb_architecture.png["This image provides a detailed pic
 
 == Solution deployment
 
-It is assumed that you already have your Oracle VLDB deployed in AWS EC2 environment within a VPC. If you need help on Oracle deployment in AWS, please refer to following technical reports for help. 
+It is assumed that you already have your Oracle VLDB deployed in Azure cloud environment within a VNet. If you need help on Oracle deployment in Azure, please refer to following technical reports for help. 
 
-* link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_deploy_intro.html[Oracle Database Deployment on EC2 and FSx Best Practices^]
+* link:https://docs.netapp.com/us-en/netapp-solutions/databases/automation_ora_anf_nfs.html[Simplified, Automated Oracle Deployment on Azure NetApp Files with NFS^]
 
-* link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_iscsi_asm.html[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^]
+* link:https://docs.netapp.com/us-en/netapp-solutions/databases/azure_ora_nfile_usecase.html#overview[Oracle Database Deployment and Protection on Azure NetApp Files^]
 
-* link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_nfs_asm.html[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^]
-
-Your Oracle VLDB can be running either on a FSx ONTAP or any other storage of choices within the AWS EC2 ecosystem. The following section provides step-by-step deployment procedures for setting up RMAN incremental merge to an image copy of an Oracle VLDB that is staging in an NFS mount off AWS FSx ONTAP storage.    
+Your Oracle VLDB can be running either on an ANF storage or any other storage of choices within the Azure cloud ecosystem. The following section provides step-by-step deployment procedures for setting up RMAN incremental merge to an image copy of an Oracle VLDB that is staging in an NFS mount off ANF storage.    
 
 === Prerequisites for deployment
 [%collapsible]
@@ -93,70 +91,61 @@ Your Oracle VLDB can be running either on a FSx ONTAP or any other storage of ch
 
 Deployment requires the following prerequisites.
 
-. An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
+. An Azure account has been set up, and the necessary Azure VNet and network segments have been created within your Azure account.
 
-. From the AWS EC2 console, you must deploy two EC2 Linux instances, one as the primary Oracle DB server and an optional alternative clone target DB server. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
+. From the Azure portal console, you must deploy two Azure VM instances, one as the primary Oracle DB server and an optional standby DB server. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://azure.microsoft.com/en-us/pricing/details/virtual-machines/series/[Azure Virtual Machine series^] for more information.
 
-. From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host the NFS volumes that stores the Oracle database standby image copy. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
-
-. Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution. The template can be easily revised for your own deployment requirements.
-+
-....
-git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
-....
+. From the Azure portal console, deploy ANF storage to host the NFS volumes that stores the Oracle database standby image copy. If you are not familiar with the deployment of ANF, see the documentation link:https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-quickstart-set-up-account-create-volumes?tabs=azure-portal[Quickstart: Set up Azure NetApp Files and create an NFS volume^] for step-by-step instructions.
 
 [NOTE]
 
-Ensure that you have allocated at least 50G in EC2 instance root volume in order to have sufficient space to stage Oracle installation files.
+Ensure that you have allocated at least 128G in Azure VM root volume in order to have sufficient space to stage Oracle installation files.
 
 ====
 
-=== Provision and export NFS volume to be mounted to EC2 DB instance host
+=== Provision and export NFS volume to be mounted on primary Oracle VLDB server
 [%collapsible]
 
 ====
 
-In this demonstration, we will show how to provision an NFS volume from the command line by login to an FSx cluster via ssh as fsxadmin user through FSx cluster management IP. Alternatively, the volume can be allocated using the AWS FSx console as well. Repeat the procedures on other FSx file systems if more than one FSx file system are set up to accommodate the size of the database. 
+In this section, we show provisioning an NFS volume from an ANF capacity pool via Azure portal console. Repeat the procedures on other ANF capacity pools if more than one ANF capacity pools are set up to accommodate the size of the database. 
 
-. First, provision NFS volume via CLI by logging to the FSx cluster through SSH as the fsxadmin user. Change to your FSx cluster management IP address, which can be retrieved from AWS FSx ONTAP UI console. 
+. First, from Azure portal console, navigating to ANF capacity pool that is used to stage Oracle VLDB image copy. 
 +
-[source, cli]
-ssh fsxadmin@172.30.15.53
+image::azure_ora_anf_vldb_vol_01.png[This image provides ANF volume provisioning screen using Azure portal console]
 
-. Create NFS volume the same size as your primary storage for storing primary Oracle VLDB database data files image copy.
+. From selected capacity pool - `database`, click `Volumes` and then, `Add volume` to launch add-volume workflow.
 + 
-[source, cli]
-vol create -volume ora_01_copy -aggregate aggr1 -size 100G -state online -type RW -junction-path /ora_01_copy -snapshot-policy none -tiering-policy snapshot-only
+image::azure_ora_anf_vldb_vol_02.png[This image provides ANF volume provisioning screen using Azure portal console]
 
-
-. Alternatively, the volume can be provisioned from AWS FSx console UI with options: storage efficiency `Enabled`, security style `Unix` , Snapshot policy `None`, and Storage tiering `Snapshot Only` as show below.
-+
-image::aws_ora_fsx_ec2_vldb_vol.png[Error: Missing Graphic Image]
-
-. Create a customized snapshot policy for oracle database with a daily schedule and 30 days retention. You should adjust the policy to fit your specific needs in terms of snapshot frequency and retention window. 
-+
-[source, cli] 
-snapshot policy create -policy oracle -enabled true -schedule1 daily -count1 30
-+
-Apply policy to provisioned NFS volume for RMAN incremental backup and merge.
-+
-[source, cli]
-vol modify -volume ora_01_copy -snapshot-policy oracle
-
-. Login to EC2 instance as ec2-user and create a directory /nfsfsxn. Create additional mount point directories for additional FSx file systems.
+. Fill in `Volume name`, `Quota`, `Virtual network`, and `Delegated subnet` to move to `Protocol` page.
 + 
-[source, cli]
-sudo mkdir /nfsfsxn
+image::azure_ora_anf_vldb_vol_03.png[This image provides ANF volume provisioning screen using Azure portal console]
 
-. Mount the FSx ONTAP NFS volume to EC2 DB instance host. Change to your FSx virtual server NFS lif address. The NFS lif address can be retrieved from FSx ONTAP UI console.
+. Take a note of the file path, enter allowed clients CIDR range, and enable `Root Access` for the volume. 
++
+image::azure_ora_anf_vldb_vol_04.png[This image provides ANF volume provisioning screen using Azure portal console]
+
+. Add a volume tag if desired.
++ 
+image::azure_ora_anf_vldb_vol_05.png[This image provides ANF volume provisioning screen using Azure portal console]
+
+. Review and create the volume.
++ 
+image::azure_ora_anf_vldb_vol_06.png[This image provides ANF volume provisioning screen using Azure portal console]
+
+. Login to primary Oracle VLDB server as a user with sudo privilege and mount the NFS volume exported from ANF storage. Change to your ANF NFS server IP address and file path as necessary. The ANF NFS server IP address can be retrieved from ANF volume console page.
 +
 [source, cli]
-sudo mount 172.30.15.19:/ora_01_copy /nfsfsxn -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=262144,wsize=262144,nointr
+sudo mkdir /nfsanf
++
+[source, cli]
+sudo mount 172.30.136.68:/ora-01-u02-copy /nfsanf -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=262144,wsize=262144,nointr
 
 . Change mount point ownership to oracle:oisntall, change to your oracle user name and primary group as necessary.
 +
 [source, cli]
-sudo chown oracle:oinstall /nfsfsxn
+sudo chown oracle:oinstall /nfsanf
 
 ====
 
