@@ -24,8 +24,8 @@ If you are keen on SLA for your VLDB and contemplating moving the Oracle databas
 This solution addresses the following use cases:
 
 * An Oracle VLDB image copy incremental merge via RMAN on NFS mount point off Microsoft ANF capacity pool storage.  
-* Quick recovery of an Oracle VLDB in the event of failure on the same Azure database server VM.
-* Quick recovery of an Oracle VLDB in the event of failure on a standby Azure database server VM.
+* Quick recovery of an Oracle VLDB in the event of a failure on the same Azure database server VM.
+* Quick recovery of an Oracle VLDB in the event of a failure on a standby Azure database server VM.
  
 
 == Audience
@@ -43,7 +43,7 @@ The testing and validation of this solution was performed in a Microsoft ANF cap
 
 === Architecture
 
-image::aws_ora_fsx_ec2_vldb_architecture.png["This image provides a detailed picture of the Oracle VLDB incremental merge implementation in Azure public cloud with ANF."]
+image::azure_ora_anf_vldb_architecture.png["This image provides a detailed picture of the Oracle VLDB incremental merge implementation in Azure public cloud with ANF."]
 
 === Hardware and software components
 
@@ -173,7 +173,7 @@ sqlplus / as sysdba
 +
 From sqlplus prompt, execute following command.
 [source, cli]
-alter database enable block change tracking using file '/nfsanf/oracopy/bct_db1.ctf'
+alter database enable block change tracking using file '/nfsanf/oracopy/bct_ntap1.ctf'
 +
 [source, cli]
 alter system set db_recovery_file_dest='/nfsanf/archlog/' scope=both;
@@ -234,23 +234,6 @@ rman target / nocatalog;
 
 output:
 
-[oracle@ip-172-30-15-99 ~]$ rman target / nocatalog;
-
-Recovery Manager: Release 19.0.0.0.0 - Production on Wed May 24 17:44:49 2023
-Version 19.18.0.0.0
-
-Copyright (c) 1982, 2019, Oracle and/or its affiliates.  All rights reserved.
-
-connected to target database: DB1 (DBID=1730530050)
-using target database control file instead of recovery catalog
-
-RMAN>
-
-....
-
-. From RMAN prompt, execute the script. First execution creates a baseline database image copy and subsequent executions merge and update the baseline image copy incrementally. The following is how to execute the script and the typical output. Set the number of channels to match the CPU cores on the host. 
-+
-....
 [oracle@ora-01 ~]$ rman target / nocatalog
 
 Recovery Manager: Release 19.0.0.0.0 - Production on Wed Mar 20 16:54:24 2024
@@ -260,6 +243,12 @@ Copyright (c) 1982, 2019, Oracle and/or its affiliates.  All rights reserved.
 
 connected to target database: NTAP1 (DBID=2441823937)
 using target database control file instead of recovery catalog
+
+....
+
+. From RMAN prompt, execute the script. First execution creates a baseline database image copy and subsequent executions merge and update the baseline image copy incrementally. The following is how to execute the script and the typical output. Set the number of channels to match the CPU cores on the host. 
++
+....
 
 RMAN> @/home/oracle/rman_bkup_merge.cmd
 
@@ -787,7 +776,7 @@ This completes the setup of an Oracle VLDB standby image copy backup and merge.
 ====
 In the event of a failure due to primary storage issue such as data loss or corruption,  database can be quickly switched over to image copy on ANF NFS mount and recovered to current state without database restore. Eliminating media restoration speeds up the database recovery tremendously for a VLDB. This use case assumes that the Oracle VLDB DB server is intact and database control file, archived and current logs are all available for recovery.
 
-. Login to EC2 DB server host as oracle user and create a test table before switch over.
+. Login to Azure primary VLDB server host as oracle user and create a test table before switch over.
 +
 ....
 [oracle@ora-01 ~]$ sqlplus / as sysdba
@@ -1288,7 +1277,7 @@ With following example entries:
 +
 The above init file should be replaced by restored backup init file from primary Oracle VLDB server in the case of discrepancy. 
 
-. As oracle user, launch RMAN to run Oracle recovery on the standby DB server host.
+. As oracle user, launch RMAN to run Oracle recovery on the standby DB server host. First, start the Oracle instance in `nomount` state.
 +
 ....
 
@@ -1696,7 +1685,7 @@ SQL> show pdbs
 
 ....
 
-. Validate the database structure restored to new host as well as the row we have inserted before primary VLDB failure. 
+. Validate the database structure restored to new host as well as the test row we have inserted before primary VLDB failure. 
 +
 ....
 
