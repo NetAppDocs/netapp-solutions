@@ -17,7 +17,7 @@ Author: Josh Powell
 == VMware Cloud Foundation with NetApp All-Flash SAN Arrays
 VMware Cloud Foundation (VCF) is an integrated software defined data center (SDDC) platform that provides a complete stack of software-defined infrastructure for running enterprise applications in a hybrid cloud environment. It combines compute, storage, networking, and management capabilities into a unified platform, offering a consistent operational experience across private and public clouds.
 
-This document provides information on storage options available for VMware Cloud Foundation using the NetApp All-Flash SAN Array. Supported storage options are covered with specific instruction for deploying iSCSI datastores as supplemental storage for workload domains and data protection of VMs and datastores using SnapCenter for VMware vSphere.
+This document provides information on storage options available for VMware Cloud Foundation using the NetApp All-Flash SAN Array. Supported storage options are covered with specific instruction for deploying iSCSI datastores as supplemental storage for both management and workload domains, and data protection of VMs and datastores is covered using SnapCenter for VMware vSphere.
 
 
 === Use Cases
@@ -26,8 +26,8 @@ Use cases covered in this documentation:
 * Storage options for customers seeking uniform environments across both private and public clouds.
 * Automated solution for deploying virtual infrastructure for workload domains.
 * Scalable storage solution tailored to meet evolving needs, even when not aligned directly with compute resource requirements.
-* Deploy VCF VI Workload Domains using ONTAP as principal storage (NFS, vVol).
-* Deploy supplemental storage to VI Workload Domains using ONTAP Tools for VMware vSphere.
+* Deploy supplemental storage to Management and VI Workload Domains using ONTAP Tools for VMware vSphere.
+* Protect VMs and datastores using the SnapCenter Plug-in for VMware vSphere.
 
 === Audience
 
@@ -35,11 +35,12 @@ This solution is intended for the following people:
 
 * Solution architects looking for more flexible storage options for VMware environments that are designed to maximize TCO.
 * Solution architects looking for VCF storage options that provide data protection and disaster recovery options with the major cloud providers.
-* Storage administrators wanting to understand how to configure VCF with principal and supplemental storage.
+* Storage administrators wanting specific instruction on how to configure VCF with principal and supplemental storage.
+* Storage administrators wanting specific instruction on how to protect VMs and datastores residing on ONTAP storage.
 
 
 == Technology Overview
-The VCF with NetApp AFF solution is comprised of the following major components:
+The VCF with NetApp ASA solution is comprised of the following major components:
 
 === VMware Cloud Foundation
 VMware Cloud Foundation extends VMware’s vSphere hypervisor offerings by combining key components such as SDDC Manager, vSphere, vSAN, NSX, and VMware Aria Suite to create a virtualized datacenter.
@@ -72,16 +73,57 @@ Additional documentation resources for VMware Cloud Foundation:
 
 '''
 
-=== NetApp All-Flash Storage Arrays
-NetApp AFF (All Flash FAS) arrays are high-performance storage solutions designed to leverage the speed and efficiency of flash technology. AFF arrays incorporate integrated data management features such as snapshot-based backups, replication, thin provisioning, and data protection capabilities.
+=== NetApp All-Flash SAN Arrays
+The NetApp All-Flash SAN Array (ASA) is a high-performance storage solution designed to meet the demanding requirements of modern data centers. It combines the speed and reliability of flash storage with NetApp's advanced data management features to deliver exceptional performance, scalability, and data protection. 
 
-NetApp AFF arrays utilize the ONTAP storage operating system, offering comprehensive storage protocol support for all storage options compatible with VCF, all within a unified architecture.
+The ASA lineup is comprised of both A-Series and C-Series models.
 
-NetApp AFF storage arrays are available in the highest performing A-Series and a QLC flash-based C-Series. Both series use NVMe flash drives.
+The NetApp A-Series all-NVMe flash arrays are designed for high-performance workloads, offering ultra-low latency and high resiliency, making them suitable for mission-critical applications.
 
-For more information on NetApp AFF A-Series storage arrays see the link:https://www.netapp.com/data-storage/aff-a-series/[NetApp AFF A-Series] landing page.
+image::vmware-asa-image1.png[width=800]
 
-For more information on NetApp C-Series storage arrays see the link:https://www.netapp.com/data-storage/aff-c-series/[NetApp AFF C-Series] landing page.
+C-Series QLC flash arrays are aimed at higher-capacity use cases, delivering the speed of flash with the economy of hybrid flash.
+
+image::vmware-asa-image2.png[width=800]
+
+For detailed information see the https://www.netapp.com/data-storage/all-flash-san-storage-array[NetApp ASA landing page].
+
+==== Storage Protocol Support
+The ASA supports all standard SAN protocols including, iSCSI,  Fibre Channel (FC), Fibre Channel over Ethernet (FCoE), and NVME over fabrics. 
+
+*iSCSI* - NetApp ASA provides robust support for iSCSI, allowing block-level access to storage devices over IP networks. It offers seamless integration with iSCSI initiators, enabling efficient provisioning and management of iSCSI LUNs. ONTAP's advanced features, such as multi-pathing, CHAP authentication, and ALUA support.
+
+For design guidance on iSCSI configurations refer to .
+
+*Fibre Channel* - NetApp ASA offers comprehensive support for Fibre Channel (FC), a high-speed network technology commonly used in storage area networks (SANs). ONTAP seamlessly integrates with FC infrastructure, providing reliable and efficient block-level access to storage devices. It offers features like zoning, multi-pathing, and fabric login (FLOGI) to optimize performance, enhance security, and ensure seamless connectivity in FC environments.
+
+For design guidance on Fibre Channel configurations refer to the https://docs.netapp.com/us-en/ontap/san-config/fc-config-concept.html[SAN Configuration reference documentation].
+
+*NVMe over Fabrics* - NetApp ONTAP and ASA support NVMe over fabrics. NVMe/FC enables the use of NVMe storage devices over Fibre Channel infrastructure, and NVMe/TCP over storage IP networks.
+
+For design guidance on NVMe refer to https://docs.netapp.com/us-en/ontap/nvme/support-limitations.html[NVMe configuration, support and limitations].
+
+
+==== Active-active technology
+NetApp All-Flash SAN Arrays allows for active-active paths through both controllers, eliminating the need for the host operating system to wait for an active path to fail before activating the alternative path. This means that the host can utilize all available paths on all controllers, ensuring active paths are always present regardless of whether the system is in a steady state or undergoing a controller failover operation.
+
+Furthermore, the NetApp ASA offers a distinctive feature that greatly enhances the speed of SAN failover. Each controller continuously replicates essential LUN metadata to its partner. As a result, each controller is prepared to take over data serving responsibilities in the event of a sudden failure of its partner. This readiness is possible because the controller already possesses the necessary information to start utilizing the drives that were previously managed by the failed controller.
+
+With active-active pathing, both planned and unplanned takeovers have IO resumption times of 2-3 seconds.
+
+For more information see https://www.netapp.com/pdf.html?item=/media/85671-tr-4968.pdf[TR-4968, NetApp All-SAS Array – Data Availability and Integrity with the NetApp ASA].
+
+
+==== Storage guarantees
+NetApp offers a unique set of storage guarantees with NetApp All-flash SAN Arrays. The unique benefits include:
+
+*Storage efficiency guarantee:* Achieve high performance while minimizing storage cost with the Storage Efficiency Guarantee. 4:1 for SAN workloads.
+
+*6 Nines (99.9999%) data availability guarantee:* Guarantees remediation for unplanned downtime in excess of 31.56 seconds per year.
+
+*Ransomware recovery guarantee:* Guaranteed data recovery in the event of a ransomware attack.
+
+See the https://www.netapp.com/data-storage/all-flash-san-storage-array/[NetApp ASA product portal] for more information.
 
 '''
 
@@ -93,6 +135,31 @@ ONTAP Tools allows mapping of datastores to storage capability profiles which de
 ONTAP Tools also includes a *VMware vSphere APIs for Storage Awareness (VASA) Provider* for ONTAP storage systems which enables the provisioning of VMware Virtual Volumes (vVols) datastores, creation and use of storage capability profiles, compliance verification, and performance monitoring.
 
 For more information on NetApp ONTAP tools see the link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/index.html[ONTAP tools for VMware vSphere Documentation] page.
+
+'''
+
+==== SnapCenter Plug-in for VMware vSphere
+The SnapCenter Plug-in for VMware vSphere (SCV) is a software solution from NetApp that offers comprehensive data protection for VMware vSphere environments. It is designed to simplify and streamline the process of protecting and managing virtual machines (VMs) and datastores.
+
+The SnapCenter Plug-in for VMware vSphere provides the following capabilities in a unified interface, integrated with the vSphere client:
+
+*Policy-Based Snapshots* - SnapCenter allows you to define policies for creating and managing application-consistent snapshots of virtual machines (VMs) in VMware vSphere.
+
+*Automation* - Automated snapshot creation and management based on defined policies help ensure consistent and efficient data protection.
+
+*VM-Level Protection* - Granular protection at the VM level allows for efficient management and recovery of individual virtual machines.
+
+*Storage Efficiency Features* - Integration with NetApp storage technologies provides storage efficiency features like deduplication and compression for snapshots, minimizing storage requirements.
+
+The SnapCenter Plug-in orchestrates the quiescing of virtual machines in conjunction with hardware-based snapshots on NetApp storage arrays. SnapMirror technology is utilized to replicate copies of backups to secondary storage systems including in the cloud.
+
+For more information refer to the https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere[SnapCenter Plug-in for VMware vSphere documentation].
+
+BlueXP integration enables 3-2-1 backup strategies that extend copies of data to object storage in the cloud.
+
+For more information on 3-2-1 backup strategies with BlueXP visit https://community.netapp.com/t5/Tech-ONTAP-Blogs/3-2-1-Data-Protection-for-VMware-with-SnapCenter-Plug-in-and-BlueXP-backup-and/ba-p/446180[3-2-1 Data Protection for VMware with SnapCenter Plug-in and BlueXP backup and recovery for VMs].
+
+'''
 
 == Solution Overview
 In the scenarios presented in this documentation we will demonstrate how to use ONTAP storage systems as principal storage for VCF VI Workload Domain deployments. In addition, we will install and use ONTAP Tools for VMware vSphere to configure supplemental datastores for VI Workload Domains.
