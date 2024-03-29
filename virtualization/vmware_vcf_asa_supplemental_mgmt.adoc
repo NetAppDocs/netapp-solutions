@@ -21,8 +21,7 @@ In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMwar
 
 This scenario covers the following high level steps:
 
-* Create an iGroup to allow the ESXi hosts access to the iSCSI LUN.
-* Create an iSCSI LUN on the ONTAP storage system.
+* Create a storage virtual machine (SVM) with logical interfaces (LIFs) for iSCSI traffic.
 * Create distributed port groups for iSCSI networks on the VCF Management Domain.
 * Create vmkernel adapters for iSCSI on the VCF Management Domain ESXi hosts.
 * Deploy ONTAP Tools on the VCF Management Domain.
@@ -32,38 +31,106 @@ This scenario covers the following high level steps:
 === Prerequisites
 This scenario requires the following components and configurations:
 
-* NetApp ASA storage system with a storage virtual machine (SVM) configured to allow iSCSI traffic.
-* Logical interfaces (LIFs) has been created on the IP network that is to carry iSCSI traffic and is associated with the SVM.
+* An ONTAP ASA storage system with physical data ports .................................................
 * VCF Management Domain deployment is complete and the vSphere client is accessible.
+* A VI Workload Domain has been previously deployed.
 
-For information on configuring ONTAP storage systems refer to the link:https://docs.netapp.com/us-en/ontap[ONTAP 9 Documentation] center.
+For multipathing and failover across multiple paths, NetApp recommends having a minimum of two LIFs per storage node in separate Ethernet networks for all SVMs in iSCSI configurations.
 
-For information on configuring VCF refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation].
+This documentation demonstrates the process of creating a new SVM and specifying the IP address information to create multiple LIFs for iSCSI traffic. To add new LIFs to an existing SVM refer to link:https://docs.netapp.com/us-en/ontap/networking/create_a_lif.htm[Create a LIF (network interface)].
+
+TIP: In situations where multiple VMkernel adapters are configured on the same IP network, it is recommended to use software iSCSI port binding on the ESXi hosts to ensure that load balancing across the adapters occurs. Refer to KB article link:https://kb.vmware.com/s/article/2038869[Considerations for using software iSCSI port binding in ESX/ESXi (2038869)].
+
+For additional information on using VMFS iSCSI datastores with VMware refer to link:https://docs.netapp.com/us-en/netapp-solutions/virtualization/vsphere_ontap_auto_block_iscsi.html[vSphere VMFS Datastore - iSCSI Storage backend with ONTAP].
 
 === Deployment Steps
 To deploy ONTAP Tools and use it to create a VMFS datastore on the VCF Management Domain, complete the following steps:
 
-==== Create iSCSI LUN on ONTAP storage system
+==== Create SVM and LIFs on ONTAP storage system
 
-.Create iGroup for SVM
+.Create the storage VM and LIFs
 [%collapsible]
 ==== 
-Verify that the required logical interfaces have been established for the network that will carry NFS traffic between the ONTAP storage cluster and VI Workload Domain.
+Complete the following steps to create an SVM together with multiple LIFs for iSCSI traffic.
 
-. From ONTAP System Manager navigate to *Storage VMs* in the lefthand menu and click on the SVM to be used for NFS traffic. On the *Overview* tab, under *NETWORK IP INTERFACES*, click on the numeric to the right of *NFS*. In the list verify that the required LIF IP addresses are listed.
+. From ONTAP System Manager navigate to *Storage VMs* in the lefthand menu and click on *+ Add* to start. 
 +
-image:vmware-vcf-aff-image03.png[Verify LIFs for SVM]
+image:vmware-vcf-asa-image01.png[Click +Add to start creating SVM]
 
-Alternately, verify the LIFs associated with an SVM from the ONTAP CLI with the following command:
+. In the *Add Storage VM* wizard provide a *Name* for the SVM, select the *IP Space* and then, under *Access Protocol, click on the *iSCSI* tab and check the box to *Enable iSCSI*.
++
+image:vmware-vcf-asa-image02.png[Add storage VM wizard - enable iSCSI]
 
-[source, cli]
-network interface show -vserver <SVM_NAME>
+. In the *Network Interface* section fill in the *IP address*, *Subnet Mask*, and *Broadcast Domain and Port* for the first LIF. For subsequent LIFs the checkbox may be enabled to use common settings across all remaining LIFs or use separate settings.
++
+NOTE: For multipathing and failover across multiple paths, NetApp recommends having a minimum of two LIFs per storage node in separate Ethernet networks for all SVMs in iSCSI configurations.
++
+image:vmware-vcf-asa-image03.png[Fill out network info for LIFs]
 
-. Verify that the ESXi hosts can communicate to the ONTAP NFS Server. Log into the ESXi host via SSH and ping the SVM LIF:
-
-[source, cli]
-vmkping <IP Address>
-
-[NOTE]
-When deploying a VI Workload Domain, VCF validates connectivity to the NFS Server. This is done using the management adapter on the ESXi hosts before any additional vmkernel adapter is added with the NFS IP address. Therefore, it is necessary to ensure that either 1) the management network is routable to the NFS Server, or 2) a LIF for the management network has been added to the SVM hosting the NFS datastore volume, to ensure that the validation can proceed.
+. Choose whether to enable the Storage VM Administration account (for multi-tenancy environments) and click on *Save* to create the SVM.
++
+image:vmware-vcf-asa-image04.png[Enable SVM account and Finish]
 ====
+
+==== Set up networking for iSCSI on ESXi hosts
+The following steps are performed on the VCF Management Domain cluster using the vSphere client.
+
+.Create Distributed Port Groups for iSCSI traffic
+[%collapsible]
+====
+Complete the following steps to create a new distributed port group for each iSCSI network:
+
+. From the vSphere client for the Management Domain cluster, navigate to *Inventory > Networking*. Navigate to the existing Distributed Switch and choose the action to create *New Distributed Port Group...*.
++
+image:vmware-vcf-asa-image05.png[Choose to create new port group]
+
+. In the *New Distributed Port Group* wizard fill in a name for the new port group and click on *Next* to continue.
+
+On the *Configure settings* page fill out all settings. In this case VLAN is select for VLAN ID and the VLAN value provided. Click on *Next* to continue.
++
+image:vmware-vcf-asa-image06.png[Fill out VLAN ID]
+
+. On the *Ready to complete* page, review the changes and click on *Finish* to create the new distributed port group.
+
+. Repeat this process for the second iSCSI network being used and ensure you have input the correct *VLAN ID*.
+====
+
+.Create VMkernel adapters on each ESXi host
+[%collapsible]
+====
+Repeat this process on each ESXi host in the Management Domain.
+
+. From the vSphere client navigate to one of the ESXi hosts in the Management Domain inventory. From the *Configure* tab select *VMkernel adapters* and click on *Add Networking...* to start.
++
+image:vmware-vcf-asa-image07.png[Start add networking wizard]
+
+. On the *Select connection type* window choose *VMkernel Network Adapter* and click on *Next* to continue.
++
+image:vmware-vcf-asa-image08.png[Choose VMkernel Network Adapter]
+
+. On the *Select target device* page, choose one of the distributed port groups for iSCSI that was created previously.
++
+image:vmware-vcf-asa-image09.png[Choose target port group]
+
+. On the *Port properties* page keep the defaults and click on *Next* to continue.
++
+image:vmware-vcf-asa-image10.png[VMkernel port properties]
+
+. On the *IPv4 settings* page fill in the *IP address*, *Subnet mask*, and provide a new Gateway IP address (only if required). Click on *Next* to continue.
++ 
+image:vmware-vcf-asa-image11.png[VMkernel IPv4 settings]
+
+. Review the your selections on the *Ready to complete* page and click on *Finish* to create the VMkernel adapter.
++
+image:vmware-vcf-asa-image12.png[Review VMkernel selections]
+
+. Repeat this process to create a VMkernel adapter for the second iSCSI network.
+====
+
+
+
+For additional information:
+
+For information on configuring ONTAP storage systems refer to the link:https://docs.netapp.com/us-en/ontap[ONTAP 9 Documentation] center.
+
+For information on configuring VCF refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation].
