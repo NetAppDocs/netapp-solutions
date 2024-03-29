@@ -14,10 +14,10 @@ summary:
 [.lead]
 Author: Josh Powell
 
-== Use ONTAP Tools to configure supplemental storage on VCF Management Domains
+== Use ONTAP Tools to configure supplemental storage for VCF Management Domains
 
 === Scenario Overview
-In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMware vSphere (OTV) to configure an iSCSI datastore on a VCF Management Domain.
+In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMware vSphere (OTV) to configure an iSCSI datastore for a VCF Management Domain.
 
 This scenario covers the following high level steps:
 
@@ -47,6 +47,7 @@ For additional information on using VMFS iSCSI datastores with VMware refer to l
 To deploy ONTAP Tools and use it to create a VMFS datastore on the VCF Management Domain, complete the following steps:
 
 ==== Create SVM and LIFs on ONTAP storage system
+The following step is is performed in ONTAP System Manager.
 
 .Create the storage VM and LIFs
 [%collapsible]
@@ -78,7 +79,7 @@ The following steps are performed on the VCF Management Domain cluster using the
 .Create Distributed Port Groups for iSCSI traffic
 [%collapsible]
 ====
-Complete the following steps to create a new distributed port group for each iSCSI network:
+Complete the following to create a new distributed port group for each iSCSI network:
 
 . From the vSphere client for the Management Domain cluster, navigate to *Inventory > Networking*. Navigate to the existing Distributed Switch and choose the action to create *New Distributed Port Group...*.
 +
@@ -86,7 +87,7 @@ image:vmware-vcf-asa-image05.png[Choose to create new port group]
 
 . In the *New Distributed Port Group* wizard fill in a name for the new port group and click on *Next* to continue.
 
-On the *Configure settings* page fill out all settings. In this case VLAN is select for VLAN ID and the VLAN value provided. Click on *Next* to continue.
+. On the *Configure settings* page fill out all settings. In this case VLAN is select for VLAN ID and the VLAN value provided. Click on *Next* to continue.
 +
 image:vmware-vcf-asa-image06.png[Fill out VLAN ID]
 
@@ -126,6 +127,88 @@ image:vmware-vcf-asa-image12.png[Review VMkernel selections]
 
 . Repeat this process to create a VMkernel adapter for the second iSCSI network.
 ====
+
+==== Deploy and use ONTAP Tools to configure storage
+The following steps are performed on the VCF Management Domain cluster using the vSphere client and involve deploying OTV, creating a VMFS iSCSI datastore, and migrating management VM's to the new datastore.
+
+.Deploy ONTAP tools for VMware vSphere
+[%collapsible]
+==== 
+ONTAP tools for VMware vSphere (OTV) is deployed as a VM appliance and provides an integrated vCenter UI for managing ONTAP storage.  
+
+Complete the following to Deploy ONTAP tools for VMware vSphere:
+
+. Obtain the ONTAP tools OVA image from the link:https://mysupport.netapp.com/site/products/all/details/otv/downloads-tab[NetApp Support site] and download to a local folder.
+
+. Log into the vCenter appliance for the VCF Management Domain.
+
+. From the vCenter appliance interface right-click on the management cluster and select *Deploy OVF Template…*
++
+image:vmware-vcf-aff-image21.png[Deploy OVF Template...]
+
+. In the *Deploy OVF Template* wizard click the *Local file* radio button and select the ONTAP tools OVA file downloaded in the previous step.
++
+image:vmware-vcf-aff-image22.png[Select OVA file]
+
+. For steps 2 through 5 of the wizard select a name and folder for the VM, select the compute resource, review the details, and accept the license agreement.
+
+. For the storage location of the configuration and disk files, select the vSAN datastore of the VCF Management Domain cluster.
++
+image:vmware-vcf-aff-image23.png[Select OVA file]
+
+. On the Select network page select the network used for management traffic.
++
+image:vmware-vcf-aff-image24.png[Select network]
+
+. On the Customize template page fill out all required information:
+* Password to be used for administrative access to OTV.
+* NTP server IP address.
+* OTV maintenance account password.
+* OTV Derby DB password.
+* Do not check the box to *Enable VMware Cloud Foundation (VCF)*. VCF mode is not required for deploying supplemental storage.
+* FQDN or IP address of the vCenter appliance and provide credentials for vCenter.
+* Provide the required network properties fields.
++
+Click Next  to continue.
++
+image:vmware-vcf-aff-image25.png[Customize OTV template 1]
++
+image:vmware-vcf-asa-image13.png[Customize OTV template 2]
+
+. Review all information on the Ready to complete  page and the click Finish to begin deploying the OTV appliance.
+====
+
+.Configure a VMFS iSCSI datastore on Management Domain using OTV
+[%collapsible]
+==== 
+Complete the following to use OTV to configure a VMFS iSCSI datastore as supplemental storage on the Management Domain:
+
+. In the vSphere client navigate to the main menu and select *NetApp ONTAP Tools*.
++
+image:vmware-vcf-asa-image14.png[Navigate to ONTAP Tools]
+
+. Once in *ONTAP Tools*, from the Getting Started page (or from *Storage Systems*), click on *Add* to add a new storage system.
++
+image:vmware-vcf-asa-image15.png[Add storage system]
+
+. Provide the IP address and credentials of the ONTAP storage system and click on *Add*.
++
+image:vmware-vcf-asa-image16.png[Provide IP and credentials of ONTAP system]
+
+. Click on *Yes* to authorize the cluster certificate and add the storage system.
++
+image:vmware-vcf-asa-image17.png[Authorize cluster certificate]
+====
+
+
+
+
+
+
+
+
+
+
 
 
 
