@@ -14,18 +14,18 @@ summary:
 [.lead]
 Author: Josh Powell
 
-== Use ONTAP Tools to configure supplemental storage for VCF Management Domains
+== Use ONTAP Tools to configure supplemental storage for VCF Workload Domains
 
 === Scenario Overview
-In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMware vSphere (OTV) to configure an iSCSI datastore for a VCF Management Domain.
+In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMware vSphere (OTV) to configure an vVols datastore for a VCF Workload Domain. iSCSI will be used as the storage protocol for the vVols datastore.
 
 This scenario covers the following high level steps:
 
 * Create a storage virtual machine (SVM) with logical interfaces (LIFs) for iSCSI traffic.
-* Create distributed port groups for iSCSI networks on the VCF Management Domain.
-* Create vmkernel adapters for iSCSI on the VCF Management Domain ESXi hosts.
-* Deploy ONTAP Tools on the VCF Management Domain.
-* Create a new VMFS datastore on the VCF Management Domain.
+* Create distributed port groups for iSCSI networks on the VI Workload Domain.
+* Create vmkernel adapters for iSCSI on the VI Workload Domain ESXi hosts.
+* Deploy ONTAP Tools on the VI Workload Domain.
+* Create a new vVols datastore on the VI Workload Domain.
 
 
 === Prerequisites
@@ -33,6 +33,7 @@ This scenario requires the following components and configurations:
 
 * An ONTAP ASA storage system with physical data ports on ethernet switches dedicated to storage traffic.
 * VCF Management Domain deployment is complete and the vSphere client is accessible.
+* A VI Workload Domain has been previously deployed.
 
 For multipathing and failover across multiple paths, NetApp recommends having a minimum of two LIFs per storage node in separate ethernet networks for all SVMs in iSCSI configurations.
 
@@ -47,8 +48,6 @@ To deploy ONTAP Tools and use it to create a VMFS datastore on the VCF Managemen
 
 ==== Create SVM and LIFs on ONTAP storage system
 The following step is is performed in ONTAP System Manager.
-
-// tag::create-svm[]
 
 .Create the storage VM and LIFs
 [%collapsible]
@@ -74,25 +73,23 @@ image:vmware-vcf-asa-image03.png[Fill out network info for LIFs]
 image:vmware-vcf-asa-image04.png[Enable SVM account and Finish]
 ====
 
-// end::create-svm[]
-
 ==== Set up networking for iSCSI on ESXi hosts
-The following steps are performed on the VCF Management Domain cluster using the vSphere client.
+The following steps are performed on the VI Workload Domain cluster using the vSphere client. In this case vCenter Single Sign-On is being used so the vSphere client is common across the management and workload domains.
 
 .Create Distributed Port Groups for iSCSI traffic
 [%collapsible]
 ====
 Complete the following to create a new distributed port group for each iSCSI network:
 
-. From the vSphere client for the Management Domain cluster, navigate to *Inventory > Networking*. Navigate to the existing Distributed Switch and choose the action to create *New Distributed Port Group...*.
+. From the vSphere client , navigate to *Inventory > Networking* for the Workload Domain. Navigate to the existing Distributed Switch and choose the action to create *New Distributed Port Group...*.
 +
-image:vmware-vcf-asa-image05.png[Choose to create new port group]
+image:vmware-vcf-asa-image22.png[Choose to create new port group]
 
 . In the *New Distributed Port Group* wizard fill in a name for the new port group and click on *Next* to continue.
 
 . On the *Configure settings* page fill out all settings. In this case VLAN is select for VLAN ID and the VLAN value provided. Click on *Next* to continue.
 +
-image:vmware-vcf-asa-image06.png[Fill out VLAN ID]
+image:vmware-vcf-asa-image23.png[Fill out VLAN ID]
 
 . On the *Ready to complete* page, review the changes and click on *Finish* to create the new distributed port group.
 
@@ -100,15 +97,16 @@ image:vmware-vcf-asa-image06.png[Fill out VLAN ID]
 
 . Once both port groups have been created, navigate to the first port group and select the action to *Edit settings...*.
 +
-image:vmware-vcf-asa-image27.png[DPG - edit settings]
+image:vmware-vcf-asa-image24.png[DPG - edit settings]
 
 . On *Distributed Port Group - Edit Settings* page, navigate to *Teaming and failover* in the left-hand menu and click on *uplink2* to move it down to *Unused uplinks*.
 +
-image:vmware-vcf-asa-image28.png[move uplink2 to unused]
+image:vmware-vcf-asa-image25.png[move uplink2 to unused]
 
 . Repeat this step for the second iSCSI port group. However, this time move *uplink1* down to *Unused uplinks*.
 +
-image:vmware-vcf-asa-image29.png[move uplink2 to unused]
+image:vmware-vcf-asa-image26.png[move uplink2 to unused]
+
 ====
 
 .Create VMkernel adapters on each ESXi host
