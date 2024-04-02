@@ -105,18 +105,17 @@ image:vmware-vcf-asa-image25.png[move uplink2 to unused]
 
 . Repeat this step for the second iSCSI port group. However, this time move *uplink1* down to *Unused uplinks*.
 +
-image:vmware-vcf-asa-image26.png[move uplink2 to unused]
-
+image:vmware-vcf-asa-image26.png[move uplink1 to unused]
 ====
 
 .Create VMkernel adapters on each ESXi host
 [%collapsible]
 ====
-Repeat this process on each ESXi host in the Management Domain.
+Repeat this process on each ESXi host in the Workload Domain.
 
-. From the vSphere client navigate to one of the ESXi hosts in the Management Domain inventory. From the *Configure* tab select *VMkernel adapters* and click on *Add Networking...* to start.
+. From the vSphere client navigate to one of the ESXi hosts in the Workload Domain inventory. From the *Configure* tab select *VMkernel adapters* and click on *Add Networking...* to start.
 +
-image:vmware-vcf-asa-image07.png[Start add networking wizard]
+image:vmware-vcf-asa-image30.png[Start add networking wizard]
 
 . On the *Select connection type* window choose *VMkernel Network Adapter* and click on *Next* to continue.
 +
@@ -124,19 +123,19 @@ image:vmware-vcf-asa-image08.png[Choose VMkernel Network Adapter]
 
 . On the *Select target device* page, choose one of the distributed port groups for iSCSI that was created previously.
 +
-image:vmware-vcf-asa-image09.png[Choose target port group]
+image:vmware-vcf-asa-image31.png[Choose target port group]
 
 . On the *Port properties* page keep the defaults and click on *Next* to continue.
 +
-image:vmware-vcf-asa-image10.png[VMkernel port properties]
+image:vmware-vcf-asa-image32.png[VMkernel port properties]
 
 . On the *IPv4 settings* page fill in the *IP address*, *Subnet mask*, and provide a new Gateway IP address (only if required). Click on *Next* to continue.
 + 
-image:vmware-vcf-asa-image11.png[VMkernel IPv4 settings]
+image:vmware-vcf-asa-image33.png[VMkernel IPv4 settings]
 
 . Review the your selections on the *Ready to complete* page and click on *Finish* to create the VMkernel adapter.
 +
-image:vmware-vcf-asa-image12.png[Review VMkernel selections]
+image:vmware-vcf-asa-image34.png[Review VMkernel selections]
 
 . Repeat this process to create a VMkernel adapter for the second iSCSI network.
 ====
@@ -144,10 +143,14 @@ image:vmware-vcf-asa-image12.png[Review VMkernel selections]
 ==== Deploy and use ONTAP Tools to configure storage
 The following steps are performed on the VCF Management Domain cluster using the vSphere client and involve deploying OTV, creating a VMFS iSCSI datastore, and migrating management VM's to the new datastore.
 
+For VI Workload Domains, OTV is installed to the VCF Management Cluster but registered with the vCenter associated with the VI Workload Domain. 
+
+For additional information on deploying and using ONTAP Tools in a multiple vCenter environment refer to link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/configure/concept_requirements_for_registering_vsc_in_multiple_vcenter_servers_environment.html[Requirements for registering ONTAP tools in multiple vCenter Servers environment].
+
 .Deploy ONTAP tools for VMware vSphere
 [%collapsible]
 ==== 
-ONTAP tools for VMware vSphere (OTV) is deployed as a VM appliance and provides an integrated vCenter UI for managing ONTAP storage.  
+ONTAP tools for VMware vSphere (OTV) is deployed as a VM appliance and provides an integrated vCenter UI for managing ONTAP storage. 
 
 Complete the following to Deploy ONTAP tools for VMware vSphere:
 
@@ -179,75 +182,100 @@ image:vmware-vcf-aff-image24.png[Select network]
 * OTV maintenance account password.
 * OTV Derby DB password.
 * Do not check the box to *Enable VMware Cloud Foundation (VCF)*. VCF mode is not required for deploying supplemental storage.
-* FQDN or IP address of the vCenter appliance and provide credentials for vCenter.
+* FQDN or IP address of the vCenter appliance for the *VI Workload Domain*
+* Credentials for the vCenter appliance of the *VI Workload Domain*
 * Provide the required network properties fields.
 +
 Click Next  to continue.
 +
 image:vmware-vcf-aff-image25.png[Customize OTV template 1]
 +
-image:vmware-vcf-asa-image13.png[Customize OTV template 2]
+image:vmware-vcf-asa-image35.png[Customize OTV template 2]
 
 . Review all information on the Ready to complete  page and the click Finish to begin deploying the OTV appliance.
 ====
 
-.Configure a VMFS iSCSI datastore on Management Domain using OTV
+*Create a vVols datastore in ONTAP Tools*
+
+To create a vVols datastore in ONTAP Tools complete the following steps:
+
+.Add a storage system to ONTAP Tools.
 [%collapsible]
 ==== 
-Complete the following to use OTV to configure a VMFS iSCSI datastore as supplemental storage on the Management Domain:
-
-. In the vSphere client navigate to the main menu and select *NetApp ONTAP Tools*.
+. Access NetApp ONTAP Tools by selecting it from the main menu in the vSphere client.
 +
-image:vmware-vcf-asa-image14.png[Navigate to ONTAP Tools]
+image::vmware-asa-image6.png[NetApp ONTAP Tools]
 
-. Once in *ONTAP Tools*, from the Getting Started page (or from *Storage Systems*), click on *Add* to add a new storage system.
+. In ONTAP Tools select *Storage Systems* from the left hand menu and then press *Add*.
 +
-image:vmware-vcf-asa-image15.png[Add storage system]
+image::vmware-asa-image8.png[Add storage system]
 
-. Provide the IP address and credentials of the ONTAP storage system and click on *Add*.
+. Fill out the IP Address, credentials of the storage system and the port number. Click on *Add* to start the discovery process.
 +
-image:vmware-vcf-asa-image16.png[Provide IP and credentials of ONTAP system]
-
-. Click on *Yes* to authorize the cluster certificate and add the storage system.
-+
-image:vmware-vcf-asa-image17.png[Authorize cluster certificate]
+image::vmware-asa-image9.png[Add storage system]
 ====
 
-.Migrate management VM's to iSCSI Datastore
+.Create a storage capability profile in ONTAP Tools
 [%collapsible]
 ==== 
-In cases where it is preferred to use ONTAP storage to protect the VCF management VM's vMotion can be use to migrate the VM's to the newly created iSCSI datastore.
+Storage capability profiles describe the features provided by a storage array or storage system. They include quality of service definitions and are used to select storage systems that meet the parameters defined in the profile.
 
-Complete the following steps to migrate the VCF management VM's to the iSCSI datastore.
+To create a storage capability profile in ONTAP Tools complete the following steps:
 
-. From the vSphere Client navigate to the Management Domain cluster and click on the *VMs* tab.
-
-. Select the VMs to be migrated to the iSCSI datastore, right click and select *Migrate..*.
+. In ONTAP Tools select *Storage capability profile* from the left hand menu and then press *Create*.
 +
-image:vmware-vcf-asa-image18.png[Select VMs to migrate]
+image::vmware-asa-image7.png[Storage capability profile]
 
-. In the *Virtual Machines - Migrate* wizard, select *Change storage only* as the migration type and click on *Next* to continue.
+. In the *Create Storage Capability profile* wizard provide a name and description of the profile and click on *Next*.
 +
-image:vmware-vcf-asa-image19.png[Select migration type]
+image::vmware-asa-image10.png[Add name for SCP]
 
-. On the *Select storage* page, select the iSCSi datastore and select *Next* to continue.
+. Select the platform type and to specify the storage system is to be an All-Flash SAN Array set *Asymmetric* to false.
 +
-image:vmware-vcf-asa-image20.png[Select destination datastore]
+image::vmware-asa-image11.png[Platorm for SCP]
 
-. Review the selections and click on *Finish* to start the migration.
+. Next, select choice of protocol or *Any* to allow all possible protocols. Click *Next* to continue.
++
+image::vmware-asa-image12.png[Protocol for SCP]
 
-. The relocation status can be viewed from the *Recent Tasks* pane.
-+ 
-image:vmware-vcf-asa-image21.png[vSphere client recent tasks pane]
+. The *performance* page allows setting of quality of service in form of minimum and maximum IOPs allowed.
++
+image::vmware-asa-image13.png[QoS for SCP]
+
+. Complete the *storage attributes* page selecting storage efficiency, space reservation, encryption and any tiering policy as needed. 
++
+image::vmware-asa-image14.png[Attributes for SCP]
+
+. Finally, review the summary and click on Finish to create the profile. 
++
+image::vmware-asa-image15.png[Summary for SCP]
 ====
 
+.Create a vVols datastore in ONTAP Tools
+[%collapsible]
+==== 
+To create a vVols datastore in ONTAP Tools complete the following steps:
 
+. In ONTAP Tools select *Overview* and from the *Getting Started* tab click on *Provision* to start the wizard.
++
+image::vmware-asa-image16.png[Provision datastore]
 
+. On the *General* page of the New Datastore wizard select the vSphere datacenter or cluster destination. Select *vVols* as the dastatore type, fill out a name for the datastore, and select the protocol.
++
+image::vmware-asa-image17.png[General page]
 
+. On the *Storage system* page select the select a storage capability profile, the storage system and SVM. Click on *Next* to continue.
++
+image::vmware-asa-image18.png[Storage system]
 
+. On the *Storage attributes* page select to create a new volume for the datastore and fill out the storage attributes of the volume to be created. Click on *Add* to create the volume and then *Next* to continue.
++
+image::vmware-asa-image19.png[Storage attributes]
 
-
-
+. Finally, review the summary and click on *Finish* to start the vVol datastore creation process.
++
+image::vmware-asa-image20.png[Summary page]
+====
 
 
 
