@@ -17,9 +17,9 @@ Author: Josh Powell
 == Use SnapCenter Plug-in for VMware vSphere to protect VMs on VCF Workload Domains
 
 === Scenario Overview
-In this scenario we will demonstrate how to deploy and use the SnapCenter Plug-in for VMware vSphere (SCV) to backup and restore VM's and datastores on a VCF Workload Domain. 
+In this scenario we will demonstrate how to deploy and use the SnapCenter Plug-in for VMware vSphere (SCV) to backup and restore VM's and datastores on a VCF Workload Domain. SCV uses ONTAP snapshot technology to take fast and efficient backup copies of the ONTAP storage volumes hosting vSphere datastores. SnapMirror and SnapVault technology are used to create secondary backups on a separate storage system and with retention policies that mimic the original volume or can be independent of the original volume for longer term retention.
 
-*iSCSI* is used as the storage protocol for the VMFS datastore.
+*iSCSI* is used as the storage protocol for the VMFS datastore in this solution.
 
 This scenario covers the following high level steps:
 
@@ -38,6 +38,7 @@ This scenario requires the following components and configurations:
 * A secondary ONTAP storage system configured to received secondary backups using SnapMirror.
 * VCF Management Domain deployment is complete and the vSphere client is accessible.
 * A VI Workload Domain has been previously deployed.
+* Virtual machines are present on the cluster SCV is designated to protect.
 
 For information on configuring iSCSI VMFS datastores as supplemental storage refer to Link:https://linkgoeshere.com[*iSCSI as supplemental storage for Management Domains*] in this documentation. The process for using OTV to deploy datastores is identical for Management and Workload Domains.
 
@@ -51,8 +52,8 @@ TIP: In addition to replicating backups taken with SCV to secondary storage, off
 === Deployment Steps
 To deploy the SnapCenter Plug-in and use it to create backup and restore VMs and datastores, complete the following steps:
 
-==== Deploy and use SCV to protect and restore data in VI Workload Domain
-Complete the following steps to deploy, configure, and use SCV to protect data and restore data to a VI Workload Domain:
+==== Deploy and use SCV to protect data in a VI Workload Domain
+Complete the following steps to deploy, configure, and use SCV to protect data in a VI Workload Domain:
 
 .Deploy the SnapCenter Plug-in for VMware vSphere
 [%collapsible]
@@ -110,12 +111,162 @@ image:vmware-vcf-asa-image52.png[select management network]
 . Finally, on the *Ready to complete page*, review all settings and click on Finish to start the deployment.
 ====
 
+.Add Storage Systems to SCV
+[%collapsible]
+==== 
+Once the SnapCenter Plug-in is installed complete the following steps to add storage systems to SCV:
+
+. SCV can be accessed from the main menu in the vSphere Client.
++
+image:vmware-vcf-asa-image53.png[Open SnapCenter Plug-in]
++
+{nbsp}
+. At the top of the SCV UI interface, select the correct SCV instance that matches the vSphere cluster to be protected.
++
+image:vmware-vcf-asa-image54.png[Select correct instance]
++
+{nbsp}
+. Navigate to *Storage Systems* in the left-hand menu and click on *Add* to get started.
++
+image:vmware-vcf-asa-image55.png[Add new storage system]
++
+{nbsp}
+. On the *Add Storage System* form, fill in the IP address and credentials of the ONTAP storage system to be added, and click on *Add* to complete the action.
++
+image:vmware-vcf-asa-image56.png[Provide storage system credentials]
++
+{nbsp}
+. Repeat this procedure for any additional storage systems to be managed, including any systems to be used as secondary backup targets.
+====
+
+.Configure backup policies in SCV
+[%collapsible]
+==== 
+For more information on creating SCV backup policies refer to link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/scpivs44_create_backup_policies_for_vms_and_datastores.html[Create backup policies for VMs and datastores].
+
+Complete the following steps to create a new backup policy:
+
+. From the left-hand menu select *Policies* and click on *Create* to begin.
++
+image:vmware-vcf-asa-image57.png[Create new policy]
++
+{nbsp}
+. On the *New Backup Policy* form, provide a *Name* and *Description* for the policy, the *Frequency* at which the backups will take place, and the *Retention* period which specifies how long the backup is retained. 
++
+*Locking Period* enables the ONTAP SnapLock feature to create tamper proof snapshots and allows configuration of the locking period.
++
+For *Replication* Select to update the underlying SnapMirror or SnapVault relationships for the ONTAP storage volume.  
++
+TIP: SnapMirror and SnapVault replication are similar in that they both utilize ONTAP SnapMirror technology to asynchronously replicate storage volumes to a secondary storage system for increased protection and security. For SnapMirror relationships, the retention schedule specified in the SCV backup policy will govern retention for both the primary and secondary volume. With SnapVault relationships, a separate retention schedule can be established on the secondary storage system for longer term or differing retention schedules. In this case the snapshot label is specified in the SCV backup policy and in the policy associated with the secondary volume, to identify which volumes to apply the independent retention schedule to. 
++
+Choose any additional advanced options and click on *Add* to create the policy.
++
+image:vmware-vcf-asa-image58.png[Fill out policy details]
+====
+
+.Create resource groups in SCV
+[%collapsible]
+==== 
+For more information on creating SCV Resource Groups refer to link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/scpivs44_create_resource_groups_for_vms_and_datastores.html[Create resource groups].
+
+Complete the following steps to create a new resource group:
+
+. From the left-hand menu select *Resource Groups* and click on *Create* to begin.
++
+image:vmware-vcf-asa-image59.png[Create new resource group]
++
+{nbsp}
+. On the *General info & notification* page, provide a name for for the resource group, notification settings, and any additional options for the naming of the snapshots.
+
+. On the *Resource* page select the datastores and VM's to be protected in the resource group. Click on *Next* to continue.
++
+TIP: Even when only specific VMs are selected, the entire datastore is always backed up. This is because ONTAP takes snapshots of the volume hosting the datastore. However, note that selecting only specific VMs for backup limits the ability to restore to only those VMs.
++
+image:vmware-vcf-asa-image60.png[Select resources to backup]
++
+{nbsp}
+. On the *Spanning disks* page select the option for how to handle VMs with VMDK's that span multiple datastores. Click on *Next* to continue.
++
+image:vmware-vcf-asa-image61.png[Select spanning datastores option]
++
+{nbsp}
+. On the *Policies* page select a previously created policy or multiple policies that will be used with this resource group.  Click on *Next* to continue.
++
+image:vmware-vcf-asa-image62.png[Select policies]
++
+{nbsp}
+. On the *Schedules* page establish for when the backup will run by configuring the recurrence and time of day. Click on *Next* to continue.
++
+image:vmware-vcf-asa-image63.png[Select schedule ]
++
+{nbsp}
+. Finally review the *Summary* and click on *Finish* to create the resource group. 
++
+image:vmware-vcf-asa-image64.png[Review summary and create resource group ]
++
+{nbsp}
+. With the resource group created click on the *Run Now* button to run the first backup.
++
+image:vmware-vcf-asa-image65.png[Review summary and create resource group]
++
+{nbsp}
+. Navigate to the *Dashboard* and, under *Recent Job Activities* click on the number next to *Job ID* to open the job monitor and view the progress of the running job.
++
+image:vmware-vcf-asa-image66.png[View backup job progress]
+====
+
+.Create resource groups in SCV
+[%collapsible]
+==== 
+For more information on creating SCV Resource Groups refer to link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/scpivs44_create_resource_groups_for_vms_and_datastores.html[Create resource groups].
+
+Complete the following steps to create a new resource group:
+
+. From the left-hand menu select *Resource Groups* and click on *Create* to begin.
++
+image:vmware-vcf-asa-image59.png[Create new resource group]
++
+{nbsp}
+
+==== Use SCV to restore VMs in a VI Workload Domain
+The SnapCenter Plug-in allows restores of VMs, VMDKs, files, and folders from primary or secondary backups.
+
+VMs can be restored to the original host, or to an alternate host in the same vCenter Server, or to an alternate ESXi host managed by the same vCenter or any vCenter in linked mode.
+
+vVol VMs can be restored to the original host.
+
+VMDKs in traditional VMs can be restored to either the original or to an alternate datastore.
+
+VMDKs in vVol VMs can be restored to the original datastore.
+
+Individual files and folders in a guest file restore session can be restored, which attaches a backup copy of a virtual disk and then restores the selected files or folders.
+
+Complete the following steps to restore VMs, VMDKs or individual folders.
 
 
+.Restore VMs with SCV
+[%collapsible]
+==== 
+Complete the following steps to restore a VM with SCV:
 
+. 
+====
 
+.Restore VMDKs with SCV
+[%collapsible]
+==== 
+Complete the following steps to restore a VM with SCV:
 
+. 
+====
 
+.Restore files and folders with SCV
+[%collapsible]
+==== 
+Complete the following steps to restore a VM with SCV:
+
+. 
+====
 
 For additional information:
 
