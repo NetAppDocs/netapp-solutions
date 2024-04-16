@@ -4,6 +4,7 @@ permalink: containers/rh-os-n_use_case_openshift_virtualization_dataprotection_o
 keywords: OpenShift, OCP, Astra Trident, NetApp ONTAP, Red Hat OpenShift, OpenShift Virtualization, CNV, Container Native Virtualization, Red Hat OpenShift Virtualization, OADP operator, Openshift Data Protection Application operator, velero
 summary: Red Hat OpenShift Virtualization with NetApp ONTAP
 ---
+
 = Data protection for VMs in OpenShift virtualization using OADP Operator
 :hardbreaks:
 :nofooter:
@@ -30,8 +31,7 @@ spec:
   snapshotVolumes: true
   storageLocation: velero-demo-1
   ttl: 720h0m0s
-
-  ....
+....
 
 
 Once the backup completes, its Phase should show as completed.
@@ -43,5 +43,38 @@ The path of the backup shows in the configured bucket with the prefix name (vele
 You can see the contents contain the volume snapshots logs and other metadata of the virtual machine. 
 
 image::redhat_openshift_OADP_backup_image2.jpg[Backup Objects in S3]
+
+== Creating a schedule for the backups
+
+To create a backup on a schedule, you need to create a Schedule CR. 
+The schedule is simply a Cron expression allowing you to specify the time at which you want to create the backup.
+
+....
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: <schedule>
+  namespace: openshift-adp
+spec:
+  schedule: 0 7 * * * 
+  template:
+    hooks: {}
+    includedNamespaces:
+    - <namespace> 
+    storageLocation: <velero-sample-1> 
+    defaultVolumesToFsBackup: true 
+    ttl: 720h0m0s
+....
+
+The Cron expression 0 7  * * * means a backup will be created at 7:00 every day.
+What should be included in the backup and the storage locations are also specified. So instead of a Backup CR, Schedule CR is used to create a backup ar the specified time and frequency.
+
+Once the schedule is created, it will be Enabled.
+
+image::redhat_openshift_OADP_backup_image3.jpg[Schedule created]
+
+
+
+
 
   
