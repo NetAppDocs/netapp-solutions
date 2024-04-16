@@ -4,7 +4,7 @@ permalink: containers/rh-os-n_use_case_openshift_virtualization_dataprotection_i
 keywords: OpenShift, OCP, Astra Trident, NetApp ONTAP, Red Hat OpenShift, OpenShift Virtualization, CNV, Container Native Virtualization, Red Hat OpenShift Virtualization, OADP operator, Openshift Data Protection Application operator, velero
 summary: Red Hat OpenShift Virtualization Data Protection with NetApp ONTAP
 ---
-= Installation of OADP Operator
+= Installation of OpenShift API for Data Protection (OADP) Operator
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -17,14 +17,14 @@ summary: Red Hat OpenShift Virtualization Data Protection with NetApp ONTAP
 *	A NetApp ONTAP cluster integrated with the cluster using Astra Trident
 *	A Trident backend configured with an SVM on ONTAP cluster
 *	A StorageClass configured on the OpenShift cluster with Astra Trident as the provisioner
-*   Trident Snapshot class created on the cluster
+* Trident Snapshot class created on the cluster
 *	Cluster-admin access to Red Hat OpenShift cluster
 *	Admin access to NetApp ONTAP cluster
-*   OpenShift Virtualization operator installed and configured
-*   VMs deployed in a Namespace on OpenShift Virtualization
+* OpenShift Virtualization operator installed and configured
+* VMs deployed in a Namespace on OpenShift Virtualization
 *	An admin workstation with tridentctl and oc tools installed and added to $PATH
 
-NOTE: If you want to take a backup of a VM when it is in the Running state, then you must install the QEMU guest agent on that virtual machine. If you install the VM using an existing template, then QEMU agent is installed automatically. QEMU allows the guest agent to quiesce in-flight data in the guest OS during the snapshot process, and avoid possible data corruption. If you dont have QEMU installed, you can stop the virtual machine before taking a backup. 
+NOTE: If you want to take a backup of a VM when it is in the Running state, then you must install the QEMU guest agent on that virtual machine. If you install the VM using an existing template, then QEMU agent is installed automatically. QEMU allows the guest agent to quiesce in-flight data in the guest OS during the snapshot process, and avoid possible data corruption. If you do not have QEMU installed, you can stop the virtual machine before taking a backup. 
 
 == Steps to install OADP Operator
 
@@ -38,9 +38,10 @@ image::redhat_openshift_OADP_install_image3.jpg[OpenShift API for Data Protectio
 
 
 
-=== Prerequisites for Velero configuration to use Ontap S3: 
+=== Prerequisites for Velero configuration with Ontap S3 details: 
+
 After the installation of the operator succeeds, configure the instance of Velero.
-Velero can be configured to use S3 compatible Object Storage Configure ONTAP S3 using the procedures shown in the link:https://docs.netapp.com/us-en/ontap/object-storage-management/index.html[Object Storage Management section of ONTAP documentation]. You will need the following information from your ONTAP S3 configuration to integrate with Velero.
+Velero can be configured to use S3 compatible Object Storage. Configure ONTAP S3 using the procedures shown in the link:https://docs.netapp.com/us-en/ontap/object-storage-management/index.html[Object Storage Management section of ONTAP documentation]. You will need the following information from your ONTAP S3 configuration to integrate with Velero.
 
 * A Logical Interface (LIF)IP that can be used to access S3
 * User credentials to access S3 that includes the access key and the secret access key
@@ -108,7 +109,7 @@ spec:
         provider: aws
 ....
 
-The above YAML has the following sections in the spec that needs to be configured appropriately:
+The above YAML has the following sections in the spec that needs to be configured appropriately similar to the example:
 
 **backupLocations**
 ONTAP S3 (with its credentials and other information as shown in the yaml) is configured as the default BackupLocation for velero.
@@ -118,11 +119,10 @@ ONTAP S3 is configured as the default location for PVC snapshots for Velero.
 
 **Enable CSI**
 Add csi to the defaultPlugins for Velero to back up persistent volumes with CSI snapshots. 
-The Velero CSI plugins, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster that has **velero.io/csi-volumesnapshot-class** label set on it.
+The Velero CSI plugins, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster that has **velero.io/csi-volumesnapshot-class** label set on it. For this
 
-You must have the trident VolumeSnapshotClass created.
-
-Edit the label of the trident-snapshotclass and set it to 
+* You must have the trident VolumeSnapshotClass created.
+* Edit the label of the trident-snapshotclass and set it to 
 **velero.io/csi-volumesnapshot-class=true** as shown below.
 
 image::redhat_openshift_OADP_install_image9.jpg[Trident Snapshot class Label]
@@ -145,3 +145,5 @@ Ensure that the DataProtectionApplication is created and is in condition:Reconci
 image::redhat_openshift_OADP_install_image11.jpg[DataProtectionApplication Object is created]
 
 The OADP operator will create a corresponding BackupStorageLocation.This will be used when creating a backup.
+
+image::redhat_openshift_OADP_install_image12.jpg[BackupStorageLocation is created]
