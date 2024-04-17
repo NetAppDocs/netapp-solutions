@@ -1,6 +1,6 @@
 ---
 sidebar: sidebar
-permalink: virtualization/vmware_vcf_asa_supp_wkld_vvols.html
+permalink: virtualization/vmware_vcf_asa_supp_wkld_nvme.html
 keywords: netapp, vmware, cloud, foundation, vcf, aff, all-flash, nfs, vvol, vvols, array, ontap tools, otv, sddc, iscsi
 summary:
 ---
@@ -14,20 +14,17 @@ summary:
 [.lead]
 Author: Josh Powell
 
-== Use ONTAP Tools to configure supplemental storage for VCF Workload Domains
+== Configure NVMe/TCP supplemental storage for VCF Workload Domains
 
 === Scenario Overview
-In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMware vSphere (OTV) to configure a *vVols datastore* for a VCF Workload Domain. 
-
-*iSCSI* will be used as the storage protocol for the vVols datastore.
+In this scenario we will demonstrate how to configure NVMe/TCP supplemental storage for a VCF Workload Domain. 
 
 This scenario covers the following high level steps:
 
 * Create a storage virtual machine (SVM) with logical interfaces (LIFs) for iSCSI traffic.
 * Create distributed port groups for iSCSI networks on the VI Workload Domain.
 * Create vmkernel adapters for iSCSI on the ESXi hosts for the VI Workload Domain.
-* Deploy ONTAP Tools on the VI Workload Domain.
-* Create a new vVols datastore on the VI Workload Domain.
+* 
 
 === Prerequisites
 This scenario requires the following components and configurations:
@@ -36,16 +33,18 @@ This scenario requires the following components and configurations:
 * VCF Management Domain deployment is complete and the vSphere client is accessible.
 * A VI Workload Domain has been previously deployed.
 
-For multipathing and failover across multiple paths, NetApp recommends having a minimum of two LIFs per storage node in separate ethernet networks for all SVMs in iSCSI configurations.
+NetApp recommends fully redundant network designs for NVMe/TCP. The following diagram illustrates an example of a redundant configuration, providing fault tolerance for storage systems, switches, networks adapters and host systems. Refer to the NetApp link:https://docs.netapp.com/us-en/ontap/san-config/index.html[SAN configuration reference] for additional information.
 
-This documentation demonstrates the process of creating a new SVM and specifying the IP address information to create multiple LIFs for iSCSI traffic. To add new LIFs to an existing SVM refer to link:https://docs.netapp.com/us-en/ontap/networking/create_a_lif.html[Create a LIF (network interface)].
+image:vmware-vcf-asa-image74.png[NVMe-tcp network design]
 
-TIP: In situations where multiple VMkernel adapters are configured on the same IP network, it is recommended to use software iSCSI port binding on the ESXi hosts to ensure that load balancing across the adapters occurs. Refer to KB article link:https://kb.vmware.com/s/article/2038869[Considerations for using software iSCSI port binding in ESX/ESXi (2038869)].
+For multipathing and failover across multiple paths, NetApp recommends having a minimum of two LIFs per storage node in separate ethernet networks for all SVMs in NVMe/TCP configurations.
 
-For additional information on using VMFS iSCSI datastores with VMware refer to link:https://docs.netapp.com/us-en/netapp-solutions/virtualization/vsphere_ontap_auto_block_iscsi.html[vSphere VMFS Datastore - iSCSI Storage backend with ONTAP].
+This documentation demonstrates the process of creating a new SVM and specifying the IP address information to create multiple LIFs for NVMe/TCP traffic. To add new LIFs to an existing SVM refer to link:https://docs.netapp.com/us-en/ontap/networking/create_a_lif.htm[Create a LIF (network interface)].
+
+Refer to link:https://docs.netapp.com/us-en/ontap/nvme/support-limitations.html[NVMe configuration, support and limitations] for additional NVMe design considerations with ONTAP storage systems.
 
 === Deployment Steps
-To deploy ONTAP Tools and use it to create a vVols datastore on the VCF Management Domain, complete the following steps:
+To create a VMFS datastore on a VCF Workload Domain using NVMe/TCP, complete the following steps.
 
 ==== Create SVM and LIFs on ONTAP storage system
 The following step is performed in ONTAP System Manager.
@@ -53,23 +52,23 @@ The following step is performed in ONTAP System Manager.
 .Create the storage VM and LIFs
 [%collapsible]
 ==== 
-Complete the following steps to create an SVM together with multiple LIFs for iSCSI traffic.
+Complete the following steps to create an SVM together with multiple LIFs for NVMe/TCP traffic.
 
 . From ONTAP System Manager navigate to *Storage VMs* in the left-hand menu and click on *+ Add* to start. 
 +
 image:vmware-vcf-asa-image01.png[Click +Add to start creating SVM]
 +
 {nbsp}
-. In the *Add Storage VM* wizard provide a *Name* for the SVM, select the *IP Space* and then, under *Access Protocol*, click on the *iSCSI* tab and check the box to *Enable iSCSI*.
+. In the *Add Storage VM* wizard provide a *Name* for the SVM, select the *IP Space* and then, under *Access Protocol*, click on the *NVMe* tab and check the box to *Enable NVMe/TCP*.
 +
-image:vmware-vcf-asa-image02.png[Add storage VM wizard - enable iSCSI]
+image:vmware-vcf-asa-image75.png[Add storage VM wizard - enable NVMe/TCP]
 +
 {nbsp}
-. In the *Network Interface* section fill in the *IP address*, *Subnet Mask*, and *Broadcast Domain and Port* for the first LIF. For subsequent LIFs the checkbox may be enabled to use common settings across all remaining LIFs or use separate settings.
+. In the *Network Interface* section fill in the *IP address*, *Subnet Mask*, and *Broadcast Domain and Port* for the first LIF. For subsequent LIFs the checkbox may be enabled to use common settings across all remaining LIFs, or use separate settings.
 +
-NOTE: For multipathing and failover across multiple paths, NetApp recommends having a minimum of two LIFs per storage node in separate Ethernet networks for all SVMs in iSCSI configurations.
+NOTE: For multipathing and failover across multiple paths, NetApp recommends having a minimum of two LIFs per storage node in separate Ethernet networks for all SVMs in NVMe/TCP configurations.
 +
-image:vmware-vcf-asa-image03.png[Fill out network info for LIFs]
+image:vmware-vcf-asa-image76.png[Fill out network info for LIFs]
 +
 {nbsp}
 . Choose whether to enable the Storage VM Administration account (for multi-tenancy environments) and click on *Save* to create the SVM.
