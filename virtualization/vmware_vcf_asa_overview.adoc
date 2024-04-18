@@ -17,7 +17,7 @@ Author: Josh Powell
 == VMware Cloud Foundation with NetApp All-Flash SAN Arrays
 VMware Cloud Foundation (VCF) is an integrated software defined data center (SDDC) platform that provides a complete stack of software-defined infrastructure for running enterprise applications in a hybrid cloud environment. It combines compute, storage, networking, and management capabilities into a unified platform, offering a consistent operational experience across private and public clouds.
 
-This document provides information on storage options available for VMware Cloud Foundation using the NetApp All-Flash SAN Array. Supported storage options are covered with specific instruction for deploying iSCSI datastores as supplemental storage for management domains and vVol datastores as supplemental datastores for workload domains. Also covered is data protection of VMs and datastores using SnapCenter for VMware vSphere.
+This document provides information on storage options available for VMware Cloud Foundation using the NetApp All-Flash SAN Array. Supported storage options are covered with specific instruction for deploying iSCSI datastores as supplemental storage for management domains and both vVol (iSCSI) and NVMe/TCP datastores as supplemental datastores for workload domains. Also covered is data protection of VMs and datastores using SnapCenter for VMware vSphere.
 
 === Use Cases
 Use cases covered in this documentation:
@@ -25,7 +25,7 @@ Use cases covered in this documentation:
 * Storage options for customers seeking uniform environments across both private and public clouds.
 * Automated solution for deploying virtual infrastructure for workload domains.
 * Scalable storage solution tailored to meet evolving needs, even when not aligned directly with compute resource requirements.
-* Deploy supplemental storage to Management and VI Workload Domains using ONTAP Tools for VMware vSphere.
+* Deploy supplemental storage to management and VI workload domains using ONTAP Tools for VMware vSphere.
 * Protect VMs and datastores using the SnapCenter Plug-in for VMware vSphere.
 
 === Audience
@@ -45,21 +45,21 @@ VMware Cloud Foundation extends VMware’s vSphere hypervisor offerings by combi
 
 The VCF solution supports both native Kubernetes and virtual machine-based workloads. Key services such as VMware vSphere, VMware vSAN, VMware NSX-T Data Center, and VMware vRealize Cloud Management are integral components of the VCF package. When combined, these services establish a software-defined infrastructure capable of efficiently managing compute, storage, networking, security, and cloud management.
 
-VCF is comprised of a single management domain and up to 24 VI Workload Domains that each represent a unit of application-ready infrastructure. A workload domain is comprised of one or more vSphere clusters managed by a single vCenter instance.
+VCF is comprised of a single management domain and up to 24 VI workload domains that each represent a unit of application-ready infrastructure. A workload domain is comprised of one or more vSphere clusters managed by a single vCenter instance.
 
 image:vmware-vcf-aff-image02.png[VCF Architecture,width=500,height=400]
 
 For more information on VCF architecture and planning, refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/5.1/vcf-design/GUID-A550B597-463F-403F-BE9A-BFF3BECB9523.html[Architecture Models and Workload Domain Types in VMware Cloud Foundation].
-700
+
 {nbsp}
 
 ==== VCF Storage Options
-VMware divides storage options for VCF into *principal* and *supplemental* storage. The VCF Management Domain must use vSAN as its principal storage. However, there are many supplemental storage options for the Management Domain and both principal and supplemental storage options available for VI Workload Domains.
+VMware divides storage options for VCF into *principal* and *supplemental* storage. The VCF management domain must use vSAN as its principal storage. However, there are many supplemental storage options for the management domain and both principal and supplemental storage options available for VI workload domains.
 
 image:vmware-vcf-aff-image01.png[VCF Storage Options,width=500,height=353]
 
 *Principal Storage for Workload Domains*
-Principal Storage refers to any type of storage that can be directly connected to a VI Workload Domain during the setup process within SDDC Manager. Principal storage is the first datastore configured for a Workload Domain and includes vSAN, vVols (VMFS), NFS and VMFS on Fibre Channel.
+Principal storage refers to any type of storage that can be directly connected to a VI workload domain during the setup process within SDDC Manager. Principal storage is the first datastore configured for a workload domain and includes vSAN, vVols (VMFS), NFS and VMFS on Fibre Channel.
 
 *Supplemental Storage for Management and Workload Domains*
 Supplemental storage is the storage type that can be added to the management or workload domains at any time after the cluster has been created. Supplemental storage represents the widest range of supported storage options, all of which are supported on NetApp AFF arrays.
@@ -129,7 +129,7 @@ ONTAP Tools for VMware vSphere (OTV) allows administrators to manage NetApp stor
 
 ONTAP Tools allows mapping of datastores to storage capability profiles which determine a set of storage system attributes. This allows the creation of datastores with specific attributes such as storage performance and QoS.
 
-ONTAP Tools also includes a *VMware vSphere APIs for Storage Awareness (VASA) Provider* for ONTAP storage systems which enables the provisioning of VMware Virtual Volumes (vVols) datastores, creation and use of storage capability profiles, compliance verification, and performance monitoring.
+ONTAP Tools also includes a *VMware vSphere APIs for Storage Awareness (VASA) Provider* for ONTAP storage systems, which enables the provisioning of VMware Virtual Volumes (vVols) datastores, creation and use of storage capability profiles, compliance verification, and performance monitoring.
 
 For more information on NetApp ONTAP tools see the link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/index.html[ONTAP tools for VMware vSphere Documentation] page.
 {nbsp}
@@ -153,13 +153,14 @@ For more information refer to the https://docs.netapp.com/us-en/sc-plugin-vmware
 
 BlueXP integration enables 3-2-1 backup strategies that extend copies of data to object storage in the cloud.
 
-For more information on 3-2-1 backup strategies with BlueXP visit https://community.netapp.com/t5/Tech-ONTAP-Blogs/3-2-1-Data-Protection-for-VMware-with-SnapCenter-Plug-in-and-BlueXP-backup-and/ba-p/446180[3-2-1 Data Protection for VMware with SnapCenter Plug-in and BlueXP backup and recovery for VMs].
+For more information on 3-2-1 backup strategies with BlueXP visit https://docs.netapp.com/us-en/netapp-solutions/ehc/bxp-scv-hybrid-solution.html[3-2-1 Data Protection for VMware with SnapCenter Plug-in and BlueXP backup and recovery for VMs].
 
 == Solution Overview
-In the scenarios presented in this documentation we will demonstrate how to use ONTAP storage systems as principal storage for VCF VI Workload Domain deployments. In addition, we will install and use ONTAP Tools for VMware vSphere to configure supplemental datastores for VI Workload Domains.
+The scenarios presented in this documentation will demonstrate how to use ONTAP storage systems as supplemental storage for management and workload domains. In addition, the SnapCenter Plug-in for VMware vSphere is used to protect VMs and datastores.
 
 Scenarios covered in this documentation:
 
-* Configure and use an NFS datastore as principal storage during VI Workload Domain deployment. Click link:https://review.docs.netapp.com/us-en/netapp-solutions_vcf_asa_aff/virtualization/vsphere_ontap_auto_block_fc.html[here] for deployment steps.
-* Configure and use a vVol datastore as principal storage during VI Workload Domain deployment. Click link:
-* Install and demonstrate the use of ONTAP Tools to configure and mount NFS and iSCSI (VMFS) datastores as supplemental storage in VI Workload Domains. Click link:
+* Use Ontap Tools to deploy iSCSI datastores in a VCF management domain. Click https://docs.netapp.com/us-en/netapp-solutions/virtualization/vmware_vcf_asa_supp_mgmt_iscsi.html[*here*] for deployment steps.
+* Use Ontap Tools to deploy vVols (iSCSI) datastores in a VI workload domain.. Click https://docs.netapp.com/us-en/netapp-solutions/virtualization/vmware_vcf_asa_supp_wkld_vvols.html[*here*] for deployment steps.
+* Configure NVMe over TCP datastores for use in a VI workload domain. Click https://docs.netapp.com/us-en/netapp-solutions/virtualization/vmware_vcf_asa_supp_wkld_nvme.html[*here*] for deployment steps.
+* Deploy and use the SnapCenter Plug-in for VMware vSphere to protect and restore VMs in a VI workload domain. Click https://docs.netapp.com/us-en/netapp-solutions/virtualization/vmware_vcf_asa_scv_wkld.html[*here*] for deployment steps.

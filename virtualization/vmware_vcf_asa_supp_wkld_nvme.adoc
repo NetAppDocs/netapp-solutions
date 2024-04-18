@@ -17,21 +17,21 @@ Author: Josh Powell
 == Configure NVMe/TCP supplemental storage for VCF Workload Domains
 
 === Scenario Overview
-In this scenario we will demonstrate how to configure NVMe/TCP supplemental storage for a VCF Workload Domain. 
+In this scenario we will demonstrate how to configure NVMe/TCP supplemental storage for a VCF workload domain. 
 
 This scenario covers the following high level steps:
 
 * Create a storage virtual machine (SVM) with logical interfaces (LIFs) for iSCSI traffic.
-* Create distributed port groups for iSCSI networks on the VI Workload Domain.
-* Create vmkernel adapters for iSCSI on the ESXi hosts for the VI Workload Domain.
+* Create distributed port groups for iSCSI networks on the VI workload domain.
+* Create vmkernel adapters for iSCSI on the ESXi hosts for the VI workload domain.
 * 
 
 === Prerequisites
 This scenario requires the following components and configurations:
 
 * An ONTAP ASA storage system with physical data ports on ethernet switches dedicated to storage traffic.
-* VCF Management Domain deployment is complete and the vSphere client is accessible.
-* A VI Workload Domain has been previously deployed.
+* VCF management domain deployment is complete and the vSphere client is accessible.
+* A VI workload domain has been previously deployed.
 
 NetApp recommends fully redundant network designs for NVMe/TCP. The following diagram illustrates an example of a redundant configuration, providing fault tolerance for storage systems, switches, networks adapters and host systems. Refer to the NetApp link:https://docs.netapp.com/us-en/ontap/san-config/index.html[SAN configuration reference] for additional information.
 
@@ -44,7 +44,7 @@ This documentation demonstrates the process of creating a new SVM and specifying
 For additional information on NVMe design considerations for ONTAP storage systems, refer to link:https://docs.netapp.com/us-en/ontap/nvme/support-limitations.html[NVMe configuration, support and limitations]. 
 
 === Deployment Steps
-To create a VMFS datastore on a VCF Workload Domain using NVMe/TCP, complete the following steps.
+To create a VMFS datastore on a VCF workload domain using NVMe/TCP, complete the following steps.
 
 ==== Create SVM, LIFs and NVMe Namespace on ONTAP storage system
 The following step is performed in ONTAP System Manager.
@@ -108,14 +108,14 @@ image:vmware-vcf-asa-image93.png[Click +Add to create NVMe Namespace]
 ====
 
 ==== Set up networking and NVMe software adapters on ESXi hosts
-The following steps are performed on the VI Workload Domain cluster using the vSphere client. In this case vCenter Single Sign-On is being used so the vSphere client is common to both the management and workload domains.
+The following steps are performed on the VI workload domain cluster using the vSphere client. In this case vCenter Single Sign-On is being used so the vSphere client is common to both the management and workload domains.
 
 .Create Distributed Port Groups for NVME/TCP traffic
 [%collapsible]
 ====
 Complete the following to create a new distributed port group for each NVMe/TCP network:
 
-. From the vSphere client , navigate to *Inventory > Networking* for the Workload Domain. Navigate to the existing Distributed Switch and choose the action to create *New Distributed Port Group...*.
+. From the vSphere client , navigate to *Inventory > Networking* for the workload domain. Navigate to the existing Distributed Switch and choose the action to create *New Distributed Port Group...*.
 +
 image:vmware-vcf-asa-image22.png[Choose to create new port group]
 +
@@ -148,9 +148,9 @@ image:vmware-vcf-asa-image79.png[move uplink 1 to unused]
 .Create VMkernel adapters on each ESXi host
 [%collapsible]
 ====
-Repeat this process on each ESXi host in the Workload Domain.
+Repeat this process on each ESXi host in the workload domain.
 
-. From the vSphere client navigate to one of the ESXi hosts in the Workload Domain inventory. From the *Configure* tab select *VMkernel adapters* and click on *Add Networking...* to start.
+. From the vSphere client navigate to one of the ESXi hosts in the workload domain inventory. From the *Configure* tab select *VMkernel adapters* and click on *Add Networking...* to start.
 +
 image:vmware-vcf-asa-image30.png[Start add networking wizard]
 +
@@ -183,8 +183,75 @@ image:vmware-vcf-asa-image98.png[Review VMkernel selections]
 . Repeat this process to create a VMkernel adapter for the second iSCSI network.
 ====
 
+.Add NVMe over TCP adapter
+[%collapsible]
+====
+Each ESXi host in the workload domain cluster must have an NVMe over TCP software adapter installed for every established NVMe/TCP network dedicated to storage traffic.
 
+To install NVMe over TCP adapters and discover the NVMe controllers, complete the following steps:
 
+. In the vSphere client navigate to one of the ESXi hosts in the workload domain cluster. From the *Configure* tab click on *Storage Adapters* in the menu and then, from the *Add Software Adapter* drop-down menu, select *Add NVMe over TCP adapter*.
++ 
+image:vmware-vcf-asa-image99.png[Add NVMe over TCP adapter]
++
+{nbsp}
+. In the *Add Software NVMe over TCP adapter* window, access the *Physical Network Adapter* drop-down menu and select the correct physical network adapter on which to enable the NVMe adapter.
++ 
+image:vmware-vcf-asa-image100.png[Select physical adapter]
++
+{nbsp}
+. Repeat this process for the second network assigned to NVMe over TCP traffic, assigning the correct physical adapter.
+
+. Select one of the newly installed NVMe over TCP adapters and, on the *Controllers* tab, select *Add Controller*.
++ 
+image:vmware-vcf-asa-image101.png[Add Controller]
++
+{nbsp}
+. In the *Add controller* window, select the *Automatically* tab and complete the following steps. 
+* Fill in an IP addresses for one of the SVM logical interfaces on the same network as the physical adapter assigned to this NVMe over TCP adapter. 
+* Click on the *Discover Controllers* button.
+* From the list of discovered controllers, click the check box for the two controllers with network addresses aligned with this NVMe over TCP adapter.
+* Click on the *OK* button to add the selected controllers. 
++ 
+image:vmware-vcf-asa-image102.png[Discover and add controllers]
++
+{nbsp}
+. After a few seconds you should see the NVMe namespace appear on the Devices tab.
++ 
+image:vmware-vcf-asa-image103.png[NVMe namespace listed under devices]
++
+{nbsp}
+. Repeat this procedure to create an NVMe over TCP adapter for the second network established for NVMe/TCP traffic.
+====
+
+.Deploy NVMe over TCP datastore
+[%collapsible]
+====
+To create a VMFS datastore on the NVMe namespace, complete the following steps:
+
+. In the vSphere client navigate to one of the ESXi hosts in the workload domain cluster. From the *Actions* menu select *Storage > New Datastore...*.
++ 
+image:vmware-vcf-asa-image104.png[Add NVMe over TCP adapter]
++
+{nbsp}
+. In the *New Datastore* wizard, select *VMFS* as the type. Click on *Next* to continue.
+
+. On the *Name and device selection* page, provide a name for the datastore and select the NVMe namespace from the list of available devices.
++ 
+image:vmware-vcf-asa-image105.png[Name and device selection]
++
+{nbsp}
+. On the *VMFS version* page select the version of VMFS for the datastore.
+
+. On the *Partition configuration* page, make any desired changes to the default partition scheme. Click on *Next* to continue.
++ 
+image:vmware-vcf-asa-image106.png[NVMe partition configuration]
++
+{nbsp}
+. On the *Ready to complete* page, review the summary and click on *Finish* to create the datastore.
+
+. Navigate to the new datastore in inventory and click on the *Hosts* tab. If configured correctly, all ESXi hosts in the cluster should be listed and have access to the new datastore.
+====
 
 
 
