@@ -1,0 +1,222 @@
+---
+sidebar: sidebar
+permalink: ai/vector-database-milvus-cluster-setup.html
+keywords: vector database
+summary: milvus cluster setup - vector database solution for netapp
+---
+
+= Milvus Cluster Setup with Kubernetes in on-premises
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+
+== Milvus cluster setup with Kubernetes in on-premises
+
+Customer challenges to scale independently on storage and compute, effective infrastructure management and data management,
+Kubernetes and vector databases together form a powerful, scalable solution for managing large data operations. Kubernetes optimizes resources and manages containers, while vector databases efficiently handle high-dimensional data and similarity searches. This combination enables swift processing of complex queries on large datasets and seamlessly scales with growing data volumes, making it ideal for big data applications and AI workloads.
+
+.	In this section, we detail the process of installing a Milvus cluster on Kubernetes, utilizing a NetApp storage controller for both cluster data and customer data. 
+.	To install a Milvus cluster, Persistent Volumes (PVs) are required for storing data from various Milvus cluster components. These components include etcd (three instances), pulsar-bookie-journal (three instances), pulsar-bookie-ledgers (three instances), and pulsar-zookeeper-data (three instances).
+.	We created a single NFS volume from NetApp ONTAP and established 12 persistent volumes, each with 250GB of storage. The storage size can vary depending on the cluster size; for instance, we have another cluster where each PV has 50GB. Please refer below to one of the PV YAML files for more details; we had 12 such files in total. In each file, the storageClassName is set to 'default', and the storage and path are unique to each PV.
++
+[source,yaml]
+....
+root@node2:~# cat sai_nfs_to_default_pv1.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: karthik-pv1
+spec:
+  capacity:
+    storage: 250Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: default
+  local:
+    path: /vectordbsc/milvus/milvus1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - node2
+          - node3
+          - node4
+          - node5
+          - node6
+root@node2:~#
+....
++
+.	Execute the 'kubectl apply' command for each PV YAML file to create the Persistent Volumes, and then verify their creation using ‘kubectl get pv’
++
+[source,bash]
+....
+root@node2:~# for i in $( seq 1 12 ); do kubectl apply -f sai_nfs_to_default_pv$i.yaml; done
+persistentvolume/karthik-pv1 created
+persistentvolume/karthik-pv2 created
+persistentvolume/karthik-pv3 created
+persistentvolume/karthik-pv4 created
+persistentvolume/karthik-pv5 created
+persistentvolume/karthik-pv6 created
+persistentvolume/karthik-pv7 created
+persistentvolume/karthik-pv8 created
+persistentvolume/karthik-pv9 created
+persistentvolume/karthik-pv10 created
+persistentvolume/karthik-pv11 created
+persistentvolume/karthik-pv12 created
+root@node2:~#
+....
++
+.	For storing customer data, Milvus supports object storage solutions such as MinIO, Azure Blob, and S3. In this guide, we utilize S3. The following steps apply to both ONTAP S3 and StorageGRID object store. We use Helm to deploy the Milvus cluster. Download the configuration file, values.yaml, from the Milvus download location. Please refer to the appendix for the values.yaml file we used in this document.
+.	Ensure that the 'storageClass' is set to 'default' in each section, including those for the log, etcd, zookeeper, and bookkeeper.
+.	In the MinIO section, disable MinIO.
+.	Create a NAS bucket from ONTAP or StorageGRID object storage and include them in an External S3 with the object storage credentials. 
++
+[source,yaml]
+....
+###################################
+# External S3
+# - these configs are only used when `externalS3.enabled` is true
+###################################
+externalS3:
+  enabled: true
+  host: "192.168.150.167"
+  port: "80"
+  accessKey: "24G4C1316APP2BIPDE5S"
+  secretKey: "Zd28p43rgZaU44PX_ftT279z9nt4jBSro97j87Bx"
+  useSSL: false
+  bucketName: "milvusdbvol1"
+  rootPath: ""
+  useIAM: false
+  cloudProvider: "aws"
+  iamEndpoint: ""
+  region: ""
+  useVirtualHost: false
+
+....
++
+.	Before creating the Milvus cluster, ensure that the PersistentVolumeClaim (PVC) does not have any pre-existing resources. 
++
+[source,bash]
+....
+root@node2:~# kubectl get pvc
+No resources found in default namespace.
+root@node2:~#
+....
++
+.	Utilize Helm and the values.yaml configuration file to install and start the Milvus cluster. 
++
+[source,bash]
+....
+root@node2:~# helm upgrade --install my-release milvus/milvus --set global.storageClass=default  -f values.yaml
+Release "my-release" does not exist. Installing it now.
+NAME: my-release
+LAST DEPLOYED: Thu Mar 14 15:00:07 2024
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+root@node2:~# 
+....
++
+.	Verify the status of the PersistentVolumeClaims (PVCs).
++
+[source,bash]
+....
+root@node2:~# kubectl get pvc
+NAME                                                             STATUS   VOLUME         CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+data-my-release-etcd-0                                           Bound    karthik-pv8    250Gi      RWO            default        3s
+data-my-release-etcd-1                                           Bound    karthik-pv5    250Gi      RWO            default        2s
+data-my-release-etcd-2                                           Bound    karthik-pv4    250Gi      RWO            default        3s
+my-release-pulsar-bookie-journal-my-release-pulsar-bookie-0      Bound    karthik-pv10   250Gi      RWO            default        3s
+my-release-pulsar-bookie-journal-my-release-pulsar-bookie-1      Bound    karthik-pv3    250Gi      RWO            default        3s
+my-release-pulsar-bookie-journal-my-release-pulsar-bookie-2      Bound    karthik-pv1    250Gi      RWO            default        3s
+my-release-pulsar-bookie-ledgers-my-release-pulsar-bookie-0      Bound    karthik-pv2    250Gi      RWO            default        3s
+my-release-pulsar-bookie-ledgers-my-release-pulsar-bookie-1      Bound    karthik-pv9    250Gi      RWO            default        3s
+my-release-pulsar-bookie-ledgers-my-release-pulsar-bookie-2      Bound    karthik-pv11   250Gi      RWO            default        3s
+my-release-pulsar-zookeeper-data-my-release-pulsar-zookeeper-0   Bound    karthik-pv7    250Gi      RWO            default        3s
+root@node2:~# 
+....
++
+.	Check the status of the pods.
++
+[source,bash]
+....
+root@node2:~# kubectl get pods -o wide
+NAME                                            READY   STATUS      RESTARTS        AGE    IP              NODE    NOMINATED NODE   READINESS GATES
+<content removed to save page space>
+....
+Please make sure the pods status are ‘running’ and working as expected
++
+.	Test data writing and reading in Milvus and NetApp object storage.
+* Write data using the "prepare_data_netapp_new.py" Python program. 
++
+[source,python]
+....
+root@node2:~# date;python3 prepare_data_netapp_new.py ;date
+Thu Apr  4 04:15:35 PM UTC 2024
+=== start connecting to Milvus     ===
+=== Milvus host: localhost         ===
+Does collection hello_milvus_ntapnew_update2_sc exist in Milvus: False
+=== Drop collection - hello_milvus_ntapnew_update2_sc ===
+=== Drop collection - hello_milvus_ntapnew_update2_sc2 ===
+=== Create collection `hello_milvus_ntapnew_update2_sc` ===
+=== Start inserting entities       ===
+Number of entities in hello_milvus_ntapnew_update2_sc: 3000
+Thu Apr  4 04:18:01 PM UTC 2024
+root@node2:~#
+....
++
+* Read the data using the "verify_data_netapp.py" Python file.
++
+....
+root@node2:~# python3 verify_data_netapp.py
+=== start connecting to Milvus     ===
+=== Milvus host: localhost         ===
+
+Does collection hello_milvus_ntapnew_update2_sc exist in Milvus: True
+{'auto_id': False, 'description': 'hello_milvus_ntapnew_update2_sc', 'fields': [{'name': 'pk', 'description': '', 'type': <DataType.INT64: 5>, 'is_primary': True, 'auto_id': False}, {'name': 'random', 'description': '', 'type': <DataType.DOUBLE: 11>}, {'name': 'var', 'description': '', 'type': <DataType.VARCHAR: 21>, 'params': {'max_length': 65535}}, {'name': 'embeddings', 'description': '', 'type': <DataType.FLOAT_VECTOR: 101>, 'params': {'dim': 16}}]}
+Number of entities in Milvus: hello_milvus_ntapnew_update2_sc : 3000
+
+=== Start Creating index IVF_FLAT  ===
+
+=== Start loading                  ===
+
+=== Start searching based on vector similarity ===
+
+hit: id: 2998, distance: 0.0, entity: {'random': 0.9728033590489911}, random field: 0.9728033590489911
+hit: id: 2600, distance: 0.602496862411499, entity: {'random': 0.3098157043984633}, random field: 0.3098157043984633
+hit: id: 1831, distance: 0.6797959804534912, entity: {'random': 0.6331477114129169}, random field: 0.6331477114129169
+hit: id: 2999, distance: 0.0, entity: {'random': 0.02316334456872482}, random field: 0.02316334456872482
+hit: id: 2524, distance: 0.5918987989425659, entity: {'random': 0.285283165889066}, random field: 0.285283165889066
+hit: id: 264, distance: 0.7254047393798828, entity: {'random': 0.3329096143562196}, random field: 0.3329096143562196
+search latency = 0.4533s
+
+=== Start querying with `random > 0.5` ===
+
+query result:
+-{'random': 0.6378742006852851, 'embeddings': [0.20963514, 0.39746657, 0.12019053, 0.6947492, 0.9535575, 0.5454552, 0.82360446, 0.21096309, 0.52323616, 0.8035404, 0.77824664, 0.80369574, 0.4914803, 0.8265614, 0.6145269, 0.80234545], 'pk': 0}
+search latency = 0.4476s
+
+=== Start hybrid searching with `random > 0.5` ===
+
+hit: id: 2998, distance: 0.0, entity: {'random': 0.9728033590489911}, random field: 0.9728033590489911
+hit: id: 1831, distance: 0.6797959804534912, entity: {'random': 0.6331477114129169}, random field: 0.6331477114129169
+hit: id: 678, distance: 0.7351570129394531, entity: {'random': 0.5195484662306603}, random field: 0.5195484662306603
+hit: id: 2644, distance: 0.8620758056640625, entity: {'random': 0.9785952878381153}, random field: 0.9785952878381153
+hit: id: 1960, distance: 0.9083120226860046, entity: {'random': 0.6376039340439571}, random field: 0.6376039340439571
+hit: id: 106, distance: 0.9792704582214355, entity: {'random': 0.9679994241326673}, random field: 0.9679994241326673
+search latency = 0.1232s
+Does collection hello_milvus_ntapnew_update2_sc2 exist in Milvus: True
+{'auto_id': True, 'description': 'hello_milvus_ntapnew_update2_sc2', 'fields': [{'name': 'pk', 'description': '', 'type': <DataType.INT64: 5>, 'is_primary': True, 'auto_id': True}, {'name': 'random', 'description': '', 'type': <DataType.DOUBLE: 11>}, {'name': 'var', 'description': '', 'type': <DataType.VARCHAR: 21>, 'params': {'max_length': 65535}}, {'name': 'embeddings', 'description': '', 'type': <DataType.FLOAT_VECTOR: 101>, 'params': {'dim': 16}}]}
+....
++
+Based on the above validation, the integration of Kubernetes with a vector database, as demonstrated through the deployment of a Milvus cluster on Kubernetes using a NetApp storage controller, offers customers a robust, scalable, and efficient solution for managing large-scale data operations. This setup provides customers with the ability to handle high-dimensional data and execute complex queries rapidly and efficiently, making it an ideal solution for big data applications and AI workloads. The use of Persistent Volumes (PVs) for various cluster components, along with the creation of a single NFS volume from NetApp ONTAP, ensures optimal resource utilization and data management. The process of verifying the status of PersistentVolumeClaims (PVCs) and pods, as well as testing data writing and reading, provides customers with the assurance of reliable and consistent data operations. The use of ONTAP or StorageGRID object storage for customer data further enhances data accessibility and security. Overall, this setup empowers customers with a resilient and high-performing data management solution that can seamlessly scale with their growing data needs.
