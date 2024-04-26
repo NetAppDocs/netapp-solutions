@@ -1,0 +1,127 @@
+---
+sidebar: sidebar
+permalink: ai/hcaios_cnvrg_io_deployment.html
+keywords: cnrvg.io, Deployment, Kubernetes
+summary:
+---
+= cnvrg.io Deployment
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+//
+// This file was created with NDAC Version 2.0 (August 17, 2020)
+//
+// 2020-08-20 13:35:29.883311
+//
+
+[.lead]
+== Deploy cnvrg CORE Using Helm
+
+Helm is the easiest way to quickly deploy cnvrg using any cluster, on-premises, Minikube, or on any cloud cluster (such as AKS, EKS, and GKE). This section describes how cnvrg was installed on an on-premises (DGX-1) instance with Kubernetes installed.
+
+=== Prerequisites
+
+Before you can complete the installation, you must install and prepare the following dependencies on your local machine:
+
+* Kubectl
+* Helm 3.x
+* Kubernetes cluster 1.15+
+
+=== Deploy Using Helm
+
+. To download the most updated cnvrg helm charts, run the following command:
++
+....
+helm repo add cnvrg https://helm.cnvrg.io
+helm repo update
+....
+
+. Before you deploy cnvrg, you need the external IP address of the cluster and the name of the node on which you will deploy cnvrg. To deploy cnvrg on an on-premises Kubernetes cluster, run the following command:
++
+....
+helm install cnvrg cnvrg/cnvrg --timeout 1500s  --wait \ --set global.external_ip=<ip_of_cluster> \ --set global.node=<name_of_node>
+....
+
+. Run the `helm install` command. All the services and systems automatically install on your cluster. The process can take up to 15 minutes.
+. The `helm install` command can take up to 10 minutes. When the deployment completes, go to the URL of your newly deployed cnvrg or add the new cluster as a resource inside your organization. The `helm` command informs you of the correct URL.
++
+....
+Thank you for installing cnvrg.io!
+Your installation of cnvrg.io is now available, and can be reached via:
+Talk to our team via email at
+....
+
+. When the status of all the containers is running or complete, cnvrg has been successfully deployed. It should look similar to the following example output:
+
+....
+NAME                            READY   STATUS      RESTARTS   AGE
+cnvrg-app-69fbb9df98-6xrgf              1/1     Running     0          2m cnvrg-sidekiq-b9d54d889-5x4fc           1/1     Running     0          2m controller-65895b47d4-s96v6             1/1     Running     0          2m init-app-vs-config-wv9c4                0/1     Completed   0          9m init-gateway-vs-config-2zbpp            0/1     Completed   0          9m init-minio-vs-config-cd2rg              0/1     Completed   0          9m minio-0                                 1/1     Running     0          2m postgres-0                              1/1     Running     0          2m redis-695c49c986-kcbt9                  1/1     Running     0          2m seeder-wh655                            0/1     Completed   0          2m speaker-5sghr                           1/1     Running     0          2m
+....
+
+== Computer Vision Model Training with ResNet50 and the Chest X-ray Dataset
+
+cnvrg.io AI OS was deployed on a Kubernetes setup on a NetApp ONTAP AI architecture powered by the NVIDIA DGX system. For validation, we used the NIH Chest X-ray dataset consisting of de-identified images of chest x-rays. The images were in the PNG format. The data was provided by the NIH Clinical Center and is available through the https://nihcc.app.box.com/v/ChestXray-NIHCC[NIH download site^]. We used a 250GB sample of the data with 627, 615 images across 15 classes.
+
+The dataset was uploaded to the cnvrg platform and was cached on an NFS export from the NetApp AFF A800 storage system.
+
+== Set up the Compute Resources
+
+The cnvrg architecture and meta-scheduling capability allow engineers and IT professionals to attach different compute resources to a single platform. In our setup, we used the same cluster cnvrg that was deployed for running the deep-learning workloads. If you need to attach additional clusters, use the GUI, as shown in the following screenshot.
+
+image:hcaios_image7.png[Error: Missing Graphic Image]
+
+== Load Data
+
+To upload data to the cnvrg platform, you can use the GUI or the cnvrg CLI. For large datasets, NetApp recommends using the CLI because it is a strong, scalable, and reliable tool that can handle a large number of files.
+
+To upload data, complete the following steps:
+
+. Download the https://app.cnvrg.io/docs/cli/install.html[cnvrg CLI^].
+. navigate to the x-ray directory.
+. Initialize the dataset in the platform with the `cnvrg data init` command.
+. Upload all contents of the directory to the central data lake with the `cnvrg data sync` command.After the data is uploaded to the central object store (StorageGRID, S3, or others), you can browse with the GUI. The following figure shows a loaded chest X-ray fibrosis image PNG file. In addition, cnvrg versions the data so that any model you build can be reproduced down to the data version.
+
+image:hcaios_image8.png[Error: Missing Graphic Image]
+
+== Cach Data
+
+To make training faster and avoid downloading 600k+ files for each model training and experiment, we used the data-caching feature after data was initially uploaded to the central data-lake object store.
+
+image:hcaios_image9.png[Error: Missing Graphic Image]
+
+After users click Cache, cnvrg downloads the data in its specific commit from the remote object store and caches it on the ONTAP NFS volume. After it completes, the data is available for instant training. In addition, if the data is not used for a few days (for model training or exploration, for example), cnvrg automatically clears the cache.
+
+== Build an ML Pipeline with Cached Data
+
+cnvrg flows allows you to easily build production ML pipelines. Flows are flexible, can work for any kind of ML use case, and can be created through the GUI or code. Each component in a flow can run on a different compute resource with a different Docker image, which makes it possible to build hybrid cloud and optimized ML pipelines.
+
+image:hcaios_image10.png[Error: Missing Graphic Image]
+
+=== Building the Chest X-ray Flow: Setting Data
+
+We added our dataset to a newly created flow. When adding the dataset, you can select the specific version (commit) and indicate whether you want the cached version. In this example, we selected the cached commit.
+
+image:hcaios_image11.png[Error: Missing Graphic Image]
+
+=== Building the Chest X-ray Flow: Setting Training Model: ResNet50
+
+In the pipeline, you can add any kind of custom code you want. In cnvrg, there is also the AI library, a reusable ML components collection. In the AI library, there are algorithms, scripts, data sources, and other solutions that can be used in any ML or deep learning flow. In this example, we selected the prebuilt ResNet50 module. We used default parameters such as batch_size:128, epochs:10, and more. These parameters can be viewed in the AI Library docs. The following screenshot shows the new flow with the X-ray dataset connected to ResNet50.
+
+image:hcaios_image12.png[Error: Missing Graphic Image]
+
+== Define the Compute Resource for ResNet50
+
+Each algorithm or component in cnvrg flows can run on a different compute instance, with a different Docker image. In our setup, we wanted to run the training algorithm on the NVIDIA DGX systems with the NetApp ONTAP AI architecture. In The following figure, we selected `gpu-real`, which is a compute template and specification for our on-premises cluster. We also created a queue of templates and selected multiple templates. In this way, if the `gpu-real` resource cannot be allocated (if, for example, other data scientists are using it), then you can enable automatic cloud-bursting by adding a cloud provider template. The following screenshot shows the use of gpu-real as a compute node for ResNet50.
+
+image:hcaios_image13.png[Error: Missing Graphic Image]
+
+=== Tracking and Monitoring Results
+
+After a flow is executed, cnvrg triggers the tracking and monitoring engine. Each run of a flow is automatically documented and updated in real time. Hyperparameters, metrics, resource usage (GPU utilization, and more), code version, artifacts, logs, and so on are automatically available in the Experiments section, as shown in the following two screenshots.
+
+image:hcaios_image14.png[Error: Missing Graphic Image]
+
+image:hcaios_image15.png[Error: Missing Graphic Image]
