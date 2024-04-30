@@ -37,7 +37,9 @@ This scenario requires the following components and configurations:
 * VCF management domain deployment is complete and the vSphere client is accessible.
 * A VI workload domain has been previously deployed.
 
-NetApp recommends fully redundant network designs for iSCSI. The following diagram illustrates an example of a redundant configuration, providing fault tolerance for storage systems, switches, networks adapters and host systems. Refer to the NetApp link:https://docs.netapp.com/us-en/ontap/san-config/index.html[SAN configuration reference] for additional information.
+//  THE FOLLOWING SECTION TO DEVELOPED SPECIFIC TO NFS DESIGN CONSIDERATIONS
+
+NetApp recommends redundant network designs for NFS. The following diagram illustrates an example of a redundant configuration, providing fault tolerance for storage systems, switches, networks adapters and host systems. Refer to the NetApp link:https://docs.netapp.com/us-en/ontap/san-config/index.html[SAN configuration reference] for additional information.
 
 image:vmware-vcf-asa-image74.png[NVMe-tcp network design]
 
@@ -51,8 +53,11 @@ TIP: In situations where multiple VMkernel adapters are configured on the same I
 
 For additional information on using VMFS iSCSI datastores with VMware refer to link:https://docs.netapp.com/us-en/netapp-solutions/virtualization/vsphere_ontap_auto_block_iscsi.html[vSphere VMFS Datastore - iSCSI Storage backend with ONTAP].
 
+https://core.vmware.com/resource/best-practices-running-nfs-vmware-vsphere
+//  THE PREVIOUS SECTION TO DEVELOPED SPECIFIC TO NFS DESIGN CONSIDERATIONS
+
 === Deployment Steps
-To deploy ONTAP Tools and use it to create a vVols datastore on the VCF management domain, complete the following steps:
+To deploy ONTAP Tools and use it to create a vVols and NFS datastore on the VCF management domain, complete the following steps:
 
 ==== Create SVM and LIFs on ONTAP storage system
 The following step is performed in ONTAP System Manager.
@@ -67,16 +72,15 @@ Complete the following steps to create an SVM together with multiple LIFs for NF
 image:vmware-vcf-asa-image01.png[Click +Add to start creating SVM]
 +
 {nbsp}
-. In the *Add Storage VM* wizard provide a *Name* for the SVM, select the *IP Space* and then, under *Access Protocol*, click on the *iSCSI* tab and check the box to *Enable NFS*.
+. In the *Add Storage VM* wizard provide a *Name* for the SVM, select the *IP Space* and then, under *Access Protocol*, click on the *SMB/CIFS, NFS, S3* tab and check the box to *Enable NFS*.
 +
-image:vmware-vcf-asa-image02.png[Add storage VM wizard - enable NFS]
+image:vmware-vcf-aff-image35.png[Add storage VM wizard - enable NFS]
 +
+TIP: It is not necessary to check the *Allow NFS client access* button here as Ontap Tools for VMware vSphere will be used to automate the datastore deployment process. This includes providing client access for the ESXi hosts.
 {nbsp}
 . In the *Network Interface* section fill in the *IP address*, *Subnet Mask*, and *Broadcast Domain and Port* for the first LIF. For subsequent LIFs the checkbox may be enabled to use common settings across all remaining LIFs or use separate settings.
 +
-NOTE: For multipathing and failover across multiple paths, NetApp recommends having a minimum of two LIFs per storage node in separate Ethernet networks for all SVMs in NFS configurations.
-+
-image:vmware-vcf-asa-image03.png[Fill out network info for LIFs]
+image:vmware-vcf-aff-image36.png[Fill out network info for LIFs]
 +
 {nbsp}
 . Choose whether to enable the Storage VM Administration account (for multi-tenancy environments) and click on *Save* to create the SVM.
@@ -90,7 +94,7 @@ The following steps are performed on the VI Workload Domain cluster using the vS
 .Create Distributed Port Groups for NFS traffic
 [%collapsible]
 ====
-Complete the following to create a new distributed port group for each NFS network:
+Complete the following to create a new distributed port group for the network to carry NFS traffic:
 
 . From the vSphere client , navigate to *Inventory > Networking* for the workload domain. Navigate to the existing Distributed Switch and choose the action to create *New Distributed Port Group...*.
 +
@@ -106,20 +110,17 @@ image:vmware-vcf-asa-image23.png[Fill out VLAN ID]
 {nbsp}
 . On the *Ready to complete* page, review the changes and click on *Finish* to create the new distributed port group.
 
-. Repeat this process to create a distributed port group for the second NFS network being used and ensure you have input the correct *VLAN ID*.
-
 . Once both port groups have been created, navigate to the first port group and select the action to *Edit settings...*.
 +
-image:vmware-vcf-asa-image24.png[DPG - edit settings]
+image:vmware-vcf-aff-image37.png[DPG - edit settings]
 +
 {nbsp}
-. On *Distributed Port Group - Edit Settings* page, navigate to *Teaming and failover* in the left-hand menu and click on *uplink2* to move it down to *Unused uplinks*.
+. On *Distributed Port Group - Edit Settings* page, navigate to *Teaming and failover* in the left-hand menu. Enable teaming for the Uplinks to be used for NFS traffic by ensuring they are together in the *Active uplinks* area. Move any unused uplinks down to *Unused uplinks*.
 +
-image:vmware-vcf-asa-image25.png[move uplink2 to unused]
-
-. Repeat this step for the second NFS port group. However, this time move *uplink1* down to *Unused uplinks*.
+image:vmware-vcf-aff-image38.png[DPG - team uplinks]
 +
-image:vmware-vcf-asa-image26.png[move uplink1 to unused]
+{nbsp}
+. Repeat this entire process for each ESXi host in the cluster.
 ====
 
 .Create VMkernel adapters on each ESXi host
