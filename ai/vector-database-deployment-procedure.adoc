@@ -1,0 +1,52 @@
+---
+sidebar: sidebar
+permalink: ai/vector-database-deployment-procedure.html
+keywords: vector database, vector-database-deployment-procedure
+summary: vector-database-deployment-procedure - vector database solution for netapp
+---
+
+= Deployment Procedure
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+
+== Deployment procedure
+
+In this deployment section, we used milvus vector database with Kubernetes for the lab setup as below. 
+
+image:Deployment_architecture.png[Error: Missing Graphic Image] 
+
+The netapp storage provides the storage for the cluster to keep customers data and milvus cluster data. 
+
+=== NetApp storage setup – ONTAP
+
+* Storage system initialization 
+* Storage virtual machine (SVM) creation 
+* Assignment of logical network interfaces
+* NFS, S3 configuration and licensing 
+
+Please follow the steps below for NFS (Network File System):
+
+1. 	Create a FlexGroup volume for NFSv4. In our set up for this validation, we have used 48 SSDs, 1 SSD dedicated for the controller’s root volume and 47 SSDs spread across for NFSv4]].Verify that the NFS export policy for the FlexGroup volume has read/write permissions for the Kubernetes (K8s) nodes network. If these permissions are not in place, grant read/write (rw) permissions for the K8s nodes network.
+2.	On all K8s nodes, create a folder and mount the FlexGroup volume onto this folder through a Logical Interface (LIF) on each K8s nodes.
+
+Please follow the steps below for NAS S3 (Network Attached Storage Simple Storage Service):
+
+1.	Create a FlexGroup volume for NFS.
+2.	Set up an object-store-server with HTTP enabled and the admin status set to 'up' using the "vserver object-store-server create" command. You have the option to enable HTTPS and set a custom listener port.
+3.	Create an object-store-server user using the "vserver object-store-server user create -user <username>" command.
+4.	To obtain the access key and secret key, you can run the following command: "set diag; vserver object-store-server user show -user <username>". However, moving forward, these keys will be supplied during the user creation process or can be retrieved using REST API calls. 
+5.	Establish an object-store-server group using the user created in step 2 and grant access. In this example, we have provided "FullAccess".
+6.	Create a NAS bucket by setting its type to "nas" and supplying the path to the NFSv3 volume. It's also possible to utilize an S3 bucket for this purpose.
+
+=== NetApp storage setup – StorageGRID
+
+1.	Install the storageGRID software.
+2.	Create a tenant and bucket.
+3.	Create user with required permission. 
+
+Please check more details in https://docs.netapp.com/us-en/storagegrid-116/primer/index.html
