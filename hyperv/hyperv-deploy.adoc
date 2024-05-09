@@ -46,6 +46,12 @@ This topic provides steps to configure and deploy a two-node failover cluster an
 * Storage should not be shared between different clusters. Plan for one or multiple CSV/CIFS share per cluster. 
 * If the SMB share is used as shared storage, then permissions on the SMB share must be configured to grant access to the computer accounts of all the Hyper-V nodes in the cluster. 
 
+For more information, see:
+
+* link:https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/system-requirements-for-hyper-v-on-windows#how-to-check-for-hyper-v-requirements[System Requirements for Hyper-V on Windows Server]
+* link:https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/jj134244(v=ws.11)#step-1-prepare-to-validate-hardware-for-a-failover-cluster[Validate Hardware for a Failover Cluster]
+* link:https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/jj863389(v=ws.11)[Deploy a Hyper-V Cluster]
+
 .Installing Windows Features 
 [%collapsible]
 ====
@@ -77,7 +83,7 @@ It is advised to separate and isolate specific workloads using multiple logical 
 * VM network 
 * Management network 
 
-NOTE: When iSCSI is used with dedicated NICs, then using any teaming solution is not recommended and MPIO/DSM should be used. But when iSCSI is used with shared NICs, those shared NICs can be teamed. 
+NOTE: When iSCSI is used with dedicated NICs, then using any teaming solution is not recommended and MPIO/DSM should be used. 
 
 NOTE: Hyper-V networking best practices also do not recommend using NIC teaming for SMB 3.0 storage networks in Hyper-V environment. 
 
@@ -91,7 +97,7 @@ Hyper-V supports NAS (SMB3.0) and Block storage (iSCSI/FC) as the backing storag
 
 The decision to use SMB3 vs iSCSI/FC is driven by the existing infrastructure in place today, SMB3/iSCSI allow customers to use existing network infrastructure. For customers that have existing FC infrastructure can leverage that infrastructure and present storage as FC based Clustered Shared Volumes. 
 
-NOTE: A NetApp storage controller running ONTAP software can support the following workloads in a Hyper-V environment: 
+*Note:* A NetApp storage controller running ONTAP software can support the following workloads in a Hyper-V environment: 
 
 * VMs hosted on continuously available SMB 3.0 shares 
 * VMs hosted on Cluster Shared Volume (CSV) LUNs running on iSCSI or FC 
@@ -235,6 +241,8 @@ image:hyperv-deploy-image02.png[Image of the Configure Cluster Quorum settings]
 .. Select   Configure a disk witness` and click Next.
 .. Select Disk W: from the available storage and click Next.
 .. Click Next through the confirmation page and Finish on the summary page.
++
+For more detailed information about quorum and witness, see link:https://learn.microsoft.com/en-us/windows-server/failover-clustering/manage-cluster-quorum#general-recommendations-for-quorum-configuration[Configuring and manage quorum]
 
 . Run the Cluster Validation wizard from Failover Cluster Manager to validate deployment.
 . Create CSV LUN to store virtual machine data and create highly available virtual machines via Roles within Failover Cluster Manager.
@@ -249,7 +257,7 @@ This step is vital to ascertain that the applications, services, and workloads c
 .Right sizing the storage
 [%collapsible]
 ====
-Before deploying the workload or migrating from existing hypervisor, ensure the workload is sized to meet the required performance. This can be easily done by collecting performance data for each individual VM that collects statistics for CPU (used/provisioned), Memory (used/provisioned), Storage (provisioned/utilized), Network throughput and latency along with aggregation of the Read/Write IOPs along with Throughput and block size. These parameters are mandatory for have a successful deployment and to correctly size the storage array and workload hosts.
+Before deploying the workload or migrating from existing hypervisor, ensure the workload is sized to meet the required performance. This can be easily done by collecting performance data for each individual VM that collects statistics for CPU (used/provisioned), Memory (used/provisioned), Storage (provisioned/utilized), Network throughput and latency along with aggregation of the Read/Write IOPs, throughput and block size. These parameters are mandatory for have a successful deployment and to correctly size the storage array and workload hosts.
 
 NOTE: Plan for IOPS and capacity when sizing storage for Hyper-V and associated workloads. 
 
@@ -309,10 +317,10 @@ NOTE: Nondisruptive operations for Hyper-V over SMB do not work correctly unless
 +
 image:hyperv-deploy-image05.png[IMage of the NTFS permissions settings]
 
-Create Highly available virtual machines on the SMB share
+For detailed best practices guidance, see link:https://docs.netapp.com/us-en/ontap-apps-dbs/microsoft/win_overview.html[Deployment Guidelines and best practices for Hyper-V].
 
 For additional information, refer to link:https://docs.netapp.com/us-en/ontap/smb-hyper-v-sql/server-volume-requirements-hyper-v-concept.html[SMB server and volume requirements for Hyper-V over SMB
-]
+].
 ====
 
 .Block Protocol Design and Consideration
@@ -322,7 +330,7 @@ Key Points
 
 * Use multipathing (MPIO) on hosts to manage the multiple paths. Create more paths as needed, either to facilitate data mobility operations or to leverage additional I/O resources, but do not exceed the maximum number of paths a host OS can support.
 * Install the Host Utilities Kit on hosts accessing the LUNs.
-* Create aminimum of 8 volumes.
+* Create a minimum of 8 volumes.
 
 NOTE: Use one LUN per volume, thus having 1:1 mapping for LUN to CSV ratio.
 
@@ -390,7 +398,7 @@ To create a highly available virtual machine, follow the below steps:
 .Fast Provisioning of Virtual Disks Using ODX Feature
 [%collapsible]
 ====
-The ODX feature in ONTAP allows making copies of master VHDXs by simply copying a master VHDX file hosted by ONTAP storage system. Because an ODX-enabled copy does not put any data on the network wire, the copy process happens on the NetApp storage side and as a result can be up to six to eight times faster on a 10GB network. General considerations for fast provisioning include master sysprepped images stored on file shares and regular copy processes initiated by the Hyper-V host machines.
+The ODX feature in ONTAP allows making copies of master VHDXs by simply copying a master VHDX file hosted by ONTAP storage system. Because an ODX-enabled copy does not put any data on the network wire, the copy process happens on the NetApp storage side and as a result can be up to six to eight times faster. General considerations for fast provisioning include master sysprepped images stored on file shares and regular copy processes initiated by the Hyper-V host machines.
 
 NOTE: ONTAP supports ODX for both the SMB and SAN protocols. 
 
@@ -411,24 +419,16 @@ Ensure the solution is adequately sized end-to-end to avoid bottlenecks and when
 Since volumes and VHDx sizes can be easily increased, if a VM needs extra capacity, it is not necessary to size CSVs larger than required. Diskpart can be used for extending the CSV size or an easier approach is to create a new CSV and migrate the required VMs to the new CSV. For optimal performance, the best practice is to increase the number of CSVs rather than increase their size as an interim measure.
 ====
 
-.Capacity monitoring for overprovisioned CSV volumes
-[%collapsible]
-====
-To ensure your storage system operates efficiently, accurately monitor available space, it is critical not to overprovision your CSV volume or SMB share beyond the total SSD capacity of your FSx for NetApp ONTAP file system. This approach allows for straightforward storage space management within the Hyper-V.
-
-Contact NetApp SA’s to plan and size storage and host requirements accurately. We recommend identifying storage performance requirements before finalizing the CSV layout for production deployments.
-==== 
-
 .Migration
 [%collapsible]
 ====
-One of the most common use cases in the current market condition is migration. Customers can use VMM Fabric or other third-party migration tools to migrate VMs, these tools use host level copy to move data one source to destination platform which can be time consuming depending on number of virtual machines that are in scope of migration.
+One of the most common use cases in the current market condition is migration. Customers can use VMM Fabric or other third-party migration tools to migrate VMs. These tools use host level copy to move data form the source platform to the destination platform, which can be time consuming depending on number of virtual machines that are in scope of migration.
 
 Using ONTAP in such scenario’s enable quicker migration than using host based migrationprocess. ONTAP also enables swift migration of VMs from one hypervisor to another (ESXi in this case to Hyper-V). VMDK of any size can be converted to VHDx in seconds on NetApp Storage. That is our PowerShell way - It leverages NetApp FlexClone® technology for the rapid conversion of VM hard disks. It also handles the creation and configuration of target and destination VMs.
 
 This process helps minimize downtime and enhances business productivity. It also offers choice and flexibility by reducing licensing costs, lock-in, and commitments to a single vendor. This is also beneficial for organizations looking to optimize VM licensing costs and extend IT budgets.
 
-For additional information about migration using Flexclone and PowerShell, see Appendix section
+For additional information about migration using Flexclone and PowerShell, see link:#appendix[Appendix A].
 ====
 
 === Data Protection
@@ -438,12 +438,9 @@ For additional information about migration using Flexclone and PowerShell, see A
 ====
 Backing up VMs and quickly recovering or cloning them are among the great strengths of ONTAP volumes. Use Snapshot copies to make quick FlexClone copies of the VMs or even the whole CSV volume without affecting performance. This enables working with production data without the risk of data corruption when cloning production data volumes and mounting them on QA, staging and development environments. FlexClone volumes are useful for making test copies of production data, without having to double the amount of space required to copy the data.
 
-Keep in mind, Hyper-V nodes assigns each disk a unique ID and taking a snapshot of the volume that has respective partition (MBR or GPT) will carry the same unique identification. MBR uses disk signatures and GPT uses GUIDs (Global Unique Identifiers). In case of standalone Hyper-V host, the FlexClone volume can be easily mounted without any conflicts. This is because stand-alone Hyper-V servers can automatically detect duplicate disk IDs and change them dynamically without user intervention. This approach can be used to recover the VM(s) by copying the VHDs as the scenario demands.
+Keep in mind, Hyper-V nodes assign each disk a unique ID and taking a snapshot of the volume that has respective partition (MBR or GPT) will carry the same unique identification. MBR uses disk signatures and GPT uses GUIDs (Global Unique Identifiers). In case of standalone Hyper-V host, the FlexClone volume can be easily mounted without any conflicts. This is because stand-alone Hyper-V servers can automatically detect duplicate disk IDs and change them dynamically without user intervention. This approach can be used to recover the VM(s) by copying the VHDs as the scenario demands.
 
 While it is straightforward with standalone Hyper-V hosts, the procedure is different for Hyper-V clusters. The recovery process involves mapping the FlexClone volume to a standalone Hyper-V host or using diskpart to manually change the signature by mapping FlexClone volume to a standalone Hyper-V host (it is important because a disk ID conflict results in inability to bring the disk online) and once done, map the FlexClone volume to the cluster.
-
-<Screenshot here>
-image:hyperv-deploy-image08.png[Image of the restore using NetApp Storage snapshot]
 ====
 
 .Backup and Restore using Third party solution
@@ -571,8 +568,14 @@ Recovery is performed by completing the following steps:
 . Import the virtual machines in the CSV to the Hyper-V manager, make them highly available, and then add them to the cluster.
 . Turn on the VMs.
 
-NOTE: NetApp SnapManager for Hyper-V is currently not supported. An updated version will be available in the future.
-
 == Conclusion
 
 ONTAP is the optimal shared storage foundation to deploy a variety of IT workloads. ONTAP AFF or ASA platforms are both flexible and scalable for multiple use cases and applications. Windows Server 2022 and Hyper-V enabled on it is one common use case as the virtualization solution, which is described in this document. The flexibility and scalability of ONTAP storage and associated features enable customers to start out with a right-sized storage layer that can grow with and adapt to their evolving business requirements. In current market conditions, Hyper-V offers a perfect alternate hypervisor option which provides most of the functionalities that was provided VMware.
+
+[[appendix]]
+== Appendix A: Migration using Flexclone and PowerShell
+
+[source, powershell]
+----
+
+----
