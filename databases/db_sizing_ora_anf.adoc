@@ -1,0 +1,163 @@
+---
+sidebar: sidebar
+permalink: databases/db_sizing_ora_anf.html
+keywords: ONTAP, Azure, ANF, Sizing
+summary: "The solution provides an useful toolkit for sizing compute and storage for Oracle deployment on ANF in Azure cloud"   
+---
+
+= Oracle Sizing Guidance for Azure NetApp Files
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+Allen Cao, Niyaz Mohamed, NetApp
+
+[.lead]
+== Purpose
+
+Moving existing Oracle workload from one platform to another, such as from on-prem to public cloud, needs sizing compute and storage in the target platform to meet performance and service level requirements. This documentation demonstrates a simple toolkit to accomplish that goal. 
+
+Unlike a new database application, which may grow over time, an existing Oracle workload has established workload patterns in compute and storage requirements, which are recorded in an Oracle Workload Repository or AWR. This toolkit utilizes an HTML parser to retrieve relevant information from Oracle AWR. The results are supplemented by additional sizing information obtained via SQL scripts against the database to provide meaningful compute and storage guidance when relocating the Oracle database.       
+
+This solution addresses the following use cases:
+
+* Provide sizing guidance for Oracle database server compute when relocating database from on-prem to Microsoft Azure cloud.
+* Provide sizing guidance for Oracle database server storage when relocating database from on-prem to Microsoft Azure NetApp Files. 
+
+== Audience
+
+This solution is intended for the following people:
+
+* A DBA who manages Oracle databases in on-prem private data center or Microsoft Azure cloud environment.
+* A storage administrator who manages on-prem storage or Microsoft Azure NetApp Files storage that supports Oracle databases.
+* An application owner who likes to migrate Oracle database from on-prem to Microsoft Azure cloud.
+
+== License
+
+By accessing, downloading, installing or using the content in this toolkit repository, you agree the terms of the License laid out in link:https://netapp.sharepoint.com/sites/CIEBuilt-OnsTeam-DatabasesandApps/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FCIEBuilt%2DOnsTeam%2DDatabasesandApps%2FShared%20Documents%2FDatabases%20and%20Apps%2FDatabase%20Solutions%2FDB%20Sizing%20Toolkits%2FOracle%20Sizing%20Guidance%20for%20ANF%2FLICENSE%2ETXT&parent=%2Fsites%2FCIEBuilt%2DOnsTeam%2DDatabasesandApps%2FShared%20Documents%2FDatabases%20and%20Apps%2FDatabase%20Solutions%2FDB%20Sizing%20Toolkits%2FOracle%20Sizing%20Guidance%20for%20ANF[License file^].
+
+[NOTE] 
+
+There are certain restrictions around producing and/or sharing any derivative works with the content in this toolkit repository. Please make sure you read the terms of the License before using the content. If you do not agree to all of the terms, do not access, download or use the content in this repository.
+
+== Solution deployment
+
+=== Prerequisites for deployment
+[%collapsible]
+====
+Deployment requires the following prerequisites.
+
+* Oracle AWR reports that capture the snapshots of database activities during peak application workload.
+* Access to Oracle database to execute SQL scripts with DBA privilege.  
+
+====
+
+=== Download the toolkit
+[%collapsible]
+====
+
+Retrieve the toolkit from repository link:https://netapp.sharepoint.com/sites/CIEBuilt-OnsTeam-DatabasesandApps/Shared%20Documents/Forms/AllItems.aspx?csf=1&web=1&e=uJYdVB&CID=bec786b6%2Dccaa%2D42e3%2Db47d%2Ddf0dcb0ce0ef&RootFolder=%2Fsites%2FCIEBuilt%2DOnsTeam%2DDatabasesandApps%2FShared%20Documents%2FDatabases%20and%20Apps%2FDatabase%20Solutions%2FDB%20Sizing%20Toolkits%2FOracle%20Sizing%20Guidance%20for%20ANF&FolderCTID=0x01200006E27E44A468B3479EA2D52BCD950351[Oracle Sizing Guidance for ANF^]
+
+====
+
+=== How to use the toolkit?
+[%collapsible]
+====
+
+The toolkit consists of a web-based HTML parser and two SQL scripts to gather Oracle database information. The output is then input into an Excel template to generate sizing guidance of computing and storage for the Oracle database server.
+
+* Use an link:https://app.atroposs.com/#/awr-module[HTML parser^] AWR module to retrieve sizing information of a current Oracle database from an AWR report. 
+
+* Execute ora_db_data_szie.sql as a DBA to retrieve physical Oracle data file size from database.
+
+* Execute ora_db_logs_size.sql as a DBA to retrieve Oracle archived logs size with desired archive logs retention window (days).
+
+* Input sizing information obtained above into excel template file oracle_db_sizing_template_anf.xlsx to create a sizing guidance on compute and storage for Oracle DB server. 
+
+
+====
+
+
+=== Toolkit usage demonstration 
+[%collapsible]
+====
+
+. Open HTML parser AWR module.
++
+image::db_sizing_ora_parser_01.png["This image provides HTML parser screen for Oracle sizing"]
+
+. Check output format as .csv and click `Upload files` to upload awr report. The parser returns results in a HTML page with a table summary as well as an output.csv file in `Download` folder. 
++
+image::db_sizing_ora_parser_02.png["This image provides HTML parser screen for Oracle sizing"]
+  
+. Open the excel template file and copy paste the csv content into column A and cell 1 to generate the DB server sizing information.
++
+image::db_sizing_ora_parser_03_anf.png["This image provides excel template screen shot for Oracle sizing"]
+
+. Highlight column A and fields 1 and 2, click on `Data`, then `Text to Columns` to open the Text Wizzard. Choose `Delimited`, then `Next` to next screen.
++
+image::db_sizing_ora_parser_04_anf.png["This image provides excel template screen shot for Oracle sizing"]
+
+. Check `Other`, then enter '=' as `Delimiters`. Click on `Next` to next screen.
++
+image::db_sizing_ora_parser_05_anf.png["This image provides excel template screen shot for Oracle sizing"]
+
+. Click on `Finish` to complete the string conversion into readable column format. Note the VM and ANF sizing fields have been populated with data retrieved from the Oracle AWR report.
++
+image::db_sizing_ora_parser_06_anf.png["This image provides excel template screen shot for Oracle sizing"]
+image::db_sizing_ora_parser_07_anf.png["This image provides excel template screen shot for Oracle sizing"]
+
+. Execute script ora_db_data_size.sql, ora_db_logs_size.sql as a DBA in sqlplus to retrieve existing Oracle database data size and archived logs size with the number of days of retention window.
++
+....
+
+[oracle@ora_01 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Tue Mar 5 15:25:27 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+
+SQL> @/home/oracle/ora_db_data_size.sql;
+
+Aggregate DB File Size, GiB Aggregate DB File RW, GiB Aggregate DB File RO, GiB
+--------------------------- ------------------------- -------------------------
+                     159.05                    159.05                         0
+
+SQL> @/home/oracle/ora_db_logs_size.sql;
+Enter value for archivelog_retention_days: 14
+old   6:       where first_time >= sysdate - &archivelog_retention_days
+new   6:       where first_time >= sysdate - 14
+
+Log Size, GiB
+-------------
+        93.83
+
+SQL>
+
+....
++
+[NOTE]
+
+The database sizing information retrieved using above scripts is the sum of actual size of all physical database data files or log files. It does not factor into the free space that may be available inside each data file.
+
+. Input the result into excel file to complete the sizing guidance output.
++
+image::db_sizing_ora_parser_08_anf.png["This image provides excel template screen shot for Oracle sizing"]
+
+. ANF uses a three-tier service level (Standard, Premium, Ultra) to manage database volume throughput limit. Refer to link:https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-service-levels[Service levels for Azure NetApp Files^] for details. Based on sizing guidance output, choose an ANF service level that provides throughput that meet the requirment for the database.
+
+====
+
+== Where to find additional information
+
+To learn more about the NetApp database solutions, review the following website link:index.html[NetApp Enterprise Database Solutions^]
+
