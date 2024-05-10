@@ -1,0 +1,194 @@
+---
+sidebar: sidebar
+permalink: vmware/vmware_vcf_aff_principal_vvols.html
+keywords: netapp, vmware, cloud, foundation, vcf, aff, all-flash, nfs, vvol, vvols, array, ontap tools, otv, sddc
+summary:
+---
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+Author: Josh Powell, Ravi BCB
+
+== vVol datastore as principal storage for VI Workload Domains
+
+=== Scenario Overview
+In this scenario we will demonstrate how to configure a vVols datastore as principal storage for the deployment of a VI Workload Domain in VCF. A vVols container must be prepared in advance of deploying the Workload Domain. To do this ONTAP tools for VMware vSphere is installed in the VCF Management Domain and the Swagger API tool is used to create the vVols container.
+
+Where appropriate we will refer to external documentation for the steps that must be performed in VCF's SDDC Manager, and only cover those steps that are specific to the storage configuration portion.
+
+For more information on using vVols storage with VCF refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/5.1/vcf-admin/GUID-28A95C3D-1344-4579-A562-BEE5D07AAD2F.html[vVols Storage with VMware Cloud Foundation]. 
+
+For information on using ONTAP tools in VCF mode refer to link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/deploy/vmware_cloud_foundation_mode_deployment.html[VMware Cloud Foundation mode of deployment for ONTAP tools].  
+
+This scenario covers the following high level steps:
+
+* Verify networking for the ONTAP storage virtual machine (SVM) and that a logical interface (LIF), is present to carry NFS traffic.
+* Create an export policy to allow the ESXi hosts access to the NFS volume.
+* Deploy ONTAP tools for VMware vSphere (VCF mode) in the VCF Management Domain.
+* Use the swagger API in ONTAP tools to add the ONTAP storage system.
+* Create a Network Pool for NFS and vMotion traffic in SDDC Manager.
+* During VI Workload Domain deployment configuration, specify the information to connect to the NFS volume.
+* Monitor the storage validation and workload domain deployment.
+* Verify that the NFS datastore was created.
+
+=== Prerequisites
+This scenario requires the following components and configurations:
+
+* NetApp AFF storage system with a storage virtual machine (SVM) configured to allow NFS traffic.
+* Logical interface (LIF) has been created on the IP network that is to carry NFS traffic and is associated with the SVM.
+* VCF management domain deployment is complete and the SDDC Manager interface is accessible.
+* Four (4) ESXi hosts commissioned to the SDDC Manager inventory.
+* IP addresses reserved for NFS storage traffic on the VLAN or network segment established for this purpose.
+* ONTAP tools for VMware vSphere v9.13 is downloaded from the link:https://mysupport.netapp.com/site/[NetApp Support] site.
+* NFS volume created on the ONTAP storage system with sufficient capacity to contain the vVols container.
+
+[NOTE]
+When deploying a VI Workload Domain, VCF validates connectivity to the NFS Server. This is done using the management adapter on the ESXi hosts before any additional vmkernel adapter is added with the NFS IP address. Therefore, it is necessary to ensure that either 1) the management network is routable to the NFS Server, or 2) a LIF for the management network has been added to the SVM hosting the NFS datastore volume, to ensure that the validation can proceed.
+
+For information on configuring ONTAP storage systems refer to the link:https://docs.netapp.com/us-en/ontap[ONTAP 9 Documentation] center.
+
+For information on configuring VCF refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation].
+
+=== Deployment Steps
+The steps for deploying a VI Workload Domain with a vVols datastore as principal storage can be divided into two separate groups. Steps related to creating a vVols container with ONTAP Tools for VMware vSphere, and steps to be completed in VCF SDDC Manager.
+
+==== Create vVols container with ONTAP Tools
+Complete the following steps to create a vVols container on the ONTAP storage system.
+
+.Deploy ONTAP tools for VMware vSphere
+[%collapsible]
+==== 
+ONTAP tools for VMware vSphere (OTV) is deployed as a VM appliance and provides an integrated vCenter UI for managing ONTAP storage. In this solution OTV is deployed in VCF mode which does not automatically register the plugin with vCenter and provides a swagger API interface to create the vVols container. 
+
+Complete the following steps to Deploy ONTAP tools for VMware vSphere:
+
+. Obtain the ONTAP tools OVA image from the link:https://mysupport.netapp.com/site/products/all/details/otv/downloads-tab[NetApp Support site] and download to a local folder.
+
+. Log into the vCenter appliance for the VCF Management Domain.
+
+. From the vCenter appliance interface right-click on the management cluster and select *Deploy OVF Template…*
++
+image:vmware-vcf-aff-image21.png[Deploy OVF Template...]
++
+{nbsp}
+. In the *Deploy OVF Template* wizard click the *Local file* radio button and select the ONTAP tools OVA file downloaded in the previous step.
++
+image:vmware-vcf-aff-image22.png[Select OVA file]
++
+{nbsp}
+. For steps 2 through 5 of the wizard select a name and folder for the VM, select the compute resource, review the details, and accept the license agreement.
+
+. For the storage location of the configuration and disk files, select the vSAN datastore of the VCF Management Domain cluster.
++
+image:vmware-vcf-aff-image23.png[Select OVA file]
++
+{nbsp}
+. On the Select network page select the network used for management traffic.
++
+image:vmware-vcf-aff-image24.png[Select network]
++
+{nbsp}
+. On the Customize template page fill out all required information:
+* Password to be used for administrative access to OTV.
+* NTP server IP address.
+* OTV maintenance account password.
+* OTV Derby DB password.
+* Check the box to *Enable VMware Cloud Foundation (VCF)*.
+* FQDN or IP address of the vCenter appliance and provide credentials for vCenter.
+* Provide the required network properties fields.
++
+Once complete, click on *Next*  to continue.
++
+image:vmware-vcf-aff-image25.png[Customize OTV template 1]
++
+image:vmware-vcf-aff-image26.png[Customize OTV template 2]
++
+{nbsp}
+. Review all information on the Ready to complete  page and the click Finish to begin deploying the OTV appliance.
+====
+
+.Obtain VCF appliance-api-token from Swagger UI
+[%collapsible]
+==== 
+There are multiple steps that must be completed using the Swagger-UI. The first is to obtain the VCF appliance-api-token.
+
+. Access the Swagger user interface by navigating to https://otv_ip:8143/api/rest/swagger-ui.html in a web browser.
+
+. Scroll down to *User Authentication: APIs for user authentication* and select *Post /2.0/VCF/user/login*.
++
+image:vmware-vcf-aff-image27.png[Post /2.0/VCF/user/login]
+
+. Under *Parameter content type*, switch the content type to *application/json*.
+
+. Under *vcfLoginRequest*, enter in the OTV appliance’s username and password.
++
+image:vmware-vcf-aff-image28.png[Enter OTV username and password]
+
+. Click on the *Try it out!* button and, under *Response Header*, copy the *"authorization":* text string.
++
+image:vmware-vcf-aff-image29.png[copy authorization response header]
+====
+
+.Obtain public SSL certificate of ONTAP storage system
+[%collapsible]
+==== 
+The next step is to obtain the public SSL certificate of the ONTAP storage system using Swagger UI.
+
+. In the Swagger UI locate *Security: APIs related to certificates* and select *Get /3.0/security/certificates/{host}/server-certificate*.
++
+image:vmware-vcf-aff-image30.png[Get /3.0/security/certificates/{host}/server-certificate]
+
+. In the *appliance-api-token* field paste in the text string obtained in the previous step.
+
+. In the *host* field type in the IP address of the ONTAP storage system from which you intend to obtain the public SSL certificate.
++
+image:vmware-vcf-aff-image31.png[copy public ssl certificate]
+====
+
+.Add Storage to ONTAP tools from Swagger UI
+[%collapsible]
+====
+Add the ONTAP storage system to OTV using the VCF appliance-api-token and ONTAP public SSL certificate.
+
+. In the Swagger UI scroll to Storage Systems: APIs related to storage systems and select Post /3.0/storage/clusters.
+
+. In the appliance-api-token field fill in the VCF token that was obtained in a previous step. Note, that the token will expire eventually so it may be necessary to obtain a new token periodically.
+
+. In the *controllerRequest* text box provide the ONTAP storage system IP address, username, password, and the public SSL certificate obtained in the previous step.
++
+image:vmware-vcf-aff-image32.png[provide info to add storage system]
+
+. Click on the *Try it out!*  button to add the storage system to OTV. 
+====
+
+.Create vVols container on ONTAP storage
+[%collapsible]
+====
+The next step is to create the vVol container on the ONTAP storage system. Note that this step requires that an NFS volume has already been created on the ONTAP storage system. Be sure to use an export policy that allows access to the NFS volume from the ESXi hosts that will be accessing it. See the previous step at...
+
+. In the Swagger UI scroll to Container: APIs related to containers and select Post /2.0/admin/containers.
++
+image:vmware-vcf-aff-image33.png[/2.0/admin/containers]
+
+. In the *appliance-api-token* field fill in the VCF token that was obtained in a previous step. Note, that the token will expire eventually so it may be necessary to obtain a new token periodically.
+
+. In the containerRequest  box, fill out the following required fields:
+* “controllerIp”: <ONTAP mgmt. IP address>
+* “defaultScp”: <storage capability profile to be associated with vvol container>
+* flexVols - “aggregateName”: <ONTAP aggregate that the NFS volume resides on>
+* flexVols - “name”: <name of the NFS FlexVol>
+* “name” <name of the vvol container>
+* “vserverName”: <ONTAP Storage SVM hosting NFS flexvol>
+
+image:vmware-vcf-aff-image34.png[vvol containerRequest form]
+
+4 Click on the *Try it out!* to execute the instruction and create the vvol container.
+====
+
+==== Deploy VI Workload Domain with vVols as principle storage
+Complete the following steps in SDDC Manager to deploy a VI Workload Domain with vVols as principle storage.
