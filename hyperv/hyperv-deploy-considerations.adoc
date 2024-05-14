@@ -19,21 +19,21 @@ This step is vital to ascertain that the applications, services, and workloads c
 
 Before deploying the workload or migrating from existing hypervisor, ensure the workload is sized to meet the required performance. This can be easily done by collecting performance data for each individual VM that collects statistics for CPU (used/provisioned), Memory (used/provisioned), Storage (provisioned/utilized), Network throughput and latency along with aggregation of the Read/Write IOPs, throughput and block size. These parameters are mandatory for have a successful deployment and to correctly size the storage array and workload hosts.
 
-NOTE: Plan for IOPS and capacity when sizing storage for Hyper-V and associated workloads. 
+*Note*: Plan for IOPS and capacity when sizing storage for Hyper-V and associated workloads. 
 
-NOTE: For higher-I/O intensive VMs or those that require lots of resources and capacity, segregate the OS and data disks. Operating system and application binaries change infrequently, and volume crash consistency is acceptable. 
+*Note*: For higher-I/O intensive VMs or those that require lots of resources and capacity, segregate the OS and data disks. Operating system and application binaries change infrequently, and volume crash consistency is acceptable. 
 
-NOTE: Use Guest connected storage (aka in-guest) for high performance data disks than using VHDs. This helps with easier cloning process as well.
+*Note*: Use Guest connected storage (aka in-guest) for high performance data disks than using VHDs. This helps with easier cloning process as well.
 
 == Enhance Virtual Machine performance
 
 Choose the right amount of RAM and vCPUs for optimal performance along with attaching multiple disks to a single virtual SCSI controller. Using fixed VHDx is still recommended as the primary choice for virtual disks for deployments and there are no restrictions for using any type of VHDX virtual disks.
 
-NOTE: Avoid installing unnecessary roles on Windows Server that will not be utilized.
+*Note*: Avoid installing unnecessary roles on Windows Server that will not be utilized.
 
-NOTE: Choose Gen2 as the generation for virtual machines able to load VMs from the SCSI controller and is based on the VMBUS and VSP / VSC architecture for the boot level, which significantly increases the overall VM performance. 
+*Note*: Choose Gen2 as the generation for virtual machines able to load VMs from the SCSI controller and is based on the VMBUS and VSP / VSC architecture for the boot level, which significantly increases the overall VM performance. 
 
-NOTE: Avoid making frequent checkpoints because it has a negative impact on the performance of the VM.
+*Note*: Avoid making frequent checkpoints because it has a negative impact on the performance of the VM.
 
 == SMB3.0 Design and Consideration	
 
@@ -47,11 +47,11 @@ SMB 3.0 file shares can be used as shared storage for Hyper-V. ONTAP supports no
 * ONTAP One is now included on every AFF (A-Series and C-Series), All-SAN Array (ASA), and FAS system. Hence there is no separate licenses needed.
 * For Shared VHDx, use guest connected iSCSI LUN
  
-NOTE: ODX is supported and works across protocols. Copying data between a file share and iSCSI or an FCP-attached LUN also utilizes ODX. 
+*Note*: ODX is supported and works across protocols. Copying data between a file share and iSCSI or an FCP-attached LUN also utilizes ODX. 
 
-NOTE: Time settings on nodes in the cluster should be set up accordingly. Network Time Protocol (NTP) should be used if the NetApp CIFS server must participate in the Windows Active Directory (AD) domain.
+*Note*: Time settings on nodes in the cluster should be set up accordingly. Network Time Protocol (NTP) should be used if the NetApp CIFS server must participate in the Windows Active Directory (AD) domain.
 
-NOTE: Large MTU values must be enabled through the CIFS server. Small packet sizes might result in performance degradation.
+*Note*: Large MTU values must be enabled through the CIFS server. Small packet sizes might result in performance degradation.
 
 == Provisioning SMB volume
 
@@ -65,7 +65,7 @@ image:hyperv-deploy-image03.png[Image of the SMB colume settings]
 +
 image:hyperv-deploy-image04.png[Image of the NTFS data volume settings]
 +
-NOTE: Nondisruptive operations for Hyper-V over SMB do not work correctly unless the volumes used in the configuration are created as NTFS security-style volumes.
+*Note*: Nondisruptive operations for Hyper-V over SMB do not work correctly unless the volumes used in the configuration are created as NTFS security-style volumes.
 
 . Enable continuously available and configure NTFS permissions on the share to include Hyper-V nodes with full control.
 +
@@ -84,7 +84,7 @@ For additional information, refer to link:https://docs.netapp.com/us-en/ontap/sm
 * Install the Host Utilities Kit on hosts accessing the LUNs.
 * Create a minimum of 8 volumes.
 
-NOTE: Use one LUN per volume, thus having 1:1 mapping for LUN to CSV ratio.
+*Note*: Use one LUN per volume, thus having 1:1 mapping for LUN to CSV ratio.
 
 * An SVM should have one LIF per Ethernet network or Fibre Channel fabric on every storage controller that is going to serve data using iSCSI or Fibre Channel.
 * SVMs serving data with FCP, or iSCSI need an SVM management interface.
@@ -96,7 +96,7 @@ To provision ISCSI volume, ensure the following pre-requisites are met.
 * The storage virtual machine (SVM) should have the iSCSI protocol enabled and the appropriate logical interfaces (LIFs) created.
 * The designated aggregate must have enough free space to contain the LUN.
 
-NOTE: By default, ONTAP uses Selective LUN Map (SLM) to make the LUN accessible only through paths on the node owning the LUN and its high-availability (HA) partner.
+*Note*: By default, ONTAP uses Selective LUN Map (SLM) to make the LUN accessible only through paths on the node owning the LUN and its high-availability (HA) partner.
 
 * Configure all the iSCSI LIFs on every node for LUN mobility in case the LUN is moved to another node in the cluster.
 
@@ -115,7 +115,7 @@ image:hyperv-deploy-image06.png[Image of the General Properties page for Hyper-V
 
 Once the LUN is created, go to the Failover Cluster Manager. To add a disk to CSV, the disk must be added to the Available Storage group of the cluster (if it is not already added), and then add the disk to CSV on the cluster. 
 
-NOTE: The CSV feature is enabled by default in Failover Clustering. 
+*Note*: The CSV feature is enabled by default in Failover Clustering. 
 
 *Adding a disk to Available Storage:*
 
@@ -148,9 +148,9 @@ To create a highly available virtual machine, follow the below steps:
 
 The ODX feature in ONTAP allows making copies of master VHDXs by simply copying a master VHDX file hosted by ONTAP storage system. Because an ODX-enabled copy does not put any data on the network wire, the copy process happens on the NetApp storage side and as a result can be up to six to eight times faster. General considerations for fast provisioning include master sysprepped images stored on file shares and regular copy processes initiated by the Hyper-V host machines.
 
-NOTE: ONTAP supports ODX for both the SMB and SAN protocols. 
+*Note*: ONTAP supports ODX for both the SMB and SAN protocols. 
 
-NOTE: To take advantage of the use cases for ODX copy offload pass-through with Hyper-V, the guest operating system must support ODX, and the guest operating system's disks must be SCSI disks backed by storage (either SMB or SAN) that supports ODX. IDE disks on the guest operating system do not support ODX pass-through.
+*Note*: To take advantage of the use cases for ODX copy offload pass-through with Hyper-V, the guest operating system must support ODX, and the guest operating system's disks must be SCSI disks backed by storage (either SMB or SAN) that supports ODX. IDE disks on the guest operating system do not support ODX pass-through.
 
 == Performance optimization
 
