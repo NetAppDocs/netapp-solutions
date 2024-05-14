@@ -33,9 +33,8 @@ For more information, see:
 * link:https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/jj134244(v=ws.11)#step-1-prepare-to-validate-hardware-for-a-failover-cluster[Validate Hardware for a Failover Cluster]
 * link:https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/jj863389(v=ws.11)[Deploy a Hyper-V Cluster]
 
-.Installing Windows Features 
-[%collapsible]
-====
+=== Installing Windows Features 
+
 The following steps describe how to install the required Windows Server 2022 features. 
 
 *All Hosts*
@@ -49,11 +48,9 @@ The following steps describe how to install the required Windows Server 2022 fea
 ----
 Add-WindowsFeature Hyper-V, Failover-Clustering, Multipath-IO `-IncludeManagementTools –Restart 
 ----
-====
 
-.Configuring Networks  
-[%collapsible]
-====
+=== Configuring Networks  
+
 Proper network planning is key to achieving fault tolerant deployment. Setting up distinct physical network adapters for each type of traffic was the standard suggestion for a failover cluster. With the ability to add virtual network adapters, switch embedded teaming (SET) and features like Hyper-V QoS introduced, condense network traffic on fewer physical adapters. Design the network configuration with quality of service, redundancy, and traffic isolation in mind. Configuring network isolation techniques like VLANs in conjunction with traffic isolation techniques provides redundancy for the traffic and quality of service which would improve and add consistency to storage traffic performance.  
 
 It is advised to separate and isolate specific workloads using multiple logical and/or physical networks. Typical network traffic examples that are typically divided into segments are as follows:  
@@ -69,11 +66,9 @@ It is advised to separate and isolate specific workloads using multiple logical 
 *Note*: Hyper-V networking best practices also do not recommend using NIC teaming for SMB 3.0 storage networks in Hyper-V environment. 
 
 For additional information, refer to link:https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/plan/plan-hyper-v-networking-in-windows-server[Plan for Hyper-V networking in Windows Server]
-====
 
-.Deciding on Storage Design for Hyper-V 
-[%collapsible]
-====
+=== Deciding on Storage Design for Hyper-V 
+
 Hyper-V supports NAS (SMB3.0) and Block storage (iSCSI/FC) as the backing storage for virtual machines. NetApp supports SMB3.0, iSCSI and FC protocol which can be used as native storage for VMs - Cluster Shared Volumes (CSV) using iSCSI/FC and SMB3. Customers can also use SMB3 and iSCSI as guest connected storage options for workloads that require direct access to the storage. ONTAP provides flexible options with unified storage (All Flash Array) - for workload that requires mixed protocol access and SAN optimized storage (All SAN Array) for SAN only configurations.  
 
 The decision to use SMB3 vs iSCSI/FC is driven by the existing infrastructure in place today, SMB3/iSCSI allow customers to use existing network infrastructure. For customers that have existing FC infrastructure can leverage that infrastructure and present storage as FC based Clustered Shared Volumes. 
@@ -89,11 +84,9 @@ The decision to use SMB3 vs iSCSI/FC is driven by the existing infrastructure in
 *Note*: MPIO is supported on the guest VM using in-guest initiators if multiple paths are available to the VM, and the multipath I/O feature is installed and configured. 
 
 *Note*: ONTAP supports all major industry-standard client protocols: NFS, SMB, FC, FCoE, iSCSI, NVMe/FC, and S3. However, NVMe/FC and NVMe/TCP are not supported by Microsoft. 
-====
 
-.Installing NetApp Windows iSCSI Host Utilities 
-[%collapsible]
-====
+=== Installing NetApp Windows iSCSI Host Utilities 
+
 The following section describes how to perform an unattended installation of the NetApp Windows iSCSI Host Utilities. For detailed information regarding the installation see the link:https://docs.netapp.com/us-en/ontap-sanhost/hu_wuhu_72.html[Install Windows Unified Host Utilities 7.2 ( or the latest supported version)] 
 
 *All Hosts*
@@ -115,11 +108,9 @@ Unblock-file ~\Downloads\netapp_windows_host_utilities_7.2_x64.msi
 ----
 
 *Note*: The system will reboot during this process. 
-====
 
-.Configuring Windows Host iSCSI initiator 
-[%collapsible]
-====
+=== Configuring Windows Host iSCSI initiator 
+
 The following steps describe how to configure the built in Microsoft iSCSI initiator. 
 
 *All Hosts*
@@ -177,11 +168,9 @@ Get-IscsiTarget | Connect-IscsiTarget -IsPersistent $true -IsMultipathEnabled $t
 ----
 
 *Note*: Add multiple sessions (min of 5-8) for increased performance and utilizing the bandwidth. 
-====
 
-.Creating a Cluster 
-[%collapsible]
-====
+=== Creating a Cluster 
+
 *One Server Only*
 
 . Launch a PowerShell prompt with administrative permissions, by right clicking the PowerShell icon and selecting `Run as Administrator``. 
@@ -227,4 +216,3 @@ For more detailed information about quorum and witness, see link:https://learn.m
 
 . Run the Cluster Validation wizard from Failover Cluster Manager to validate deployment.
 . Create CSV LUN to store virtual machine data and create highly available virtual machines via Roles within Failover Cluster Manager.
-====
