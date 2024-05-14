@@ -1,0 +1,440 @@
+---
+sidebar: sidebar
+permalink: hyperv/hyperv-deploy-script.html
+keywords: hyperv, hyper-v, deploy, netapp, virtualization, powershell, script
+summary: "The solution provides the steps required to deploy Hyper-V on NetApp storage"   
+---
+
+= Deploying Microsoft Hyper-V on NetApp Storage: Migration Script
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+This section contains a PowerShell script that can be used for migration using Flexclone.
+
+== Powershell script
+
+[source, powershell]
+----
+param (
+    [Parameter(Mandatory=$True, HelpMessage="VCenter DNS name or IP Address")]
+    [String]$VCENTER,
+    [Parameter(Mandatory=$True, HelpMessage="NetApp ONTAP NFS Datastore name")]
+    [String]$DATASTORE,
+    [Parameter(Mandatory=$True, HelpMessage="VCenter credentials")]
+    [System.Management.Automation.PSCredential]$VCENTER_CREDS, 
+    [Parameter(Mandatory=$True, HelpMessage="The IP Address of the ONTAP Cluster")]
+    [String]$ONTAP_CLUSTER,
+    [Parameter(Mandatory=$True, HelpMessage="NetApp ONTAP VServer/SVM name")]
+    [String]$VSERVER,
+    [Parameter(Mandatory=$True, HelpMessage="NetApp ONTAP NSF,SMB Volume name")]
+    [String]$ONTAP_VOLUME_NAME,
+    [Parameter(Mandatory=$True, HelpMessage="ONTAP NFS/CIFS Volume mount Drive on Hyper-V host")]
+    [String]$ONTAP_NETWORK_SHARE_ADDRESS,
+    [Parameter(Mandatory=$True, HelpMessage="NetApp ONTAP Volume QTree folder name")]
+    [String]$VHDX_QTREE_NAME,
+    [Parameter(Mandatory=$True, HelpMessage="The Credential to connect to the ONTAP Cluster")]
+    [System.Management.Automation.PSCredential]$ONTAP_CREDS,
+    [Parameter(Mandatory=$True, HelpMessage="Hyper-V VM switch name")]
+    [String]$HYPERV_VM_SWITCH
+)
+
+function main {
+
+    ConnectVCenter
+
+    ConnectONTAP
+
+    GetVMList
+
+    GetVMInfo
+
+    #PowerOffVMs
+
+    CreateOntapVolumeSnapshot
+
+    Shift
+
+    ConfigureVMsOnHyperV
+}
+
+function ConnectVCenter {
+    Write-Host "------------------------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "Connecting to vCenter $VCENTER" -ForegroundColor Magenta
+    Write-Host "------------------------------------------------------------------------------`n" -ForegroundColor Cyan
+
+    [string]$vmwareModuleName = "VMware.VimAutomation.Core"
+    
+    Write-Host "Importing VMware $vmwareModuleName Powershell module"
+    if ((Get-Module|Select-Object -ExpandProperty Name) -notcontains $vmwareModuleName) {
+        Try {
+            Import-Module $vmwareModuleName -ErrorAction Stop
+            Write-Host "$vmwareModuleName imported successfully" -ForegroundColor Green
+        } Catch {
+            Write-Error "Error: $vmwareMdouleName PowerShell module not found"
+			break;
+        }
+    }
+    else {
+        Write-Host "$vmwareModuleName Powershell module already imported" -ForegroundColor Green
+    }
+
+    Write-Host "`nConnecting to vCenter $VCENTER"
+    Try {
+        $connect = Connect-VIServer -Server $VCENTER -Protocol https -Credential $VCENTER_CREDS -ErrorAction Stop
+        Write-Host "Connected to vCenter $VCENTER" -ForegroundColor Green
+    } Catch {
+        Write-Error "Failed to connect to vCenter $VCENTER. Error : $($_.Exception.Message)"
+		break;
+    }
+}
+
+function ConnectONTAP {
+    Write-Host "`n------------------------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "Connecting to VSerevr $VSERVER at ONTAP Cluster $ONTAP_CLUSTER" -ForegroundColor Magenta
+    Write-Host "------------------------------------------------------------------------------`n" -ForegroundColor Cyan
+
+    [string]$ontapModuleName = "NetApp.ONTAP"
+    
+    Write-Host "Importing NetApp ONTAP $ontapModuleName Powershell module"
+    if ((Get-Module|Select-Object -ExpandProperty Name) -notcontains $ontapModuleName) {
+        Try {
+            Import-Module $ontapModuleName -ErrorAction Stop
+            Write-Host "$ontapModuleName imported successfully" -ForegroundColor Green
+        } Catch {
+            Write-Error "Error: $vmwareMdouleName PowerShell module not found"
+			break;
+        }
+    }
+    else {
+        Write-Host "$ontapModuleName Powershell module already imported" -ForegroundColor Green
+    }
+
+    Write-Host "`nConnecting to ONTAP Cluster $ONTAP_CLUSTER"
+    Try {
+        $connect = Connect-NcController -Name $ONTAP_CLUSTER -Credential $ONTAP_CREDS -Vserver $VSERVER
+        Write-Host "Connected to ONTAP Cluster $ONTAP_CLUSTER" -ForegroundColor Green
+    } Catch {
+        Write-Error "Failed to connect to ONTAP Cluster $ONTAP_CLUSTER. Error : $($_.Exception.Message)"
+		break;
+    }
+}
+
+function GetVMList {
+    Write-Host "`n------------------------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "Fetching powered on VMs list with Datastore $DATASTORE" -ForegroundColor Magenta
+    Write-Host "------------------------------------------------------------------------------`n" -ForegroundColor Cyan
+    try {
+        $vmList = VMware.VimAutomation.Core\Get-VM -Datastore $DATASTORE -ErrorAction Stop| Where-Object {$_.PowerState -eq "PoweredOn"} | OUT-GridView -OutputMode Multiple
+        #$vmList = Get-VM -Datastore $DATASTORE -ErrorAction Stop| Where-Object {$_.PowerState -eq "PoweredOn"}
+
+        if($vmList) {
+            Write-Host "Selected VMs for Shift" -ForegroundColor Green
+            $vmList | Format-Table -Property Name
+            $Script:VMList = $vmList
+        }
+        else {
+            Throw "No VMs selected"
+        }
+    }
+    catch {
+        Write-Error "Failed to get VM List. Error : $($_.Exception.Message)"
+        Break;
+    }
+}
+
+function GetVMInfo {
+    Write-Host "------------------------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "VM Information" -ForegroundColor Magenta
+    Write-Host "------------------------------------------------------------------------------" -ForegroundColor Cyan
+    $vmObjArray = New-Object System.Collections.ArrayList
+
+    if($VMList) {
+        foreach($vm in $VMList) {
+            $vmObj = New-Object -TypeName System.Object
+    
+            $vmObj | Add-Member -MemberType NoteProperty -Name ID -Value $vm.Id
+            $vmObj | Add-Member -MemberType NoteProperty -Name Name -Value $vm.Name
+            $vmObj | Add-Member -MemberType NoteProperty -Name NumCpu -Value $vm.NumCpu
+            $vmObj | Add-Member -MemberType NoteProperty -Name MemoryGB -Value $vm.MemoryGB
+            $vmObj | Add-Member -MemberType NoteProperty -Name Firmware -Value $vm.ExtensionData.Config.Firmware
+    
+            $vmDiskInfo = $vm | VMware.VimAutomation.Core\Get-HardDisk
+    
+            $vmDiskArray = New-Object System.Collections.ArrayList
+            foreach($disk in $vmDiskInfo) {
+                $diskObj = New-Object -TypeName System.Object
+    
+                $diskObj | Add-Member -MemberType NoteProperty -Name Name -Value $disk.Name
+    
+                $fileName = $disk.Filename
+                if ($fileName -match '\[(.*?)\]') {
+                    $dataStoreName = $Matches[1]
+                }
+    
+                $parts = $fileName -split " "
+                $pathParts = $parts[1] -split "/"
+                $folderName = $pathParts[0]
+                $fileName = $pathParts[1]
+    
+                $diskObj | Add-Member -MemberType NoteProperty -Name DataStore -Value $dataStoreName
+                $diskObj | Add-Member -MemberType NoteProperty -Name Folder -Value $folderName
+                $diskObj | Add-Member -MemberType NoteProperty -Name Filename -Value $fileName
+                $diskObj | Add-Member -MemberType NoteProperty -Name CapacityGB -Value $disk.CapacityGB
+    
+                $null = $vmDiskArray.Add($diskObj)
+            }
+    
+            $vmObj | Add-Member -MemberType NoteProperty -Name PrimaryHardDisk -Value "[$($vmDiskArray[0].DataStore)] $($vmDiskArray[0].Folder)/$($vmDiskArray[0].Filename)"
+            $vmObj | Add-Member -MemberType NoteProperty -Name HardDisks -Value $vmDiskArray
+    
+            $null = $vmObjArray.Add($vmObj)
+    
+            $vmNetworkArray = New-Object System.Collections.ArrayList
+    
+            $vm |
+            ForEach-Object {
+              $VM = $_
+              $VM | VMware.VimAutomation.Core\Get-VMGuest | Select-Object -ExpandProperty Nics |
+              ForEach-Object {
+                $Nic = $_
+                foreach ($IP in $Nic.IPAddress)
+                {
+                  if ($IP.Contains('.'))
+                  { 
+                    $networkObj = New-Object -TypeName System.Object
+                
+                    $vlanId = VMware.VimAutomation.Core\Get-VirtualPortGroup | Where-Object {$_.Key -eq $Nic.NetworkName}
+                    $networkObj | Add-Member -MemberType NoteProperty -Name VLanID -Value $vlanId
+                    $networkObj | Add-Member -MemberType NoteProperty -Name IPv4Address -Value $IP
+    
+                    $null = $vmNetworkArray.Add($networkObj)
+                  }
+                }
+              }
+            }
+    
+            $vmObj | Add-Member -MemberType NoteProperty -Name PrimaryIPv4 -Value $vmNetworkArray[0].IPv4Address
+            $vmObj | Add-Member -MemberType NoteProperty -Name PrimaryVLanID -Value $vmNetworkArray.VLanID
+            $vmObj | Add-Member -MemberType NoteProperty -Name Networks -Value $vmNetworkArray
+    
+            $guest = $vm.Guest
+            $parts = $guest -split ":"
+            $afterColon = $parts[1]
+    
+            $osFullName = $afterColon
+    
+            $vmObj | Add-Member -MemberType NoteProperty -Name OSFullName -Value $osFullName
+            $vmObj | Add-Member -MemberType NoteProperty -Name GuestID -Value $vm.GuestId
+        }
+    }
+
+    $vmObjArray | Format-Table -Property ID, Name, NumCpu, MemoryGB, PrimaryHardDisk, PrimaryIPv4, PrimaryVLanID, GuestID, OSFullName, Firmware
+
+    $Script:VMObjList = $vmObjArray
+}
+
+function PowerOffVMs {
+    Write-Host "`n------------------------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "Power Off VMs" -ForegroundColor Magenta
+    Write-Host "------------------------------------------------------------------------------`n" -ForegroundColor Cyan
+    foreach($vm in $VMObjList) {
+        try {
+            Write-Host "Powering Off VM $($vm.Name) in vCenter $($VCENTER)"
+            $null = VMware.VimAutomation.Core\Stop-VM -VM $vm.Name -Confirm:$false -ErrorAction Stop
+            Write-Host "Powered Off VM $($vm.Name)" -ForegroundColor Green
+        }
+        catch {
+            Write-Error "Failed to Power Off VM $($vm.Name). Error : $._Exception.Message"
+            Break;
+        }
+        Write-Host "`n"
+    }
+}
+
+function CreateOntapVolumeSnapshot {
+    Write-Host "`n------------------------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "Taking ONTAP Snapshot for Volume $ONTAP_VOLUME_NAME" -ForegroundColor Magenta
+    Write-Host "------------------------------------------------------------------------------`n" -ForegroundColor Cyan
+
+    Try {
+        Write-Host "Taking snapshot for Volume $ONTAP_VOLUME_NAME"
+        $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
+        $snapshot = New-NcSnapshot -VserverContext $VSERVER -Volume $ONTAP_VOLUME_NAME -Snapshot "snap.script-$timestamp"
+
+        if($snapshot) {
+            Write-Host "Snapshot ""$($snapshot.Name)"" created for Volume $ONTAP_VOLUME_NAME" -ForegroundColor Green
+            $Script:OntapVolumeSnapshot = $snapshot
+        }
+    } Catch {
+        Write-Error "Failed to create snapshot for Volume $ONTAP_VOLUME_NAME. Error : $_.Exception.Message"
+        Break;
+    }
+}
+
+function Shift {
+    Write-Host "------------------------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "VM Shift" -ForegroundColor Magenta
+    Write-Host "------------------------------------------------------------------------------`n" -ForegroundColor Cyan
+
+    $Script:HypervVMList = New-Object System.Collections.ArrayList
+    foreach($vmObj in $VMObjList) {
+
+        Write-Host "***********************************************"
+        Write-Host "Performing VM conversion for $($vmObj.Name)" -ForegroundColor Blue
+        Write-Host "***********************************************"
+
+        $hypervVMObj = New-Object -TypeName System.Object
+    
+        $directoryName = "/vol/$($ONTAP_VOLUME_NAME)/$($VHDX_QTREE_NAME)/$($vmObj.HardDisks[0].Folder)"
+        
+        try {
+            Write-Host "Creating Folder ""$directoryName"" for VM $($vmObj.Name)"
+            $dir = New-NcDirectory -VserverContext $VSERVER -Path $directoryName -Permission 0777 -Type directory -ErrorAction Stop
+            if($dir) {
+                Write-Host "Created folder ""$directoryName"" for VM $($vmObj.Name)`n" -ForegroundColor Green
+            }
+        }
+        catch {
+            if($_.Exception.Message -eq "[500]: File exists") {
+                Write-Warning "Folder ""$directoryName"" already exists!`n"
+            }
+            Else {
+                Write-Error "Failed to create folder ""$directoryName"" for VM $($vmObj.Name). Error : $($_.Exception.Message)"
+                Break;
+            }
+        }
+
+        $vmDiskArray = New-Object System.Collections.ArrayList
+    
+        foreach($disk in $vmObj.HardDisks) {
+            $vmDiskObj = New-Object -TypeName System.Object
+            try {
+                Write-Host "`nConverting $($disk.Name)"
+                Write-Host "--------------------------------"
+
+                $vmdkPath = "/vol/$($ONTAP_VOLUME_NAME)/$($disk.Folder)/$($disk.Filename)"
+                $fileName = $disk.Filename -replace '\.vmdk$', ''
+                $vhdxPath = "$($directoryName)/$($fileName).vhdx"
+
+                Write-Host "Converting ""$($disk.Name)"" VMDK path ""$($vmdkPath)"" to VHDX at Path ""$($vhdxPath)"" for VM $($vmObj.Name)"
+                $convert = ConvertTo-NcVhdx -SourceVmdk $vmdkPath -DestinationVhdx $vhdxPath  -SnapshotName $OntapVolumeSnapshot -ErrorAction Stop -WarningAction SilentlyContinue
+                if($convert) {
+                    Write-Host "Successfully converted VM ""$($vmObj.Name)"" VMDK path ""$($vmdkPath)"" to VHDX at Path ""$($vhdxPath)""" -ForegroundColor Green
+                    
+                    $vmDiskObj | Add-Member -MemberType NoteProperty -Name Name -Value $disk.Name
+                    $vmDiskObj | Add-Member -MemberType NoteProperty -Name VHDXPath -Value $vhdxPath
+
+                    $null = $vmDiskArray.Add($vmDiskObj)
+                }
+            }
+            catch {
+                Write-Error "Failed to convert ""$($disk.Name)"" VMDK to VHDX for VM $($vmObj.Name). Error : $($_.Exception.Message)"
+                Break;
+            }
+        }
+
+        $hypervVMObj | Add-Member -MemberType NoteProperty -Name Name -Value $vmObj.Name
+        $hypervVMObj | Add-Member -MemberType NoteProperty -Name HardDisks -Value $vmDiskArray
+        $hypervVMObj | Add-Member -MemberType NoteProperty -Name MemoryGB -Value $vmObj.MemoryGB
+        $hypervVMObj | Add-Member -MemberType NoteProperty -Name Firmware -Value $vmObj.Firmware
+        $hypervVMObj | Add-Member -MemberType NoteProperty -Name GuestID -Value $vmObj.GuestID
+        
+        
+    
+        $null = $HypervVMList.Add($hypervVMObj)
+        Write-Host "`n"
+
+    }
+}
+
+function ConfigureVMsOnHyperV {
+    Write-Host "------------------------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "Configuring VMs on Hyper-V" -ForegroundColor Magenta
+    Write-Host "------------------------------------------------------------------------------`n" -ForegroundColor Cyan
+
+    foreach($vm in $HypervVMList) {
+        try {
+
+            # Define the original path
+            $originalPath = $vm.HardDisks[0].VHDXPath
+            # Replace forward slashes with backslashes
+            $windowsPath = $originalPath -replace "/", "\"
+
+            # Replace the initial part of the path with the Windows drive letter
+            $windowsPath = $windowsPath -replace "^\\vol\\", "\\$($ONTAP_NETWORK_SHARE_ADDRESS)\"
+
+            $vmGeneration = if ($vm.Firmware -eq "bios") {1} else {2};
+
+            Write-Host "***********************************************"
+            Write-Host "Creating VM $($vm.Name)" -ForegroundColor Blue
+            Write-Host "***********************************************"
+            Write-Host "Creating VM $($vm.Name) with Memory $($vm.MemoryGB)GB, vSwitch $($HYPERV_VM_SWITCH), $($vm.HardDisks[0].Name) ""$($windowsPath)"", Generation $($vmGeneration) on Hyper-V"
+
+            $createVM = Hyper-V\New-VM -Name $vm.Name -VHDPath $windowsPath -SwitchName $HYPERV_VM_SWITCH -MemoryStartupBytes (Invoke-Expression "$($vm.MemoryGB)GB") -Generation $vmGeneration -ErrorAction Stop
+            if($createVM) {
+                Write-Host "VM $($createVM.Name) created on Hyper-V host`n" -ForegroundColor Green
+                
+            
+                $index = 0
+                foreach($vmDisk in $vm.HardDisks) {
+                    $index++
+                    if ($index -eq 1) {
+                        continue
+                    }
+
+                    Write-Host "`nAttaching $($vmDisk.Name) for VM $($vm.Name)"
+                    Write-Host "---------------------------------------------"
+
+                    $originalPath = $vmDisk.VHDXPath
+
+                    # Replace forward slashes with backslashes
+                    $windowsPath = $originalPath -replace "/", "\"
+
+                    # Replace the initial part of the path with the Windows drive letter
+                    $windowsPath = $windowsPath -replace "^\\vol\\", "\\$($ONTAP_NETWORK_SHARE_ADDRESS)\"
+
+                    try {
+                        $attachDisk = Hyper-v\Add-VMHardDiskDrive -VMName $vm.Name -Path $windowsPath -ErrorAction Stop
+                        Write-Host "Attached $($vmDisk.Name) ""$($windowsPath)"" to VM $($vm.Name)" -ForegroundColor Green
+                    }
+                    catch {
+                        Write-Error "Failed to attach $($vmDisk.Name) $($windowsPath) to VM $($vm.Name): Error : $($_.Exception.Message)"
+                        Break;
+                    }
+                }
+
+                if($vmGeneration -eq 2 -and $vm.GuestID -like "*rhel*") {
+                    try {
+                        Write-Host "`nDisabling secure boot"
+                        Hyper-V\Set-VMFirmware -VMName $createVM.Name -EnableSecureBoot Off -ErrorAction Stop
+                        Write-Host "Secure boot disabled" -ForegroundColor Green
+                    }
+                    catch {
+                        Write-Error "Failed to disable secure boot for VM $($createVM.Name). Error : $($_.Exception.Message)"
+                    }
+                }
+
+                try {
+                    Write-Host "`nStarting VM $($createVM.Name)"
+                    Hyper-v\Start-VM -Name $createVM.Name -ErrorAction Stop
+                    Write-Host "Started VM $($createVM.Name)`n" -ForegroundColor Green
+                }
+                catch {
+                    Write-Error "Failed to start VM $($createVM.Name). Error : $($_.Exception.Message)"
+                    Break;
+                }
+            }
+        }
+        catch {
+            Write-Error "Failed  to create VM $($vm.Name) on Hyper-V. Error : $($_.Exception.Message)"
+            Break;
+        }
+    }
+}
+
+main
+----

@@ -1,0 +1,56 @@
+---
+sidebar: sidebar
+permalink: vmware/migrate-vms-to-ec2-fsxn-arch.html
+keywords: netapp, vmware, amazon, ec2, fsxn, migration, iscsi, 
+summary: "This technical report covers how to migrate on-premises VMware vSphere VMs to an Amazon EC2 instance with data disks placed on FSx for ONTAP iSCSI LUNs using the MigrateOps 'data-mobility-as-code' functionality of Cirrus Migrate Cloud (CMC)."
+---
+
+== Migrate VMs to Amazon EC2 using FSxN: Architecture and Pre-Requisites
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+This article shows the high-level architecture and deployment pre-requisites for completing the migration.
+
+== High level architecture
+
+The diagram below illustrates the high-level architecture of migrating Virtual Machine Disk (VMDK) data on VMware to AWS using CMC MigrateOps:
+
+image:migrate-ec2-fsxn-image01.png[Migrating VMs to Amazon EC2 using FSxN Architecture diagram]
+
+== How to migrate your VMware VMs to AWS using Amazon EC2 and FSx for ONTAP iSCSI
+
+=== Prerequisites
+
+Before starting the walkthrough steps, make sure the following prerequisites are met:
+
+*On AWS*
+
+* An AWS account. This includes permissions for subnets, VPC setup, routing tables, security rule migration, security groups, and other requirements for networking such as load balancing. As with any migration, the most effort and consideration should go into networking.
+* Appropriate IAM roles that allow you to provision both FSx for ONTAP and Amazon EC2 instances.
+* Route tables and security groups are allowed to communicate with FSx for ONTAP.
+* Add an inbound rule to the appropriate security group (see below for more details) to allow for secure data transfer from your on-premises data center to AWS.
+* A valid DNS that can resolve public internet domain names.
+* Check that your DNS resolution is functional and allows you to resolve host names. 
+* For optimal performance and rightsizing, use performance data from your source environment to rightsize your FSx for ONTAP storage.
+* Each MigrateOps session uses one EIP, hence the quota for EIP should be increased for more parallelism. Keep in mind, the default EIP quota is 5.
+* (If Active Directory-based workloads are being migrated) A Windows Active Directory domain on Amazon EC2.
+
+*For Cirrus Migrate Cloud*
+
+* A Cirrus Data Cloud account at link:http://cloud.cirrusdata.com/[cloud.cirrusdata.com] must be created before using CMC. Outbound communication with the CDN, Cirrus Data endpoints, and software repository via HTTPS must be allowed.
+* Allow communication (outbound) with Cirrus Data Cloud services via HTTPS protocol (Port 443). 
+* For a host to be managed by the CMC project, the deployed CMC software must initiate a one-way outbound TCP connection to Cirrus Data Cloud.
+* Allow TCP protocol, Port 443 access to portal-gateway.cloud.cirrusdata.com which is currently at 208.67.222.222.
+* Allow HTTP POST requests (via HTTPS connection) with binary data payload (application/octet-stream). This is similar to a file upload.
+* Ensure that portal-gateway.cloud.cirrusdata.com is resolvable by your DNS (or via OS host file).
+* If you have strict rules for prohibiting product instances to make outbound connections, the “Management Relay” feature of CMC can be used where the outbound 443 connection is from a single, secured non-production host.
+
+*Note*: No storage data is ever sent to the Cirrus Data Cloud endpoint. Only management metadata is sent, and this can be optionally masked so that no real host name, volume name, network IP are included.
+
+For migrating data from on-premises storage repositories to AWS, MigrateOps automates the management of a Host-to-Host (H2H) connection. These are optimized, one-way, TCP-based network connections that CMC uses to facilitate remote migration. This process features always-on compression and encryption that can reduce the amount of traffic by up to eight times, depending on the nature of the data.
+
+*Note*: CMC is designed so that no production data / I/O leaves the production network during the entire migration phase. As a result, direct connectivity between the source and destination host is required.
