@@ -26,7 +26,7 @@ Cloud Volumes Service provides support for the SMB 2.1 and 3.x versions of the p
 
 * When a Windows username requests access to the Cloud Volumes Service volume, Cloud Volumes Service looks for a UNIX username using the methods configured by Cloud Volumes Service administrators.
 * If an external UNIX identity provider (LDAP) is configured and Windows/UNIX usernames are identical, then Windows usernames will map 1:1 to UNIX usernames without any additional configuration needed. When LDAP is enabled, Active Directory is used to host those UNIX attributes for user and group objects.
-* If Windows names and UNIX names do not match identically, then LDAP must be configured to allow Cloud Volumes Service to use the LDAP name mapping configuration (see the section link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#ldap#using-ldap-for-asymmetric-name-mapping[“Using LDAP for asymmetric name mapping”]).
+* If Windows names and UNIX names do not match identically, then LDAP must be configured to allow Cloud Volumes Service to use the LDAP name mapping configuration (see the section link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#using-ldap-for-asymmetric-name-mapping[“Using LDAP for asymmetric name mapping”]).
 * If LDAP is not in use, then Windows SMB users map to a default local UNIX user named `pcuser` in Cloud Volumes Service. This means files written in Windows by users that map to the `pcuser` show UNIX ownership as `pcuser` in multiprotocol NAS environments. `pcuser` here is effectively the `nobody` user in Linux environments (UID 65534).
 
 In deployments with SMB only, the `pcuser` mapping still occurs, but it won’t matter, because Windows user and group ownership is correctly displayed and NFS access to the SMB-only volume is not allowed. In addition, SMB-only volumes do not support conversion to NFS or dual-protocol volumes after they are created.
@@ -167,6 +167,7 @@ Hiding Snapshot copies from end users might be desired for security reasons, per
 * *Enable access-based enumeration (ABE) (CVS-SW only).* This is similar to hiding the SMB share, except the shares or files are only hidden from users or groups that do not have permissions to access the objects. For instance, if Windows user `joe` is not allowed at least Read access through the permissions, then the Windows user `joe` cannot see the SMB share or files at all. This is disabled by default,  and you can enable it by selecting the checkbox. For more information on ABE, see the NetApp Knowledge Base article https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/How_does_Access_Based_Enumeration_(ABE)_work[How does Access Based Enumeration (ABE) work?^]
 * *Enable Continuously Available (CA) share support (CVS-Performance only).* https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/What_are_SMB_Continuously_Available_(CA)_Shares[Continuously Available SMB shares^] provide a way to minimize application disruptions during failover events by replicating lock states across nodes in the Cloud Volumes Service backend system. This is not a security feature, but it does offer better overall resiliency. Currently, only SQL Server and FSLogix applications are supported for this functionality.
 
+[[default-hidden-shares]]
 == Default hidden shares
 
 When an SMB server is created in Cloud Volumes Service, there are https://library.netapp.com/ecmdocs/ECMP1366834/html/GUID-5B56B12D-219C-4E23-B3F8-1CB1C4F619CE.html[hidden administrative shares^] (using the $ naming convention) that are created in addition to the data volume SMB share.  These include C$ (namespace access) and IPC$ (sharing named pipes for communication between programs, such as the remote procedure calls (RPC) used for Microsoft Management Console (MMC) access).
@@ -301,7 +302,7 @@ The following table contains a list of those options, what they do, the default 
 |False
 |No
 |Client Session Security
-|Sets signing and/or sealing for LDAP communication. This is not currently set in Cloud Volumes Service but might be needed in future releases to address . Remediation for LDAP authentication issues due to the Windows patch is covered in the section link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#ldap#ldap-channel-binding[“LDAP channel binding.”].
+|Sets signing and/or sealing for LDAP communication. This is not currently set in Cloud Volumes Service but might be needed in future releases to address . Remediation for LDAP authentication issues due to the Windows patch is covered in the section link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#ldap-channel-binding[“LDAP channel binding.”].
 |None
 |No
 |SMB2 enable for DC connections
