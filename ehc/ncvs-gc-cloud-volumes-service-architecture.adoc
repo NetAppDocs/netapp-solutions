@@ -26,10 +26,12 @@ image:ncvs-gc-image1.png[Error: Missing Graphic Image]
 
 The part above the dotted line shows the control plane of the service, which controls the volume lifecycle. The part below the dotted line shows the data plane. The left blue box depicts the user VPC (service consumer), the right blue box is the service producer provided by NetApp. Both are connected through VPC peering.
 
+[[tenancy-model]]
 == Tenancy model
 
 In Cloud Volumes Service, individual projects are considered unique tenants. This means that manipulation of volumes, Snapshot copies, and so on are performed on a per- project basis. In other words, all volumes are owned by the project that they were created in and only that project can manage and access the data inside of them by default. This is considered the control plane view of the service.
 
+[[shared-vpcs]]
 === Shared VPCs
 
 On the data plane view, Cloud Volumes Service can connect to a shared VPC. You can create volumes in the hosting project or in one of the service projects connected to the shared VPC. All projects (host or service) connected to that shared VPC are able to reach the volumes at the network layer (TCP/IP). Because all clients with network connectivity on the shared- VPC can potentially access the data through NAS protocols, access control on the individual volume (such as user/group access control lists (ACLs) and hostnames/IP addresses for NFS exports) must be used to control who can access the data.
@@ -48,11 +50,12 @@ The Cloud Volumes Service data plane is not connected to the external internet b
 
 In short, the Cloud Volumes Service data plane provides the capability of network access control, without the requirement to support VPC Service Controls and does not explicitly use VPC Service Controls.
 
+[[packet-sniffing]]
 === Packet sniffing/trace considerations
 
-Packet captures can be useful for troubleshooting network issues or other problems (such as NAS permissions, LDAP connectivity, and so on), but can also be used maliciously to gain information about network IP addresses, MAC addresses, user and group names, and what level of security is being used on endpoints. Because of the way Google Cloud networking, VPCs, and firewall rules are configured, unwanted access to network packets should be difficult to obtain without user login credentials or link:ncvs-gc-control-plane-architecture.html#_jwt_tokens[JWT tokens] into the cloud instances. Packet captures are only possible on endpoints (such as virtual machines (VMs)) and only possible on endpoints internal to the VPC unless a shared VPC and/or external network tunnel/IP forwarding is in use to explicitly allow external traffic to endpoints. There is no way to sniff traffic outside of the clients.
+Packet captures can be useful for troubleshooting network issues or other problems (such as NAS permissions, LDAP connectivity, and so on), but can also be used maliciously to gain information about network IP addresses, MAC addresses, user and group names, and what level of security is being used on endpoints. Because of the way Google Cloud networking, VPCs, and firewall rules are configured, unwanted access to network packets should be difficult to obtain without user login credentials or link:ncvs-gc-control-plane-architecture.html#jwt-tokens[JWT tokens] into the cloud instances. Packet captures are only possible on endpoints (such as virtual machines (VMs)) and only possible on endpoints internal to the VPC unless a shared VPC and/or external network tunnel/IP forwarding is in use to explicitly allow external traffic to endpoints. There is no way to sniff traffic outside of the clients.
 
-When shared VPCs are used, in-flight encryption with NFS Kerberos and/or link:ncvs-gc-data-encryption-in-transit.html#_smb_encryption[SMB encryption] can mask much of the information gleaned from traces. However, some traffic is still sent in plaintext, such as link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#_dns[DNS] and link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#_ldap_queries[LDAP queries]. The following figure shows a packet capture from a plaintext LDAP query originating from Cloud Volumes Service and the potential identifying information that is exposed. LDAP queries in Cloud Volumes Service currently do not support encryption or LDAP over SSL. CVS-Performance support LDAP signing, if requested by Active Directory. CVS-SW does not support LDAP signing.
+When shared VPCs are used, in-flight encryption with NFS Kerberos and/or link:ncvs-gc-data-encryption-in-transit.html#smb-encryption[SMB encryption] can mask much of the information gleaned from traces. However, some traffic is still sent in plaintext, such as link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#dns[DNS] and link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#ldap_queries[LDAP queries]. The following figure shows a packet capture from a plaintext LDAP query originating from Cloud Volumes Service and the potential identifying information that is exposed. LDAP queries in Cloud Volumes Service currently do not support encryption or LDAP over SSL. CVS-Performance support LDAP signing, if requested by Active Directory. CVS-SW does not support LDAP signing.
 
 image:ncvs-gc-image2.png[Error: Missing Graphic Image]
 
