@@ -2,7 +2,7 @@
 sidebar: sidebar
 permalink: databases/automation_ora_c-series_nfs.html
 keywords: Database, Oracle, Azure, ANF, Ansible, Automation
-summary: "The solution provides overview and details for automated Oracle deployment in NetApp C-Series as primary database storage with NFS protocol and Oracle database is deployed as container database with dNFS enabled." 
+summary: "This solution provides an overview and details for automated Oracle deployment in NetApp AFF C-Series as primary database storage with NFS protocol. The Oracle database deploys as a container database with dNFS enabled." 
 ---
 
 = TR-4992: Simplified, Automated Oracle Deployment on NetApp C-Series with NFS
@@ -51,13 +51,13 @@ image::automation_ora_c-series_nfs_archit.png["This image provides a detailed pi
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| Azure NetApp Files | Current offering in Azure by Microsoft | One capacity pool with Premium service level 
-| Azure VM for DB server | Standard_B4ms - 4 vCPUs, 16GiB | Two Linux virtual machine instances for concurrent deployment 
-| Azure VM for SnapCenter | Standard_B4ms - 4 vCPUs, 16GiB | One Windows virtual machine instance 
+| NetApp C-Series C400 | ONTAP Version 9.13.1P3 | two disk shelves / 24 disks with 278 TiB capacity 
+| VM for DB server | 4 vCPUs, 16GiB RAM | Two Linux VM instances for concurrent deployment 
+| VM for SnapCenter | 4 vCPUs, 16GiB RAM| One Windows VM instance 
 
 3+^| *Software*
 | RedHat Linux | RHEL Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
-| Windows Server | 2022 DataCenter; Azure Edition Hotpatch - x64 Gen2 | Hosting SnapCenter server 
+| Windows Server | 2022 DataCenter x64 Gen2 | Hosting SnapCenter server 
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 | SnapCenter Server | Version 5.0 | Workgroup deployment 
@@ -72,8 +72,8 @@ image::automation_ora_c-series_nfs_archit.png["This image provides a detailed pi
 |===
 3+^| 
 | *Server* | *Database* | *DB Storage*
-| ora-01 | NTAP1(NTAP1_PDB1,NTAP1_PDB2,NTAP1_PDB3) | /u01, /u02, /u03 NFS mounts on ANF capacity pool
-| ora-02 | NTAP2(NTAP2_PDB1,NTAP2_PDB2,NTAP2_PDB3) | /u01, /u02, /u03 NFS mounts on ANF capacity pool
+| ora_01 | NTAP1(NTAP1_PDB1,NTAP1_PDB2,NTAP1_PDB3) | /u01, /u02, /u03 NFS mounts on C400 volumes
+| ora_02 | NTAP2(NTAP2_PDB1,NTAP2_PDB2,NTAP2_PDB3) | /u01, /u02, /u03 NFS mounts on C400 volumes
 |===
 
 === Key factors for deployment consideration
@@ -82,15 +82,15 @@ image::automation_ora_c-series_nfs_archit.png["This image provides a detailed pi
 
 * *Multiple DB servers deployment.* The automation solution can deploy an Oracle container database to multiple DB servers in a single Ansible playbook run. Regardless of the number of DB servers, the playbook execution remains the same. You can deploy multiple container databases to a single VM instance by repeating the deployment with different database instance IDs (Oracle SID). But ensure there is sufficient memory on the host to support deployed databases.  
 
-* *dNFS configuration.* By using dNFS (available since Oracle 11g), an Oracle database running on an Azure Virtual Machine can drive significantly more I/O than the native NFS client. Automated Oracle deployment configures dNFS on NFSv3 by default.
+* *dNFS configuration.* By using dNFS (available since Oracle 11g), an Oracle database running on a DB VM can drive significantly more I/O than the native NFS client. Automated Oracle deployment configures dNFS on NFSv3 by default.
 
-* *Allocate large size volume to speed up deployment.* ANF file system IO throughput is regulated based on the size of volume. For initial deployment, allocate large size volumes can speed up the deployment. The volumes subsequently can be downsized dynamically without application impact.
+* *Load balancing on C400 controller pair.* Place Oracle database volumes on C400 controller nodes evenly to balance the workload. DB1 on controller 1, DB2 on controller 2, and so on. Mount the DB volumes to its local lif address.
 
 * *Database backup.* NetApp provides a SnapCenter software suite for database backup, restore, and cloning with a user-friendly UI interface. NetApp recommends implementing such a management tool to achieve fast (under a minute) snapshot backup, quick (minutes) database restore, and database clone.    
 
 == Solution deployment
 
-The following sections provide step-by-step procedures for automated Oracle 19c deployment and database migration on Azure NetApp Files with directly mounted database volumes via NFS to Azure VMs.     
+The following sections provide step-by-step procedures for automated Oracle 19c deployment and information for Oracle database protection and clone after deployment.    
 
 === Prerequisites for deployment
 [%collapsible]
@@ -98,49 +98,134 @@ The following sections provide step-by-step procedures for automated Oracle 19c 
 
 Deployment requires the following prerequisites.
 
-. An Azure account has been set up, and the necessary VNet and network segments have been created within your Azure account.
+. A NetApp C-Series storage controller pair is racked, stacked, and latest version of ONTAP operating system is installed and configured. Refer to this setup guide as necessary: https://docs.netapp.com/us-en/ontap-systems/c400/install-detailed-guide.html#step-1-prepare-for-installation[Detailed guide - AFF C400^]
 
-. From the Azure cloud portal, deploy Azure Linux VMs as Oracle DB servers. Create an Azure NetApp Files capacity pool and database volumes for Oracle database. Enable VM SSH private/public key authentication for azureuser to DB servers. See the architecture diagram in the previous section for details about the environment setup. Also referred to link:azure_ora_nfile_procedures.html[Step-by-Step Oracle deployment procedures on Azure VM and Azure NetApp Files^] for detailed information.
-+
-[NOTE]
+. Provision two Linux VMs as Oracle DB servers. See the architecture diagram in the previous section for details about the environment setup. 
 
-For Azure VMs deployed with local disk redundancy, ensure that you have allocated at least 128G in the VM root disk to have sufficient space to stage Oracle installation files and add OS swap file. Expand /tmplv and /rootlv OS partition accordingly. Ensure the database volume naming follows the VMname-u01, VMname-u02, and VMname-u03 convention.
-+
-[source, cli]
-sudo lvresize -r -L +20G /dev/mapper/rootvg-rootlv
-+
-[source, cli]
-sudo lvresize -r -L +10G /dev/mapper/rootvg-tmplv
-
-. From the Azure cloud portal, provision a Windows server to run the NetApp SnapCenter UI tool with the latest version. Refer to the following link for details: link:https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^]
+. Provision a Windows server to run the NetApp SnapCenter UI tool with the latest version. Refer to the following link for details: link:https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^]
 
 . Provision a Linux VM as the Ansible controller node with the latest version of Ansible and Git installed. Refer to the following link for details: link:../automation/getting-started.html[Getting Started with NetApp solution automation^] in section - 
 `Setup the Ansible Control Node for CLI deployments on RHEL / CentOS` or 
 `Setup the Ansible Control Node for CLI deployments on Ubuntu / Debian`. 
 +
-[NOTE]
+Enable ssh public/private key authentication between Ansible controller and database VMs.
 
-The Ansible controller node can locate either on-premisses or in Azure cloud as far as it can reach Azure DB VMs via ssh port.  
-
-. Clone a copy of the NetApp Oracle deployment automation toolkit for NFS. 
+. From Ansible controller admin user home directory, clone a copy of the NetApp Oracle deployment automation toolkit for NFS. 
 +
 [source, cli]
 git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_nfs.git
 
-. Stage following Oracle 19c installation files on Azure DB VM /tmp/archive directory with 777 permission.
+. Stage following Oracle 19c installation files on DB VM /tmp/archive directory with 777 permission.
 +
       installer_archives:
         - "LINUX.X64_193000_db_home.zip"
         - "p34765931_190000_Linux-x86-64.zip"
         - "p6880880_190000_Linux-x86-64.zip"
 
+====
 
-. Watch the following video:
-+
-video::d1c859b6-e45a-44c7-8361-b10f012fc89b[panopto, title="Simplified and automated Oracle deployment on Azure NetApp Files with NFS", width=360]
+=== Configure Networking and SVM on C-Series for Oracle
+[%collapsible]
 
 ====
 
+This section of deployment guide demonstrates best practices to set up networking and storage virtual machine (SVM) on C-Series controller for Oracle workload with NFS protocol using ONTAP System Manager UI.
+
+. Login to ONTAP System Manager to review that after initial ONTAP cluster installation, broadcast domains have been configured with ethernet ports properly assigned to each domain. Generally, there should be a broadcast domain for cluster, a broadcast domain for management, and a broadcast domain for workload such as data.
++
+image::automation_ora_c-series_nfs_net_01.png["This image provides screen shot for c-series controller config"]
+
+. From NETWORK - Ethernet Ports, click `Link Aggregate Group` to create a LACP link aggregate group port a0a, which provides load balance and failover. 
++
+image::automation_ora_c-series_nfs_net_02.png["This image provides screen shot for c-series controller config"]
+
+. Select the ethernet ports in the group, `LACP` for mode, and `Port` for load distribution.
++
+image::automation_ora_c-series_nfs_net_03.png["This image provides screen shot for c-series controller config"]
+
+. Validate LACP port a0a created and broadcast domain `Data` is now operating on LACP port.
++
+image::automation_ora_c-series_nfs_net_04.png["This image provides screen shot for c-series controller config"]
+image::automation_ora_c-series_nfs_net_05.png["This image provides screen shot for c-series controller config"]
+
+. From `Ethernet Ports`, click `VLAN` to add a VLAN on each controller node for Oracle workload on NFS protocol.
++
+image::automation_ora_c-series_nfs_net_06.png["This image provides screen shot for c-series controller config"]
+image::automation_ora_c-series_nfs_net_07.png["This image provides screen shot for c-series controller config"]
+image::automation_ora_c-series_nfs_net_08.png["This image provides screen shot for c-series controller config"]
+
+. Login to C-Series controller via ssh to validate that network failover groups are configured correctly. ONTAP create and manage failover groups automatically.
++
+....
+
+HCG-NetApp-C400-E9U9::> net int failover-groups show
+  (network interface failover-groups show)
+                                  Failover
+Vserver          Group            Targets
+---------------- ---------------- --------------------------------------------
+Cluster
+                 Cluster
+                                  HCG-NetApp-C400-E9U9a:e0c,
+                                  HCG-NetApp-C400-E9U9a:e0d,
+                                  HCG-NetApp-C400-E9U9b:e0c,
+                                  HCG-NetApp-C400-E9U9b:e0d
+HCG-NetApp-C400-E9U9
+                 Data
+                                  HCG-NetApp-C400-E9U9a:a0a,
+                                  HCG-NetApp-C400-E9U9a:a0a-3277,
+                                  HCG-NetApp-C400-E9U9b:a0a,
+                                  HCG-NetApp-C400-E9U9b:a0a-3277
+                 Mgmt
+                                  HCG-NetApp-C400-E9U9a:e0M,
+                                  HCG-NetApp-C400-E9U9b:e0M
+3 entries were displayed.
+
+....
+
+. From `STORAGE - Storage VMs`, click +Add to create a SVM for Oracle.
++
+image::automation_ora_c-series_nfs_svm_01.png["This image provides screen shot for c-series controller config"]
+
+. Name your Oracle SVM, check `Enable NFS` and `Allow NFS client access`.
++
+image::automation_ora_c-series_nfs_svm_02.png["This image provides screen shot for c-series controller config"]
+
+. Add NFS export policy `Default` rules.
++
+image::automation_ora_c-series_nfs_svm_03.png["This image provides screen shot for c-series controller config"]
+
+. In `NETWORK INTERFACE`, fill in IP address on each node for NFS lif addresses.
++
+image::automation_ora_c-series_nfs_svm_04.png["This image provides screen shot for c-series controller config"]
+
+. Validate SVM for Oracle is up/running and NFS lifs status is active.
++
+image::automation_ora_c-series_nfs_svm_05.png["This image provides screen shot for c-series controller config"]
+image::automation_ora_c-series_nfs_svm_06.png["This image provides screen shot for c-series controller config"]
+
+. From `STORAGE-Volumes` tab to add NFS volumes for Oracle database.
++
+image::automation_ora_c-series_nfs_vol_01.png["This image provides screen shot for c-series controller config"]
+
+. Name your volume, assign capacity, and performance level.
++
+image::automation_ora_c-series_nfs_vol_02.png["This image provides screen shot for c-series controller config"]
+
+. In `Access Permission`, choose the default policy created from previous step.
++
+image::automation_ora_c-series_nfs_vol_03.png["This image provides screen shot for c-series controller config"]
+
+. Create three DB volumes for each DB server: server_name_u01 - binary, server_name_u02 - data, server_name_u03 - logs. 
++
+image::automation_ora_c-series_nfs_vol_04.png["This image provides screen shot for c-series controller config"]
++
+[NOTE]
+
+The DB volume naming convention should strictly follow format as stated above to ensure automation to work correctly.
+
+This completes the C-series controller configuration for Oracle.
+
+====
 === Automation parameter files
 [%collapsible]
 
