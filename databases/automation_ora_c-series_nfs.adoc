@@ -248,15 +248,15 @@ In addition to these user-defined variable files, there are several default vari
 
 . Ansible target `hosts` file configuration:
 +
-include::../_include/automation_ora_anf_nfs_hosts.adoc[]
+include::../_include/automation_ora_nfs_hosts.adoc[]
 
 . Global `vars/vars.yml` file configuration
 +
-include::../_include/automation_ora_anf_nfs_vars.adoc[]
+include::../_include/automation_ora_nfs_vars.adoc[]
 
 . Local DB server `host_vars/host_name.yml` configuration such as ora_01.yml, ora_02.yml ...
 +
-include::../_include/automation_ora_asa_iscsi_host_vars.adoc[]
+include::../_include/automation_ora_nfs_host_vars.adoc[]
 
 ====
 
@@ -278,34 +278,34 @@ There are three options to run the playbooks with the following commands.
 . Execute all deployment playbooks in one combined run.
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml
 
 . Execute playbooks one at a time with the number sequence from 1-4.
 +
 [source, cli]] 
-ansible-playbook -i hosts 1-ansible_requirements.yml -u azureuser -e @vars/vars.yml
+ansible-playbook -i hosts 1-ansible_requirements.yml -u admin -e @vars/vars.yml
 +
 [source, cli] 
-ansible-playbook -i hosts 2-linux_config.yml -u azureuser -e @vars/vars.yml
+ansible-playbook -i hosts 2-linux_config.yml -u admin -e @vars/vars.yml
 +
 [source, cli]
-ansible-playbook -i hosts 4-oracle_config.yml -u azureuser -e @vars/vars.yml
+ansible-playbook -i hosts 4-oracle_config.yml -u admin -e @vars/vars.yml
 
 . Execute 0-all_playbook.yml with a tag.
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml -t ansible_requirements
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t ansible_requirements
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml -t linux_config
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t linux_config
 +
 [source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u azureuser -e @vars/vars.yml -t oracle_config
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t oracle_config
 
 . Undo the environment
 +
 [source, cli]
-ansible-playbook -i hosts 5-destroy.yml -u azureuser -e @vars/vars.yml
+ansible-playbook -i hosts 5-destroy.yml -u admin -e @vars/vars.yml
 
 
 ====
@@ -315,17 +315,17 @@ ansible-playbook -i hosts 5-destroy.yml -u azureuser -e @vars/vars.yml
 
 ====
 
-After the playbook run, login to the Oracle DB server VM to validate that Oracle is installed and configured and a container database is created successfully. Following is an example of Oracle database validation on host ora-01. 
+After the playbook run, login to the Oracle DB server VM to validate that Oracle is installed and configured and a container database is created successfully. Following is an example of Oracle database validation on DB VM ora_01 or ora_02. 
 
 . Validate NFS mounts
 +
 ....
 
-[azureuser@ora-01 ~]$ cat /etc/fstab
+[admin@ora_01 ~]$ cat /etc/fstab
 
 #
 # /etc/fstab
-# Created by anaconda on Thu Sep 14 11:04:01 2023
+# Created by anaconda on Wed Oct 18 19:43:31 2023
 #
 # Accessible filesystems, by reference, are maintained under '/dev/disk/'.
 # See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
@@ -333,36 +333,42 @@ After the playbook run, login to the Oracle DB server VM to validate that Oracle
 # After editing this file, run 'systemctl daemon-reload' to update systemd
 # units generated from this file.
 #
-/dev/mapper/rootvg-rootlv /                       xfs     defaults        0 0
-UUID=268633bd-f9bb-446d-9a1d-8fca4609a1e1 /boot                   xfs     defaults        0 0
-UUID=89D8-B037          /boot/efi               vfat    defaults,uid=0,gid=0,umask=077,shortname=winnt 0 2
-/dev/mapper/rootvg-homelv /home                   xfs     defaults        0 0
-/dev/mapper/rootvg-tmplv /tmp                    xfs     defaults        0 0
-/dev/mapper/rootvg-usrlv /usr                    xfs     defaults        0 0
-/dev/mapper/rootvg-varlv /var                    xfs     defaults        0 0
-/mnt/swapfile swap swap defaults 0 0
-172.30.136.68:/ora-01-u01 /u01 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
-172.30.136.68:/ora-01-u02 /u02 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
-172.30.136.68:/ora-01-u03 /u03 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
+/dev/mapper/rhel-root   /                       xfs     defaults        0 0
+UUID=aff942c4-b224-4b62-807d-6a5c22f7b623 /boot                   xfs     defaults        0 0
+/dev/mapper/rhel-swap   none                    swap    defaults        0 0
+/root/swapfile swap swap defaults 0 0
+172.21.21.100:/ora_01_u01 /u01 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
+172.21.21.100:/ora_01_u02 /u02 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
+172.21.21.100:/ora_01_u03 /u03 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
 
-[azureuser@ora-01 ~]$ df -h
+
+[admin@ora_01 tmp]$ df -h
 Filesystem                 Size  Used Avail Use% Mounted on
 devtmpfs                   7.7G     0  7.7G   0% /dev
 tmpfs                      7.8G     0  7.8G   0% /dev/shm
-tmpfs                      7.8G  8.6M  7.7G   1% /run
+tmpfs                      7.8G   18M  7.8G   1% /run
 tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
-/dev/mapper/rootvg-rootlv   22G   17G  5.8G  74% /
-/dev/mapper/rootvg-usrlv    10G  2.0G  8.1G  20% /usr
-/dev/mapper/rootvg-varlv   8.0G  890M  7.2G  11% /var
-/dev/sda1                  496M  106M  390M  22% /boot
-/dev/mapper/rootvg-homelv 1014M   40M  975M   4% /home
-/dev/sda15                 495M  5.9M  489M   2% /boot/efi
-/dev/mapper/rootvg-tmplv    12G  8.4G  3.7G  70% /tmp
-tmpfs                      1.6G     0  1.6G   0% /run/user/54321
-172.30.136.68:/ora-01-u01  500G   11G  490G   3% /u01
-172.30.136.68:/ora-01-u03  250G  1.2G  249G   1% /u03
-172.30.136.68:/ora-01-u02  250G  7.1G  243G   3% /u02
-tmpfs                      1.6G     0  1.6G   0% /run/user/1000
+/dev/mapper/rhel-root       44G   28G   17G  62% /
+/dev/sda1                 1014M  258M  757M  26% /boot
+tmpfs                      1.6G   12K  1.6G   1% /run/user/42
+tmpfs                      1.6G  4.0K  1.6G   1% /run/user/1000
+172.21.21.100:/ora_01_u01   50G  8.7G   42G  18% /u01
+172.21.21.100:/ora_01_u02  200G  384K  200G   1% /u02
+172.21.21.100:/ora_01_u03  100G  320K  100G   1% /u03
+
+[admin@ora_02 ~]$ df -h
+Filesystem                 Size  Used Avail Use% Mounted on
+devtmpfs                   7.7G     0  7.7G   0% /dev
+tmpfs                      7.8G     0  7.8G   0% /dev/shm
+tmpfs                      7.8G   18M  7.8G   1% /run
+tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/mapper/rhel-root       44G   28G   17G  63% /
+/dev/sda1                 1014M  258M  757M  26% /boot
+tmpfs                      1.6G   12K  1.6G   1% /run/user/42
+tmpfs                      1.6G  4.0K  1.6G   1% /run/user/1000
+172.21.21.101:/ora_02_u01   50G  7.8G   43G  16% /u01
+172.21.21.101:/ora_02_u02  200G  320K  200G   1% /u02
+172.21.21.101:/ora_02_u03  100G  320K  100G   1% /u03
 
 ....
 
@@ -370,49 +376,49 @@ tmpfs                      1.6G     0  1.6G   0% /run/user/1000
 +
 ....
 
-[azureuser@ora-01 ~]$ sudo su
-[root@ora-01 azureuser]# su - oracle
-Last login: Thu Feb  1 16:13:44 UTC 2024
-[oracle@ora-01 ~]$ lsnrctl status listener.ntap1
+[admin@ora_02 ~]$ sudo su
+[root@ora_02 admin]# su - oracle
+[oracle@ora_02 ~]$ lsnrctl status listener.ntap2
 
-LSNRCTL for Linux: Version 19.0.0.0.0 - Production on 01-FEB-2024 16:25:37
+LSNRCTL for Linux: Version 19.0.0.0.0 - Production on 29-MAY-2024 12:13:30
 
 Copyright (c) 1991, 2022, Oracle.  All rights reserved.
 
-Connecting to (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ora-01.internal.cloudapp.net)(PORT=1521)))
+Connecting to (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ora_02.cie.netapp.com)(PORT=1521)))
 STATUS of the LISTENER
 ------------------------
-Alias                     LISTENER.NTAP1
+Alias                     LISTENER.NTAP2
 Version                   TNSLSNR for Linux: Version 19.0.0.0.0 - Production
-Start Date                01-FEB-2024 16:13:49
-Uptime                    0 days 0 hr. 11 min. 49 sec
+Start Date                23-MAY-2024 16:13:03
+Uptime                    5 days 20 hr. 0 min. 26 sec
 Trace Level               off
 Security                  ON: Local OS Authentication
 SNMP                      OFF
-Listener Parameter File   /u01/app/oracle/product/19.0.0/NTAP1/network/admin/listener.ora
-Listener Log File         /u01/app/oracle/diag/tnslsnr/ora-01/listener.ntap1/alert/log.xml
+Listener Parameter File   /u01/app/oracle/product/19.0.0/NTAP2/network/admin/listener.ora
+Listener Log File         /u01/app/oracle/diag/tnslsnr/ora_02/listener.ntap2/alert/log.xml
 Listening Endpoints Summary...
-  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=ora-01.hr2z2nbmhnqutdsxgscjtuxizd.jx.internal.cloudapp.net)(PORT=1521)))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=ora_02.cie.netapp.com)(PORT=1521)))
   (DESCRIPTION=(ADDRESS=(PROTOCOL=ipc)(KEY=EXTPROC1521)))
-  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcps)(HOST=ora-01.hr2z2nbmhnqutdsxgscjtuxizd.jx.internal.cloudapp.net)(PORT=5500))(Security=(my_wallet_directory=/u01/app/oracle/product/19.0.0/NTAP1/admin/NTAP1/xdb_wallet))(Presentation=HTTP)(Session=RAW))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcps)(HOST=ora_02.cie.netapp.com)(PORT=5500))(Security=(my_wallet_directory=/u01/app/oracle/product/19.0.0/NTAP2/admin/NTAP2/xdb_wallet))(Presentation=HTTP)(Session=RAW))
 Services Summary...
-Service "104409ac02da6352e063bb891eacf34a.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "104412c14c2c63cae063bb891eacf64d.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "1044174670ad63ffe063bb891eac6b34.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "NTAP1.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "NTAP1XDB.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "ntap1_pdb1.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "ntap1_pdb2.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
-Service "ntap1_pdb3.solutions.netapp.com" has 1 instance(s).
-  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "192551f1d7e65fc3e06308b43d0a63ae.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP2", status READY, has 1 handler(s) for this service...
+Service "1925529a43396002e06308b43d0a2d5a.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP2", status READY, has 1 handler(s) for this service...
+Service "1925530776b76049e06308b43d0a49c3.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP2", status READY, has 1 handler(s) for this service...
+Service "NTAP2.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP2", status READY, has 1 handler(s) for this service...
+Service "NTAP2XDB.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP2", status READY, has 1 handler(s) for this service...
+Service "ntap2_pdb1.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP2", status READY, has 1 handler(s) for this service...
+Service "ntap2_pdb2.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP2", status READY, has 1 handler(s) for this service...
+Service "ntap2_pdb3.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP2", status READY, has 1 handler(s) for this service...
 The command completed successfully
+[oracle@ora_02 ~]$
 
 ....
 
@@ -513,59 +519,40 @@ MEMBER
 /u03/orareco/NTAP1/onlinelog/redo02.log
 /u03/orareco/NTAP1/onlinelog/redo01.log
 
-SQL> select svrname, dirname, nfsversion from v$dnfs_servers;
+SQL> select svrname, dirname from v$dnfs_servers;
 
 SVRNAME
 --------------------------------------------------------------------------------
 DIRNAME
 --------------------------------------------------------------------------------
-NFSVERSION
-----------------
-172.30.136.68
-/ora-01-u02
-NFSv3.0
+172.21.21.100
+/ora_01_u02
 
-172.30.136.68
-/ora-01-u03
-NFSv3.0
+172.21.21.100
+/ora_01_u03
 
-SVRNAME
---------------------------------------------------------------------------------
-DIRNAME
---------------------------------------------------------------------------------
-NFSVERSION
-----------------
+172.21.21.100
+/ora_01_u01
 
-172.30.136.68
-/ora-01-u01
-NFSv3.0
 
 ....
 
 . Login to Oracle Enterprise Manager Express to validate database.
 +
-image::automation_ora_anf_nfs_em_01.png["This image provides login screen for Oracle Enterprise Manager Express"]
-image::automation_ora_anf_nfs_em_02.png["This image provides container database view from Oracle Enterprise Manager Express"]
-
+image::automation_ora_c-series_nfs_em_01.png["This image provides login screen for Oracle Enterprise Manager Express"]
+image::automation_ora_c-series_nfs_em_02.png["This image provides container database view from Oracle Enterprise Manager Express"]
+image::automation_ora_c-series_nfs_em_03.png["This image provides container database view from Oracle Enterprise Manager Express"]
 
 
 ====
 
-=== Migrate Oracle database to Azure
-[%collapsible]
-
-====
-
-Oracle database migration from on-premises to the cloud is a heavy-lifting. Using the right strategy and automation can smooth the process and minimize service interruption and downtime. Follow this detailed instruction link:azure_ora_nfile_migration.html#converting-a-single-instance-non-cdb-to-a-pdb-in-a-multitenant-cdb[Database migration from on-premises to Azure cloud^] to guide your database migration journey. 
-
-====
 
 === Oracle backup, restore, and clone with SnapCenter
 [%collapsible]
 
 ====
 
-NetApp recommends SnapCenter UI tool to manage Oracle database deployed in Azure cloud. Please refer to TR-4988: link:snapctr_ora_azure_anf.html[Oracle Database Backup, Recovery, and Clone on ANF with SnapCenter^] for details.
+NetApp recommends SnapCenter UI tool to manage Oracle database deployed in C-Series. Refer to TR-4979 link:aws_ora_fsx_vmc_guestmount.html#oracle-backup-restore-and-clone-with-snapcenter[Simplified, Self-managed Oracle in VMware Cloud on AWS with guest-mounted FSx ONTAP^] section `Oracle backup, restore, and clone with SnapCenter` for details on setting up SnapCenter and executing the database backup, restore, and clone workflows.
 
 ====
 
@@ -574,13 +561,13 @@ NetApp recommends SnapCenter UI tool to manage Oracle database deployed in Azure
 
 To learn more about the information described in this document, review the following documents and/or websites:
 
-* Oracle Database Backup, Recovery, and Clone on ANF with SnapCenter
+* NetApp AFF C-Series
 +
-link:snapctr_ora_azure_anf.html[Oracle Database Backup, Recovery, and Clone on ANF with SnapCenter^]
+link:https://www.netapp.com/pdf.html?item=/media/81583-da-4240-aff-c-series.pdf[https://www.netapp.com/pdf.html?item=/media/81583-da-4240-aff-c-series.pdf^]
 
-* Azure NetApp Files
+* NetApp Enterprise Database Solutions
 +
-link:https://azure.microsoft.com/en-us/products/netapp[https://azure.microsoft.com/en-us/products/netapp^]
+link:https://docs.netapp.com/us-en/netapp-solutions/databases/index.html[https://docs.netapp.com/us-en/netapp-solutions/databases/index.html^]
 
 
 * Deploying Oracle Direct NFS
@@ -588,9 +575,6 @@ link:https://azure.microsoft.com/en-us/products/netapp[https://azure.microsoft.c
 link:https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/deploying-dnfs.html#GUID-D06079DB-8C71-4F68-A1E3-A75D7D96DCE2[https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/deploying-dnfs.html#GUID-D06079DB-8C71-4F68-A1E3-A75D7D96DCE2^]
 
 
-*  Installing and Configuring Oracle Database Using Response Files
-+
-link:https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/installing-and-configuring-oracle-database-using-response-files.html#GUID-D53355E9-E901-4224-9A2A-B882070EDDF7[https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/installing-and-configuring-oracle-database-using-response-files.html#GUID-D53355E9-E901-4224-9A2A-B882070EDDF7^]
 
 
 
