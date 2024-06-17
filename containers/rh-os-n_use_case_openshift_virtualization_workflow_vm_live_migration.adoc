@@ -12,31 +12,28 @@ summary: Red Hat OpenShift Virtualization with NetApp ONTAP
 :imagesdir: ./../media/
 
 [.lead]
-This section covers the how to migrate a virtual machine between clusters with Red Hat OpenShift Virtualization.
+This section shows how to migrate a virtual machine in OpenShift Virtualization between nodes in the cluster .
 
 == VM Live Migration
 
-Live Migration is a process of migrating a VM instance from one node to another in an OpenShift cluster with no downtime. For live migration to work in an OpenShift cluster, VMs must be bound to PVCs with shared ReadWriteMany access mode. Astra Trident backend configured with an SVM on a NetApp ONTAP cluster that is enabled for NFS protocol supports shared ReadWriteMany access for PVCs. Therefore, the VMs with PVCs that are requested from StorageClasses provisioned by Trident from NFS-enabled SVM can be migrated with no downtime.
+Live Migration is a process of migrating a VM instance from one node to another in an OpenShift cluster with no downtime. For live migration to work in an OpenShift cluster, VMs must be bound to PVCs with shared ReadWriteMany access mode. Astra Trident backends configured using ontap-nas drivers support RWX access mode for FileSystem protocols nfs and smb. Refer to the documentation link:https://docs.netapp.com/us-en/trident/trident-use/ontap-nas.html[here]. Astra Trident backends configured using ontap-san drivers support RWX access mode for block volumeMode for iSCSI and NVMe/TCP protocols. Refer to the documentation link:https://docs.netapp.com/us-en/trident/trident-use/ontap-san.html[here].
 
-image::redhat_openshift_image55.jpg[VM Live Migration architecture]
+Therefore, for live migration to succeed, the VMs must be provisioned with disks (boot disks and additional hot plug disks) with PVCs using ontap-nas or ontap-san (volumeMode: Block) storage classes. When the PVCs are created, Trident creates ONTAP volumes in an SVM which is NFS-enabled or iSCSI enabled.
 
-To create a VM bound to PVCs with shared ReadWriteMany access:
+image::redhat_openshift_image55.png[VM Live Migration architecture]
 
-.	Navigate to Workloads > Virtualization > Virtual Machines and click Create > With Wizard.
-.	Select the desired the operating system and click Next. Let us assume the selected OS already had a boot source configured with it.
-.	In the Review and Create pane, select the project you want to create the VM in and furnish the VM details. Make sure that the boot source is selected to be Clone and boot from CD-ROM with the appropriate PVC assigned for the selected OS.
-.	Click Customize Virtual Machine and then click Storage.
-.	Click the ellipsis next to rootdisk, and make sure that the storageclass provisioned using Trident is selected. Expand Advanced and select Shared Access (RWX) for Access Mode. Then click Save.
-+
+To perform a live migration of a VM that has been created previously and is in a Running state perform the following steps:
 
-image::redhat_openshift_image56.JPG[Make the disk RWX accessible]
+.   Select the VM that you want to live-migrate.
+.   Click on *Configuration* tab.
+.   Ensure that all the disks of the VM are created using Storage classes that can support RWX access mode.
+.   Click on *Actions* on the right corner and then select *Migrate*.
+.   To look at the progression of the Migration, go to Virtualization > Overview on the left hand side menu and then click on the *Migrations* tab. 
+The Migration of the VM will transition from *Pending* to *Scheduling* to *Succeeded*
 
-.	Click Review and confirm and then click Create Virtual Machine.
-
-To manually migrate a VM to another node in the OpenShift cluster, complete the following steps.
-
-.	Navigate to Workloads > Virtualization > Virtual Machines.
-.	For the VM you wish to migrate, click the ellipsis, and then click Migrate the Virtual Machine.
-.	Click Migrate when the message pops up to confirm.
 
 NOTE: A VM instance in an OpenShift cluster automatically migrates to another node when the original node is placed into maintenance mode if the evictionStrategy is set to LiveMigrate.
+
+image::rh-os-n_use_case_vm_live_migrate_1[VM Live Migrate start]
+
+image::rh-os-n_use_case_vm_live_migrate_2[VM Live Migrate Succeeded]
