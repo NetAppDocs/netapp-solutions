@@ -28,11 +28,11 @@ The following table shows example cabling assignments for up to 16 DGX systems a
 
 |switch1 ports 1-16   
 |DGX-H100-01 through -16     
-|enp140s0f0np0, slot1 port 1
+|enp170s0f0np0, slot1 port 1
 
 |switch1 ports 17-32  
 |DGX-H100-01 through -16     
-|enp140s0f1np1, slot1 port 2
+|enp170s0f1np1, slot1 port 2
 
 |switch1 ports 33-36  
 |AFF-A90-01 through -04      
@@ -71,6 +71,24 @@ The following table shows example cabling assignments for up to 16 DGX systems a
 |ports 57-64
 |===
 
+The following table shows the software versions for the various components used in this validation.
+
+.Software versions
+|===
+|Device  |Software version
+
+|NVIDIA SN4600 switches   
+|Cumulus Linux v5.9.1     
+
+|NVIDIA DGX system 
+|DGX OS v6.2.1 (Ubuntu 22.04 LTS)   
+
+|Mellanox OFED
+|24.01
+
+|NetApp AFF A90 
+|NetApp ONTAP 9.14.1pX
+|===
 
 == Storage network configuration
 This section outlines key details for configuration of the Ethernet storage network. For information on configuring the InfiniBand compute network please see the link:https://nvdam.widen.net/s/nfnjflmzlj/nvidia-dgx-basepod-reference-architecture[NVIDIA BasePOD documentation]. For more details about switch configuration please refer to the link:https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-59/[NVIDIA Cumulus Linux documentation].
@@ -81,7 +99,7 @@ The basic steps used to configure the SN4600 switches are outlined below. This p
     * This validation used 8 links to provide more than enough bandwidth for the storage configuration under test 
     * For specific instructions on enabling MLAG please refer to the Cumulus Linux documentation. 
 . Configure LACP MLAG for each pair of client ports and storage ports on both switches
-    * port swp17 on each switch for DGX-H100-01 (enp140s0f1np0 and enp41s0f1np1), port swp18 for DGX-H100-02, etc (bond1-16)
+    * port swp17 on each switch for DGX-H100-01 (enp170s0f1np1 and enp41s0f1np1), port swp18 for DGX-H100-02, etc (bond1-16)
     * port swp37 on each switch for AFF-A90-01 (e2b and e8b), port swp38 for AFF-A90-02, etc (bond7-20)
     * nv set interface bondX bond member swpX
     * nv set interface bondx bond mlag id X
@@ -90,23 +108,38 @@ The basic steps used to configure the SN4600 switches are outlined below. This p
     * nv set int bond1-20 bridge domain br_default
 . Enable RoCE on each switch
     * nv set roce mode lossless
-. Configure 5 VLANs- 2 for client ports, 2 for storage ports, 1 for management
+. Configure VLANs- 2 for client ports, 2 for storage ports, 1 for management, 1 for L3 switch to switch 
     * switch 1-
-    ** VLAN 11 for storage port 1 on each DGX system (enp140s0f0np0, slot1 port 1)
+    ** VLAN 3 for L3 switch to switch routing in the event of client NIC failure
+    ** VLAN 11 for storage port 1 on each DGX system (enp170s0f0np0, slot1 port 1)
     ** VLAN 21 for port e2a on each AFF A90 storage controller
     ** VLAN 31 for management using the MLAG interfaces to each DGX system and storage controller
     * switch 2-
-    ** VLAN 12 for storage port 1 on each DGX system (enp140s0f0np0, slot1 port 1)
-    ** VLAN 22 for port e2a on each AFF A90 storage controller
+    ** VLAN 3 for L3 switch to switch routing in the event of client NIC failure
+    ** VLAN 12 for storage port 2 on each DGX system (enp41s0f0np0, slot2 port 1)
+    ** VLAN 22 for port e8a on each AFF A90 storage controller
     ** VLAN 31 for management using the MLAG interfaces to each DGX system and storage controller
-. assign physical ports to each VLAN as appropriate, e.g. client ports in client VLANs and storage ports in storage VLANs
+. Assign physical ports to each VLAN as appropriate, e.g. client ports in client VLANs and storage ports in storage VLANs
     * nv set int <swpX> bridge domain br_default access <vlan id>
-. configure VNI on each VLAN to act as a gateway & enable L3 routing
-    * nv set int vlanXX ip address 192.168.XX.254/24
-. static routes are automatically configured on the switch for each locally attached subnet
-    * routes for subnets on other switch?????
-    * L3 connection between switches for routing? sharing the ISL bond???
-
+    * MLAG ports should remain as trunk ports to enable multiple VLANs over the bonded interfaces as needed. 
+. Configure switch virtual interfaces (SVI) on each VLAN to act as a gateway & enable L3 routing
+    * switch 1-
+    ** nv set int vlan3 ip address 192.168.3.0/31
+    ** nv set int vlan11 ip address 192.168.11.254/24
+    ** nv set int vlan21 ip address 192.168.21.254/24
+    * switch 2-
+    ** nv set int vlan3 ip address 192.168.3.1/31
+    ** nv set int vlan12 ip address 192.168.12.254/24
+    ** nv set int vlan22 ip address 192.168.22.254/24
+. Create static routes 
+    * Static routes are automatically created for subnets on the same switch
+    * Additional static routes are required for switch to switch routing in the event of a client link failure
+    ** switch 1- 
+    *** nv set vrf default router static 192.168.12.0/24 via 192.168.3.1
+    *** nv set vrf default router static 192.168.22.0/24 via 192.168.3.1
+    ** switch 2- 
+    *** nv set vrf default router static 192.168.11.0/24 via 192.168.3.0
+    *** nv set vrf default router static 192.168.21.0/24 via 192.168.3.0
 
 == Storage system configuration
 This section describes key details for configuration of the A90 storage system for this solution. For more details about configuration of ONTAP systems please refer to the [ONTAP documentation]. The diagram below shows the logical configuration of the storage system. 
@@ -117,11 +150,11 @@ image:aipod_nv_A90_logical.png[Error: Missing Graphic Image]
 The basic steps used to configure the storage system are outlined below. This process assumes that basic storage cluster installation has been completed. 
 
 . Configure 1 aggregate on each controller with all available partitions minus 1 spare
-    * aggr create -node <node> -aggregate <node>_data01 -diskcount <23,47>
+    * aggr create -node <node> -aggregate <node>_data01 -diskcount <47>
 . Configure ifgrps on each controller
     * a11a on controller 1, a21a on controller 2, a31a on controller 3, a41a on controller 4
     * net port ifgrp create -node <node> -ifgrp <ifgrp> -mode multimode_lacp -distr-function port
-    * net port ifgrp add-port -node <node> -ifgrp <ifgrp> -ports aff-a90-01:e2b,aff-a90-01:e8b
+    * net port ifgrp add-port -node <node> -ifgrp <ifgrp> -ports <node>:e2b,<node>:e8b
 . Configure mgmt vlan port on ifgrp on each controller
     * net port vlan create -node aff-a90-01 -port a11a -vlan-id 31
     * net port vlan create -node aff-a90-02 -port a21a -vlan-id 31
@@ -149,6 +182,7 @@ The basic steps used to configure the storage system are outlined below. This pr
     ** net int create -vserver basepod-data -lif c2-8a-lif1 -home-node aff-a90-02 -home-port e8a -address 192.168.22.103 -netmask 255.255.255.0
     ** net int create -vserver basepod-data -lif c2-8a-lif2 -home-node aff-a90-02 -home-port e8a -address 192.168.22.104 -netmask 255.255.255.0
 . Configure LIFs for RDMA access
+    * Starting with ONTAP 9.15.1, physical interfaces automatically configure for appropriate DSCP and ToS values for end-to-end RoCE support. Prior to ONTAP 9.15.1, this configuration can be enabled with the help of NetApp Support. 
     * net int modify -vserver 
 . Create FlexGroup volumes-
     * vol create -vserver basepod-data -volume data -size 100T -auto-provision-as flexgroup -junction-path /data  
@@ -161,32 +195,30 @@ The basic steps used to configure the storage system are outlined below. This pr
     * route add -vserver basepod_data -destination 192.168.12.0/24 -gateway 192.168.22.254 metric 20
     * route add -vserver basepod_data -destination 192.168.12.0/24 -gateway 192.168.21.254 metric 30  
 
-
-
-The workload SVM is configured with a total of eight logical interfaces (LIFs), with two LIFs on each physical port. This configuration provides maximum bandwidth as well as the means for each LIF to fail over to another port on the same controller, so that both controllers stay active in the event of a network failure. This configuration also supports NFS over RDMA to enable GPUDirect Storage access. Storage capacity is provisioned in the form of a single large FlexGroup volume that spans all storage controllers in the cluster, with 16 constituent volumes on each controller. This FlexGroup is accessible from any of the LIFs on the SVM, and by using NFSv4.1 with pNFS and session trunking, clients establish connections to every LIF in the SVM, enabling data local to each storage node to be accessed in parallel for significantly improved performance. The workload SVM and each data LIF are also configured for RDMA protocol access. For more details on RDMA configuration for ONTAP please refer to the link:https://docs.netapp.com/us-en/ontap/nfs-rdma/index.html[ONTAP documentation]. 
-
-The management SVM only requires a single LIF, which is hosted on the 2-port interface groups configured on each controller. Other FlexGroup volumes are provisioned on the management SVM to house cluster management artifacts like cluster node images, system monitoring historical data, and end-user home directories. The drawing below shows the logical configuration of the storage system.
-
-
-
-
 === Client configuration for storage access
+This section describes key details for configuration of the DGX H100 systems. Many of these configuration items can be included in the OS image deployed to the DGX systems or implemented by Base Command Manager at boot time. They are listed here for reference, for more information on configuring nodes and software images in BCM please see the BCM documentation. 
+
 . Install additional packages
-. install Python packages
-. Install mft tools to modify adapters for RocE
-. reconfigure dpkg after package installation
+    * ipmitool
+    * python3-pip
+. Install Python packages
+  * paramiko
+  * matplotlib
+. Reconfigure dpkg after package installation
+  * dpkg --configure -a
 . Install MOFED
 . Set mst values for performance tuning
-  * mstconfig -y -d {{clients[inventory_hostname]['storage_port1']['ethpci']}} set ADVANCED_PCI_SETTINGS=1 NUM_OF_VFS=0 MAX_ACC_OUT_READ=44
-  * The adapters need to be reset after this command. mlxfwreset -d {{clients[inventory_hostname]['storage_port1']['ethpci']}} -y reset
+  * mstconfig -y -d <aa:00.0,29:00.0> set ADVANCED_PCI_SETTINGS=1 NUM_OF_VFS=0 MAX_ACC_OUT_READ=44
+. Reset the adapters after modifying settings
+  * mlxfwreset -d <aa:00.0,29:00.0> -y reset
 . Set MaxReadReq on PCI devices
-  * setpci -s {{clients[inventory_hostname]['storage_port2']['ethpci']}} 68.W=5957
+  * setpci -s <aa:00.0,29:00.0> 68.W=5957
 . Set RX and TX ring buffer size
-  * ethtool -G {{clients[inventory_hostname]['storage_port1']['ethname']}} rx 8192 tx 8192
+  * ethtool -G <enp170s0f0np0,enp41s0f0np0> rx 8192 tx 8192
 . Set PFC and DSCP using mlnx_qos
-  * mlnx_qos -i {{clients[inventory_hostname]['storage_port1']['ethname']}} --pfc 0,0,0,1,0,0,0,0 --trust=dscp --cable_len=3
+  * mlnx_qos -i <enp170s0f0np0,enp41s0f0np0> --pfc 0,0,0,1,0,0,0,0 --trust=dscp --cable_len=3
 . Set ToS for RoCE traffic on network ports
-  * echo 106 > /sys/class/infiniband/{{clients[inventory_hostname]['storage_port2']['rocename']}}/tc/1/traffic_class
+  * echo 106 > /sys/class/infiniband/<mlx5_7,mlx5_1>/tc/1/traffic_class
 . Set NFS max_session_slots
   * echo 1024 > /sys/module/nfs/parameters/max_session_slots
 . Set file_max limit
@@ -198,17 +230,12 @@ The management SVM only requires a single LIF, which is hosted on the 2-port int
   * route add –net 192.168.22.0/24 gw 192.168.12.254 metric 20
   * route add –net 192.168.22.0/24 gw 192.168.11.254 metric 30
 . Mount /home volume
+  * mount -o vers=3,nconnect=16,rsize=262144,wsize=262144 192.168.31.X:/home /home
 . Mount /data volume 
   * The following mount options were used when mounting the data volume-
   ** vers=4.1                  # enables pNFS for parallel access to multiple storage nodes
   ** proto=rdma                # sets the transfer protocol to RDMA instead of the default TCP
-  ** port=20049                # specify the correct port for the RDMA NFS service
   ** max_connect=16            # enables NFS session trunking to aggregate storage port bandwidth
   ** write=eager               # improves write performance of buffered writes
   ** rsize=262144,wsize=262144 # sets the I/O transfer size to 256k
-s
-== Management plane servers
 
-This reference architecture also includes five CPU-based servers for management plane uses. Two of these systems are used as the head nodes for NVIDIA Base Command Manager for cluster deployment and management. The other three systems are used to provide additional cluster services such as Kubernetes master nodes or login nodes for deployments utilizing Slurm for job scheduling. Deployments utilizing Kubernetes can leverage the NetApp Astra Trident CSI driver to provide automated provisioning and data services with persistent storage for both management and AI workloads on the AFF A900 storage system. 
-
-Each server is physically connected to both the IB switches and Ethernet switches to enable cluster deployment and management, and configured with NFS mounts to the storage system via the management SVM for storage of cluster management artifacts as described earlier. 
