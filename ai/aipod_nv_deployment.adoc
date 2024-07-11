@@ -162,6 +162,8 @@ The basic steps used to configure the storage system are outlined below. This pr
     * broadcast-domain create -broadcast-domain vlan21 -mtu 9000 -ports aff-a90-01:e2a,aff-a90-02:e2a,aff-a90-03:e2a,aff-a90-04:e2a
     * broadcast-domain create -broadcast-domain vlan22 -mtu 9000 -ports aff-a90-01:e8a,aff-a90-02:e8a,aff-a90-03:e8a,aff-a90-04:e8a
     * broadcast-domain create -broadcast-domain vlan31 -mtu 9000 -ports aff-a90-01:a11a-31,aff-a90-02:a21a-31,aff-a90-03:a31a-31,aff-a90-04:a41a-31
+. Create management SVM
+    * 
 . Configure management SVM
     * create LIF
     ** net int create -vserver basepod-mgmt -lif vlan31-01 -home-node aff-a90-01 -home-port a11a-31 -address 192.168.31.X -netmask 255.255.255.0
@@ -170,8 +172,11 @@ The basic steps used to configure the storage system are outlined below. This pr
     ** vol create -vserver basepod-mgmt -volume cm -size 10T -auto-provision-as flexgroup -junction-path /cm
     * create export policy 
     ** export-policy rule create -vserver basepod-mgmt -policy default -client-match 192.168.31.0/24 -rorule sys -rwrule sys -superuser sys
-
+. Create data SVM
+    * 
 . Configure data SVM
+    * configure SVM for RDMA support
+    ** vserver modify -vserver basepod-data -rdma enabled
     * create LIFs
     ** net int create -vserver basepod-data -lif c1-2a-lif1 -home-node aff-a90-01 -home-port e2a -address 192.168.21.101 -netmask 255.255.255.0
     ** net int create -vserver basepod-data -lif c1-2a-lif2 -home-node aff-a90-01 -home-port e2a -address 192.168.21.102 -netmask 255.255.255.0
@@ -182,8 +187,10 @@ The basic steps used to configure the storage system are outlined below. This pr
     ** net int create -vserver basepod-data -lif c2-8a-lif1 -home-node aff-a90-02 -home-port e8a -address 192.168.22.103 -netmask 255.255.255.0
     ** net int create -vserver basepod-data -lif c2-8a-lif2 -home-node aff-a90-02 -home-port e8a -address 192.168.22.104 -netmask 255.255.255.0
 . Configure LIFs for RDMA access
-    * Starting with ONTAP 9.15.1, physical interfaces automatically configure for appropriate DSCP and ToS values for end-to-end RoCE support. Prior to ONTAP 9.15.1, this configuration can be enabled with the help of NetApp Support. 
-    * net int modify -vserver 
+    * Starting with ONTAP 9.15.1, physical interfaces automatically configure appropriate DSCP values (DSCP 26) for end-to-end RoCE support. 
+    * net int modify -vserver basepod-data -lif * -rdma-protocols roce
+. Configure NFS parameters on the data SVM
+    * nfs modify -vserver basepod-data -v4.1 enabled -v4.1-pnfs enabled -v4.1-trunking enabled -tcp-max-transfer-size 262144
 . Create FlexGroup volumes-
     * vol create -vserver basepod-data -volume data -size 100T -auto-provision-as flexgroup -junction-path /data  
 . Create export policy 
@@ -195,8 +202,8 @@ The basic steps used to configure the storage system are outlined below. This pr
     * route add -vserver basepod_data -destination 192.168.12.0/24 -gateway 192.168.22.254 metric 20
     * route add -vserver basepod_data -destination 192.168.12.0/24 -gateway 192.168.21.254 metric 30  
 
-=== DGX H100 configuration for storage access
-This section describes key details for configuration of the DGX H100 systems. Many of these configuration items can be included in the OS image deployed to the DGX systems or implemented by Base Command Manager at boot time. They are listed here for reference, for more information on configuring nodes and software images in BCM please see the BCM documentation. 
+=== DGX H100 configuration for RoCE storage access
+This section describes key details for configuration of the DGX H100 systems. Many of these configuration items can be included in the OS image deployed to the DGX systems or implemented by Base Command Manager at boot time. They are listed here for reference, for more information on configuring nodes and software images in BCM please see the link:https://docs.nvidia.com/base-command-manager/index.html#overview[BCM documentation]. 
 
 . Install additional packages
     * ipmitool
@@ -219,10 +226,6 @@ This section describes key details for configuration of the DGX H100 systems. Ma
   * mlnx_qos -i <enp170s0f0np0,enp41s0f0np0> --pfc 0,0,0,1,0,0,0,0 --trust=dscp --cable_len=3
 . Set ToS for RoCE traffic on network ports
   * echo 106 > /sys/class/infiniband/<mlx5_7,mlx5_1>/tc/1/traffic_class
-. Set NFS max_session_slots
-  * echo 1024 > /sys/module/nfs/parameters/max_session_slots
-. Set file_max limit
-  * echo 999999 > /proc/sys/fs/file-max
 . Configure each storage NIC with an IP address on appropriate subnet
 . configure static routes for primary & secondary paths to each storage subnet
   * route add –net 192.168.21.0/24 gw 192.168.11.254 metric 20
