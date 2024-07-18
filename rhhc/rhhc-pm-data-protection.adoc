@@ -80,7 +80,7 @@ Access the ROSA cluster by creating an admin user  with the following command : 
 
 The command will provide an output that will look like the following. Login to the cluster using the `oc login` command provided in the output. 
 
-image:rhhc-rosa-cluster-admin-create.png[]
+image::rhhc-rosa-cluster-admin-create.png[]
 
 NOTE: You can also login to the cluster using a token. If you already created an admin-user at the time of cluster creation, you can login to the cluster from the Red Hat OpenShift Hybrid Cloud console with the admin-user credentials. Then by clicking on the top right corner where it displays the name of the logged in user, you can obtain the `oc login` command (token login) for the command line. 
 
@@ -92,16 +92,16 @@ Follow the procedures link:https://docs.netapp.com/us-en/astra-control-service/g
 
 Install Astra Trident (latest version) on the ROSA cluster. To do this, you can follow any one of the  procedures given link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy.html[here]. To install Trident using helm from the console of the cluster, first create a project called Trident. 
 
-image:rhhc-trident-project-create.png[]
+image::rhhc-trident-project-create.png[]
 
 Then from the Developer view, create a Helm chart repository. For the URL field use `'https://netapp.github.io/trident-helm-chart'`. Then create a helm release for Trident operator.
 
-image:rhhc-helm-repo-create.png[]
-image:rhhc-helm-release-create.png[]
+image::rhhc-helm-repo-create.png[]
+image::rhhc-helm-release-create.png[]
 
 Verify all trident pods are running by going back to the Administrator view on the console and selecting pods in the trident project.
 
-image:rhhc-trident-installed.png[]
+image::rhhc-trident-installed.png[]
 
 ==== **4. Create a backend, storage class and snapshot class configuration using the Trident CSI provisioner**
 
@@ -109,7 +109,7 @@ Use the yaml files shown below to create a trident backend object, storage class
 
 NOTE: You can use the command line to create the objects or create them with the yaml files from the hybrid cloud console. 
 
-image:rhhc-fsx-details.png[]
+image::rhhc-fsx-details.png[]
 
 **Trident Backend Configuration**
 [source,yaml]
@@ -166,50 +166,50 @@ deletionPolicy: Delete
 
 Verify that the backend, storage class and the trident-snapshotclass objects are created by issuing the commands shown below.
 
-image:rhhc-tbc-sc-verify.png[]
+image::rhhc-tbc-sc-verify.png[]
 
 At this time, an important modification you need to make is to set ontap-nas as the default storage class instead of gp3 so that the postgresql app you deploy later can use the default storage class. In the Openshift console of your cluster, under Storage select StorageClasses. Edit the annotation of the current default class to be false and add the annotation storageclass.kubernetes.io/is-default-class set to  true for the ontap-nas storage class.
 
-image:rhhc-change-default-sc.png[]
+image::rhhc-change-default-sc.png[]
 
-image:rhhc-default-sc.png[]
+image::rhhc-default-sc.png[]
 
 ==== **5. Deploy a postgresql application on the cluster**
 You can deploy the application from the command line as follows:
 
 `helm install postgresql bitnami/postgresql -n postgresql --create-namespace`
 
-image:rhhc-postgres-install.png[]
+image::rhhc-postgres-install.png[]
 
 NOTE: If you do not see the application pods running, then there might be an error caused due to security context constraints.
-image:rhhc-scc-error.png[]
+image::rhhc-scc-error.png[]
 Fix the error by editing the `runAsUser` and `fsGroup` fields in `statefuleset.apps/postgresql` object with the uid that is in the output of the `oc get project` command as shown below. 
-image:rhhc-scc-fix.png[]
+image::rhhc-scc-fix.png[]
 
 postgresql app should be running and using persistent volumes backed by Amazon FSx for NetApp ONTAP storage.
 
-image:rhhc-postgres-running.png[]
+image::rhhc-postgres-running.png[]
 
-image:rhhc-postgres-pvc.png[]
+image::rhhc-postgres-pvc.png[]
 
 ==== **6. Create a database and add a record**
 
-image:rhhc-postgres-db-create.png[]
+image::rhhc-postgres-db-create.png[]
 
 ==== **7. Add the cluster into ACS** 
 Log in to ACS. Select cluster and click on Add. Select other and upload or paste the kubeconfig file. 
 
-image:rhhc-acs-add-1.png[]
+image::rhhc-acs-add-1.png[]
 
 Click *Next* and select ontap-nas as the default storage class for ACS. Click *Next*, review the details and *Add* the cluster. 
 
-image:rhhc-acs-add-2.png[]
+image::rhhc-acs-add-2.png[]
 
 ==== **8. Define the application in ACS**
 
 Define the postgresql application in ACS. From the landing page, select *Applications*, *Define* and fill in the appropriate details. Click *Next* a couple of times, Review the details and click *Define*. The application gets added to ACS.
 
-image:rhhc-acs-add-2.png[]
+image::rhhc-acs-add-2.png[]
 
 ==== **9. Create a snapshot using ACS** 
 
@@ -217,28 +217,28 @@ There are many ways to create a snapshot in ACS. You can select the application 
 
 Create an on-demand snapshot by simply clicking on *Create snapshot*, providing a name, reviewing the details, and clicking on *Snapshot*. The snapshot state changes to Healthy after the operation is completed.
 
-image:rhhc-snapshot-create.png[]
+image::rhhc-snapshot-create.png[]
 
-image:rhhc-snapshot-on-demand.png[]
+image::rhhc-snapshot-on-demand.png[]
 
 ==== **10. Delete the database in the postgresql application**
 
 Log back into postgresql, list the available databases, delete the one you created previously and list again to ensure that the database has been deleted.
 
-image:rhhc-postgres-db-delete.png[]
+image::rhhc-postgres-db-delete.png[]
 
 ==== **11. Restore from a snapshot using ACS**
 
 To restore the application from a snapshot, go to ACS UI landing page, select the application and select Restore. You need to pick a snapshot or a backup from which to restore. (Typically, you would have multiple created based on a policy that you have configured). Make appropriate choices in the next couple of screens and then click on *Restore*. The application status moves from Restoring to Available after it has been restored from the snapshot.
 
-image:rhhc-app-restore-1.png[]
+image::rhhc-app-restore-1.png[]
 
-image:rhhc-app-restore-2.png[]
+image::rhhc-app-restore-2.png[]
 
-image:rhhc-app-restore-3.png[]
+image::rhhc-app-restore-3.png[]
 
 ==== **12. Verify your app has been restored from the snapshot**
 
 Login to the postgresql client and you should now see the table and the record in the table that you previously had.  That’s it. Just by clicking a button, your application has been restored to a previous state. That is how easy we make it for our customers with Astra Control.
 
-image:rhhc-app-restore-verify.png[]
+image::rhhc-app-restore-verify.png[]

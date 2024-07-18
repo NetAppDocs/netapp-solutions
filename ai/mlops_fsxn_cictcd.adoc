@@ -43,7 +43,7 @@ In this tutorial, you will learn how to leverage various AWS services to constru
 * The *ml.g4dn.xlarge* instance type is required to leverage the GPU acceleration necessary for the computations of deep neural networks.
 
 == Architecture
-image:mlops_fsxn_cictcd_0.png[Architecture]
+image::mlops_fsxn_cictcd_0.png[Architecture]
 
 This MLOps pipeline is a practical implementation that utilizes a cron job to trigger a serverless function, which in turn executes an AWS service registered with a lifecycle callback function. The *AWS EventBridge* acts as the cron job. It periodically invokes an *AWS Lambda function* responsible for retraining and redeploying the model. This process involves spinning up the *AWS SageMaker Notebook* instance to perform the necessary tasks.
 
@@ -55,11 +55,11 @@ It's important to note that the configuration for *Lifecycle configurations* nee
 
 . To set up a Lifecycle configurations, open the *Sagemaker* panel and navigate to *Lifecycle configurations* under the section *Admin configurations*.
 +
-image:mlops_fsxn_cictcd_1.png[SageMaker panel]
+image::mlops_fsxn_cictcd_1.png[SageMaker panel]
 
 . Select the *Notebook Instance* tab and click the *Create configuration* button
 +
-image:mlops_fsxn_cictcd_2.png[Lifecycle configuration welcome page]
+image::mlops_fsxn_cictcd_2.png[Lifecycle configuration welcome page]
 
 . Paste the below code to the entry area.
 +
@@ -85,30 +85,30 @@ EOF
 
 . This script executes the Jupyter Notebook, which handles the retraining and redeployment of the model for inference. After the execution is complete, the notebook will automatically shut down within 5 minutes. To learn more about the problem statement and the code implementation, please refer to link:./mlops_fsxn_sagemaker_integration_training.html[Part 2 - Leveraging AWS FSx for NetApp ONTAP (FSxN) as a Data Source for Model Training in SageMaker].
 +
-image:mlops_fsxn_cictcd_3.png[Create lifecycle configuration]
+image::mlops_fsxn_cictcd_3.png[Create lifecycle configuration]
 
 . After the creation, navigate to Notebook instances, select the target instance, and click *Update settings* under Actions dropdown.
 +
-image:mlops_fsxn_cictcd_4.png[Update settings dropdown]
+image::mlops_fsxn_cictcd_4.png[Update settings dropdown]
 
 . Select the created *Lifecycle configuration* and click *Update notebook instance*.
 +
-image:mlops_fsxn_cictcd_5.png[Update lifecycle configuration of the notebook]
+image::mlops_fsxn_cictcd_5.png[Update lifecycle configuration of the notebook]
 
 === AWS Lambda serverless function
 As mentioned earlier, the *AWS Lambda function* is responsible for spinning up the *AWS SageMaker Notebook instance*.
 
 . To create an *AWS Lambda function*, navigate to the respective panel, switch to the *Functions* tab, and click on *Create Function*.
 +
-image:mlops_fsxn_cictcd_6.png[AWS lambda function welcome page]
+image::mlops_fsxn_cictcd_6.png[AWS lambda function welcome page]
 
 . Please file all required entries on the page and remember to switch the Runtime to *Python 3.10*.
 +
-image:mlops_fsxn_cictcd_7.png[Create an AWS lambda function]
+image::mlops_fsxn_cictcd_7.png[Create an AWS lambda function]
 
 . Please verify that the designated role has the required permission *AmazonSageMakerFullAccess* and click on the *Create function* button.
 +
-image:mlops_fsxn_cictcd_8.png[Select execution role]
+image::mlops_fsxn_cictcd_8.png[Select execution role]
 
 . Select the created Lambda function. In the code tab, copy and paste the following code into the text area. This code starts the notebook instance named *fsxn-ontap*.
 +
@@ -127,15 +127,15 @@ def lambda_handler(event, context):
 ```
 . Click the *Deploy* button to apply this code change.
 +
-image:mlops_fsxn_cictcd_9.png[Deployment]
+image::mlops_fsxn_cictcd_9.png[Deployment]
 
 . To specify how to trigger this AWS Lambda function, click on the Add Trigger button.
 +
-image:mlops_fsxn_cictcd_10.png[Add AWS function trigger]
+image::mlops_fsxn_cictcd_10.png[Add AWS function trigger]
 
 . Select EventBridge from the dropdown menu, then click on the radio button labeled Create a new rule. In the schedule expression field, enter `rate(1 day)`, and click on the Add button to create and apply this new cron job rule to the AWS Lambda function.
 +
-image:mlops_fsxn_cictcd_11.png[Finalize trigger]
+image::mlops_fsxn_cictcd_11.png[Finalize trigger]
 
 After completing the two-step configuration, on a daily basis, the *AWS Lambda function* will initiate the *SageMaker Notebook*, perform model retraining using the data from the *FSxN* repository, redeploy the updated model to the production environment, and automatically shut down the *SageMaker Notebook instance* to optimize cost. This ensures that the model remains up to date.
 
