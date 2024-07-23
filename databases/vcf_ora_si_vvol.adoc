@@ -116,184 +116,83 @@ Ensure that you have allocated at least 50G in Oracle VM root volume in order to
 
 ====
 
-=== DB VM kernel configuration
+=== Create storage capability profile
 [%collapsible]
 
 ====
 
-With the prerequisites provisioned, login to the Oracle VM as an admin user via SSH and sudo to the root user to configure the Linux kernel for Oracle installation. Oracle install files can be staged in an AWS S3 bucket and transferred into the VM. 
+First, create a custom storage capability profile for the underlined ONTAP storage that is hosting the vVols datastore.
 
-. Create a staging directory `/tmp/archive` folder and set the `777` permission.
+. From vSphere client shortcuts, open NetApp ONTAP tool. Ensure that ONTAP storage cluster has been added to `Storage Systems` as part of ONTAP tool deployment. 
 +
-[source, cli]
-mkdir /tmp/archive
-+
-[source, cli]
-chmod 777 /tmp/archive
+image:vcf_ora_vvol_scp_01.png["Screenshot showing a custom storage capability profile configuration."]
+image:vcf_ora_vvol_scp_00.png["Screenshot showing a custom storage capability profile configuration."]
 
-. Download and stage the Oracle binary installation files and other required rpm files to the `/tmp/archive` directory.
+. Click on `Storage capability profile` to add a custom profile for Oracle. Name the profile and add a brief description.
 +
-See the following list of installation files to be stated in `/tmp/archive` on the DB VM.
-+
-....
+image:vcf_ora_vvol_scp_02.png["Screenshot showing a custom storage capability profile configuration."]
 
-[admin@ora_02 ~]$ ls -l /tmp/archive/
-total 10539364
--rw-rw-r--. 1 admin  admin         19112 Oct  4 17:04 compat-libcap1-1.10-7.el7.x86_64.rpm
--rw-rw-r--. 1 admin  admin    3059705302 Oct  4 17:10 LINUX.X64_193000_db_home.zip
--rw-rw-r--. 1 admin  admin    2889184573 Oct  4 17:11 LINUX.X64_193000_grid_home.zip
--rw-rw-r--. 1 admin  admin        589145 Oct  4 17:04 netapp_linux_unified_host_utilities-7-1.x86_64.rpm
--rw-rw-r--. 1 admin  admin         31828 Oct  4 17:04 oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
--rw-rw-r--. 1 admin  admin    2872741741 Oct  4 17:12 p34762026_190000_Linux-x86-64.zip
--rw-rw-r--. 1 admin  admin    1843577895 Oct  4 17:13 p34765931_190000_Linux-x86-64.zip
--rw-rw-r--. 1 admin  admin     124347218 Oct  4 17:13 p6880880_190000_Linux-x86-64.zip
--rw-rw-r--. 1 admin  admin        257136 Oct  4 17:04 policycoreutils-python-utils-2.9-9.el8.noarch.rpm
-[admin@ora_02 ~]$
+. Choose storage controller category: performance, capacity, or hybrid.
++
+image:vcf_ora_vvol_scp_03.png["Screenshot showing a custom storage capability profile configuration."]
 
-....
+. Select the protocol.
++
+image:vcf_ora_vvol_scp_04.png["Screenshot showing a custom storage capability profile configuration."]
 
-. Install Oracle 19c preinstall RPM, which satisfies most kernel configuration requirements.
+. Define a QoS policy if desired.
 +
-[source, cli]
-yum install /tmp/archive/oracle-database-preinstall-19c-1.0-2.el8.x86_64.rpm
+image:vcf_ora_vvol_scp_05.png["Screenshot showing a custom storage capability profile configuration."]
 
-. Download and install the missing `compat-libcap1` in Linux 8.
+. Additional storage attributes for the profile. Be sure that the encryption is enabled on the NetApp controller if you want to have the encryption capability or it may cause issues when applying the profile.
 +
-[source, cli]
-yum install /tmp/archive/compat-libcap1-1.10-7.el7.x86_64.rpm
+image:vcf_ora_vvol_scp_06.png["Screenshot showing a custom storage capability profile configuration."]
 
-. From NetApp, download and install NetApp host utilities.
+. Review the summary and finish the storage capability profile creation.
 +
-[source, cli]
-yum install /tmp/archive/netapp_linux_unified_host_utilities-7-1.x86_64.rpm
-
-. Install `policycoreutils-python-utils`.
-+
-[source, cli]
-yum install /tmp/archive/policycoreutils-python-utils-2.9-9.el8.noarch.rpm
-
-. Install open JDK version 1.8.
-+
-[source, cli]
-yum install java-1.8.0-openjdk.x86_64
-
-. Install iSCSI initiator utils.
-+
-[source, cli]
-yum install iscsi-initiator-utils
-
-. Install sg3_utils.
-+
-[source, cli]
-yum install sg3_utils
-
-. Install device-mapper-multipath.
-+
-[source, cli]
-yum install device-mapper-multipath
-
-. Disable transparent hugepages in the current system.
-+
-[source, cli]
-echo never > /sys/kernel/mm/transparent_hugepage/enabled
-+
-[source, cli]
-echo never > /sys/kernel/mm/transparent_hugepage/defrag
-
-. Add the following lines in `/etc/rc.local` to disable `transparent_hugepage` after reboot.
-+
-[source, cli]
-vi /etc/rc.local
-+
-....
-  # Disable transparent hugepages
-          if test -f /sys/kernel/mm/transparent_hugepage/enabled; then
-            echo never > /sys/kernel/mm/transparent_hugepage/enabled
-          fi
-          if test -f /sys/kernel/mm/transparent_hugepage/defrag; then
-            echo never > /sys/kernel/mm/transparent_hugepage/defrag
-          fi
-....
-
-. Disable selinux by changing `SELINUX=enforcing` to `SELINUX=disabled`. You must reboot the host to make the change effective.
-+
-[source, cli]
-vi /etc/sysconfig/selinux
-
-. Add the following lines to `limit.conf` to set the file descriptor limit and stack size.
-+
-[source, cli]
-vi /etc/security/limits.conf
-+
-....
-
-*               hard    nofile          65536
-*               soft    stack           10240
-....
-
-. Add swap space to DB VM if there is no swap space configured with this instruction: link:https://aws.amazon.com/premiumsupport/knowledge-center/ec2-memory-swap-file/[How do I allocate memory to work as swap space in an Amazon EC2 instance by using a swap file?^] The exact amount of space to add depends on the size of RAM up to 16G.
-
-. Change `node.session.timeo.replacement_timeout` in the `iscsi.conf` configuration file from 120 to 5 seconds.
-+
-[source, cli]
-vi /etc/iscsi/iscsid.conf
-
-. Enable and start the iSCSI service on the EC2 instance.
-+
-[source, cli]
-systemctl enable iscsid
-+
-[source, cli]
-systemctl start iscsid
-
-. Retrieve the iSCSI initiator address to be used for database LUN mapping.
-+
-[source, cli]
-cat /etc/iscsi/initiatorname.iscsi
-
-. Add the asm groups for asm management user (oracle).
-+
-[source, cli]
-groupadd asmadmin
-+
-[source, cli]
-groupadd asmdba
-+
-[source, cli]
-groupadd asmoper
-
-. Modify the oracle user to add asm groups as secondary groups (the oracle user should have been created after Oracle preinstall RPM installation).
-+
-[source, cli]
-usermod -a -G asmadmin oracle
-+
-[source, cli]
-usermod -a -G asmdba oracle
-+
-[source, cli]
-usermod -a -G asmoper oracle
+image:vcf_ora_vvol_scp_07.png["Screenshot showing a custom storage capability profile configuration."]
 
 
-. Stop and disable the Linux firewall if it is active.
-+
-[source, cli]
-systemctl stop firewalld
-+
-[source, cli]
-systemctl disable firewalld
 
-. Enable password-less sudo for admin user by uncommenting `# %wheel  ALL=(ALL)       NOPASSWD: ALL` line in /etc/sudoers file. Change the file permission to make the edit.
-+
-[source, cli]
-chmod 640 /etc/sudoers
-+
-[source, cli]
-vi /etc/sudoers
-+
-[source, cli]
-chmod 440 /etc/sudoers
+====
 
-. Reboot the EC2 instance. 
+=== Create and configure vVols
+[%collapsible]
+
+====
+
+With the prerequisites completed, login to the VCF as an admin user via vSphere client, navigating to workload domain. Do not use built-in VMware storage option to create vVols. Instead, use NetApp ONTAP tool to create vVols. Following demonstrates the procedures to create and configure vVols. 
+
+. The vVols creation workflow can be triggered either from ONTAP tool interface or from VCF workload domain cluster.
++
+image:vcf_ora_vvol_datastore_01.png["Screenshot showing vVols datastore configuration."]
++
+image:vcf_ora_vvol_datastore_01_2.png["Screenshot showing vVols datastore configuration."]
+
+
+. Filling in general information for datastore including provisioning destination, type, name, and protocol.
++
+image:vcf_ora_vvol_datastore_02.png["Screenshot showing vVols datastore configuration."]
+
+. Select the custom storage capability profile created from previous step, `Storage system`, and `Storage VM`, where vVols are to be created. 
++
+image:vcf_ora_vvol_datastore_03.png["Screenshot showing vVols datastore configuration."]
+
+. Choose `Create new volumes`, fill in the volume name and size and click on `ADD` then `NEXT` to move to the summary page.
++
+image:vcf_ora_vvol_datastore_04.png["Screenshot showing vVols datastore configuration."]
+
+. Click `Finish` to create vVols datastore for Oracle binary. 
++
+image:vcf_ora_vvol_datastore_05.png["Screenshot showing vVols datastore configuration."]
+
+. Repeat the same procedures to create vVols datastore for Oracle data and log. 
++
+image:vcf_ora_vvol_datastore_06.png["Screenshot showing vVols datastore configuration."]
+
+[NOTE]
+
+Notice that when an Oracle database is cloned, an additional vVols for Data is added to the vVols list.
 
 ====
 
