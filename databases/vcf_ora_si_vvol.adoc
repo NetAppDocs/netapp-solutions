@@ -236,113 +236,130 @@ image:vcf_ora_vvol_vm_policy_07.png["Screenshot showing a VM storage policy conf
 
 ====
 
-
-
 === Allocate disks to DB VM from vVols datastore and configure DB storage
 [%collapsible]
 
 ====
 
-Add three disk volumes from the command line by login to FSx cluster as fsxadmin user via ssh and FSx cluster management IP. Create LUNs within the volumes to host the Oracle database binary, data, and logs files.
+From vSphere client, add three disks from the vVols datastore to database VM by editing VM settings. Then, login to VM to format and mount the disks to mount points /u01, /u02, and /u03. The following demonstrates the exact steps and tasks.
 
-. Log into the FSx cluster through SSH as the fsxadmin user.
+. Add a disk to VM as Oracle binary storage.
 +
-[source, cli]
-ssh fsxadmin@10.49.0.74
+image:vcf_ora_vvol_vm_bins.png["Screenshot showing a VM storage configuration."]
 
-. Execute the following command to create a volume for the Oracle binary.
-+ 
-[source, cli]
-vol create -volume ora_02_biny -aggregate aggr1 -size 50G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
-
-. Execute the following command to create a volume for Oracle data.
+. Add a disk to VM as Oracle data storage.
 +
-[source, cli]
-vol create -volume ora_02_data -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+image:vcf_ora_vvol_vm_data.png["Screenshot showing a VM storage configuration."]
 
-. Execute the following command to create a volume for Oracle logs.
-+ 
-[source, cli]
-vol create -volume ora_02_logs -aggregate aggr1 -size 100G -state online  -type RW -snapshot-policy none -tiering-policy snapshot-only
+. Add a disk to VM as Oracle log storage.
++
+image:vcf_ora_vvol_vm_logs.png["Screenshot showing a VM storage configuration."]
 
-. Validate the volumes created.
+. From VM `Edit Settings`, `Advanced Parameters`, add Attribute `disk.enableuuid` with Value `TRUE`.  The VM needs to be down to add the advanced parameter.
 +
-[source, cli]
-vol show ora*
-+
-Output from the command:
+image:vcf_ora_vvol_vm_uuid.png["Screenshot showing a VM storage configuration."]
+
+. Now, restart the VM. Login to VM as an admin user via ssh to review the newly added disk drives. 
 +
 ....
-FsxId0c00cec8dad373fd1::> vol show ora*
-Vserver   Volume       Aggregate    State      Type       Size  Available Used%
---------- ------------ ------------ ---------- ---- ---------- ---------- -----
-nim       ora_02_biny  aggr1        online     RW         50GB    22.98GB   51%
-nim       ora_02_data  aggr1        online     RW        100GB    18.53GB   80%
-nim       ora_02_logs  aggr1        online     RW         50GB     7.98GB   83%
+[admin@ora_01 ~]$ sudo fdisk -l
+
+Disk /dev/sdb: 50 GiB, 53687091200 bytes, 104857600 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+Disk /dev/sdc: 100 GiB, 107374182400 bytes, 209715200 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+Disk /dev/sdd: 100 GiB, 107374182400 bytes, 209715200 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+.
+.
+.
 ....
 
-. Create a binary LUN within the database binary volume.
+. Partition the drives as a primary and single partition by simply accepting the default choices.
 +
 [source, cli]
-lun create -path /vol/ora_02_biny/ora_02_biny_01 -size 40G -ostype linux
+sudo fdisk /dev/sdb
++
+[source, cli]
+sudo fdisk /dev/sdc
++
+[source, cli]
+sudo fdisk /dev/sdd
 
-. Create data LUNs within the database data volume.
+. Format the partitioned disks as xfs file systems.
 +
 [source, cli]
-lun create -path /vol/ora_02_data/ora_02_data_01 -size 20G -ostype linux
+sudo mkfs.xfs /dev/sdb1
 +
 [source, cli]
-lun create -path /vol/ora_02_data/ora_02_data_02 -size 20G -ostype linux
+sudo mkfs.xfs /dev/sdc1
 +
 [source, cli]
-lun create -path /vol/ora_02_data/ora_02_data_03 -size 20G -ostype linux
-+
-[source, cli]
-lun create -path /vol/ora_02_data/ora_02_data_04 -size 20G -ostype linux
+sudo mkfs.xfs /dev/sdd1
 
-. Create log LUNs within the database logs volume.
-+
-[source, cli]
-lun create -path /vol/ora_02_logs/ora_02_logs_01 -size 40G -ostype linux
-+
-[source, cli]
-lun create -path /vol/ora_02_logs/ora_02_logs_02 -size 40G -ostype linux
 
-. Create an igroup for the EC2 instance with the initiator retrieved from step 14 of the EC2 kernel configuration above.
+. Mount the drives to mount point /u01, /u02, and /u03. 
 +
 [source, cli]
-igroup create -igroup ora_02 -protocol iscsi -ostype linux -initiator iqn.1994-05.com.redhat:f65fed7641c2
-
-. Map the LUNs to the igroup created above. Increment the LUN ID sequentially for each additional LUN.
+sudo mount -t xfs /dev/sdb1 /u01
 +
 [source, cli]
-lun map -path /vol/ora_02_biny/ora_02_biny_01 -igroup ora_02 -vserver svm_ora -lun-id 0
-lun map -path /vol/ora_02_data/ora_02_data_01 -igroup ora_02 -vserver svm_ora -lun-id 1
-lun map -path /vol/ora_02_data/ora_02_data_02 -igroup ora_02 -vserver svm_ora -lun-id 2
-lun map -path /vol/ora_02_data/ora_02_data_03 -igroup ora_02 -vserver svm_ora -lun-id 3
-lun map -path /vol/ora_02_data/ora_02_data_04 -igroup ora_02 -vserver svm_ora -lun-id 4
-lun map -path /vol/ora_02_logs/ora_02_logs_01 -igroup ora_02 -vserver svm_ora -lun-id 5
-lun map -path /vol/ora_02_logs/ora_02_logs_02 -igroup ora_02 -vserver svm_ora -lun-id 6
-
-. Validate the LUN mapping.
+sudo mount -t xfs /dev/sdc1 /u02
 +
 [source, cli]
-mapping show
-+
-This is expected to return:
+sudo mount -t xfs /dev/sdd1 /u03
 +
 ....
-FsxId0c00cec8dad373fd1::> mapping show
-  (lun mapping show)
-Vserver    Path                                      Igroup   LUN ID  Protocol
----------- ----------------------------------------  -------  ------  --------
-nim        /vol/ora_02_biny/ora_02_u01_01            ora_02        0  iscsi
-nim        /vol/ora_02_data/ora_02_u02_01            ora_02        1  iscsi
-nim        /vol/ora_02_data/ora_02_u02_02            ora_02        2  iscsi
-nim        /vol/ora_02_data/ora_02_u02_03            ora_02        3  iscsi
-nim        /vol/ora_02_data/ora_02_u02_04            ora_02        4  iscsi
-nim        /vol/ora_02_logs/ora_02_u03_01            ora_02        5  iscsi
-nim        /vol/ora_02_logs/ora_02_u03_02            ora_02        6  iscsi
+[admin@ora_01 ~]$ df -h
+Filesystem             Size  Used Avail Use% Mounted on
+devtmpfs               7.7G     0  7.7G   0% /dev
+tmpfs                  7.8G     0  7.8G   0% /dev/shm
+tmpfs                  7.8G  782M  7.0G  10% /run
+tmpfs                  7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/mapper/rhel-root   44G   19G   26G  43% /
+/dev/sda1             1014M  258M  757M  26% /boot
+tmpfs                  1.6G   12K  1.6G   1% /run/user/42
+tmpfs                  1.6G  4.0K  1.6G   1% /run/user/1000
+/dev/sdb1               50G  390M   50G   1% /u01
+/dev/sdc1              100G  746M  100G   1% /u02
+/dev/sdd1              100G  746M  100G   1% /u03
+
+....
+
+. Add mount points to /etc/fstab so that disk drives will be mounted when VM reboots.
++
+[source, cli]
+sudo vi /etc/fstab
++
+....
+[oracle@ora_01 ~]$ cat /etc/fstab
+
+#
+# /etc/fstab
+# Created by anaconda on Wed Oct 18 19:43:31 2023
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk/'.
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
+#
+# After editing this file, run 'systemctl daemon-reload' to update systemd
+# units generated from this file.
+#
+/dev/mapper/rhel-root   /                       xfs     defaults        0 0
+UUID=aff942c4-b224-4b62-807d-6a5c22f7b623 /boot                   xfs     defaults        0 0
+/dev/mapper/rhel-swap   none                    swap    defaults        0 0
+/root/swapfile swap swap defaults 0 0
+/dev/sdb1               /u01                    xfs     defaults        0 0
+/dev/sdc1               /u02                    xfs     defaults        0 0
+/dev/sdd1               /u03                    xfs     defaults        0 0
 ....
 
 ====
