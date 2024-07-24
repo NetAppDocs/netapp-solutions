@@ -83,7 +83,7 @@ image::vcf_ora_si_vvols_architecture.png["This image provides a detailed picture
 
 * *Protocol for vVols to ONTAP cluster connectivity.* NFS or iSCSI are good choices. The performance levels are equivalent. In this solution demonstration, we used NFS as a storage protocol for vVols connectivity to the underlined ONTAP storage cluster.
 
-* *Oracle storage layout on vVols.* In our tests and validations, we deployed three vVols datastores for Oracle binary, Oracle data, and Oracle log files. It's good practice to separate different types of Oracle files into their datastore so that database backup, recovery, or clone can be easily managed and executed.  
+* *Oracle storage layout on vVols.* In our tests and validations, we deployed three vVols datastores for Oracle binary, Oracle data, and Oracle log files. It's good practice to separate different types of Oracle files into their datastore so that database backup, recovery, or clone can be easily managed and executed. Create dedicate vVols for large databases and share vVols for smaller databases or databases with similar QoS profile. 
 
 * *Credential for ONTAP storage authentication.* Only use ONTAP cluster-level credentials for the ONTAP storage cluster authentication, including SnapCenter connectivity to the ONTAP storage cluster or ONTAP tool connectivity to the ONTAP storage cluster. 
 
@@ -108,7 +108,6 @@ Deployment requires the following prerequisites.
 . SnapCenter plugin version 6.0 for VMware vSphere has been deployed in VCF. Refer to following resources for the plugin deployment: link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/[SnapCenter Plug-in for VMware vSphere documentation^].
 
 . ONTAP tool for VMware vSphere has been deployed in VCF. Refer to following resources for the ONTAP tool for VMware vSphere deployment: link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/index.html[ONTAP tools for VMware vSphere documentation^]
-
 
 [NOTE]
 
@@ -152,8 +151,6 @@ image:vcf_ora_vvol_scp_06.png["Screenshot showing a custom storage capability pr
 +
 image:vcf_ora_vvol_scp_07.png["Screenshot showing a custom storage capability profile configuration."]
 
-
-
 ====
 
 === Create and configure vVols
@@ -196,12 +193,57 @@ Notice that when an Oracle database is cloned, an additional vVols for Data is a
 
 ====
 
-=== Provision and map FSx ONTAP LUNs to the DB VM
+
+=== Create VM storage policy based on storage capability profile
 [%collapsible]
 
 ====
 
-Provision three volumes from the command line by login to FSx cluster as fsxadmin user via ssh and FSx cluster management IP. Create LUNs within the volumes to host the Oracle database binary, data, and logs files.
+Before attaching vVols datastore to database VM, add a VM storage policy based on storage capability profile created from previous step. Following are the procedures.
+
+. From vSphere client menus, open `Policies and Profiles` and highlight `VM Storage Policies`. Click `Create` to open `VM Storage Policies` workflow.
++
+image:vcf_ora_vvol_vm_policy_01.png["Screenshot showing a VM storage policy configuration."]
+
+. Name the VM storage policy.
++
+image:vcf_ora_vvol_vm_policy_02.png["Screenshot showing a VM storage policy configuration."]
+
+. In `Datastore specific rules`, check `Enable rules for "NetAPP.clustered.Data.ONTAP.VP.vvol" storage`
++
+image:vcf_ora_vvol_vm_policy_03.png["Screenshot showing a VM storage policy configuration."]
+
+. For NetApp.clustered.Data.ONTAP.VP.vvol rules `Placement`, select the custom storage capacity profile created from the previous step. 
++
+image:vcf_ora_vvol_vm_policy_04.png["Screenshot showing a VM storage policy configuration."]
+
+. For NetApp.clustered.Data.ONTAP.VP.vvol rules `Replication`, choose `Disabled` if vVols are not replicated.
++
+image:vcf_ora_vvol_vm_policy_04_1.png["Screenshot showing a VM storage policy configuration."]
+
+. Storage compatibility page displays the compatible vVols datastores in VCF environment.
++
+image:vcf_ora_vvol_vm_policy_05.png["Screenshot showing a VM storage policy configuration."]
+
+. Review and finish to create the VM Storage Policy.
++
+image:vcf_ora_vvol_vm_policy_06.png["Screenshot showing a VM storage policy configuration."]
+
+. Validate the VM Storage Policy just created. 
++
+image:vcf_ora_vvol_vm_policy_07.png["Screenshot showing a VM storage policy configuration."]
+
+
+====
+
+
+
+=== Allocate disks to DB VM from vVols datastore and configure DB storage
+[%collapsible]
+
+====
+
+Add three disk volumes from the command line by login to FSx cluster as fsxadmin user via ssh and FSx cluster management IP. Create LUNs within the volumes to host the Oracle database binary, data, and logs files.
 
 . Log into the FSx cluster through SSH as the fsxadmin user.
 +
