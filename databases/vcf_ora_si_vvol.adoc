@@ -532,15 +532,14 @@ image:vcf_ora_vvol_snapctr_bkup_10.png["Screenshot showing SnapCenter configurat
 
 =====
 
-SnapCenter provides a number of restore and recovery options for Oracle databases from snapshot backup. In this example, we demonstrate a point in time restoration to recover a dropped table by mistake. On VM ora_02, two databases cdb3, cdb4 share the same +DATA and +LOGS disk groups. Database restoration for one database does not impact the availability of the other database. 
+SnapCenter provides a number of restore and recovery options for Oracle databases from snapshot backup. In this example, we demonstrate to restore from a older snapshot backup, then roll forward the database to the last available log. 
 
-. First, create a test table and insert a row into table to validate a point in time recovery.
+. First, run a snapshot backup. Then, create a test table and insert a row into table to validate that recovered database from snapshot image before test table creation regains the test table.
 +
 .....
+[oracle@ora_01 ~]$ sqlplus / as sysdba
 
-[oracle@ora_02 ~]$ sqlplus / as sysdba
-
-SQL*Plus: Release 19.0.0.0.0 - Production on Fri Oct 6 14:15:21 2023
+SQL*Plus: Release 19.0.0.0.0 - Production on Wed Jul 17 10:20:10 2024
 Version 19.18.0.0.0
 
 Copyright (c) 1982, 2022, Oracle.  All rights reserved.
@@ -550,32 +549,22 @@ Connected to:
 Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
 Version 19.18.0.0.0
 
-SQL> select name, open_mode from v$database;
-
-NAME      OPEN_MODE
---------- --------------------
-CDB3      READ WRITE
-
-SQL> show pdbs
+SQL> sho pdbs
 
     CON_ID CON_NAME                       OPEN MODE  RESTRICTED
 ---------- ------------------------------ ---------- ----------
          2 PDB$SEED                       READ ONLY  NO
-         3 CDB3_PDB1                      READ WRITE NO
-         4 CDB3_PDB2                      READ WRITE NO
-         5 CDB3_PDB3                      READ WRITE NO
-SQL>
+         3 NTAP1_PDB1                     READ WRITE NO
+         4 NTAP1_PDB2                     READ WRITE NO
+         5 NTAP1_PDB3                     READ WRITE NO
+SQL> alter session set container=ntap1_pdb1;
+
+SQL> select * from test;
+
+no rows selected
 
 
-SQL> alter session set container=cdb3_pdb1;
-
-Session altered.
-
-SQL> create table test (id integer, dt timestamp, event varchar(100));
-
-Table created.
-
-SQL> insert into test values(1, sysdate, 'test oracle recovery on guest mounted fsx storage to VMC guest vm ora_02');
+SQL> insert into test values (1, sysdate, 'test oracle backup/restore/clone on VMware Cloud Foundation vVols');
 
 1 row created.
 
@@ -592,55 +581,26 @@ DT
 EVENT
 --------------------------------------------------------------------------------
          1
-06-OCT-23 03.18.24.000000 PM
-test oracle recovery on guest mounted fsx storage to VMC guest vm ora_02
+18-JUL-24 11.15.03.000000 AM
+test oracle backup/restore/clone on VMware Cloud Foundation vVols
 
 
-SQL> select current_timestamp from dual;
+SQL>
 
-CURRENT_TIMESTAMP
----------------------------------------------------------------------------
-06-OCT-23 03.18.53.996678 PM -07:00
 
 .....
 
-. We run a manual snapshot backup from SnapCenter. Then drop the table.
+. From SnapCenter `Resources` tab, open the database NTAP1 backup topology page. Highlight the snapshot data backup set before the creation of test table. Click on `Restore` to launch restore-recover workflow.
 +
-.....
-
-SQL> drop table test;
-
-Table dropped.
-
-SQL> commit;
-
-Commit complete.
-
-SQL> select current_timestamp from dual;
-
-CURRENT_TIMESTAMP
----------------------------------------------------------------------------
-06-OCT-23 03.26.30.169456 PM -07:00
-
-SQL> select * from test;
-select * from test
-              *
-ERROR at line 1:
-ORA-00942: table or view does not exist
-
-.....
-
-. From backup set created from last step, take a note of the SCN number of log backup. Click on `Restore` to launch restore-recover workflow.
-+
-image:aws_ora_fsx_vmc_snapctr_12.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_restore_01.png["Screenshot showing SnapCenter configuration."]
 
 . Choose restore scope.
 +
-image:aws_ora_fsx_vmc_snapctr_13.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_restore_02.png["Screenshot showing SnapCenter configuration."]
 
-. Choose recovery scope up to the log SCN from last full database backup. 
+. Choose recovery scope to `All Logs`. 
 +
-image:aws_ora_fsx_vmc_snapctr_14.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_restore_03.png["Screenshot showing SnapCenter configuration."]
 
 . Specify any optional pre-scripts to run.
 +
@@ -656,23 +616,19 @@ image:aws_ora_fsx_vmc_snapctr_17.png["Screenshot showing SnapCenter configuratio
 
 . Review the summary and click on `Finish` to launch the restoration and recovery.
 +
-image:aws_ora_fsx_vmc_snapctr_18.png["Screenshot showing SnapCenter configuration."]
-
-. From Oracle Restart grid control, we observe that while cdb3 is under restoration and recovery cdb4 is online and available.
-+
-image:aws_ora_fsx_vmc_snapctr_19.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_restore_07.png["Screenshot showing SnapCenter configuration."]
 
 . From `Monitor` tab, open the job to review the details.
 +
-image:aws_ora_fsx_vmc_snapctr_20.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_restore_08.png["Screenshot showing SnapCenter configuration."]
 
-. From DB VM ora_02, validate the dropped table is recovered after a successful recovery.
+. From DB VM ora_01, validate that the test table is recovered after a successful restore/recovery and database is rolled forward to most recent state.
 +
 .....
 
-[oracle@ora_02 bin]$ sqlplus / as sysdba
+[oracle@ora_01 ~]$ sqlplus / as sysdba
 
-SQL*Plus: Release 19.0.0.0.0 - Production on Fri Oct 6 17:01:28 2023
+SQL*Plus: Release 19.0.0.0.0 - Production on Thu Jul 18 11:42:58 2024
 Version 19.18.0.0.0
 
 Copyright (c) 1982, 2022, Oracle.  All rights reserved.
@@ -686,17 +642,9 @@ SQL> select name, open_mode from v$database;
 
 NAME      OPEN_MODE
 --------- --------------------
-CDB3      READ WRITE
+NTAP1     READ WRITE
 
-SQL> show pdbs
-
-    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
----------- ------------------------------ ---------- ----------
-         2 PDB$SEED                       READ ONLY  NO
-         3 CDB3_PDB1                      READ WRITE NO
-         4 CDB3_PDB2                      READ WRITE NO
-         5 CDB3_PDB3                      READ WRITE NO
-SQL> alter session set container=CDB3_PDB1;
+SQL> alter session set container=ntap1_pdb1;
 
 Session altered.
 
@@ -709,17 +657,12 @@ DT
 EVENT
 --------------------------------------------------------------------------------
          1
-06-OCT-23 03.18.24.000000 PM
-test oracle recovery on guest mounted fsx storage to VMC guest vm ora_02
+18-JUL-24 11.15.03.000000 AM
+test oracle backup/restore/clone on VMware Cloud Foundation vVols
 
-
-SQL> select current_timestamp from dual;
-
-CURRENT_TIMESTAMP
----------------------------------------------------------------------------
-06-OCT-23 05.02.20.382702 PM -07:00
 
 SQL>
+
 
 .....
 
@@ -730,97 +673,50 @@ SQL>
 
 =====
 
-In this example, the same backup sets is used to clone a database on the same VM in a different ORACLE_HOME. The procedures are equally applicable to clone a database from the backup to separate VM in VMC if needed.
+In this example, the most recent backup sets is used to clone a database on the DB VM ora_02 in a different ORACLE_HOME in VCF. 
 
-. Open the database cdb3 backup list. From a data backup of choice, click on `Clone` button to launch database clone workflow.
+. Again, open the database NTAP1 backup list. Select the most recent data backup set, click on `Clone` button to launch database clone workflow.
 +
-image:aws_ora_fsx_vmc_snapctr_21.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_clone_01.png["Screenshot showing SnapCenter configuration."]
 
 . Name the clone database SID.
 +
-image:aws_ora_fsx_vmc_snapctr_22.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_clone_02.png["Screenshot showing SnapCenter configuration."]
 
-. Select a VM in VMC as the target database host. Identical Oracle version should have been installed and configured on the host.
+. Select ora_02 in VCF as the target database clone host. Identical Oracle database software should have been installed and configured on the host.
 +
-image:aws_ora_fsx_vmc_snapctr_23.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_clone_03.png["Screenshot showing SnapCenter configuration."]
 
 . Select the proper ORACLE_HOME, user and group on the target host. Keep credential at default.
 +
-image:aws_ora_fsx_vmc_snapctr_24.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_clone_04.png["Screenshot showing SnapCenter configuration."]
 
-. Change clone database parameters to meet configuration or resources requirements for the clone database.
+. You may change clone database parameters to meet configuration or resources requirements for the clone database.
 +
-image:aws_ora_fsx_vmc_snapctr_25.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_clone_05.png["Screenshot showing SnapCenter configuration."]
 
 . Choose recovery scope. `Until Cancel` recovers the clone up to last available log file in the backup set. 
 +
-image:aws_ora_fsx_vmc_snapctr_26.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_clone_06.png["Screenshot showing SnapCenter configuration."]
 
 . Review the summary and launch the clone job.
 +
-image:aws_ora_fsx_vmc_snapctr_27.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_clone_08.png["Screenshot showing SnapCenter configuration."]
 
 . Monitor the clone job execution from `Monitor` tab.
 +
-image:aws_ora_fsx_vmc_snapctr_28.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_clone_09.png["Screenshot showing SnapCenter configuration."]
 
 . Cloned database is immediately registered in SnapCenter.
 +
-image:aws_ora_fsx_vmc_snapctr_29.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_clone_10.png["Screenshot showing SnapCenter configuration."]
 
-. From DB VM ora_02, the cloned database is also registered in Oracle Restart grid control and the dropped test table is recovered in the cloned database cdb3tst as shown below.
+. From DB VM ora_02, validate the cloned database and query the test table.
 +
 .....
-
-[oracle@ora_02 ~]$ /u01/app/oracle/product/19.0.0/grid/bin/crsctl stat res -t
---------------------------------------------------------------------------------
-Name           Target  State        Server                   State details
---------------------------------------------------------------------------------
-Local Resources
---------------------------------------------------------------------------------
-ora.DATA.dg
-               ONLINE  ONLINE       ora_02                   STABLE
-ora.LISTENER.lsnr
-               ONLINE  INTERMEDIATE ora_02                   Not All Endpoints Re
-                                                             gistered,STABLE
-ora.LOGS.dg
-               ONLINE  ONLINE       ora_02                   STABLE
-ora.SC_2090922_CDB3TST.dg
-               ONLINE  ONLINE       ora_02                   STABLE
-ora.asm
-               ONLINE  ONLINE       ora_02                   Started,STABLE
-ora.ons
-               OFFLINE OFFLINE      ora_02                   STABLE
---------------------------------------------------------------------------------
-Cluster Resources
---------------------------------------------------------------------------------
-ora.cdb3.db
-      1        ONLINE  ONLINE       ora_02                   Open,HOME=/u01/app/o
-                                                             racle/product/19.0.0
-                                                             /cdb3,STABLE
-ora.cdb3tst.db
-      1        ONLINE  ONLINE       ora_02                   Open,HOME=/u01/app/o
-                                                             racle/product/19.0.0
-                                                             /cdb4,STABLE
-ora.cdb4.db
-      1        ONLINE  ONLINE       ora_02                   Open,HOME=/u01/app/o
-                                                             racle/product/19.0.0
-                                                             /cdb4,STABLE
-ora.cssd
-      1        ONLINE  ONLINE       ora_02                   STABLE
-ora.diskmon
-      1        OFFLINE OFFLINE                               STABLE
-ora.driver.afd
-      1        ONLINE  ONLINE       ora_02                   STABLE
-ora.evmd
-      1        ONLINE  ONLINE       ora_02                   STABLE
---------------------------------------------------------------------------------
-
-[oracle@ora_02 ~]$ export ORACLE_HOME=/u01/app/oracle/product/19.0.0/cdb4
-[oracle@ora_02 ~]$ export ORACLE_SID=cdb3tst
 [oracle@ora_02 ~]$ sqlplus / as sysdba
 
-SQL*Plus: Release 19.0.0.0.0 - Production on Sat Oct 7 08:04:51 2023
+SQL*Plus: Release 19.0.0.0.0 - Production on Thu Jul 18 12:06:48 2024
 Version 19.18.0.0.0
 
 Copyright (c) 1982, 2022, Oracle.  All rights reserved.
@@ -830,21 +726,32 @@ Connected to:
 Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
 Version 19.18.0.0.0
 
-SQL> select name, open_mode from v$database;
+SQL> select name, open_mode, log_mode from v$database;
 
-NAME      OPEN_MODE
---------- --------------------
-CDB3TST   READ WRITE
+NAME      OPEN_MODE            LOG_MODE
+--------- -------------------- ------------
+NTAP1CLN  READ WRITE           ARCHIVELOG
+
+SQL> select instance_name, host_name from v$instance;
+
+INSTANCE_NAME
+----------------
+HOST_NAME
+----------------------------------------------------------------
+NTAP1CLN
+ora_02
+
 
 SQL> show pdbs
 
     CON_ID CON_NAME                       OPEN MODE  RESTRICTED
 ---------- ------------------------------ ---------- ----------
          2 PDB$SEED                       READ ONLY  NO
-         3 CDB3_PDB1                      READ WRITE NO
-         4 CDB3_PDB2                      READ WRITE NO
-         5 CDB3_PDB3                      READ WRITE NO
-SQL> alter session set container=CDB3_PDB1;
+         3 NTAP1_PDB1                     READ WRITE NO
+         4 NTAP1_PDB2                     READ WRITE NO
+         5 NTAP1_PDB3                     READ WRITE NO
+SQL> alter session set container=ntap1_pdb1
+  2  ;
 
 Session altered.
 
@@ -857,15 +764,15 @@ DT
 EVENT
 --------------------------------------------------------------------------------
          1
-06-OCT-23 03.18.24.000000 PM
-test oracle recovery on guest mounted fsx storage to VMC guest vm ora_02
+18-JUL-24 11.15.03.000000 AM
+test oracle backup/restore/clone on VMware Cloud Foundation vVols
 
 
 SQL>
 
 .....
 
-This completes the demonstration of SnapCenter backup, restore, and clone of Oracle database in VMC SDDC on AWS.
+This completes the demonstration of SnapCenter backup, restore, and clone of Oracle database in VCF.
 
 =====
 
