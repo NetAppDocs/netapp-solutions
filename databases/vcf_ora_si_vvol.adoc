@@ -428,41 +428,60 @@ image:vcf_ora_vvol_em_01.png["Screenshot showing Oracle EM Express configuration
 
 =====
 
-SnapCenter relies on a host-side plug-in on database VM to perform application-aware data protection management activities. For detailed information on NetApp SnapCenter plugin for Oracle, refer to this documentation link:https://docs.netapp.com/us-en/snapcenter/protect-sco/concept_what_you_can_do_with_the_snapcenter_plug_in_for_oracle_database.html[What can you do with the Plug-in for Oracle Database^]. The following provides high level steps to setup SnapCenter for Oracle database backup, recovery, and clone. 
+SnapCenter version 6 has many feature enhancements over version 5, including support for VMware vVols. SnapCenter relies on a host-side plug-in on a database VM to perform application-aware data protection management activities. For detailed information on NetApp SnapCenter plug-in for Oracle, refer to this documentation link:https://docs.netapp.com/us-en/snapcenter/protect-sco/concept_what_you_can_do_with_the_snapcenter_plug_in_for_oracle_database.html[What can you do with the Plug-in for Oracle Database^]. The following provides high-level steps to set up SnapCenter version 6 for Oracle database backup, recovery, and clone in VCF. 
 
-. Download the latest version of SnapCenter software from NetApp support site: link:https://mysupport.netapp.com/site/downloads[NetApp Support Downloads^].
+. Download the version 6 of SnapCenter software from NetApp support site: link:https://mysupport.netapp.com/site/downloads[NetApp Support Downloads^].
 
-. As administrator, install latest java JDK from link:https://www.java.com/en/[Get Java for desktop applications^] on SnapCenter server Windows host.
+. Login to the SnapCenter hosting Windows VM as administrator. Install prerequisites for SnapCenter 6.0.
++
+image:vcf_ora_vvol_snapctr_prerequisites.png["Screenshot showing SnapCenter 6.0 prerequisites."]
+
+. As administrator, install latest java JDK from link:https://www.java.com/en/[Get Java for desktop applications^].
 +
 [NOTE]
 
 If Windows server is deployed in a domain environment, add a domain user to SnapCenter server local administrators group and run SnapCenter installation with the domain user. 
 
 . Login to SnapCenter UI via HTTPS port 8846 as installation user to configure SnapCenter for Oracle.
++
+image:vcf_ora_vvol_snapctr_deploy_01.png["Screenshot showing SnapCenter configuration."]
+
+. Review `Get Started` menu to get up to speed on SnapCenter if you are a new user.
++
+image:vcf_ora_vvol_snapctr_deploy_02.png["Screenshot showing SnapCenter configuration."]
 
 . Update `Hypervisor Settings` in global settings.
 +
 image:aws_ora_fsx_vmc_snapctr_01.png["Screenshot showing SnapCenter configuration."]
 
-. Create Oracle database backup policies. Ideally, create a separate archive log backup policy to allow more frequent backup interval to minimize data loss in the event of a failure.
+. Add ONTAP storage cluster to `Storage Systems` with cluster management IP and authenticated via cluster admin user ID. 
 +
-image:aws_ora_fsx_vmc_snapctr_02.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_06.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_07.png["Screenshot showing SnapCenter configuration."]
 
-. Add database server `Credential` for SnapCenter access to DB VM. The credential should have sudo privilege on a Linux VM or administrator privilege on a Windows VM. 
+. Add database VM and vSphere plugin VM `Credential` for SnapCenter access to DB VM and vSphere plugin VM. The credential should have sudo privilege on the Linux VMs. 
 +
 image:aws_ora_fsx_vmc_snapctr_03.png["Screenshot showing SnapCenter configuration."]
 
-. Add FSx ONTAP storage cluster to `Storage Systems` with cluster management IP and authenticated via fsxadmin user ID. 
+. Add Oracle database VM in VCF to `Hosts` with DB VM credential created in previous step.  
 +
-image:aws_ora_fsx_vmc_snapctr_04.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_08.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_09.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_10.png["Screenshot showing SnapCenter configuration."]
 
-. Add Oracle database VM in VMC to `Hosts` with server credential created in previous step 6.  
+. Similarly, add NetApp VMware plugin VM to `Hosts` with vSphere plugin VM credential created in previous step.
 +
-image:aws_ora_fsx_vmc_snapctr_05.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_11.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_12.png["Screenshot showing SnapCenter configuration."]
+
+. Finally, after Oracle database is discovered on DB VM, back to `Settings`-`Policies` to create Oracle database backup policies. Ideally, create a separate archive log backup policy to allow more frequent backup interval to minimize data loss in the event of a failure.
++
+image:aws_ora_fsx_vmc_snapctr_02.png["Screenshot showing SnapCenter configuration."]
+
 
 [NOTE]
-
-Ensure that the SnapCenter server name can be resolved to the IP address from the DB VM and DB VM name can be resolved to the IP address from the SnapCenter server.  
+Ensure that the SnapCenter server name can be resolved to the IP address from the DB VM and vSphere plugin VM. Equally, the DB VM name and vSphere plugin VM name can be resolved to the IP address from the SnapCenter server. 
+ 
 
 =====
 
