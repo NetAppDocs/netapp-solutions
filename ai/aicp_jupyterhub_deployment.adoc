@@ -34,4 +34,111 @@ JupyterHub is deployed using Helm, a popular package manager for Kubernetes. Bef
 Before you deploy JupyterHub, you must designate a default StorageClass within your Kubernetes cluster. To designate a default StorageClass within your cluster, follow the instructions outlined in the link:aicp_kubeflow_deployment_overview.html[Kubeflow Deployment] section. If you have already designated a default StorageClass within your cluster, then you can skip this step.
 
 == Deploy JupyterHub
-# TODO - Sufian to complete
+
+After completing the steps above, you are now ready to deploy JupyterHub. JupyterHub deployment requires the following steps:
+
+=== Configure JupyterHub Deployment
+
+Before deployment it is a good practice to optimize the JupyterHub deployment for your respective environment. You can create a *config.yaml* file and utilize it during deployment using the Helm chart.
+
+An example *config.yaml* file can be found at  https://github.com/jupyterhub/zero-to-jupyterhub-k8s/blob/HEAD/jupyterhub/values.yaml
+
+[NOTE]
+In this config.yaml file, you can set the *(singleuser.storage.dynamic.storageClass)* parameter for the NetApp Trident StorageClass. This is the storage class that will be used to provision the volumes for individual user workspaces. 
+
+=== Adding Shared Volumes 
+If you want to use a shared volume for all JupyterHub users you can adjust your *config.yaml* accordingly. For example, if you have a shared PersistentVolumeClaim called jupyterhub-shared-volume you could mount it as /home/shared in all user pods as:
+
+[source, shell]
+----
+singleuser:
+  storage:
+    extraVolumes:
+      - name: jupyterhub-shared
+        persistentVolumeClaim:
+          claimName: jupyterhub-shared-volume
+    extraVolumeMounts:
+      - name: jupyterhub-shared
+        mountPath: /home/shared
+----
+[NOTE]
+This is an optional step, you can adjust these parameters to your needs.
+
+
+=== Deploy JupyterHub with Helm Chart
+
+Make Helm aware of the JupyterHub Helm chart repository.
+
+[source, shell]
+----
+helm repo add jupyterhub https://hub.jupyter.org/helm-chart/
+helm repo update
+----
+
+This should show output like:
+
+[source, shell]
+----
+Hang tight while we grab the latest from your chart repositories...
+...Skip local chart repository
+...Successfully got an update from the "stable" chart repository
+...Successfully got an update from the "jupyterhub" chart repository
+Update Complete. ⎈ Happy Helming!⎈
+----
+
+Now install the chart configured by your config.yaml by running this command from the directory that contains your config.yaml:
+
+[source, shell]
+----
+helm upgrade --cleanup-on-fail \
+  --install my-jupyterhub jupyterhub/jupyterhub \
+  --namespace my-namespace \
+  --create-namespace \
+  --values config.yaml
+----
+
+[NOTE]
+In this example:
+
+<helm-release-name> is set to my-jupyterhub, which will be the name of your JupyterHub release.
+<k8s-namespace> is set to my-namespace, which is the namespace where you want to install JupyterHub.
+The --create-namespace flag is used to create the namespace if it does not already exist.
+The --values flag specifies the config.yaml file that contains your desired configuration options.
+
+=== Check Deployment
+
+While step 2 is running, you can see the pods being created from the following command:
+
+[source, shell]
+----
+kubectl get pod --namespace <k8s-namespace>
+----
+
+Wait for the hub and proxy pod to enter the Running state.
+
+[source, shell]
+----
+NAME                    READY     STATUS    RESTARTS   AGE
+hub-5d4ffd57cf-k68z8    1/1       Running   0          37s
+proxy-7cb9bc4cc-9bdlp   1/1       Running   0          37s
+----
+
+=== Access JupyterHub
+
+Find the IP we can use to access the JupyterHub. Run the following command until the EXTERNAL-IP of the proxy-public service is available like in the example output.
+
+[NOTE]
+We used NodePort service in our config.yaml file, you can adjust for your environment based on your setup (e.g LoadBalancer).
+
+[source, shell]
+----
+kubectl --namespace <k8s-namespace> get service proxy-public
+----
+
+[source, shell]
+----
+NAME           TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)        AGE
+proxy-public   NodePort   10.51.248.230   104.196.41.97   80:30000/TCP   1m
+----
+
+To use JupyterHub, enter the external IP for the proxy-public service in to a browser. 
