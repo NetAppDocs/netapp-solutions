@@ -44,7 +44,26 @@ Before deployment it is a good practice to optimize the JupyterHub deployment fo
 An example *config.yaml* file can be found at  https://github.com/jupyterhub/zero-to-jupyterhub-k8s/blob/HEAD/jupyterhub/values.yaml
 
 [NOTE]
-In this config.yaml file, you can set the *(singleuser.storage.dynamic.storageClass)* parameter for the NetApp Trident StorageClass. This is the storage class that will be used to provision the volumes for individual user workspaces.  
+In this config.yaml file, you can set the *(singleuser.storage.dynamic.storageClass)* parameter for the NetApp Trident StorageClass. This is the storage class that will be used to provision the volumes for individual user workspaces. 
+
+=== Adding Shared Volumes 
+If you want to use a shared volume for all JupyterHub users you can adjust your *config.yaml* accordingly. For example, if you have a shared PersistentVolumeClaim called jupyterhub-shared-volume you could mount it as /home/shared in all user pods as:
+
+[source, shell]
+----
+singleuser:
+  storage:
+    extraVolumes:
+      - name: jupyterhub-shared
+        persistentVolumeClaim:
+          claimName: jupyterhub-shared-volume
+    extraVolumeMounts:
+      - name: jupyterhub-shared
+        mountPath: /home/shared
+----
+[NOTE]
+This is an optional step, you can adjust these parameters to your needs.
+
 
 === Deploy JupyterHub with Helm Chart
 
