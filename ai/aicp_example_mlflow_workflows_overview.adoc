@@ -13,6 +13,33 @@ summary: Open Source MLOps with NetApp - Dataset-to-model Traceability with NetA
 :imagesdir: ./../media/
 
 [.lead]
-The https://github.com/NetApp/netapp-dataops-toolkit/tree/main/netapp_dataops_k8s[NetApp DataOps Toolkit for Kubernetes] can be used in conjunction with MLflow in order to implement dataset-to-model or workspace-to-model traceability.
+The https://github.com/NetApp/netapp-dataops-toolkit/tree/main/netapp_dataops_k8s[NetApp DataOps Toolkit for Kubernetes] can be used in conjunction with MLflow's experiment tracking capabilities in order to implement dataset-to-model or workspace-to-model traceability.
 
-#TODO - Mike to complete
+To implement dataset-to-model or workspace-to-model traceability, simply create a snapshot of your dataset or workspace volume using the DataOps Toolkit as part of your training run, as shown the following example code snippet. This code will save the data volume name and snapshot name as tags associated with the specific training run that you are logging to your MLflow experiment tracking server.
+
+```
+...
+from netapp_dataops.k8s import create_volume_snapshot
+
+with mlflow.start_run() :
+    ...
+    
+    namespace = "my_namespace" # Kubernetes namespace in which dataset volume PVC resides
+    dataset_volume_name = "project1" # Name of PVC corresponding to dataset volume
+    snapshot_name = "run1" # Name to assign to your new snapshot
+ 
+    # Create snapshot
+    create_volume_snapshot(
+        namespace=namespace,
+        pvc_name=dataset_volume_name, 
+        snapshot_name=snapshot_name, 
+        printOutput=True
+    )
+ 
+    # Log data volume name and snapshot name as "tags" 
+    # associated with this training run in mlflow.
+    mlflow.set_tag("data_volume_name", dataset_volume_name)
+    mlflow.set_tag("snapshot_name", snapshot_name)
+     
+    ...
+```
