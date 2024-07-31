@@ -1,0 +1,93 @@
+---
+sidebar: sidebar
+permalink: rhhc/on-premises/data-protection.html
+keywords: NetApp Solutions, redhat OpenShift, red hat OpenShift, redhat openshift container platform, ocp, openshift container platform, Advanced Cluster Management, ACM, Hub Cluster, containers, container workloads, VMware, customer managed storage, ONTAP
+summary:
+---
+
+= Data protection using Astra
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+[.lead]
+This page shows the data protection options for Red Hat OpenShift Container based applications running on VMware vSphere using Astra Control Center (ACC). 
+
+As users take their journey of modernizing their applications with Red Hat OpenShift, a data protection strategy should be in place to protect them from accidental deletion or any other human errors. Often a protection strategy is also required for regulatory or compliance purposes to protect their data from a diaster.
+
+The requirements of data protection varies from reverting back to a point in time copy to automatically failing over to a different fault domain without any human intervention. Many customers pick ONTAP as their preferred storage platform for their Kubernetes applications because of its rich features like multitenancy, multi-protocol, high performance and capacity offerings, replication and caching for multi-site locations, security and flexibility.
+
+Data protection in ONTAP can be achieved using ad-hoc or policy controlled  
+- **Snapshot**
+- **backup and restore**
+
+Both Snapshot copies and backups protect the following types of data:
+- **The application metadata that represents the state of the application**
+- **Any persistent data volumes associated with the application**
+- **Any resource artifacts belonging to the application**
+
+== Snapshot with ACC
+A point in time copy of data can be captured using Snapshot with ACC. Protection policy defines the number of Snapshot copies to keep. Minimum schedule option available is hourly. Manual, on-demand Snapshot copies can be taken at any time and at shorter intervals than scheduled Snapshot copies. Snapshot copies are stored on the same provisioned volume as the app.
+
+=== Configuring Snapshot with ACC
+image::rhhc-onprem-dp-snap.png[Astra Control Center Snapshot view]
+
+
+== Backup and Restore with ACC
+A backup is based on a Snapshot. ACC can take Snapshot copies using CSI and perform backup using the point in time Snapshot copy. The backup is stored in an external object store (any s3 compatible including ONTAP S3 at a different location). Protection policy can be configured for scheduled backups and the number of backup versions to keep. The minimum RPO is one hour.
+
+=== Restoring an application from a backup using ACC
+
+ACC restores application from the S3 bucket where the backups are store. 
+
+image:rhhc-onprem-dp-br.png[Astra Control Center Restore option]
+
+== Application specific execution hooks
+
+In addition, execution hooks can be configured to run in conjunction with a data protection operation of a managed app. Even though storage array level data protection features are available, often additional steps are needed to make backups and restores, application consistent. The app-specific additional steps could be:
+- before or after a Snapshot copy is created.
+- before or after a backup is created.
+- after restoring from a Snapshot copy or backup.
+
+Astra Control can execute these app-specific steps coded as custom scripts called execution hooks.
+
+https://github.com/NetApp/Verda[NetApp Verda GitHub project] provides execution hooks for popular cloud-native applications to make protecting applications straightforward, robust, and easy to orchestrate. Feel free to contribute to that project if you have enough information for an application that is not in the repository.
+
+== Sample execution hook for pre-Snapshot of a redis application.
+image::rhhc-onprem-dp-br-hook.png[Astra Control Center execution hook]
+
+== Replication with ACC
+
+For regional protection or for a low RPO and RTO solution, an application can be replicated to another Kubernetes instance running at a different site, preferably in another region. ACC utilizes ONTAP async SnapMirror with RPO as low as 5 minutes. Replication is done by replicating to ONTAP and then a fail over creates the Kubernetes resources in the destination cluster. 
+
+NOTE: Note that replication is different from the backup and restore where the backup goes to S3 and restore is performed from S3. Refer link: https://docs.netapp.com/us-en/astra-control-center/concepts/data-protection.html#replication-to-a-remote-cluster[here] to get additional details about the differences between the two types of data protection.  
+
+Refer link:https://docs.netapp.com/us-en/astra-control-center/use/replicate_snapmirror.html[here] for SnapMirror setup instructions.  
+
+=== SnapMirror with ACC
+image::rhhc-onprem-dp-rep.png[Astra Control Center replication]
+
+NOTE: san-economy and nas-economy storage drivers do not support replication feature. Refer link:https://docs.netapp.com/us-en/astra-control-center/get-started/requirements.html#astra-trident-requirements[here] for additional details. 
+
+
+=== Demo video:
+link:https://www.netapp.tv/details/29504?mcid=35609780286441704190790628065560989458[Demonstration video of disaster recovery with Astra Control Center]
+
+
+== Business Continuity with MetroCluster 
+
+Most of our hardware platform for ONTAP has high availability features to protect from device failures avoiding the need to perform diaster recovery. But to protect from fire or any other disaster and to continue the business with zero RPO and low RTO, often a MetroCluster solution is used.
+
+Customers who currently have an ONTAP system can extend to MetroCluster by adding supported ONTAP systems within the distance limitations for providing zone level disaster recovery.
+Astra Trident, the CSI (Container Storage Interface) supports NetApp ONTAP including MetroCluster configuration as well as other options like Cloud Volumes ONTAP, Azure NetApp Files, AWS FSx for NetApp ONTAP, etc. Astra Trident provides five storage driver options for ONTAP and all are supported for MetroCluster configuration. Refer link:https://docs.netapp.com/us-en/trident/trident-concepts/ontap-drivers.html[here] for additional details about ONTAP storage drivers supported by Astra Trident.
+
+The MetroCluster solution requires layer 2 network extension or capability to access the same network address from both fault domains. Once MetroCluster configuration is in place, the solution is transparent to application owners as all the volumes in the MetroCluster svm are protected and get the benefits of SyncMirror (zero RPO).
+
+image:rhhc-onprem-dp-bc.png[Business Continuity Solution with MetroCluster]
+
+
+TIP: For Trident Backend Configuration (TBC), do not specify the dataLIF and SVM when using MetroCluster configuration. Specify SVM management IP for managementLIF and use vsadmin role credentials.
+
+Details on Astra Control Center Data Protection features are available link:https://docs.netapp.com/us-en/astra-control-center/concepts/data-protection.html[here]
