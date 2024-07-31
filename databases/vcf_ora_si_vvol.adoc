@@ -19,30 +19,29 @@ The solution provides an overview and details for Oracle deployment and protecti
 
 == Purpose
 
-VMware vSphere Virtual Volumes (vVols) is a SAN/NAS management and integration framework that exposes virtual disks as native storage objects and enables array-based operations at the virtual disk level. In other words, vVols make SAN/NAS devices VM-aware and unlocks the ability to leverage array-based data services with a VM-centric approach at the granularity of a single virtual disk. vVols allows customers to leverage the unique capabilities of their current storage investments and 
-transition without disruption to a simpler and more efficient operational model optimized for virtual environments that work across all storage types.
+VMware vSphere Virtual Volumes (vVols) is a SAN/NAS management and integration framework that exposes virtual disks as native storage objects and enables array-based operations at the virtual disk level. In other words, vVols make SAN/NAS devices VM-aware and unlocks the ability to leverage array-based data services with a VM-centric approach at the granularity of a single virtual disk. vVols allows customers to leverage the unique capabilities of their current storage investments and transition without disruption to a simpler and more efficient operational model optimized for virtual environments that work across all storage types.
 
 This documentation demonstrates the deployment and protection of an Oracle single instance database in a VMware Cloud Foundation environment with vVols as primary database storage in a NetApp ONTAP storage cluster. Oracle database is configured as if it is deployed in local file systems on a local storage system. This technical report focuses on steps in creating vVols in VCF for Oracle deployment. We also demonstrate how to use the NetApp SnapCenter UI tool to backup, restore, and clone an Oracle database for dev/test or other use cases for storage-efficient database operation in VCF. 
 
 
 This solution addresses the following use cases:
 
-* Oracle SI database deployment in VCF with vVols on NetApp ONTAP AFF as primary database storage 
-* Oracle database backup and restore in VCF with vVols using NetApp SnapCenter UI tool 
-* Oracle database clone for dev/test or other use cases in VCF with vVols using NetApp SnapCenter UI tool
+* Oracle SI database deployment in VCF with vVols datastore on NetApp ONTAP AFF as primary database storage 
+* Oracle database backup and restore in VCF with vVols datastore using NetApp SnapCenter UI tool 
+* Oracle database clone for dev/test or other use cases in VCF with vVols datastore using NetApp SnapCenter UI tool
 
 == Audience
 
 This solution is intended for the following people:
 
-* A DBA who would like to deploy Oracle in VCF with vVols on NetApp ONTAP AFF as primary database storage
-* A database solution architect who would like to test Oracle workloads in VCF with vVols on NetApp ONTAP AFF storage
-* A storage administrator who would like to deploy and manage an Oracle database deployed to VCF with vVols on NetApp ONTAP AFF storage
-* An application owner who would like to stand up an Oracle database in VCF with vVol
+* A DBA who would like to deploy Oracle in VCF with vVols datastore on NetApp ONTAP AFF as primary database storage
+* A database solution architect who would like to test Oracle workloads in VCF with vVols datastore on NetApp ONTAP AFF storage
+* A storage administrator who would like to deploy and manage an Oracle database deployed to VCF with vVols datastore on NetApp ONTAP AFF storage
+* An application owner who would like to stand up an Oracle database in VCF with vVol datastore
 
 == Solution test and validation environment
 
-The testing and validation of this solution was performed in a lab environment with VCF with vVols on NetApp ONTAP AFF storage that might not match the final deployment environment. For more information, see the section <<Key factors for deployment consideration>>.
+The testing and validation of this solution was performed in a lab environment with VCF with vVols datastore on NetApp ONTAP AFF storage that might not match the final deployment environment. For more information, see the section <<Key factors for deployment consideration>>.
 
 === Architecture
 
@@ -53,7 +52,7 @@ image::vcf_ora_si_vvols_architecture.png["This image provides a detailed picture
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| ONTAP storage AFF A300 | Version 9.14.1P4 | DS224 shelf with 24 NVMe disks, total capacity 35.2 TiB
+| NetApp ONTAP AFF A300 | Version 9.14.1P4 | DS224 shelf with 24 NVMe disks, total capacity 35.2 TiB
 | VMware VSphere cluster | Version 8.02  | 12 CPU(s) x Intel(R) Xeon(R) Gold 5218 CPU @ 2.30GHz, 8 nodes (4 management and 4 workload domains) 
 
 3+^| *Software*
@@ -81,7 +80,7 @@ image::vcf_ora_si_vvols_architecture.png["This image provides a detailed picture
 
 === Key factors for deployment consideration
 
-* *Protocol for vVols to ONTAP cluster connectivity.* NFS or iSCSI are good choices. The performance levels are equivalent. In this solution demonstration, we used NFS as a storage protocol for vVols connectivity to the underlined ONTAP storage cluster.
+* *Protocol for vVols to ONTAP cluster connectivity.* NFS or iSCSI are good choices. The performance levels are equivalent. In this solution demonstration, we used NFS as a storage protocol for vVols connectivity to the underlined ONTAP storage cluster. If VCF infrastructure supports, FC/FCoE, NVMe/FC protocols are also supported for vVols datastores on NetApp ONTAP.
 
 * *Oracle storage layout on vVols datastores.* In our tests and validations, we deployed three vVols datastores for Oracle binary, Oracle data, and Oracle log files. It's good practice to separate different types of Oracle files into their datastore so that database backup, recovery, or clone can be easily managed and executed. Create dedicate vVols for large databases and share vVols for smaller databases or databases with similar QoS profile. 
 
@@ -170,7 +169,7 @@ image:vcf_ora_vvol_datastore_01_2.png["Screenshot showing vVols datastore config
 +
 image:vcf_ora_vvol_datastore_02.png["Screenshot showing vVols datastore configuration."]
 
-. Select the custom storage capability profile created from previous step, `Storage system`, and `Storage VM`, where vVols are to be created. 
+. Select the custom storage capability profile created from previous step, the `Storage system`, and `Storage VM`, where vVols are to be created. 
 +
 image:vcf_ora_vvol_datastore_03.png["Screenshot showing vVols datastore configuration."]
 
@@ -202,7 +201,7 @@ Notice that when an Oracle database is cloned, an additional vVols for Data is a
 
 ====
 
-Before attaching vVols datastore to database VM, add a VM storage policy based on storage capability profile created from previous step. Following are the procedures.
+Before provisioning storage from vVols datastore to database VM, add a VM storage policy based on storage capability profile created from previous step. Following are the procedures.
 
 . From vSphere client menus, open `Policies and Profiles` and highlight `VM Storage Policies`. Click `Create` to open `VM Storage Policies` workflow.
 +
@@ -239,22 +238,22 @@ image:vcf_ora_vvol_vm_policy_07.png["Screenshot showing a VM storage policy conf
 
 ====
 
-=== Allocate disks to DB VM from vVols datastore and configure DB storage
+=== Allocate disks to DB VM from vVols datastores and configure DB storage
 [%collapsible]
 
 ====
 
-From vSphere client, add three disks from the vVols datastore to database VM by editing VM settings. Then, login to VM to format and mount the disks to mount points /u01, /u02, and /u03. The following demonstrates the exact steps and tasks.
+From vSphere client, add three disks from the vVols datastores to database VM by editing VM settings. Then, login to VM to format and mount the disks to mount points /u01, /u02, and /u03. The following demonstrates the exact steps and tasks.
 
-. Add a disk to VM as Oracle binary storage.
+. Add a disk to VM for Oracle binary storage.
 +
 image:vcf_ora_vvol_vm_bins.png["Screenshot showing a VM storage configuration."]
 
-. Add a disk to VM as Oracle data storage.
+. Add a disk to VM for Oracle data storage.
 +
 image:vcf_ora_vvol_vm_data.png["Screenshot showing a VM storage configuration."]
 
-. Add a disk to VM as Oracle log storage.
+. Add a disk to VM for Oracle log storage.
 +
 image:vcf_ora_vvol_vm_logs.png["Screenshot showing a VM storage configuration."]
 
@@ -420,6 +419,11 @@ ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml --skip-t
 image:vcf_ora_vvol_em_02.png["Screenshot showing Oracle EM Express configuration."]
 image:vcf_ora_vvol_em_01.png["Screenshot showing Oracle EM Express configuration."]
 
+. Optionally, execute destroy playbook to remove database from DB VM.
++
+[source, cli]
+ansible-playbook -i hosts 5-destroy.yml -u admin -e @vars/vars.yml
+
 
 ====
 
@@ -431,7 +435,7 @@ image:vcf_ora_vvol_em_01.png["Screenshot showing Oracle EM Express configuration
 
 =====
 
-SnapCenter version 6 has many feature enhancements over version 5, including support for VMware vVols. SnapCenter relies on a host-side plug-in on a database VM to perform application-aware data protection management activities. For detailed information on NetApp SnapCenter plug-in for Oracle, refer to this documentation link:https://docs.netapp.com/us-en/snapcenter/protect-sco/concept_what_you_can_do_with_the_snapcenter_plug_in_for_oracle_database.html[What can you do with the Plug-in for Oracle Database^]. The following provides high-level steps to set up SnapCenter version 6 for Oracle database backup, recovery, and clone in VCF. 
+SnapCenter version 6 has many feature enhancements over version 5, including support for VMware vVols datastore. SnapCenter relies on a host-side plug-in on a database VM to perform application-aware data protection management activities. For detailed information on NetApp SnapCenter plug-in for Oracle, refer to this documentation link:https://docs.netapp.com/us-en/snapcenter/protect-sco/concept_what_you_can_do_with_the_snapcenter_plug_in_for_oracle_database.html[What can you do with the Plug-in for Oracle Database^]. The following provides high-level steps to set up SnapCenter version 6 for Oracle database backup, recovery, and clone in VCF. 
 
 . Download the version 6 of SnapCenter software from NetApp support site: link:https://mysupport.netapp.com/site/downloads[NetApp Support Downloads^].
 
@@ -462,7 +466,7 @@ image:aws_ora_fsx_vmc_snapctr_01.png["Screenshot showing SnapCenter configuratio
 image:vcf_ora_vvol_snapctr_deploy_06.png["Screenshot showing SnapCenter configuration."]
 image:vcf_ora_vvol_snapctr_deploy_07.png["Screenshot showing SnapCenter configuration."]
 
-. Add database VM and vSphere plugin VM `Credential` for SnapCenter access to DB VM and vSphere plugin VM. The credential should have sudo privilege on the Linux VMs. 
+. Add database VM and vSphere plugin VM `Credential` for SnapCenter access to DB VM and vSphere plugin VM. The credential should have sudo privilege on the Linux VMs. You may create different credentials for different management user IDs for the VMs.
 +
 image:aws_ora_fsx_vmc_snapctr_03.png["Screenshot showing SnapCenter configuration."]
 
