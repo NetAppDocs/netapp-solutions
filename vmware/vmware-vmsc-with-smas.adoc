@@ -5,7 +5,7 @@ keywords: NetApp Solutions, vMSC, Metro Storage Cluster, SnapMirror active sync,
 summary:
 ---
 
-= VMware Metro Storage Cluster with SnapMirror active sync
+= VMware vSphere Metro Storage Cluster with SnapMirror active sync
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -47,7 +47,7 @@ NOTE: In Non-Uniform host access mode, the VMs will be restarted in other fault 
 
 TIP: If using self-signed certificate, the CA certificate can be retrieved from the <installation path>/ontap_mediator/server_config/ca.crt on mediator VM. 
 
-== Manual steps of provisioning iSCSI datastore with non-uniform host access mode utilizing ONTAP System Manager UI.
+== vMSC non-uniform host access with ONTAP System Manager UI.
 
 Note: ONTAP Tools 10.2 or above can be used to provision stretched datastore with non-uniform host access mode without switching multiple interfaces. This section is just for reference if ONTAP Tools is not used.
 
@@ -92,7 +92,7 @@ image:vmware-vmsc-with-smas-image14.png[CG protection policy]
 . Ensure NetApp ONTAP Tools is deployed and registered to vCenter. 
 image:vmware-vmsc-with-smas-image15.png[ONTAP Tools Plug-in registered to vCenter]
 If not, follow link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/deploy/prepare-deployment.html#preparing-for-deployment[ONTAP Tools deployment] and link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/configure/add-vcenter.html[Add a vCenter server instance]
-. Ensure both fault domain ONTAP Storage systems are registered to ONTAP Tools.
+. Ensure ONTAP Storage systems are registered to ONTAP Tools. This includes both fault domain storage systems and third one for Asynchronous remote replication to use for VM protection with SnapCenter Plugin for VMware vSphere.
 image:vmware-vmsc-with-smas-image16.png[Registered storage backends]
 If not, follow link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/configure/add-storage-backend.html#add-storage-backend-using-vsphere-client-ui[Add storage backend using vSphere client UI]
 . Update hosts data to sync with ONTAP Tools and then, link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/configure/create-vvols-datastore.html#create-a-vmfs-datastore[create a datastore].
@@ -112,6 +112,16 @@ image:vmware-vmsc-with-smas-image22.png[Volume protection status]
 . For more details and to update the host proximity info, Host cluster relationships option under the ONTAP Tools can be utilized.
 image:vmware-vmsc-with-smas-image23.png[Host cluster relationships]
 
-== VM protection with Snapcenter plugin for VMware vSphere.
+== VM protection with SnapCenter plug-in for VMware vSphere.
+
+SnapCenter Plug-in for VMware vSphere (SCV) 6.0 or above supports SnapMirror active sync and also in combination with SnapMirror Async to replicate to third fault domain.
+image:vmware-vmsc-with-smas-image24.png[Three site topology]
+
+. Add all the ONTAP Storage Systems planned to use in SCV.
+image:vmware-vmsc-with-smas-image25.png[Register storage arrays]
+. Create Policy. Ensure Update SnapMirror after backup checked.
+image:vmware-vmsc-with-smas-image26.png[Backup Policy]
+. Create Resource Group to pick items that need to be protected, associate to  policy and schedule
+image:vmware-vmsc-with-smas-image27.png[Resource Group]
 
 
