@@ -1,0 +1,144 @@
+---
+sidebar: sidebar
+permalink: vmware/vmware-vmsc-with-smas.html
+keywords: NetApp Solutions, vMSC, Metro Storage Cluster, SnapMirror active sync, Business Continuity, SMBC, ONTAP Tools, AFD, SCV, iSCSI, backup, restore
+summary:
+---
+
+= VMware vSphere Metro Storage Cluster with SnapMirror active sync
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+link:https://docs.netapp.com/us-en/ontap-apps-dbs/vmware/vmware_vmsc_overview.html[VMware vSphere Metro Storage Cluster (vMSC)] is a stretched cluster solution across different fault domains to provide
+* Workload mobility across availability zones or sites.
+* downtime avoidance
+* disaster avoidance
+* fast recovery
+
+This document provides the vMSC implementation details with link:https://docs.netapp.com/us-en/ontap/snapmirror-active-sync[SnapMirror active sync (SM-as)] utilizing System Manager and ONTAP Tools. Further, it shows how the VM can be protected by replicating to third site and manage with SnapCenter Plugin for VMware vSphere.
+
+image::vmware-vmsc-with-smas-image01.png[vMSC with SnapMirror active sync architecture]
+
+SnapMirror active sync supports ASA, AFF and FAS storage arrays. It is recommended to use same type (Performance/Capacity models) on both fault domains. Currently, only block protocols like FC and iSCSI are supported. For further support guidelines, refer link:https://imt.netapp.com/matrix/[Interoperability Matrix Tool] and link:https://hwu.netapp.com/[Hardware Universe]
+
+vMSC supports two different deployment models named Uniform host access and Non-uniform host access. In Uniform host access configuration, every host on the cluster has access to LUN on both fault domains. It is typically used in different availability zones in same datacenter.
+
+image:vmware-vmsc-with-smas-image02.png[vMSC Uniform vs Non-Uniform host access mode]
+
+In Non-Uniform host access configuration, host has access only to local fault domain. It is typically used in different sites where running multiple cables across the fault domains are restrictive option.
+
+NOTE: In Non-Uniform host access mode, the VMs will be restarted in other fault domain by vSphere HA. Application availability will be impacted based on its design. Non-Uniform host access mode is supported only with ONTAP 9.15 onwards.
+
+
+== Prerequisites
+
+* link:https://docs.netapp.com/us-en/netapp-solutions/vmware/vmware_vcf_asa_supp_mgmt_iscsi.html#deployment-steps[VMware vSphere hosts deployed with dual storage fabric (Two HBAs or Dual VLAN for iSCSI) per host].
+* link:https://docs.netapp.com/us-en/ontap/networking/combine_physical_ports_to_create_interface_groups.html[Storage Arrays are deployed with link aggregation for data ports (for iSCSI)].
+* link:https://docs.netapp.com/us-en/netapp-solutions/vmware/vmware_vcf_asa_supp_mgmt_iscsi.html#deployment-steps[Storage VM and LIFs are available]
+* link:https://docs.netapp.com/us-en/ontap/snapmirror-active-sync/prerequisites-reference.html#networking-environment[Inter-Cluster latency round trip time must be less than 10 milliseconds].
+* link:https://docs.netapp.com/us-en/ontap/mediator/index.html[ONTAP Mediator VM is deployed on different fault domain]
+* link:https://docs.netapp.com/us-en/ontap/task_dp_prepare_mirror.html[Cluster Peer relationship is established]
+* link:https://docs.netapp.com/us-en/ontap/peering/create-intercluster-svm-peer-relationship-93-later-task.html[SVM Peer relationship is established]
+* link:https://docs.netapp.com/us-en/ontap/snapmirror-active-sync/mediator-install-task.html#initialize-the-ontap-mediator[ONTAP Mediator registered to ONTAP cluster]
+
+TIP: If using self-signed certificate, the CA certificate can be retrieved from the <installation path>/ontap_mediator/server_config/ca.crt on mediator VM. 
+
+== vMSC non-uniform host access with ONTAP System Manager UI.
+
+Note: ONTAP Tools 10.2 or above can be used to provision stretched datastore with non-uniform host access mode without switching multiple user interfaces. This section is just for reference if ONTAP Tools is not used.
+
+. Note down one of the iSCSI data lif IP address from the local fault domain storage array.
+image:vmware-vmsc-with-smas-image04.png[System Manager iSCSI Lifs]
+. On vSphere host iSCSI Storage Adapter, add that iSCSI IP under the Dynamic Discovery tab.
+image:vmware-vmsc-with-smas-image03.png[Add iSCSI server for dynamic discovery]
++
+NOTE: For Uniform access mode, need to provide the source and target fault domain iSCSI data lif address.
+. Repeat the above step on vSphere hosts for the other fault domain adding its local iSCSI data lif IP on Dynamic Discovery tab.
+. With proper network connectivity, four iSCSI connection should exist per vSphere host that has two iSCSI VMKernel nics and two iSCSI data lifs per storage controller.
+image:vmware-vmsc-with-smas-image05.png[iSCSI connection info]
+. Create LUN using ONTAP System Manager, setup SnapMirror with replication policy AutomatedFailOverDuplex, pick the host initiators and set host proximity.
+image:vmware-vmsc-with-smas-image06.png[Create LUN with AutomatedFailOverDuplex]
+. On other fault domain storage array, create the SAN initiator group with its vSphere host initiators and set host proximity. 
+image:vmware-vmsc-with-smas-image09.png[SAN initiator group]
++
+NOTE: For Uniform access mode, the igroup can be replicated from source fault domain.
+. Map the replicated LUN with same mapping ID as in source fault domain.
+image:vmware-vmsc-with-smas-image10.png[LUN Mapping ID]
+. On vCenter, right click on vSphere Cluster and select Rescan Storage option.
+image:vmware-vmsc-with-smas-image07.png[Rescan storage]
+. On one of the vSphere host in the cluster, check the newly created device shows up with datastore showing Not Consumed.
+image:vmware-vmsc-with-smas-image08.png[iSCSI Device list on vSphere host]
+. On vCenter, right click on vSphere Cluster and select New Datastore option.
+image:vmware-vmsc-with-smas-image07.png[New Datastore]
+. On Wizard, remember to provide the datastore name and select the device with right capacity & device id.
+image:vmware-vmsc-with-smas-image11.png[Datastore creation on iSCSI device]
+. Verify the datastore is mounted on all hosts on cluster across both fault domains.
+image:vmware-vmsc-with-smas-image12.png[Datastore on source host]
++
+image:vmware-vmsc-with-smas-image13.png[Datastore on destination host]
++
+NOTE: The above screenshots shows Active I/O on single controller since we used AFF. For ASA, it will have Active IO on all paths.
++
+. When additional datastores are added, need to remember to expand the existing Consistency Group to have it consistent across the vSphere cluster.
+image:vmware-vmsc-with-smas-image14.png[CG protection policy]
+
+
+== vMSC uniform host access mode with ONTAP Tools.
+
+. Ensure NetApp ONTAP Tools is deployed and registered to vCenter. 
+image:vmware-vmsc-with-smas-image15.png[ONTAP Tools Plug-in registered to vCenter]
+If not, follow link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/deploy/prepare-deployment.html#preparing-for-deployment[ONTAP Tools deployment] and link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/configure/add-vcenter.html[Add a vCenter server instance]
+. Ensure ONTAP Storage systems are registered to ONTAP Tools. This includes both fault domain storage systems and third one for Asynchronous remote replication to use for VM protection with SnapCenter Plugin for VMware vSphere.
+image:vmware-vmsc-with-smas-image16.png[Registered storage backends]
+If not, follow link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/configure/add-storage-backend.html#add-storage-backend-using-vsphere-client-ui[Add storage backend using vSphere client UI]
+. Update hosts data to sync with ONTAP Tools and then, link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/configure/create-vvols-datastore.html#create-a-vmfs-datastore[create a datastore].
+image:vmware-vmsc-with-smas-image17.png[Update hosts data]
+. To enable SM-as, right click on vSphere cluster and pick Protect cluster on NetApp ONTAP Tools (refer above screenshot)
+. It will show existing datastores for that cluster along with SVM details. The default CG name is <vSphere Cluster name>_<SVM name>. Click on Add Relationship button.
+image:vmware-vmsc-with-smas-image18.png[Protect Cluster]
+. Pick the target SVM and set the policy to AutomatedFailOverDuplex for SM-as. There is a toggle switch for Uniform host configuration. Set the proximity for each host.
+image:vmware-vmsc-with-smas-image19.png[Add SnapMirror Relationship]
+. Verify the host promity info and other details. Add another relationship to third site with replication policy of Asynchronous if required. Then, click on Protect.
+image:vmware-vmsc-with-smas-image20.png[Add Relationship]
+NOTE: If plan to use SnapCenter Plug-in for VMware vSphere 6.0, the replication needs to be setup at volume level rather than at Consistency Group level.
+. With Uniform host access, the host has iSCSI connection to both fault domain storage arrays.
+image:vmware-vmsc-with-smas-image21.png[iSCSI Multipath info]
+NOTE: The above screenshot is from AFF. If ASA, ACTIVE I/O should be in all paths with proper network connections.
+. ONTAP Tools plugin also indicates the volume is protected or not.
+image:vmware-vmsc-with-smas-image22.png[Volume protection status]
+. For more details and to update the host proximity info, Host cluster relationships option under the ONTAP Tools can be utilized.
+image:vmware-vmsc-with-smas-image23.png[Host cluster relationships]
+
+== VM protection with SnapCenter plug-in for VMware vSphere.
+
+SnapCenter Plug-in for VMware vSphere (SCV) 6.0 or above supports SnapMirror active sync and also in combination with SnapMirror Async to replicate to third fault domain.
+
+image:vmware-vmsc-with-smas-image33.png[Three site topology]
+
+image:vmware-vmsc-with-smas-image24.png[Three site topology with async failover]
+
+Supported use-cases include:
+* Backup and Restore the VM or Datastore from either of fault domains with SnapMirror active sync.
+* Restore resources from third fault domain.
+
+. Add all the ONTAP Storage Systems planned to use in SCV.
+image:vmware-vmsc-with-smas-image25.png[Register storage arrays]
+. Create Policy. Ensure Update SnapMirror after backup is checked for SM-as and also Update SnapVault after backup for Async replication to third fault domain.
+image:vmware-vmsc-with-smas-image26.png[Backup Policy]
+. Create Resource Group with desiered items that need to be protected, associate to policy and schedule.
+image:vmware-vmsc-with-smas-image27.png[Resource Group]
+NOTE: Snapshot name ending with _recent is not supported with SM-as.
+. Backups occur at scheduled time based on Policy associated to Resource Group. Jobs can be monitored from the Dashboard job monitor or from the backup info on those resources.
+image:vmware-vmsc-with-smas-image28.png[SCV Dashboard]
+image:vmware-vmsc-with-smas-image29.png[Resource Backup info for Datastore]
+image:vmware-vmsc-with-smas-image30.png[Resource Backup info for VM]
+. VMs can be restored to same or alternate vCenter from the SVM on Primary fault domain or from one of the secondary locations.
+image:vmware-vmsc-with-smas-image31.png[VM restore location options]
+. Similar option is also available for Datastore mount operation.
+image:vmware-vmsc-with-smas-image32.png[Datastore restore location options]
+
+For assistance with additional operations with SCV, refer link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/index.html[SnapCenter Plug-in for VMware vSphere documentation]
