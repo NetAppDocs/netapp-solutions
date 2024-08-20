@@ -1,0 +1,84 @@
+---
+sidebar: sidebar
+permalink: ai/aicp_mlflow_deployment.html
+keywords: AI, control plane, MLOps, MLflow
+summary: Open Source MLOps with NetApp - MLflow Deployment
+---
+
+= MLflow Deployment
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+This section describes the tasks that you must complete to deploy MLflow in your Kubernetes cluster.
+
+[NOTE]
+It is possible to deploy MLflow on platforms other than Kubernetes. Deploying MLflow on platforms other than Kubernetes is outside of the scope of this solution.
+
+== Prerequisites
+
+Before you perform the deployment exercise that is outlined in this section, we assume that you have already performed the following tasks:
+
+. You already have a working Kubernetes cluster.
+. You have already installed and configured NetApp Astra Trident in your Kubernetes cluster. For more details on Astra Trident, refer to the link:https://docs.netapp.com/us-en/trident/index.html[Astra Trident documentation^].
+
+== Install Helm
+
+MLflow is deployed using Helm, a popular package manager for Kubernetes. Before you deploy MLflow, you must install Helm on your Kubernetes control node. To install Helm, follow the https://helm.sh/docs/intro/install/[installation instructions^] in the official Helm documentation.
+
+== Set Default Kubernetes StorageClass
+
+Before you deploy MLflow, you must designate a default StorageClass within your Kubernetes cluster. To designate a default StorageClass within your cluster, follow the instructions outlined in the link:aicp_kubeflow_deployment_overview.html[Kubeflow Deployment] section. If you have already designated a default StorageClass within your cluster, then you can skip this step.
+
+== Deploy MLflow
+
+Once the pre-requisites have been met, you can start with MLflow deployment using the helm chart.
+
+
+=== Configure MLflow Helm Chart Deployment.
+
+Before we deploy MLflow using the Helm chart, we can configure the deployment to use NetApp Trident Storage Class and change other parameters to suit our needs using a *config.yaml* file. An example of *config.yaml* file can be found at: https://github.com/bitnami/charts/blob/main/bitnami/mlflow/values.yaml
+
+[NOTE]
+You can set the Trident storageClass under the *global.defaultStorageClass* parameter in the config.yaml file (e.g. storageClass: "ontap-flexvol").
+
+=== Installing the Helm Chart
+
+The Helm chart can be installed with the custom *config.yaml* file for MLflow using the following command: 
+
+[source, shell]
+----
+helm install oci://registry-1.docker.io/bitnamicharts/mlflow -f config.yaml --generate-name --namespace jupyterhub
+----
+
+[NOTE]
+The command deploys MLflow on the Kubernetes cluster in the custom configuration via the provided *config.yaml* file. MLflow is deployed in the given namespace and a random release name is given via kubernetes for the release. 
+
+=== Check Deployment
+After the Helm chart is done deploying, you can check if the service is accessible using:
+
+[source, shell]
+----
+kubectl get service -n jupyterhub
+----
+[NOTE]
+Replace *jupyterhub* with the namespace you used during deployment.
+
+You should see the following services:
+
+[source, shell]
+----
+NAME                              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)           AGE
+mlflow-1719843029-minio           ClusterIP   10.233.22.4     <none>        80/TCP,9001/TCP   25d
+mlflow-1719843029-postgresql      ClusterIP   10.233.5.141    <none>        5432/TCP          25d
+mlflow-1719843029-postgresql-hl   ClusterIP   None            <none>        5432/TCP          25d
+mlflow-1719843029-tracking        NodePort    10.233.2.158    <none>        30002:30002/TCP   25d
+----
+[NOTE]
+We edited the config.yaml file to use NodePort service to access MLflow on port 30002.
+
+=== Access MLflow
+Once all the services related to MLflow are up and running you can access it using the given NodePort or LoadBalancer IP address (e.g. http://10.61.181.109:30002)
