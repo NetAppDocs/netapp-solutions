@@ -14,9 +14,9 @@ summary:
 [.lead]
 ONTAP tools for VMware vSphere 10 features a next-generation architecture that enables native high availability and scalability for the VASA Provider (supporting iSCSI and NFS vVols). This simplifies the management of multiple VMware vCenter servers and ONTAP clusters.
 
-In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMware vSphere (10 and configure an *NFS datastore* for vSphere 8. 
+In this scenario we will demonstrate how to deploy and use ONTAP tools for VMware vSphere (10 and configure an *NFS datastore* for vSphere 8. 
 
-== Use ONTAP Tools 10 to configure NFS datastores for vSphere 8
+== Use ONTAP tools 10 to configure NFS datastores for vSphere 8
 
 === Scenario Overview
 
@@ -25,7 +25,7 @@ This scenario covers the following high level steps:
 * Create a storage virtual machine (SVM) with logical interfaces (LIFs) for NFS traffic.
 * Create a distributed port group for the NFS network on the vSphere 8 cluster.
 * Create a vmkernel adapter for NFS on the ESXi hosts in the vSphere 8 cluster.
-* Deploy ONTAP Tools v10.1 and register with the vSphere 8 cluster.
+* Deploy ONTAP tools v10.1 and register with the vSphere 8 cluster.
 * Create a new NFS datastore on the vSphere 8 cluster.
 * Create a new vVols datastore on the vSphere 8 cluster.
 
@@ -34,7 +34,7 @@ This scenario requires the following components and configurations:
 
 * An ONTAP AFF storage system with physical data ports on ethernet switches dedicated to storage traffic.
 * vSphere 8 cluster deployment is complete and the vSphere client is accessible.
-* ONTAP Tools for VMware vSphere 10.1 OVA template has been downloaded from the NetApp support site.
+* ONTAP tools for VMware vSphere 10.1 OVA template has been downloaded from the NetApp support site.
 
 NetApp recommends a redundant network designs for NFS, providing fault tolerance for storage systems, switches, networks adapters and host systems. It is common to deploy NFS with a single subnet or multiple subnets depending on the architectural requirements.
 
@@ -44,10 +44,10 @@ For network guidance on using ONTAP with VMware vSphere refer to the https://doc
 
 This documentation demonstrates the process of creating a new SVM and specifying the IP address information to create multiple LIFs for NFS traffic. To add new LIFs to an existing SVM refer to link:https://docs.netapp.com/us-en/ontap/networking/create_a_lif.html[Create a LIF (network interface)].
 
-Comprehensive ONTAP Tools 10 resources can be found https://www.netapp.com/support-and-training/documentation/ontap-tools-for-vmware-vsphere-documentation/[ONTAP Tools for VMware vSphere Documentation Resources].
+Comprehensive ONTAP tools 10 resources can be found https://www.netapp.com/support-and-training/documentation/ontap-tools-for-vmware-vsphere-documentation/[ONTAP tools for VMware vSphere Documentation Resources].
 
 === Deployment Steps
-To deploy ONTAP Tools 10 and use it to create an NFS datastore on the VCF management domain, complete the following steps:
+To deploy ONTAP tools 10 and use it to create an NFS datastore on the VCF management domain, complete the following steps:
 
 ==== Create SVM and LIFs on ONTAP storage system
 The following step is performed in ONTAP System Manager.
@@ -66,7 +66,7 @@ image::vmware-vcf-asa-image01.png[Click +Add to start creating SVM]
 +
 image::vmware-vcf-aff-image35.png[Add storage VM wizard - enable NFS]
 +
-TIP: It is not necessary to check the *Allow NFS client access* button here as Ontap Tools for VMware vSphere will be used to automate the datastore deployment process. This includes providing client access for the ESXi hosts.
+TIP: It is not necessary to check the *Allow NFS client access* button here as Ontap tools for VMware vSphere will be used to automate the datastore deployment process. This includes providing client access for the ESXi hosts.
 {nbsp}
 . In the *Network Interface* section fill in the *IP address*, *Subnet Mask*, and *Broadcast Domain and Port* for the first LIF. For subsequent LIFs the checkbox may be enabled to use common settings across all remaining LIFs or use separate settings.
 +
@@ -145,15 +145,17 @@ image::vmware-nfs-otv10-image05.png[VMkernel IPv4 settings]
 image::vmware-nfs-otv10-image06.png[Review VMkernel selections]
 ====
 
-==== Deploy and use ONTAP Tools 10 to configure storage
+==== Deploy and use ONTAP tools 10 to configure storage
 The following steps are performed on vSphere 8 cluster using the vSphere client and involve deploying OTV, configuring ONTAP tools Manager, and creating a vVols NFS datastore.
 
-For the full documentation on deploying and using ONTAP Tools for VMware vSphere 10 refer to https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/deploy/prepare-deployment.html[Prepare to deploy ONTAP tools for VMware vSphere].
+For the full documentation on deploying and using ONTAP tools for VMware vSphere 10 refer to https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/deploy/prepare-deployment.html[Prepare to deploy ONTAP tools for VMware vSphere].
 
 .Deploy ONTAP tools for VMware vSphere 10
 [%collapsible]
 ==== 
-ONTAP tools for VMware vSphere 10 is deployed as a VM appliance and provides an integrated vCenter UI for managing ONTAP storage. ONTAP Tools 10 features a new global management portal for managing connections to multiple vCenter servers and ONTAP storage backends.
+ONTAP tools for VMware vSphere 10 is deployed as a VM appliance and provides an integrated vCenter UI for managing ONTAP storage. ONTAP tools 10 features a new global management portal for managing connections to multiple vCenter servers and ONTAP storage backends.
+
+NOTE: In a non-HA deployment scenario, three available IP addresses are required. One IP address is allocated for the load balancer, another for the Kubernetes control plane, and the remaining one for the node. In an HA deployment, two additional IP addresses are necessary for the second and third nodes, in addition to the initial three. Prior to assignment, the host names should be associated to the IP addresses in DNS. It is important that all five IP addresses are on the same VLAN, which is chosen for the deployment.
 
 Complete the following to Deploy ONTAP tools for VMware vSphere:
 
@@ -191,47 +193,73 @@ image::vmware-nfs-otv10-image10.png[Select network]
 +
 {nbsp}
 . On the Customize template page fill out all required information:
-* Password to be used for administrative access to OTV.
-* NTP server IP address.
-* OTV maintenance account password.
-* OTV Derby DB password.
-* Do not check the box to *Enable VMware Cloud Foundation (VCF)*. VCF mode is not required for deploying supplemental storage.
-* FQDN or IP address of the vCenter appliance for the *VI Workload Domain*
-* Credentials for the vCenter appliance of the *VI Workload Domain*
+* Application username to be used to register the VASA provider and SRA in the vCenter Server.
+* Enable ASUP for automated support.
+* ASUP Proxy URL if required.
+* Administrator username and password.
+* NTP servers.
+* Maintenance user password to access management functions from the console.
+* Load Balancer IP.
+* Virtual IP for K8s control plane.
+* Primary VM to select the current VM as the primary (for HA configurations).
+* Hostname for the VM
 * Provide the required network properties fields.
 +
 Click on *Next* to continue.
 +
-image::vmware-vcf-aff-image25.png[Customize OTV template 1]
+image::vmware-nfs-otv10-image11.png[Customize OTV template 1]
 +
-image::vmware-vcf-asa-image35.png[Customize OTV template 2]
+image::vmware-nfs-otv10-image12.png[Customize OTV template 2]
 +
 {nbsp}
-. Review all information on the Ready to complete  page and the click Finish to begin deploying the OTV appliance.
+. Review all information on the Ready to complete  page and the click Finish to begin deploying the ONTAP tools appliance.
 ====
 
-.Add a storage system to ONTAP Tools.
+.Connect Storage Backend and vCenter Server to ONTAP tools 10.
 [%collapsible]
 ==== 
-. Access NetApp ONTAP Tools by selecting it from the main menu in the vSphere client.
+ONTAP tools manager is used to configure global settings for ONTAP Tools 10.
+
+. Access ONTAP tools Manager by navigating to https://loadBalanceIP:8443/virtualization/ui/ in a web browser and logging in with the administrative credentials provided during deployment.
 +
-image::vmware-asa-image6.png[NetApp ONTAP Tools]
-+
-{nbsp}
-. From the *INSTANCE* drop down menu in the ONTAP Tool interface, select the OTV instance associated with the workload domain to be managed.
-+
-image::vmware-vcf-asa-image36.png[Choose OTV instance]
+image::vmware-nfs-otv10-image13.png[ONTAP tools manager]
 +
 {nbsp}
-. In ONTAP Tools select *Storage Systems* from the left hand menu and then press *Add*.
+. On the *Getting Started* page click on *Go to Storage Backends*.
 +
-image::vmware-vcf-asa-image37.png[Add storage system]
+image::vmware-nfs-otv10-image14.png[Getting started]
 +
 {nbsp}
-. Fill out the IP Address, credentials of the storage system and the port number. Click on *Add* to start the discovery process.
-//vVol requires ONTAP Cluster credential rather than SVM credential. Better to link to product documentation
+. On the *Storage Backends* page, click on *ADD* to fill in the credentials of an ONTAP storage system to be registered with ONTAP tools 10.
 +
-image::vmware-vcf-asa-image38.png[Provide storage system credentials]
+image::vmware-nfs-otv10-image15[Add storage backend]
++
+{nbsp}
+. On the *Add Storage Backend* box, fill out the credentials for the ONTAP storage system.
++
+image::vmware-nfs-otv10-image16[Add storage backend]
++
+{nbsp}
+. In the left hand menu click on *vCenters*, and then on on *ADD* to fill in the credentials of a vCenter server to be registered with ONTAP tools 10.
++
+image::vmware-nfs-otv10-image17[Add vCenter server]
++
+{nbsp}
+. On the *Add vCenter* box, fill out the credentials for the ONTAP storage system.
++
+image::vmware-nfs-otv10-image18[Add storage backend]
++
+{nbsp}
+. From the vertical three-dot menu for the newly discovered vCenter server, select *Associate Storage Backend*.
++
+image::vmware-nfs-otv10-image19[Add storage backend]
++
+{nbsp}
+. On the *Associate Storage Backend* box, select the ONTAP storage system to associated with the vCenter server and click on *Associate* to complete the action.
++
+image::vmware-nfs-otv10-image19[Add storage backend]
++
+{nbsp}
 ====
 
 .Create an NFS datastore in ONTAP Tools
@@ -267,34 +295,6 @@ image::vmware-vcf-aff-image44.png[Storage attributes]
 image::vmware-vcf-aff-image45.png[Review summary and finish]
 ====
 
-.Create a vVols datastore in ONTAP Tools
-[%collapsible]
-==== 
-To create a vVols datastore in ONTAP Tools complete the following steps:
-
-. In ONTAP Tools select *Overview* and from the *Getting Started* tab click on *Provision* to start the wizard.
-+
-image::vmware-vcf-asa-image41.png[Provision datastore]
-
-. On the *General* page of the New Datastore wizard select the vSphere datacenter or cluster destination. Select *vVols* as the datastore type, fill out a name for the datastore, and select *NFS* as the protocol. Click on *Next* to continue.
-+
-image::vmware-vcf-aff-image46.png[General page]
-
-. On the *Storage system* page select the select a storage capability profile, the storage system and SVM. Click on *Next* to continue.
-+
-image::vmware-vcf-aff-image43.png[Storage system]
-
-. On the *Storage attributes* page select to create a new volume for the datastore and fill out the storage attributes of the volume to be created. Click on *Add* to create the volume and then *Next* to continue.
-+
-image::vmware-vcf-aff-image47.png[Storage attributes]
-+
-image::vmware-vcf-aff-image48.png[Storage attributes - Next]
-
-. Finally, review the *Summary* and click on *Finish* to start the vVol datastore creation process.
-+
-image::vmware-vcf-aff-image49.png[Summary page]
-====
-
 === Additional information
 
 For information on configuring ONTAP storage systems refer to the link:https://docs.netapp.com/us-en/ontap[ONTAP 9 Documentation] center.
@@ -303,4 +303,4 @@ For information on configuring VCF refer to link:https://docs.vmware.com/en/VMwa
 
 
 
-https://www.netapp.com/support-and-training/documentation/ontap-tools-for-vmware-vsphere-documentation/[ONTAP Tools for VMware vSphere Documentation Resources]
+https://www.netapp.com/support-and-training/documentation/ontap-tools-for-vmware-vsphere-documentation/[ONTAP tools for VMware vSphere Documentation Resources]
