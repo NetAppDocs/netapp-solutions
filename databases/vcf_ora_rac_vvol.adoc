@@ -1,0 +1,819 @@
+---
+sidebar: sidebar
+permalink: databases/vcf_ora_si_vvol.html
+keywords: Database, Oracle, AWS, FSx ONTAP, VMC, VMware
+summary: "The solution provides an overview and details for Oracle deployment and protection in VMware Cloud Foundation (VCF) with vSphere Virtual Volumes (vVols) as primary database storage and Oracle database in Real Application Clusters (RAC) configuration." 
+---
+
+= TR-4996: Oracle SI Deployment and Protection in VCF with vVols
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+Allen Cao, Niyaz Mohamed, NetApp
+
+[.lead]
+The solution provides an overview and details for Oracle deployment and protection in VMware Cloud Foundation (VCF) with vSphere Virtual Volumes (vVols) as primary database storage and Oracle database in Real Application Clusters (RAC) configuration.
+
+== Purpose
+
+VMware vSphere Virtual Volumes (vVols) is a SAN/NAS management and integration framework that exposes virtual disks as native storage objects and enables array-based operations at the virtual disk level. In other words, vVols make SAN/NAS devices VM-aware and unlocks the ability to leverage array-based data services with a VM-centric approach at the granularity of a single virtual disk. vVols allows customers to leverage the unique capabilities of their current storage investments and transition without disruption to a simpler and more efficient operational model optimized for virtual environments that work across all storage types.
+
+In link:https://docs.netapp.com/us-en/netapp-solutions/databases/vcf_ora_si_vvol.html[TR-4996^], we demonstrated single instance Oracle database deployment and protection in VCF with vVols. This documentation demonstrates the deployment and protection of an Oracle RAC database in a VMware Cloud Foundation environment with vVols as primary database storage in a NetApp ONTAP storage cluster. The Oracle RAC database is configured as if it is deployed in local file systems on a local storage system. This technical report focuses on steps in creating vVols in VCF for Oracle RAC deployment. We also demonstrate Oracle RAC database deployment in VCF on vVols with NetApp automation toolkit and RAC database protection with NetApp SnapCenter UI tool. 
+
+
+This solution addresses the following use cases:
+
+* Oracle RAC database deployment in VCF with vVols datastore on NetApp ONTAP AFF as primary database storage 
+* Oracle database backup and restore in VCF with vVols datastore using NetApp SnapCenter UI tool 
+
+== Audience
+
+This solution is intended for the following people:
+
+* A DBA who would like to deploy Oracle RAC in VCF with vVols datastore on NetApp ONTAP AFF as primary database storage
+* A database solution architect who would like to test Oracle RAC workloads in VCF with vVols datastore on NetApp ONTAP AFF storage
+* A storage administrator who would like to deploy and manage an Oracle RAC database deployed to VCF with vVols datastore on NetApp ONTAP AFF storage
+* An application owner who would like to stand up an Oracle RAC database in VCF with vVol datastore
+
+== Solution test and validation environment
+
+The testing and validation of this solution was performed in a lab environment in VCF with vVols datastore on NetApp ONTAP AFF storage that might not match the final deployment environment. For more information, see the section <<Key factors for deployment consideration>>.
+
+=== Architecture
+
+image::vcf_ora_si_vvols_architecture.png["This image provides a detailed picture of the Oracle deployment configuration in AWS public cloud with iSCSI and ASM."]
+
+=== Hardware and software components
+
+[width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
+|===
+3+^| *Hardware*
+| NetApp ONTAP AFF A300 | Version 9.14.1P4 | DS224 shelf with 24 NVMe disks, total capacity 35.2 TiB
+| VMware VSphere cluster | Version 8.02  | 12 CPU(s) x Intel(R) Xeon(R) Gold 5218 CPU @ 2.30GHz, 8 nodes (4 management and 4 workload domains) 
+
+3+^| *Software*
+| RedHat Linux | RHEL-8.6, 4.18.0-372.9.1.el8.x86_64 kernel | Hosting Oracle DB servers, deployed RedHat subscription for testing
+| Windows Server | 2022 Standard, 10.0.20348 Build 20348 | Hosting SnapCenter server
+| Centos Linux |  CentOS Linux release 8.5.2111 | Hosting Ansible controller
+| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
+| Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
+| Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
+| SnapCenter Server | Version 6.0 | Workgroup deployment 
+| SnapCenter Plug-in for VMware vSphere | Version 6.0 | Deployed as an ova VM to vSphere cluster
+| ONTAP tool for VMware vSphere | Version 9.13 | Deployed as an ova VM to vSphere cluster  
+| Open JDK | Version java-11-openjdk-11.0.23.0.9-3.el8.x86_64 | SnapCenter plugin requirement on DB VMs 
+|===
+
+=== Oracle RAC database configuration in VCF
+
+[width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
+|===
+3+^| 
+| *RAC Node* | *Database* | *DB Storage*
+| ora_01 | NTAP(NTAP_pdb1,NTAP_pdb2,NTAP_pdb3) | vVols datastores (VCF_ORA_BINS, VCF_ORA_CRS, VCF_ORA_DAT1, VCF_ORA_DAT2, VCF_ORA_LOGS) on NetApp ONTAP AFF A300
+| ora_02 | NTAP(NTAP_pdb1,NTAP_pdb2,NTAP_pdb3) | vVols datastores (VCF_ORA_BINS, VCF_ORA_CRS, VCF_ORA_DAT1, VCF_ORA_DAT2, VCF_ORA_LOGS) on NetApp ONTAP AFF A300
+
+|===
+
+=== Key factors for deployment consideration
+
+* *Protocol for vVols to ONTAP cluster connectivity.* NFS or iSCSI are good choices. The performance levels are equivalent. In this solution demonstration, we used iSCSI as a storage protocol for vVols connectivity to the underlined ONTAP storage cluster. If VCF infrastructure supports, FC/FCoE, NVMe/FC protocols are also supported for vVols datastores on NetApp ONTAP.
+
+* *Oracle storage layout on vVols datastores.* In our tests and validations, we deployed five vVols datastores for Oracle binary, Oracle cluster registry/vote, Oracle data, and Oracle log files. It's good practice to separate different types of Oracle files into their datastore so that database backup, recovery, or clone can be easily managed and executed. Create dedicate vVols for large databases and share vVols for smaller databases or databases with similar QoS profile. 
+
+* *Oracle storage redundancy.* Use `Normal Redundancy` For critical Oracle RAC cluster registry/vote files so that three vote files on three ASM disk failgroups provide optimal cluster protection and the cluster registry is mirrored among the ASM disk failgroups. Use `External Redundancy` for Oracle binary, data, and log files to optimize storage utilization. The underlined ONTAP RAID-DP provides data protection when `External Redundancy` is employed. 
+
+* *Credential for ONTAP storage authentication.* Only use ONTAP cluster-level credentials for the ONTAP storage cluster authentication, including SnapCenter connectivity to the ONTAP storage cluster or ONTAP tool connectivity to the ONTAP storage cluster. 
+
+* *Provision storage from vVols datastore to database VM.* Add only one disk at a time to the database VM from the vVols datastore. Adding Multiple disks from vVols datastores at the same time is not supported at this time.   
+
+* *Database protection.* NetApp provides a SnapCenter software suite for database backup, restore with a user-friendly UI interface. NetApp recommends implementing such a management tool to achieve fast SnapShot backup, quick database restore and recovery.   
+
+== Solution deployment
+
+The following sections provide step-by-step procedures for Oracle 19c database deployment in VCF with vVols datastores on NetApp ONTAP storage in an Oracle RAC configuration.     
+
+=== Prerequisites for deployment
+[%collapsible]
+====
+
+Deployment requires the following prerequisites.
+
+. A VMware VCF has been setup. For information or instruction on how to create a VCF, please refer to VMware documentation link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation^].
+
+. Provision three Linux VMs, two VMs for Oracle database and one VM for Ansible controller within VCF workload domain. Provision one Windows server VM for running NetApp SnapCenter server. For information on setting up Ansible controller for automated Oracle database deployment, referring to following resources link:https://docs.netapp.com/us-en/netapp-solutions/automation/getting-started.html[Getting Started with NetApp solution automation^].
+
+. SnapCenter plugin version 6.0 for VMware vSphere has been deployed in VCF. Refer to following resources for the plugin deployment: link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/[SnapCenter Plug-in for VMware vSphere documentation^].
+
+. ONTAP tool for VMware vSphere has been deployed in VCF. Refer to following resources for the ONTAP tool for VMware vSphere deployment: link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/index.html[ONTAP tools for VMware vSphere documentation^]
+
+[NOTE]
+
+Ensure that you have allocated at least 50G in Oracle VM root volume in order to have sufficient space to stage Oracle installation files.
+
+====
+
+=== Create storage capability profile
+[%collapsible]
+
+====
+
+First, create a custom storage capability profile for the underlined ONTAP storage that is hosting the vVols datastore.
+
+. From vSphere client shortcuts, open NetApp ONTAP tool. Ensure that ONTAP storage cluster has been added to `Storage Systems` as part of ONTAP tool deployment. 
++
+image:vcf_ora_vvol_scp_01.png["Screenshot showing a custom storage capability profile configuration."]
+image:vcf_ora_vvol_scp_00.png["Screenshot showing a custom storage capability profile configuration."]
+
+. Click on `Storage capability profile` to add a custom profile for Oracle. Name the profile and add a brief description.
++
+image:vcf_ora_vvol_scp_02.png["Screenshot showing a custom storage capability profile configuration."]
+
+. Choose storage controller category: performance, capacity, or hybrid.
++
+image:vcf_ora_vvol_scp_03.png["Screenshot showing a custom storage capability profile configuration."]
+
+. Select the protocol.
++
+image:vcf_ora_vvol_scp_04.png["Screenshot showing a custom storage capability profile configuration."]
+
+. Define a QoS policy if desired.
++
+image:vcf_ora_vvol_scp_05.png["Screenshot showing a custom storage capability profile configuration."]
+
+. Additional storage attributes for the profile. Be sure that the encryption is enabled on the NetApp controller if you want to have the encryption capability or it may cause issues when applying the profile.
++
+image:vcf_ora_vvol_scp_06.png["Screenshot showing a custom storage capability profile configuration."]
+
+. Review the summary and finish the storage capability profile creation.
++
+image:vcf_ora_vvol_scp_07.png["Screenshot showing a custom storage capability profile configuration."]
+
+====
+
+=== Create and configure vVols datastore
+[%collapsible]
+
+====
+
+With the prerequisites completed, login to the VCF as an admin user via vSphere client, navigating to workload domain. Do not use built-in VMware storage option to create vVols. Instead, use NetApp ONTAP tool to create vVols. Following demonstrates the procedures to create and configure vVols. 
+
+. The vVols creation workflow can be triggered either from ONTAP tool interface or from VCF workload domain cluster.
++
+image:vcf_ora_vvol_datastore_01.png["Screenshot showing vVols datastore configuration."]
++
+image:vcf_ora_vvol_datastore_01_2.png["Screenshot showing vVols datastore configuration."]
+
+. Filling in general information for datastore including provisioning destination, type, name, and protocol.
++
+image:vcf_orarac_vvol_datastore_01.png["Screenshot showing vVols datastore configuration."]
+
+. Select the custom storage capability profile created from previous step, the `Storage system`, and `Storage VM`, where vVols are to be created. 
++
+image:vcf_orarac_vvol_datastore_02.png["Screenshot showing vVols datastore configuration."]
+
+. Choose `Create new volumes`, fill in the volume name and size and click on `ADD` then `NEXT` to move to the summary page. 
++
+image:vcf_orarac_vvol_datastore_03.png["Screenshot showing vVols datastore configuration."]
+image:vcf_orarac_vvol_datastore_04.png["Screenshot showing vVols datastore configuration."]
+
+. Click `Finish` to create vVols datastore for Oracle binary. 
++
+image:vcf_orarac_vvol_datastore_05.png["Screenshot showing vVols datastore configuration."]
+
+. Create datastore for Oracle cluster registry or CRS.  
++
+image:vcf_orarac_vvol_datastore_06.png["Screenshot showing vVols datastore configuration."]
++
+[NOTE]
+
+You could add more than one volume to a vVols datastore or span a vVols datastore volumes across ONTAP controller nodes for performance or redundancy.
+
+. Create datastore for Oracle data. Ideally, create separate datastores on each ONTAP controller node and employ Oracle ASM to stripe data across controller nodes to maximize utilization of ONTAP storage cluster capacity.
++
+image:vcf_orarac_vvol_datastore_06_1.png["Screenshot showing vVols datastore configuration."]
+image:vcf_orarac_vvol_datastore_06_2.png["Screenshot showing vVols datastore configuration."]
+
+. Create datastore for Oracle log. Given sequential nature of Oracle log writing, it is good just place it on a single ONTAP controller node.
++
+image:vcf_orarac_vvol_datastore_06_3.png["Screenshot showing vVols datastore configuration."]
+
+. Validate the Oracle datastores after deployment.
++
+image:vcf_orarac_vvol_datastore_07.png["Screenshot showing vVols datastore configuration."]
+
+
+====
+
+
+=== Create VM storage policy based on storage capability profile
+[%collapsible]
+
+====
+
+Before provisioning storage from vVols datastore to database VM, add a VM storage policy based on storage capability profile created from previous step. Following are the procedures.
+
+. From vSphere client menus, open `Policies and Profiles` and highlight `VM Storage Policies`. Click `Create` to open `VM Storage Policies` workflow.
++
+image:vcf_ora_vvol_vm_policy_01.png["Screenshot showing a VM storage policy configuration."]
+
+. Name the VM storage policy.
++
+image:vcf_ora_vvol_vm_policy_02.png["Screenshot showing a VM storage policy configuration."]
+
+. In `Datastore specific rules`, check `Enable rules for "NetAPP.clustered.Data.ONTAP.VP.vvol" storage`
++
+image:vcf_ora_vvol_vm_policy_03.png["Screenshot showing a VM storage policy configuration."]
+
+. For NetApp.clustered.Data.ONTAP.VP.vvol rules `Placement`, select the custom storage capacity profile created from the previous step. 
++
+image:vcf_ora_vvol_vm_policy_04.png["Screenshot showing a VM storage policy configuration."]
+
+. For NetApp.clustered.Data.ONTAP.VP.vvol rules `Replication`, choose `Disabled` if vVols are not replicated.
++
+image:vcf_ora_vvol_vm_policy_04_1.png["Screenshot showing a VM storage policy configuration."]
+
+. Storage compatibility page displays the compatible vVols datastores in VCF environment.
++
+image:vcf_orarac_vvol_datastore_08.png["Screenshot showing a VM storage policy configuration."]
+
+. Review and finish to create the VM Storage Policy.
++
+image:vcf_ora_vvol_vm_policy_06.png["Screenshot showing a VM storage policy configuration."]
+
+. Validate the VM Storage Policy just created. 
++
+image:vcf_ora_vvol_vm_policy_07.png["Screenshot showing a VM storage policy configuration."]
+
+
+====
+
+=== Allocate disks to DB VM from vVols datastores and configure DB storage
+[%collapsible]
+
+====
+
+From vSphere client, add three disks from the vVols datastores to database VM by editing VM settings. Then, login to VM to format and mount the disks to mount points /u01, /u02, and /u03. The following demonstrates the exact steps and tasks.
+
+. Add a disk to VM for Oracle binary storage.
++
+image:vcf_ora_vvol_vm_bins.png["Screenshot showing a VM storage configuration."]
+
+. Add a disk to VM for Oracle data storage.
++
+image:vcf_ora_vvol_vm_data.png["Screenshot showing a VM storage configuration."]
+
+. Add a disk to VM for Oracle log storage.
++
+image:vcf_ora_vvol_vm_logs.png["Screenshot showing a VM storage configuration."]
+
+. From VM `Edit Settings`, `Advanced Parameters`, add Attribute `disk.enableuuid` with Value `TRUE`. The VM needs to be down to add the advanced parameter. Setting this option enables SnapCenter to precisely identify the vVol in your environment. 
++
+image:vcf_ora_vvol_vm_uuid.png["Screenshot showing a VM storage configuration."]
+
+. Now, restart the VM. Login to VM as an admin user via ssh to review the newly added disk drives. 
++
+....
+[admin@ora_01 ~]$ sudo fdisk -l
+
+Disk /dev/sdb: 50 GiB, 53687091200 bytes, 104857600 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+Disk /dev/sdc: 100 GiB, 107374182400 bytes, 209715200 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+Disk /dev/sdd: 100 GiB, 107374182400 bytes, 209715200 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+.
+.
+.
+....
+
+. Partition the drives as a primary and single partition by simply accepting the default choices.
++
+[source, cli]
+sudo fdisk /dev/sdb
++
+[source, cli]
+sudo fdisk /dev/sdc
++
+[source, cli]
+sudo fdisk /dev/sdd
+
+. Format the partitioned disks as xfs file systems.
++
+[source, cli]
+sudo mkfs.xfs /dev/sdb1
++
+[source, cli]
+sudo mkfs.xfs /dev/sdc1
++
+[source, cli]
+sudo mkfs.xfs /dev/sdd1
+
+
+. Mount the drives to mount point /u01, /u02, and /u03. 
++
+[source, cli]
+sudo mount -t xfs /dev/sdb1 /u01
++
+[source, cli]
+sudo mount -t xfs /dev/sdc1 /u02
++
+[source, cli]
+sudo mount -t xfs /dev/sdd1 /u03
++
+....
+[admin@ora_01 ~]$ df -h
+Filesystem             Size  Used Avail Use% Mounted on
+devtmpfs               7.7G     0  7.7G   0% /dev
+tmpfs                  7.8G     0  7.8G   0% /dev/shm
+tmpfs                  7.8G  782M  7.0G  10% /run
+tmpfs                  7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/mapper/rhel-root   44G   19G   26G  43% /
+/dev/sda1             1014M  258M  757M  26% /boot
+tmpfs                  1.6G   12K  1.6G   1% /run/user/42
+tmpfs                  1.6G  4.0K  1.6G   1% /run/user/1000
+/dev/sdb1               50G  390M   50G   1% /u01
+/dev/sdc1              100G  746M  100G   1% /u02
+/dev/sdd1              100G  746M  100G   1% /u03
+
+....
+
+. Add mount points to /etc/fstab so that disk drives will be mounted when VM reboots.
++
+[source, cli]
+sudo vi /etc/fstab
++
+....
+[oracle@ora_01 ~]$ cat /etc/fstab
+
+#
+# /etc/fstab
+# Created by anaconda on Wed Oct 18 19:43:31 2023
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk/'.
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
+#
+# After editing this file, run 'systemctl daemon-reload' to update systemd
+# units generated from this file.
+#
+/dev/mapper/rhel-root   /                       xfs     defaults        0 0
+UUID=aff942c4-b224-4b62-807d-6a5c22f7b623 /boot                   xfs     defaults        0 0
+/dev/mapper/rhel-swap   none                    swap    defaults        0 0
+/root/swapfile swap swap defaults 0 0
+/dev/sdb1               /u01                    xfs     defaults        0 0
+/dev/sdc1               /u02                    xfs     defaults        0 0
+/dev/sdd1               /u03                    xfs     defaults        0 0
+....
+
+====
+
+
+=== Oracle database deployment in VCF
+[%collapsible]
+
+====
+
+It's recommended to leverage NetApp automation toolkit to deploy Oracle in VCF with vVols. For detailed reference on executing Oracle automated deployment on xfs file systems, refer to TR-4992: link:https://docs.netapp.com/us-en/netapp-solutions/databases/automation_ora_c-series_nfs.html[Simplified, Automated Oracle Deployment on NetApp C-Series with NFS^]. Although the TR-4992 covers automated Oracle deployment on the NetApp C-Series with NFS, it's identical to Oracle deployment in VCF with vVols if bypassing NFS file systems mounting to database VM. We would simply skip that with specific tags. Following are step by step procedures.
+
+. Login to Ansible controller VM as admin user via ssh and clone a copy of automation toolkit for Oracle on NFS. 
++
+[source, cli] 
+git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_nfs.git
+
+. Stage the following Oracle installation files in /tmp/archive folder on database VM. The folder should allow all user access with 777 permission.
++
+....
+LINUX.X64_193000_db_home.zip
+p34765931_190000_Linux-x86-64.zip
+p6880880_190000_Linux-x86-64.zip
+....
+
+. Configure deployment target file - hosts, global variables file - vars/vars.yml, and local DB VM variables file - host_vars/host_name.yml according to instructions in this section of TR-4992: link:https://docs.netapp.com/us-en/netapp-solutions/databases/automation_ora_c-series_nfs.html#parameter-files-configuration[Parameter files configuration^]. Comment out nfs_lif variable from local DB VM variable file.
+
+. Set up ssh keyless authentication between Ansible controller and database VMs, which requires to generate a ssh key pair and copy the public key to database VMs admin user root directory .ssh folder authorized_keys file. 
++
+[source, cli]
+ssh-keygen
+
+. From Ansible controller, cloned automation toolkit home directory /home/admin/na_oracle_deploy_nf, execute prerequisites playbook.
++
+[source, cli]
+ansible-playbook -i hosts 1-ansible_requirements.yml
+
+. Execute Linux configuration playbook.
++
+[source, cli]
+ansible-playbook -i hosts 2-linux_config.yml -u admin -e @vars/vars.yml
+
+. Execute Oracle deployment playbook.
++
+[source, cli]
+ansible-playbook -i hosts 4-oracle_config.yml -u admin -e @vars/vars.yml --skip-tags "ora_mount_points,enable_dnfs_client"
+
+. Optionally, all above playbooks can be executed from a single playbook run as well.
++
+[source, cli] 
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml --skip-tags "ora_mount_points,enable_dnfs_client"
+
+. Login to EM express to to validate Oracle after successful playbook execution. 
++
+image:vcf_ora_vvol_em_02.png["Screenshot showing Oracle EM Express configuration."]
+image:vcf_ora_vvol_em_01.png["Screenshot showing Oracle EM Express configuration."]
+
+. Optionally, execute destroy playbook to remove database from DB VM.
++
+[source, cli]
+ansible-playbook -i hosts 5-destroy.yml -u admin -e @vars/vars.yml
+
+
+====
+
+=== Oracle backup, restore, and clone in VCF with SnapCenter
+[%collapsible]
+
+==== SnapCenter Setup
+[%collapsible]
+
+=====
+
+SnapCenter version 6 has many feature enhancements over version 5, including support for VMware vVols datastore. SnapCenter relies on a host-side plug-in on a database VM to perform application-aware data protection management activities. For detailed information on NetApp SnapCenter plug-in for Oracle, refer to this documentation link:https://docs.netapp.com/us-en/snapcenter/protect-sco/concept_what_you_can_do_with_the_snapcenter_plug_in_for_oracle_database.html[What can you do with the Plug-in for Oracle Database^]. The following provides high-level steps to set up SnapCenter version 6 for Oracle database backup, recovery, and clone in VCF. 
+
+. Download the version 6 of SnapCenter software from NetApp support site: link:https://mysupport.netapp.com/site/downloads[NetApp Support Downloads^].
+
+. Login to the SnapCenter hosting Windows VM as administrator. Install prerequisites for SnapCenter 6.0.
++
+image:vcf_ora_vvol_snapctr_prerequisites.png["Screenshot showing SnapCenter 6.0 prerequisites."]
+
+. As administrator, install latest java JDK from link:https://www.java.com/en/[Get Java for desktop applications^].
++
+[NOTE]
+
+If Windows server is deployed in a domain environment, add a domain user to SnapCenter server local administrators group and run SnapCenter installation with the domain user. 
+
+. Login to SnapCenter UI via HTTPS port 8846 as installation user to configure SnapCenter for Oracle.
++
+image:vcf_ora_vvol_snapctr_deploy_01.png["Screenshot showing SnapCenter configuration."]
+
+. Review `Get Started` menu to get up to speed on SnapCenter if you are a new user.
++
+image:vcf_ora_vvol_snapctr_deploy_02.png["Screenshot showing SnapCenter configuration."]
+
+. Update `Hypervisor Settings` in global settings.
++
+image:aws_ora_fsx_vmc_snapctr_01.png["Screenshot showing SnapCenter configuration."]
+
+. Add ONTAP storage cluster to `Storage Systems` with cluster management IP and authenticated via cluster admin user ID. 
++
+image:vcf_ora_vvol_snapctr_deploy_06.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_07.png["Screenshot showing SnapCenter configuration."]
+
+. Add database VM and vSphere plugin VM `Credential` for SnapCenter access to DB VM and vSphere plugin VM. The credential should have sudo privilege on the Linux VMs. You may create different credentials for different management user IDs for the VMs.
++
+image:aws_ora_fsx_vmc_snapctr_03.png["Screenshot showing SnapCenter configuration."]
+
+. Add Oracle database VM in VCF to `Hosts` with DB VM credential created in previous step.  
++
+image:vcf_ora_vvol_snapctr_deploy_08.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_09.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_10.png["Screenshot showing SnapCenter configuration."]
+
+. Similarly, add NetApp VMware plugin VM to `Hosts` with vSphere plugin VM credential created in previous step.
++
+image:vcf_ora_vvol_snapctr_deploy_11.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_deploy_12.png["Screenshot showing SnapCenter configuration."]
+
+. Finally, after Oracle database is discovered on DB VM, back to `Settings`-`Policies` to create Oracle database backup policies. Ideally, create a separate archive log backup policy to allow more frequent backup interval to minimize data loss in the event of a failure.
++
+image:aws_ora_fsx_vmc_snapctr_02.png["Screenshot showing SnapCenter configuration."]
+
+
+[NOTE]
+Ensure that the SnapCenter server name can be resolved to the IP address from the DB VM and vSphere plugin VM. Equally, the DB VM name and vSphere plugin VM name can be resolved to the IP address from the SnapCenter server. 
+ 
+
+=====
+
+==== Database backup
+[%collapsible]
+
+=====
+
+SnapCenter leverages ONTAP volume snapshot for much quicker database backup, restore, or clone compared with traditional RMAN based methodology. The snapshots are application-consistent as the database is put in Oracle backup mode before a snapshot. 
+
+. From the `Resources` tab, any databases on the VM are auto-discovered after the VM is added to SnapCenter. Initially, the database status shows as `Not protected`.
++
+image:vcf_ora_vvol_snapctr_bkup_01.png["Screenshot showing SnapCenter configuration."]
+
+. Click on database to start a workflow to enable protection for the database.
++
+image:vcf_ora_vvol_snapctr_bkup_02.png["Screenshot showing SnapCenter configuration."]
+
+. Apply backup policy, setup scheduling if needed. 
++
+image:vcf_ora_vvol_snapctr_bkup_03.png["Screenshot showing SnapCenter configuration."]
+
+. Setup backup job notification if required.
++
+image:vcf_ora_vvol_snapctr_bkup_05.png["Screenshot showing SnapCenter configuration."]
+
+. Review the summary and finish to enable database protection.
++
+image:vcf_ora_vvol_snapctr_bkup_06.png["Screenshot showing SnapCenter configuration."]
+
+. On-demand backup job can be triggered by click on `Back up Now`.
++
+image:vcf_ora_vvol_snapctr_bkup_07.png["Screenshot showing SnapCenter configuration."]
+image:vcf_ora_vvol_snapctr_bkup_08.png["Screenshot showing SnapCenter configuration."]
+
+. The backup job can be monitored at the `Monitor` tab by clicking on the running job.
++
+image:vcf_ora_vvol_snapctr_bkup_09.png["Screenshot showing SnapCenter configuration."]
+
+. Click on database to review the backup sets completed for each database. 
++
+image:vcf_ora_vvol_snapctr_bkup_10.png["Screenshot showing SnapCenter configuration."]
+
+=====
+
+==== Database restore/recovery
+[%collapsible]
+
+=====
+
+SnapCenter provides a number of restore and recovery options for Oracle databases from snapshot backup. In this example, we demonstrate to restore from a older snapshot backup, then roll forward the database to the last available log. 
+
+. First, run a snapshot backup. Then, create a test table and insert a row into table to validate that recovered database from snapshot image before test table creation regains the test table.
++
+.....
+[oracle@ora_01 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Wed Jul 17 10:20:10 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> sho pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 NTAP1_PDB1                     READ WRITE NO
+         4 NTAP1_PDB2                     READ WRITE NO
+         5 NTAP1_PDB3                     READ WRITE NO
+SQL> alter session set container=ntap1_pdb1;
+
+SQL> select * from test;
+
+no rows selected
+
+
+SQL> insert into test values (1, sysdate, 'test oracle backup/restore/clone on VMware Cloud Foundation vVols');
+
+1 row created.
+
+SQL> commit;
+
+Commit complete.
+
+SQL> select * from test;
+
+        ID
+----------
+DT
+---------------------------------------------------------------------------
+EVENT
+--------------------------------------------------------------------------------
+         1
+18-JUL-24 11.15.03.000000 AM
+test oracle backup/restore/clone on VMware Cloud Foundation vVols
+
+
+SQL>
+
+
+.....
+
+. From SnapCenter `Resources` tab, open the database NTAP1 backup topology page. Highlight the snapshot data backup set before the creation of test table. Click on `Restore` to launch restore-recover workflow.
++
+image:vcf_ora_vvol_snapctr_restore_01.png["Screenshot showing SnapCenter configuration."]
+
+. Choose restore scope.
++
+image:vcf_ora_vvol_snapctr_restore_02.png["Screenshot showing SnapCenter configuration."]
+
+. Choose recovery scope to `All Logs`. 
++
+image:vcf_ora_vvol_snapctr_restore_03.png["Screenshot showing SnapCenter configuration."]
+
+. Specify any optional pre-scripts to run.
++
+image:vcf_ora_vvol_snapctr_restore_04.png["Screenshot showing SnapCenter configuration."]
+
+. Specify any optional after-script to run.
++
+image:vcf_ora_vvol_snapctr_restore_05.png["Screenshot showing SnapCenter configuration."]
+
+. Send a job report if desired.
++
+image:vcf_ora_vvol_snapctr_restore_06.png["Screenshot showing SnapCenter configuration."]
+
+. Review the summary and click on `Finish` to launch the restoration and recovery.
++
+image:vcf_ora_vvol_snapctr_restore_07.png["Screenshot showing SnapCenter configuration."]
+
+. From `Monitor` tab, open the job to review the details.
++
+image:vcf_ora_vvol_snapctr_restore_08.png["Screenshot showing SnapCenter configuration."]
+
+. From DB VM ora_01, validate that a successful restore/recovery of database rolled forward to its most recent state and recovered the test table. 
++
+.....
+
+[oracle@ora_01 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Thu Jul 18 11:42:58 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> select name, open_mode from v$database;
+
+NAME      OPEN_MODE
+--------- --------------------
+NTAP1     READ WRITE
+
+SQL> alter session set container=ntap1_pdb1;
+
+Session altered.
+
+SQL> select * from test;
+
+        ID
+----------
+DT
+---------------------------------------------------------------------------
+EVENT
+--------------------------------------------------------------------------------
+         1
+18-JUL-24 11.15.03.000000 AM
+test oracle backup/restore/clone on VMware Cloud Foundation vVols
+
+
+SQL>
+
+
+.....
+
+=====
+
+==== Database clone
+[%collapsible]
+
+=====
+
+In this example, the most recent backup sets is used to clone a database on the DB VM ora_02 in a different software installation and ORACLE_HOME in VCF. 
+
+. Again, open the database NTAP1 backup list. Select the most recent data backup set, click on `Clone` button to launch database clone workflow.
++
+image:vcf_ora_vvol_snapctr_clone_01.png["Screenshot showing SnapCenter configuration."]
+
+. Name the clone database SID.
++
+image:vcf_ora_vvol_snapctr_clone_02.png["Screenshot showing SnapCenter configuration."]
+
+. Select ora_02 in VCF as the target database clone host. Identical Oracle database software should have been installed and configured on the host.
++
+image:vcf_ora_vvol_snapctr_clone_03.png["Screenshot showing SnapCenter configuration."]
+
+. Select the proper ORACLE_HOME, user and group on the target host. Keep credential at default.
++
+image:vcf_ora_vvol_snapctr_clone_04.png["Screenshot showing SnapCenter configuration."]
+
+. You may change clone database parameters to meet configuration or resources requirements for the clone database.
++
+image:vcf_ora_vvol_snapctr_clone_05.png["Screenshot showing SnapCenter configuration."]
+
+. Choose recovery scope. `Until Cancel` recovers the clone up to last available log file in the backup set. 
++
+image:vcf_ora_vvol_snapctr_clone_06.png["Screenshot showing SnapCenter configuration."]
+
+. Review the summary and launch the clone job.
++
+image:vcf_ora_vvol_snapctr_clone_08.png["Screenshot showing SnapCenter configuration."]
+
+. Monitor the clone job execution from `Monitor` tab.
++
+image:vcf_ora_vvol_snapctr_clone_09.png["Screenshot showing SnapCenter configuration."]
+
+. Cloned database is immediately registered in SnapCenter.
++
+image:vcf_ora_vvol_snapctr_clone_10.png["Screenshot showing SnapCenter configuration."]
+
+. From DB VM ora_02, validate the cloned database and query the test table.
++
+.....
+[oracle@ora_02 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Thu Jul 18 12:06:48 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> select name, open_mode, log_mode from v$database;
+
+NAME      OPEN_MODE            LOG_MODE
+--------- -------------------- ------------
+NTAP1CLN  READ WRITE           ARCHIVELOG
+
+SQL> select instance_name, host_name from v$instance;
+
+INSTANCE_NAME
+----------------
+HOST_NAME
+----------------------------------------------------------------
+NTAP1CLN
+ora_02
+
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 NTAP1_PDB1                     READ WRITE NO
+         4 NTAP1_PDB2                     READ WRITE NO
+         5 NTAP1_PDB3                     READ WRITE NO
+SQL> alter session set container=ntap1_pdb1
+  2  ;
+
+Session altered.
+
+SQL> select * from test;
+
+        ID
+----------
+DT
+---------------------------------------------------------------------------
+EVENT
+--------------------------------------------------------------------------------
+         1
+18-JUL-24 11.15.03.000000 AM
+test oracle backup/restore/clone on VMware Cloud Foundation vVols
+
+
+SQL>
+
+.....
+
+This completes the demonstration of SnapCenter backup, restore, and clone of Oracle database in VCF.
+
+=====
+
+
+== Where to find additional information
+
+To learn more about the information described in this document, review the following documents and/or websites:
+
+* VMware Cloud Foundation
++
+link:https://www.vmware.com/products/cloud-infrastructure/vmware-cloud-foundation[https://www.vmware.com/products/cloud-infrastructure/vmware-cloud-foundation^]
+
+* NetApp Enterprise Database Solutions
++
+link:https://docs.netapp.com/us-en/netapp-solutions/databases/index.html[https://docs.netapp.com/us-en/netapp-solutions/databases/index.html^]
+
+* SnapCenter Software 6.0
++
+link:https://docs.netapp.com/us-en/snapcenter/concept/concept_snapcenter_overview.html[https://docs.netapp.com/us-en/snapcenter/concept/concept_snapcenter_overview.html^]
+
+
+
+
+
