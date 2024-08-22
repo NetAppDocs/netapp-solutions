@@ -13,51 +13,43 @@ summary:
 :imagesdir: ./../media/
 
 [.lead]
-VMware Cloud Foundation (VCF) is an integrated software defined data center (SDDC) platform that provides a complete stack of software-defined infrastructure for running enterprise applications in a hybrid cloud environment. It combines compute, storage, networking, and management capabilities into a unified platform, offering a consistent operational experience across private and public clouds.
-
-Author: Chris Reno, Josh Powell
+VMware vSphere Foundation (VVF) is an enterprise-grade platform capable of delivering various virtualized workloads.  Core to vSphere are VMware vCenter, the ESXi hypervisor, networking components, and various resource services.  When combined with ONTAP, VMware-powered virtualized infrastructures exhibit remarkable flexibility, scalability, and capability.
 
 == Using NFS 3.1 with vSphere 8 and ONTAP Storage Systems
 
-This document provides information on storage options available for VMware Cloud Foundation using the NetApp All-Flash SAN Array. Supported storage options are covered with specific instruction for deploying iSCSI datastores as supplemental storage for management domains and both vVol (iSCSI) and NVMe/TCP datastores as supplemental datastores for workload domains. Also covered is data protection of VMs and datastores using SnapCenter for VMware vSphere.
+This document provides information on storage options available for VMware Cloud vSphere Foundation using the NetApp All-Flash Arrays. Supported storage options are covered with specific instruction for deploying NFS datastores. Additionally, VMware Live Site Recovery for Disaster Recovery of NFS datastores is demonstrated. Also covered is data protection of VMs and datastores using SnapCenter for VMware vSphere. Finally, NetApp’s Autonomous Ransomware Protection for NFS storage is reviewed. 
 
 
 === Use Cases
 Use cases covered in this documentation:
 
 * Storage options for customers seeking uniform environments across both private and public clouds.
-// SDDC in public cloud (VMC/AVS/GCVE) doesn't have block support.
-* Automated solution for deploying virtual infrastructure for workload domains.
+* Deployment of virtual infrastructure for workloads.
 * Scalable storage solution tailored to meet evolving needs, even when not aligned directly with compute resource requirements.
-* Deploy supplemental storage to management and VI workload domains using ONTAP Tools for VMware vSphere.
 * Protect VMs and datastores using the SnapCenter Plug-in for VMware vSphere.
+* Use of VMware Live Site Recovery for Disaster Recovery of NFS datastores.
+* Ransomware detection strategy, including multiple layers of protection at ESXi host and guest VM levels.
+
 
 === Audience
 
 This solution is intended for the following people: 
 
 * Solution architects looking for more flexible storage options for VMware environments that are designed to maximize TCO.
-* Solution architects looking for VCF storage options that provide data protection and disaster recovery options with the major cloud providers.
-* Storage administrators wanting specific instruction on how to configure VCF with principal and supplemental storage.
-// Replace storage admin with cloud admin?
+* Solution architects looking for VVF storage options that provide data protection and disaster recovery options with the major cloud providers.
+* Storage administrators wanting specific instruction on how to configure VVF with NFS storage.
 * Storage administrators wanting specific instruction on how to protect VMs and datastores residing on ONTAP storage.
-//Not sure it falls with storage admin responsibility. Feels more like cloud admin.
+
 
 == Technology Overview
-The VCF with NetApp ASA solution is comprised of the following major components:
+The NFS 3.1 VCF Reference Guide for vSphere 8 is comprised of the following major components:
 
-=== VMware Cloud Foundation
-VMware Cloud Foundation extends VMware’s vSphere hypervisor offerings by combining key components such as SDDC Manager, vSphere, vSAN, NSX, and VMware Aria Suite to create a software-defined datacenter.
+=== VMware vSphere Foundation
 
-The VCF solution supports both native Kubernetes and virtual machine-based workloads. Key services such as VMware vSphere, VMware vSAN, VMware NSX-T Data Center, and VMware Aria Cloud Management are integral components of the VCF package. When combined, these services establish a software-defined infrastructure capable of efficiently managing compute, storage, networking, security, and cloud management.
+A central component of vSphere Foundation, VMware vCenter is a centralized management platform for providing configuration, control and administration of vSphere environments. vCenter acts as the base for managing virtualized infrastructures, allowing administrators to deploy, monitor and manage VMs, containers, and ESXi hosts within the virtual environment. 
 
-VCF is comprised of a single management domain and up to 24 VI workload domains that each represent a unit of application-ready infrastructure. A workload domain is comprised of one or more vSphere clusters managed by a single vCenter instance.
 
-image::vmware-vcf-aff-image02.png[VCF Architecture]
 
-For more information on VCF architecture and planning, refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/5.1/vcf-design/GUID-A550B597-463F-403F-BE9A-BFF3BECB9523.html[Architecture Models and Workload Domain Types in VMware Cloud Foundation].
-
-{nbsp}
 
 ==== VCF Storage Options
 VMware divides storage options for VCF into *principal* and *supplemental* storage. The VCF management domain must use vSAN as its principal storage. However, there are many supplemental storage options for the management domain and both principal and supplemental storage options available for VI workload domains.
