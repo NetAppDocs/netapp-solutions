@@ -428,7 +428,7 @@ UUID=aff942c4-b224-4b62-807d-6a5c22f7b623 /boot                   xfs     defaul
 ====
 
 
-=== Oracle database deployment in VCF
+=== Oracle RAC deployment in VCF
 [%collapsible]
 
 ====
@@ -586,17 +586,329 @@ ansible-playbook -i hosts 4-oracle_config.yml -u admin -e @vars/vars.yml
 ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml 
 
 
-. Login to EM express to to validate Oracle after successful playbook execution. 
-+
-image:vcf_ora_vvol_em_02.png["Screenshot showing Oracle EM Express configuration."]
-image:vcf_ora_vvol_em_01.png["Screenshot showing Oracle EM Express configuration."]
-
-
 
 
 ====
 
-=== Oracle backup, restore, and clone in VCF with SnapCenter
+=== Oracle RAC deployment validation in VCF
+[%collapsible]
+
+====
+
+This section provides details on Oracle RAC deployment validation in VCF to ensure all Oracle RAC resources are fully deployed, configured, and functioning as expected. 
+
+. Login to RAC VM as admin user to validate Oracle grid infrastructure.
++
+....
+[admin@ora01 ~]$ sudo su
+[root@ora01 admin]# su - grid
+[grid@ora01 ~]$ crsctl stat res -t
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.LISTENER.lsnr
+               ONLINE  ONLINE       ora01                    STABLE
+               ONLINE  ONLINE       ora02                    STABLE
+ora.chad
+               ONLINE  ONLINE       ora01                    STABLE
+               ONLINE  ONLINE       ora02                    STABLE
+ora.net1.network
+               ONLINE  ONLINE       ora01                    STABLE
+               ONLINE  ONLINE       ora02                    STABLE
+ora.ons
+               ONLINE  ONLINE       ora01                    STABLE
+               ONLINE  ONLINE       ora02                    STABLE
+ora.proxy_advm
+               OFFLINE OFFLINE      ora01                    STABLE
+               OFFLINE OFFLINE      ora02                    STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.ASMNET1LSNR_ASM.lsnr(ora.asmgroup)
+      1        ONLINE  ONLINE       ora01                    STABLE
+      2        ONLINE  ONLINE       ora02                    STABLE
+ora.DATA.dg(ora.asmgroup)
+      1        ONLINE  ONLINE       ora01                    STABLE
+      2        ONLINE  ONLINE       ora02                    STABLE
+ora.LISTENER_SCAN1.lsnr
+      1        ONLINE  ONLINE       ora01                    STABLE
+ora.LISTENER_SCAN2.lsnr
+      1        ONLINE  ONLINE       ora02                    STABLE
+ora.LISTENER_SCAN3.lsnr
+      1        ONLINE  ONLINE       ora02                    STABLE
+ora.RECO.dg(ora.asmgroup)
+      1        ONLINE  ONLINE       ora01                    STABLE
+      2        ONLINE  ONLINE       ora02                    STABLE
+ora.VOTE.dg(ora.asmgroup)
+      1        ONLINE  ONLINE       ora01                    STABLE
+      2        ONLINE  ONLINE       ora02                    STABLE
+ora.asm(ora.asmgroup)
+      1        ONLINE  ONLINE       ora01                    Started,STABLE
+      2        ONLINE  ONLINE       ora02                    Started,STABLE
+ora.asmnet1.asmnetwork(ora.asmgroup)
+      1        ONLINE  ONLINE       ora01                    STABLE
+      2        ONLINE  ONLINE       ora02                    STABLE
+ora.cvu
+      1        ONLINE  ONLINE       ora02                    STABLE
+ora.ntap.db
+      1        ONLINE  ONLINE       ora01                    Open,HOME=/u01/app/o
+                                                             racle2/product/19.0.
+                                                             0/NTAP,STABLE
+      2        ONLINE  ONLINE       ora02                    Open,HOME=/u01/app/o
+                                                             racle2/product/19.0.
+                                                             0/NTAP,STABLE
+ora.ora01.vip
+      1        ONLINE  ONLINE       ora01                    STABLE
+ora.ora02.vip
+      1        ONLINE  ONLINE       ora02                    STABLE
+ora.qosmserver
+      1        ONLINE  ONLINE       ora02                    STABLE
+ora.scan1.vip
+      1        ONLINE  ONLINE       ora01                    STABLE
+ora.scan2.vip
+      1        ONLINE  ONLINE       ora02                    STABLE
+ora.scan3.vip
+      1        ONLINE  ONLINE       ora02                    STABLE
+--------------------------------------------------------------------------------
+[grid@ora01 ~]$
+
+....
+
+. Validate Oracle ASM.
++
+....
+[grid@ora01 ~]$ asmcmd
+ASMCMD> lsdg
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  1048576    163840   163723                0          163723              0             N  DATA/
+MOUNTED  EXTERN  N         512             512   4096  1048576    163840   163729                0          163729              0             N  RECO/
+MOUNTED  NORMAL  N         512             512   4096  4194304     30720    29732            10240            9746              0             Y  VOTE/
+ASMCMD> lsdsk
+Path
+AFD:ORA_CRS_01
+AFD:ORA_CRS_02
+AFD:ORA_CRS_03
+AFD:ORA_DATA_01
+AFD:ORA_DATA_02
+AFD:ORA_DATA_03
+AFD:ORA_DATA_04
+AFD:ORA_LOGS_01
+AFD:ORA_LOGS_02
+ASMCMD> afd_state
+ASMCMD-9526: The AFD state is 'LOADED' and filtering is 'ENABLED' on host 'ora01'
+ASMCMD>
+
+....
+
+. List cluster nodes.
++
+....
+
+[grid@ora01 ~]$ olsnodes
+ora01
+ora02
+
+....
+
+. Validate OCR/VOTE.
++
+....
+[grid@ora01 ~]$ ocrcheck
+Status of Oracle Cluster Registry is as follows :
+         Version                  :          4
+         Total space (kbytes)     :     901284
+         Used space (kbytes)      :      84536
+         Available space (kbytes) :     816748
+         ID                       :  118267044
+         Device/File Name         :      +VOTE
+                                    Device/File integrity check succeeded
+
+                                    Device/File not configured
+
+                                    Device/File not configured
+
+                                    Device/File not configured
+
+                                    Device/File not configured
+
+         Cluster registry integrity check succeeded
+
+         Logical corruption check bypassed due to non-privileged user
+
+[grid@ora01 ~]$ crsctl query css votedisk
+##  STATE    File Universal Id                File Name Disk group
+--  -----    -----------------                --------- ---------
+ 1. ONLINE   1ca3fcb0bd354f8ebf00ac97d70e0824 (AFD:ORA_CRS_01) [VOTE]
+ 2. ONLINE   708f84d505a54f58bf41124e09a5115a (AFD:ORA_CRS_02) [VOTE]
+ 3. ONLINE   133ecfcedb684fe6bfdc1899b90f91c7 (AFD:ORA_CRS_03) [VOTE]
+Located 3 voting disk(s).
+[grid@ora01 ~]$
+
+
+....
+
+. Validate Oracle listener.
++
+....
+[grid@ora01 ~]$ lsnrctl status listener
+
+LSNRCTL for Linux: Version 19.0.0.0.0 - Production on 16-AUG-2024 10:21:38
+
+Copyright (c) 1991, 2022, Oracle.  All rights reserved.
+
+Connecting to (DESCRIPTION=(ADDRESS=(PROTOCOL=IPC)(KEY=LISTENER)))
+STATUS of the LISTENER
+------------------------
+Alias                     LISTENER
+Version                   TNSLSNR for Linux: Version 19.0.0.0.0 - Production
+Start Date                14-AUG-2024 16:24:48
+Uptime                    1 days 17 hr. 56 min. 49 sec
+Trace Level               off
+Security                  ON: Local OS Authentication
+SNMP                      OFF
+Listener Parameter File   /u01/app/grid/19.0.0/network/admin/listener.ora
+Listener Log File         /u01/app/oracle/diag/tnslsnr/ora01/listener/alert/log.xml
+Listening Endpoints Summary...
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=ipc)(KEY=LISTENER)))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=10.61.180.21)(PORT=1521)))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=10.61.180.93)(PORT=1521)))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcps)(HOST=ora01.solutions.netapp.com)(PORT=5500))(Security=(my_wallet_directory=/u01/app/oracle2/product/19.0.0/NTAP/admin/NTAP/xdb_wallet))(Presentation=HTTP)(Session=RAW))
+Services Summary...
+Service "+ASM" has 1 instance(s).
+  Instance "+ASM1", status READY, has 1 handler(s) for this service...
+Service "+ASM_DATA" has 1 instance(s).
+  Instance "+ASM1", status READY, has 1 handler(s) for this service...
+Service "+ASM_RECO" has 1 instance(s).
+  Instance "+ASM1", status READY, has 1 handler(s) for this service...
+Service "+ASM_VOTE" has 1 instance(s).
+  Instance "+ASM1", status READY, has 1 handler(s) for this service...
+Service "1fbf0aaa1d13cb5ae06315b43d0ab734.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "1fbf142e7db2d090e06315b43d0a6894.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "1fbf203c3a46d7bae06315b43d0ae055.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "NTAP.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "NTAPXDB.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "ntap_pdb1.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "ntap_pdb2.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+Service "ntap_pdb3.solutions.netapp.com" has 1 instance(s).
+  Instance "NTAP1", status READY, has 1 handler(s) for this service...
+The command completed successfully
+[grid@ora01 ~]$
+
+[grid@ora01 ~]$ tnsping ntap-scan
+
+TNS Ping Utility for Linux: Version 19.0.0.0.0 - Production on 16-AUG-2024 12:07:58
+
+Copyright (c) 1997, 2022, Oracle.  All rights reserved.
+
+Used parameter files:
+/u01/app/grid/19.0.0/network/admin/sqlnet.ora
+
+Used EZCONNECT adapter to resolve the alias
+Attempting to contact (DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=))(ADDRESS=(PROTOCOL=tcp)(HOST=10.61.180.90)(PORT=1521))(ADDRESS=(PROTOCOL=tcp)(HOST=10.61.180.91)(PORT=1521))(ADDRESS=(PROTOCOL=tcp)(HOST=10.61.180.92)(PORT=1521)))
+OK (10 msec)
+
+
+....
+
+. Change to oracle user to validate the clustered database.
++
+....
+[oracle@ora02 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Fri Aug 16 11:32:23 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> select name, open_mode, log_mode from v$database;
+
+NAME      OPEN_MODE            LOG_MODE
+--------- -------------------- ------------
+NTAP      READ WRITE           ARCHIVELOG
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 NTAP_PDB1                      READ WRITE NO
+         4 NTAP_PDB2                      READ WRITE NO
+         5 NTAP_PDB3                      READ WRITE NO
+SQL> select name from v$datafile
+  2  union
+  3  select name from v$controlfile
+  4  union
+  5  select member from v$logfile;
+
+NAME
+--------------------------------------------------------------------------------
++DATA/NTAP/1FBF0AAA1D13CB5AE06315B43D0AB734/DATAFILE/sysaux.275.1177083797
++DATA/NTAP/1FBF0AAA1D13CB5AE06315B43D0AB734/DATAFILE/system.274.1177083797
++DATA/NTAP/1FBF0AAA1D13CB5AE06315B43D0AB734/DATAFILE/undo_2.277.1177083853
++DATA/NTAP/1FBF0AAA1D13CB5AE06315B43D0AB734/DATAFILE/undotbs1.273.1177083797
++DATA/NTAP/1FBF0AAA1D13CB5AE06315B43D0AB734/DATAFILE/users.278.1177083901
++DATA/NTAP/1FBF142E7DB2D090E06315B43D0A6894/DATAFILE/sysaux.281.1177083903
++DATA/NTAP/1FBF142E7DB2D090E06315B43D0A6894/DATAFILE/system.280.1177083903
++DATA/NTAP/1FBF142E7DB2D090E06315B43D0A6894/DATAFILE/undo_2.283.1177084061
++DATA/NTAP/1FBF142E7DB2D090E06315B43D0A6894/DATAFILE/undotbs1.279.1177083903
++DATA/NTAP/1FBF142E7DB2D090E06315B43D0A6894/DATAFILE/users.284.1177084103
++DATA/NTAP/1FBF203C3A46D7BAE06315B43D0AE055/DATAFILE/sysaux.287.1177084105
+
+NAME
+--------------------------------------------------------------------------------
++DATA/NTAP/1FBF203C3A46D7BAE06315B43D0AE055/DATAFILE/system.286.1177084105
++DATA/NTAP/1FBF203C3A46D7BAE06315B43D0AE055/DATAFILE/undo_2.289.1177084123
++DATA/NTAP/1FBF203C3A46D7BAE06315B43D0AE055/DATAFILE/undotbs1.285.1177084105
++DATA/NTAP/1FBF203C3A46D7BAE06315B43D0AE055/DATAFILE/users.290.1177084125
++DATA/NTAP/86B637B62FE07A65E053F706E80A27CA/DATAFILE/sysaux.266.1177081837
++DATA/NTAP/86B637B62FE07A65E053F706E80A27CA/DATAFILE/system.265.1177081837
++DATA/NTAP/86B637B62FE07A65E053F706E80A27CA/DATAFILE/undotbs1.267.1177081837
++DATA/NTAP/CONTROLFILE/current.261.1177080403
++DATA/NTAP/DATAFILE/sysaux.258.1177080245
++DATA/NTAP/DATAFILE/system.257.1177080129
++DATA/NTAP/DATAFILE/undotbs1.259.1177080311
+
+NAME
+--------------------------------------------------------------------------------
++DATA/NTAP/DATAFILE/undotbs2.269.1177082203
++DATA/NTAP/DATAFILE/users.260.1177080311
++DATA/NTAP/ONLINELOG/group_1.262.1177080427
++DATA/NTAP/ONLINELOG/group_2.263.1177080427
++DATA/NTAP/ONLINELOG/group_3.270.1177083297
++DATA/NTAP/ONLINELOG/group_4.271.1177083313
++RECO/NTAP/CONTROLFILE/current.256.1177080403
++RECO/NTAP/ONLINELOG/group_1.257.1177080427
++RECO/NTAP/ONLINELOG/group_2.258.1177080427
++RECO/NTAP/ONLINELOG/group_3.259.1177083313
++RECO/NTAP/ONLINELOG/group_4.260.1177083315
+
+33 rows selected.
+
+
+....
+
+. Or login to EM express to to validate RAC database after successful playbook execution. 
++
+image:vcf_orarac_vvol_em_01.png["Screenshot showing Oracle EM Express configuration."]
+image:vcf_orarac_vvol_em_02.png["Screenshot showing Oracle EM Express configuration."]
+
+====
+
+=== Oracle RAC database backup, and recovery in VCF with SnapCenter
 [%collapsible]
 
 ==== SnapCenter Setup
@@ -635,20 +947,20 @@ image:aws_ora_fsx_vmc_snapctr_01.png["Screenshot showing SnapCenter configuratio
 image:vcf_ora_vvol_snapctr_deploy_06.png["Screenshot showing SnapCenter configuration."]
 image:vcf_ora_vvol_snapctr_deploy_07.png["Screenshot showing SnapCenter configuration."]
 
-. Add database VM and vSphere plugin VM `Credential` for SnapCenter access to DB VM and vSphere plugin VM. The credential should have sudo privilege on the Linux VMs. You may create different credentials for different management user IDs for the VMs.
+. Add Oracle RAC database VMs and vSphere plugin VM `Credential` for SnapCenter access to DB VM and vSphere plugin VM. The credential should have sudo privilege on the Linux VMs. You may create different credentials for different management user IDs for the VMs. vShpere plugin VM management user ID is defined when the plugin VM is deployed in vCenter.
 +
 image:aws_ora_fsx_vmc_snapctr_03.png["Screenshot showing SnapCenter configuration."]
 
-. Add Oracle database VM in VCF to `Hosts` with DB VM credential created in previous step.  
+. Add Oracle RAC database VM in VCF to `Hosts` with DB VM credential created in previous step.  
 +
-image:vcf_ora_vvol_snapctr_deploy_08.png["Screenshot showing SnapCenter configuration."]
-image:vcf_ora_vvol_snapctr_deploy_09.png["Screenshot showing SnapCenter configuration."]
-image:vcf_ora_vvol_snapctr_deploy_10.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_setup_01.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_setup_02.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_setup_03.png["Screenshot showing SnapCenter configuration."]
 
 . Similarly, add NetApp VMware plugin VM to `Hosts` with vSphere plugin VM credential created in previous step.
 +
 image:vcf_ora_vvol_snapctr_deploy_11.png["Screenshot showing SnapCenter configuration."]
-image:vcf_ora_vvol_snapctr_deploy_12.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_setup_04.png["Screenshot showing SnapCenter configuration."]
 
 . Finally, after Oracle database is discovered on DB VM, back to `Settings`-`Policies` to create Oracle database backup policies. Ideally, create a separate archive log backup policy to allow more frequent backup interval to minimize data loss in the event of a failure.
 +
@@ -670,32 +982,32 @@ SnapCenter leverages ONTAP volume snapshot for much quicker database backup, res
 
 . From the `Resources` tab, any databases on the VM are auto-discovered after the VM is added to SnapCenter. Initially, the database status shows as `Not protected`.
 +
-image:vcf_ora_vvol_snapctr_bkup_01.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_bkup_01.png["Screenshot showing SnapCenter configuration."]
 
 . Click on database to start a workflow to enable protection for the database.
 +
-image:vcf_ora_vvol_snapctr_bkup_02.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_bkup_02.png["Screenshot showing SnapCenter configuration."]
 
 . Apply backup policy, setup scheduling if needed. 
 +
-image:vcf_ora_vvol_snapctr_bkup_03.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_bkup_03.png["Screenshot showing SnapCenter configuration."]
 
 . Setup backup job notification if required.
 +
-image:vcf_ora_vvol_snapctr_bkup_05.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_bkup_05.png["Screenshot showing SnapCenter configuration."]
 
 . Review the summary and finish to enable database protection.
 +
-image:vcf_ora_vvol_snapctr_bkup_06.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_bkup_06.png["Screenshot showing SnapCenter configuration."]
 
 . On-demand backup job can be triggered by click on `Back up Now`.
 +
-image:vcf_ora_vvol_snapctr_bkup_07.png["Screenshot showing SnapCenter configuration."]
-image:vcf_ora_vvol_snapctr_bkup_08.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_bkup_07.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_bkup_08.png["Screenshot showing SnapCenter configuration."]
 
 . The backup job can be monitored at the `Monitor` tab by clicking on the running job.
 +
-image:vcf_ora_vvol_snapctr_bkup_09.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_bkup_09.png["Screenshot showing SnapCenter configuration."]
 
 . Click on database to review the backup sets completed for each database. 
 +
@@ -713,9 +1025,9 @@ SnapCenter provides a number of restore and recovery options for Oracle database
 . First, run a snapshot backup. Then, create a test table and insert a row into table to validate that recovered database from snapshot image before test table creation regains the test table.
 +
 .....
-[oracle@ora_01 ~]$ sqlplus / as sysdba
+[oracle@ora01 ~]$ sqlplus / as sysdba
 
-SQL*Plus: Release 19.0.0.0.0 - Production on Wed Jul 17 10:20:10 2024
+SQL*Plus: Release 19.0.0.0.0 - Production on Mon Aug 19 10:31:12 2024
 Version 19.18.0.0.0
 
 Copyright (c) 1982, 2022, Oracle.  All rights reserved.
@@ -725,22 +1037,24 @@ Connected to:
 Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
 Version 19.18.0.0.0
 
-SQL> sho pdbs
+SQL> show pdbs
 
     CON_ID CON_NAME                       OPEN MODE  RESTRICTED
 ---------- ------------------------------ ---------- ----------
          2 PDB$SEED                       READ ONLY  NO
-         3 NTAP1_PDB1                     READ WRITE NO
-         4 NTAP1_PDB2                     READ WRITE NO
-         5 NTAP1_PDB3                     READ WRITE NO
-SQL> alter session set container=ntap1_pdb1;
+         3 NTAP_PDB1                      READ WRITE NO
+         4 NTAP_PDB2                      READ WRITE NO
+         5 NTAP_PDB3                      READ WRITE NO
+SQL> alter session set container=ntap_pdb1;
 
-SQL> select * from test;
-
-no rows selected
+Session altered.
 
 
-SQL> insert into test values (1, sysdate, 'test oracle backup/restore/clone on VMware Cloud Foundation vVols');
+SQL> create table test (id integer, dt timestamp, event varchar(100));
+
+Table created.
+
+SQL> insert into test values (1, sysdate, 'validate SnapCenter rac database restore on VMware vVols storage');
 
 1 row created.
 
@@ -757,54 +1071,50 @@ DT
 EVENT
 --------------------------------------------------------------------------------
          1
-18-JUL-24 11.15.03.000000 AM
-test oracle backup/restore/clone on VMware Cloud Foundation vVols
+19-AUG-24 10.36.04.000000 AM
+validate SnapCenter rac database restore on VMware vVols storage
 
 
 SQL>
 
-
 .....
 
-. From SnapCenter `Resources` tab, open the database NTAP1 backup topology page. Highlight the snapshot data backup set before the creation of test table. Click on `Restore` to launch restore-recover workflow.
+. From SnapCenter `Resources` tab, open the database NTAP1 backup topology page. Highlight the snapshot data backup set created 3 days ago. Click on `Restore` to launch restore-recover workflow.
 +
-image:vcf_ora_vvol_snapctr_restore_01.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_restore_01.png["Screenshot showing SnapCenter configuration."]
 
 . Choose restore scope.
 +
-image:vcf_ora_vvol_snapctr_restore_02.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_restore_02.png["Screenshot showing SnapCenter configuration."]
 
 . Choose recovery scope to `All Logs`. 
 +
-image:vcf_ora_vvol_snapctr_restore_03.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_restore_03.png["Screenshot showing SnapCenter configuration."]
 
 . Specify any optional pre-scripts to run.
 +
-image:vcf_ora_vvol_snapctr_restore_04.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_restore_04.png["Screenshot showing SnapCenter configuration."]
 
 . Specify any optional after-script to run.
 +
-image:vcf_ora_vvol_snapctr_restore_05.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_restore_05.png["Screenshot showing SnapCenter configuration."]
 
 . Send a job report if desired.
 +
-image:vcf_ora_vvol_snapctr_restore_06.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_restore_06.png["Screenshot showing SnapCenter configuration."]
 
 . Review the summary and click on `Finish` to launch the restoration and recovery.
 +
-image:vcf_ora_vvol_snapctr_restore_07.png["Screenshot showing SnapCenter configuration."]
+image:vcf_orarac_vvol_snapctr_restore_07.png["Screenshot showing SnapCenter configuration."]
 
-. From `Monitor` tab, open the job to review the details.
-+
-image:vcf_ora_vvol_snapctr_restore_08.png["Screenshot showing SnapCenter configuration."]
-
-. From DB VM ora_01, validate that a successful restore/recovery of database rolled forward to its most recent state and recovered the test table. 
+. From RAC DB VM ora01, validate that a successful restore/recovery of database rolled forward to its most recent state and recovered the test table created 3 days later. 
 +
 .....
 
-[oracle@ora_01 ~]$ sqlplus / as sysdba
+[root@ora01 ~]# su - oracle
+[oracle@ora01 ~]$ sqlplus / as sysdba
 
-SQL*Plus: Release 19.0.0.0.0 - Production on Thu Jul 18 11:42:58 2024
+SQL*Plus: Release 19.0.0.0.0 - Production on Mon Aug 19 11:51:15 2024
 Version 19.18.0.0.0
 
 Copyright (c) 1982, 2022, Oracle.  All rights reserved.
@@ -818,116 +1128,17 @@ SQL> select name, open_mode from v$database;
 
 NAME      OPEN_MODE
 --------- --------------------
-NTAP1     READ WRITE
+NTAP      READ WRITE
 
-SQL> alter session set container=ntap1_pdb1;
-
-Session altered.
-
-SQL> select * from test;
-
-        ID
-----------
-DT
----------------------------------------------------------------------------
-EVENT
---------------------------------------------------------------------------------
-         1
-18-JUL-24 11.15.03.000000 AM
-test oracle backup/restore/clone on VMware Cloud Foundation vVols
-
-
-SQL>
-
-
-.....
-
-=====
-
-==== Database clone
-[%collapsible]
-
-=====
-
-In this example, the most recent backup sets is used to clone a database on the DB VM ora_02 in a different software installation and ORACLE_HOME in VCF. 
-
-. Again, open the database NTAP1 backup list. Select the most recent data backup set, click on `Clone` button to launch database clone workflow.
-+
-image:vcf_ora_vvol_snapctr_clone_01.png["Screenshot showing SnapCenter configuration."]
-
-. Name the clone database SID.
-+
-image:vcf_ora_vvol_snapctr_clone_02.png["Screenshot showing SnapCenter configuration."]
-
-. Select ora_02 in VCF as the target database clone host. Identical Oracle database software should have been installed and configured on the host.
-+
-image:vcf_ora_vvol_snapctr_clone_03.png["Screenshot showing SnapCenter configuration."]
-
-. Select the proper ORACLE_HOME, user and group on the target host. Keep credential at default.
-+
-image:vcf_ora_vvol_snapctr_clone_04.png["Screenshot showing SnapCenter configuration."]
-
-. You may change clone database parameters to meet configuration or resources requirements for the clone database.
-+
-image:vcf_ora_vvol_snapctr_clone_05.png["Screenshot showing SnapCenter configuration."]
-
-. Choose recovery scope. `Until Cancel` recovers the clone up to last available log file in the backup set. 
-+
-image:vcf_ora_vvol_snapctr_clone_06.png["Screenshot showing SnapCenter configuration."]
-
-. Review the summary and launch the clone job.
-+
-image:vcf_ora_vvol_snapctr_clone_08.png["Screenshot showing SnapCenter configuration."]
-
-. Monitor the clone job execution from `Monitor` tab.
-+
-image:vcf_ora_vvol_snapctr_clone_09.png["Screenshot showing SnapCenter configuration."]
-
-. Cloned database is immediately registered in SnapCenter.
-+
-image:vcf_ora_vvol_snapctr_clone_10.png["Screenshot showing SnapCenter configuration."]
-
-. From DB VM ora_02, validate the cloned database and query the test table.
-+
-.....
-[oracle@ora_02 ~]$ sqlplus / as sysdba
-
-SQL*Plus: Release 19.0.0.0.0 - Production on Thu Jul 18 12:06:48 2024
-Version 19.18.0.0.0
-
-Copyright (c) 1982, 2022, Oracle.  All rights reserved.
-
-
-Connected to:
-Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
-Version 19.18.0.0.0
-
-SQL> select name, open_mode, log_mode from v$database;
-
-NAME      OPEN_MODE            LOG_MODE
---------- -------------------- ------------
-NTAP1CLN  READ WRITE           ARCHIVELOG
-
-SQL> select instance_name, host_name from v$instance;
-
-INSTANCE_NAME
-----------------
-HOST_NAME
-----------------------------------------------------------------
-NTAP1CLN
-ora_02
-
-
-SQL> show pdbs
+SQL> sho pdbs
 
     CON_ID CON_NAME                       OPEN MODE  RESTRICTED
 ---------- ------------------------------ ---------- ----------
          2 PDB$SEED                       READ ONLY  NO
-         3 NTAP1_PDB1                     READ WRITE NO
-         4 NTAP1_PDB2                     READ WRITE NO
-         5 NTAP1_PDB3                     READ WRITE NO
-SQL> alter session set container=ntap1_pdb1
-  2  ;
+         3 NTAP_PDB1                      READ WRITE NO
+         4 NTAP_PDB2                      READ WRITE NO
+         5 NTAP_PDB3                      READ WRITE NO
+SQL> alter session set container=ntap_pdb1;
 
 Session altered.
 
@@ -940,17 +1151,27 @@ DT
 EVENT
 --------------------------------------------------------------------------------
          1
-18-JUL-24 11.15.03.000000 AM
-test oracle backup/restore/clone on VMware Cloud Foundation vVols
+19-AUG-24 10.36.04.000000 AM
+validate SnapCenter rac database restore on VMware vVols storage
+
+SQL> select current_timestamp from dual;
+
+CURRENT_TIMESTAMP
+---------------------------------------------------------------------------
+19-AUG-24 11.55.20.079686 AM -04:00
 
 
-SQL>
+
+SQL> exit
+Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
 
 .....
 
-This completes the demonstration of SnapCenter backup, restore, and clone of Oracle database in VCF.
+This completes the demonstration of SnapCenter backup, restore, and recovery of Oracle RAC database in VCF with vVols.
 
 =====
+
 
 
 == Where to find additional information
@@ -969,7 +1190,9 @@ link:https://docs.netapp.com/us-en/netapp-solutions/databases/index.html[https:/
 +
 link:https://docs.netapp.com/us-en/snapcenter/concept/concept_snapcenter_overview.html[https://docs.netapp.com/us-en/snapcenter/concept/concept_snapcenter_overview.html^]
 
-
+* ONTAP tools for VMware vSphere documentation
++
+link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/index.html[https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/index.html^]
 
 
 
