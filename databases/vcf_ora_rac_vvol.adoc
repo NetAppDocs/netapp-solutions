@@ -5,7 +5,7 @@ keywords: Database, Oracle, AWS, FSx ONTAP, VMC, VMware
 summary: "The solution provides an overview and details for Oracle deployment and protection in VMware Cloud Foundation (VCF) with vSphere Virtual Volumes (vVols) as primary database storage and Oracle database in Real Application Clusters (RAC) configuration." 
 ---
 
-= TR-4996: Oracle SI Deployment and Protection in VCF with vVols
+= TR-4997: Oracle RAC Deployment and Protection in VCF with vVols
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -105,6 +105,8 @@ Deployment requires the following prerequisites.
 . A VMware VCF has been setup. For information or instruction on how to create a VCF, please refer to VMware documentation link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation^].
 
 . Provision three Linux VMs, two VMs for Oracle database and one VM for Ansible controller within VCF workload domain. Provision one Windows server VM for running NetApp SnapCenter server. For information on setting up Ansible controller for automated Oracle database deployment, referring to following resources link:https://docs.netapp.com/us-en/netapp-solutions/automation/getting-started.html[Getting Started with NetApp solution automation^].
+
+. Oracle RAC database VMs should have provisioned at least two network interfaces - one for Oracle RAC private interconnect and one for apps or public data traffic. 
 
 . SnapCenter plugin version 6.0 for VMware vSphere has been deployed in VCF. Refer to following resources for the plugin deployment: link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/[SnapCenter Plug-in for VMware vSphere documentation^].
 
@@ -251,102 +253,150 @@ image:vcf_ora_vvol_vm_policy_07.png["Screenshot showing a VM storage policy conf
 
 ====
 
-=== Allocate disks to DB VM from vVols datastores and configure DB storage
+=== Allocate disks to RAC VMs from vVols datastores and configure DB storage
 [%collapsible]
 
 ====
 
 From vSphere client, add three disks from the vVols datastores to database VM by editing VM settings. Then, login to VM to format and mount the disks to mount points /u01, /u02, and /u03. The following demonstrates the exact steps and tasks.
 
-. Add a disk to VM for Oracle binary storage.
+. Before allocating disks from datastore to database VM, login to VMware ESXi hosts to validate and ensure multi-writer are enabled (GBLAllowMW value set to 1) on ESXi level.
 +
-image:vcf_ora_vvol_vm_bins.png["Screenshot showing a VM storage configuration."]
+....
+[root@vcf-wkld-esx01:~] which esxcli
+/bin/esxcli
+[root@vcf-wkld-esx01:~] esxcli system settings advanced list -o /VMFS3/GBLAllowMW
+   Path: /VMFS3/GBLAllowMW
+   Type: integer
+   Int Value: 1
+   Default Int Value: 1
+   Min Value: 0
+   Max Value: 1
+   String Value:
+   Default String Value:
+   Valid Characters:
+   Description: Allow multi-writer GBLs.
+   Host Specific: false
+   Impact: none
+[root@vcf-wkld-esx01:~]
 
-. Add a disk to VM for Oracle data storage.
+....
+
+. Add a new, dedicate SCSI controller for use with Oracle RAC disks. Disable SCSI bus sharing.
 +
-image:vcf_ora_vvol_vm_data.png["Screenshot showing a VM storage configuration."]
+image:vcf_orarac_vvol_vm_01.png["Screenshot showing a VM storage configuration."]
 
-. Add a disk to VM for Oracle log storage.
+. From RAC node 1 - ora01, add a disk to VM for Oracle binary storage without sharing.
 +
-image:vcf_ora_vvol_vm_logs.png["Screenshot showing a VM storage configuration."]
+image:vcf_orarac_vvol_vm_02.png["Screenshot showing a VM storage configuration."]
 
-. From VM `Edit Settings`, `Advanced Parameters`, add Attribute `disk.enableuuid` with Value `TRUE`. The VM needs to be down to add the advanced parameter. Setting this option enables SnapCenter to precisely identify the vVol in your environment. 
+. From RAC node 1, add three disks to VM for Oracle RAC CRS storage and enable multi-writer sharing.
++
+image:vcf_orarac_vvol_vm_03.png["Screenshot showing a VM storage configuration."]
+image:vcf_orarac_vvol_vm_04.png["Screenshot showing a VM storage configuration."]
+image:vcf_orarac_vvol_vm_05.png["Screenshot showing a VM storage configuration."]
+
+. From RAC node 1, add two disks each from each datastore to VM for shared Oracle data storage.
++
+image:vcf_orarac_vvol_vm_06.png["Screenshot showing a VM storage configuration."]
+image:vcf_orarac_vvol_vm_08.png["Screenshot showing a VM storage configuration."]
+image:vcf_orarac_vvol_vm_09.png["Screenshot showing a VM storage configuration."]
+image:vcf_orarac_vvol_vm_10.png["Screenshot showing a VM storage configuration."]
+
+. From RAC node 1, add two disks to VM from logs datastore for shared Oracle log files storage.
++
+image:vcf_orarac_vvol_vm_11.png["Screenshot showing a VM storage configuration."]
+image:vcf_orarac_vvol_vm_12.png["Screenshot showing a VM storage configuration."]
+
+. From RAC node 2, add a disk to VM for Oracle binary storage without sharing.
++
+image:vcf_orarac_vvol_vm_13.png["Screenshot showing a VM storage configuration."]
+
+. From RAC node 2, add other shared disks by selecting `Existing Hard Disks` option and enable multi-writer sharing for each shared disk.
++
+image:vcf_orarac_vvol_vm_14.png["Screenshot showing a VM storage configuration."]
+image:vcf_orarac_vvol_vm_15.png["Screenshot showing a VM storage configuration."]
+
+. From VM `Edit Settings`, `Advanced Parameters`, add Attribute `disk.enableuuid` with Value `TRUE`. The VM needs to be down to add the advanced parameter. Setting this option enables SnapCenter to precisely identify the vVol in your environment. This should be done on all RAC nodes.
 +
 image:vcf_ora_vvol_vm_uuid.png["Screenshot showing a VM storage configuration."]
 
 . Now, restart the VM. Login to VM as an admin user via ssh to review the newly added disk drives. 
 +
 ....
-[admin@ora_01 ~]$ sudo fdisk -l
+[admin@ora01 ~]$ sudo lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   50G  0 disk
+├─sda1          8:1    0  600M  0 part /boot/efi
+├─sda2          8:2    0    1G  0 part /boot
+└─sda3          8:3    0 48.4G  0 part
+  ├─rhel-root 253:0    0 43.4G  0 lvm  /
+  └─rhel-swap 253:1    0    5G  0 lvm  [SWAP]
+sdb             8:16   0   50G  0 disk
+sdc             8:32   0   10G  0 disk
+sdd             8:48   0   10G  0 disk
+sde             8:64   0   10G  0 disk
+sdf             8:80   0   40G  0 disk
+sdg             8:96   0   40G  0 disk
+sdh             8:112  0   40G  0 disk
+sdi             8:128  0   40G  0 disk
+sdj             8:144  0   80G  0 disk
+sdk             8:160  0   80G  0 disk
+sr0            11:0    1 1024M  0 rom
+[admin@ora01 ~]$
 
-Disk /dev/sdb: 50 GiB, 53687091200 bytes, 104857600 sectors
-Units: sectors of 1 * 512 = 512 bytes
-Sector size (logical/physical): 512 bytes / 512 bytes
-I/O size (minimum/optimal): 512 bytes / 512 bytes
+[admin@ora02 ~]$ sudo lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda             8:0    0   50G  0 disk
+├─sda1          8:1    0  600M  0 part /boot/efi
+├─sda2          8:2    0    1G  0 part /boot
+└─sda3          8:3    0 48.4G  0 part
+  ├─rhel-root 253:0    0 43.4G  0 lvm  /
+  └─rhel-swap 253:1    0    5G  0 lvm  [SWAP]
+sdb             8:16   0   50G  0 disk
+sdc             8:32   0   10G  0 disk
+sdd             8:48   0   10G  0 disk
+sde             8:64   0   10G  0 disk
+sdf             8:80   0   40G  0 disk
+sdg             8:96   0   40G  0 disk
+sdh             8:112  0   40G  0 disk
+sdi             8:128  0   40G  0 disk
+sdj             8:144  0   80G  0 disk
+sdk             8:160  0   80G  0 disk
+sr0            11:0    1 1024M  0 rom
+[admin@ora02 ~]$
 
-Disk /dev/sdc: 100 GiB, 107374182400 bytes, 209715200 sectors
-Units: sectors of 1 * 512 = 512 bytes
-Sector size (logical/physical): 512 bytes / 512 bytes
-I/O size (minimum/optimal): 512 bytes / 512 bytes
 
-Disk /dev/sdd: 100 GiB, 107374182400 bytes, 209715200 sectors
-Units: sectors of 1 * 512 = 512 bytes
-Sector size (logical/physical): 512 bytes / 512 bytes
-I/O size (minimum/optimal): 512 bytes / 512 bytes
-
-.
-.
-.
 ....
 
-. Partition the drives as a primary and single partition by simply accepting the default choices.
+. From each RAC node, partition the Oracle binary disk (/dev/sdb) as a primary and single partition by simply accepting the default choices.
 +
 [source, cli]
 sudo fdisk /dev/sdb
-+
-[source, cli]
-sudo fdisk /dev/sdc
-+
-[source, cli]
-sudo fdisk /dev/sdd
 
 . Format the partitioned disks as xfs file systems.
 +
 [source, cli]
 sudo mkfs.xfs /dev/sdb1
-+
-[source, cli]
-sudo mkfs.xfs /dev/sdc1
-+
-[source, cli]
-sudo mkfs.xfs /dev/sdd1
 
 
-. Mount the drives to mount point /u01, /u02, and /u03. 
-+
-[source, cli]
-sudo mount -t xfs /dev/sdb1 /u01
-+
-[source, cli]
-sudo mount -t xfs /dev/sdc1 /u02
-+
-[source, cli]
-sudo mount -t xfs /dev/sdd1 /u03
+. Mount the disk to mount point /u01. 
 +
 ....
-[admin@ora_01 ~]$ df -h
+[admin@ora01 ~]$ df -h
 Filesystem             Size  Used Avail Use% Mounted on
-devtmpfs               7.7G     0  7.7G   0% /dev
-tmpfs                  7.8G     0  7.8G   0% /dev/shm
-tmpfs                  7.8G  782M  7.0G  10% /run
+devtmpfs               7.7G   36K  7.7G   1% /dev
+tmpfs                  7.8G  1.4G  6.4G  18% /dev/shm
+tmpfs                  7.8G   34M  7.7G   1% /run
 tmpfs                  7.8G     0  7.8G   0% /sys/fs/cgroup
-/dev/mapper/rhel-root   44G   19G   26G  43% /
-/dev/sda1             1014M  258M  757M  26% /boot
+/dev/mapper/rhel-root   44G   29G   16G  66% /
+/dev/sda2             1014M  249M  766M  25% /boot
+/dev/sda1              599M  5.9M  593M   1% /boot/efi
+/dev/sdb1               50G   24G   27G  47% /u01
 tmpfs                  1.6G   12K  1.6G   1% /run/user/42
+tmpfs                  1.6G     0  1.6G   0% /run/user/54331
 tmpfs                  1.6G  4.0K  1.6G   1% /run/user/1000
-/dev/sdb1               50G  390M   50G   1% /u01
-/dev/sdc1              100G  746M  100G   1% /u02
-/dev/sdd1              100G  746M  100G   1% /u03
+
 
 ....
 
@@ -373,8 +423,6 @@ UUID=aff942c4-b224-4b62-807d-6a5c22f7b623 /boot                   xfs     defaul
 /dev/mapper/rhel-swap   none                    swap    defaults        0 0
 /root/swapfile swap swap defaults 0 0
 /dev/sdb1               /u01                    xfs     defaults        0 0
-/dev/sdc1               /u02                    xfs     defaults        0 0
-/dev/sdd1               /u03                    xfs     defaults        0 0
 ....
 
 ====
@@ -385,29 +433,139 @@ UUID=aff942c4-b224-4b62-807d-6a5c22f7b623 /boot                   xfs     defaul
 
 ====
 
-It's recommended to leverage NetApp automation toolkit to deploy Oracle in VCF with vVols. For detailed reference on executing Oracle automated deployment on xfs file systems, refer to TR-4992: link:https://docs.netapp.com/us-en/netapp-solutions/databases/automation_ora_c-series_nfs.html[Simplified, Automated Oracle Deployment on NetApp C-Series with NFS^]. Although the TR-4992 covers automated Oracle deployment on the NetApp C-Series with NFS, it's identical to Oracle deployment in VCF with vVols if bypassing NFS file systems mounting to database VM. We would simply skip that with specific tags. Following are step by step procedures.
+It's recommended to leverage NetApp automation toolkit to deploy Oracle RAC in VCF with vVols. Read the included instruction (READme) carefully and Configure deployment target file - hosts, global variables file - vars/vars.yml, and local DB VM variables file - host_vars/host_name.yml according to included instructions in the toolkit. Following is the step by step procedures.
 
-. Login to Ansible controller VM as admin user via ssh and clone a copy of automation toolkit for Oracle on NFS. 
+. Login to Ansible controller VM as admin user via ssh and clone a copy of automation toolkit for Oracle RAC deployment in VCF with vVols. 
 +
 [source, cli] 
-git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_nfs.git
+git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_rac.git
 
-. Stage the following Oracle installation files in /tmp/archive folder on database VM. The folder should allow all user access with 777 permission.
+. Stage the following Oracle installation files in /tmp/archive folder on RAC node 1 database VM. The folder should allow all user access with 777 permission.
 +
 ....
+LINUX.X64_193000_grid_home.zip
+p34762026_190000_Linux-x86-64.zip
 LINUX.X64_193000_db_home.zip
 p34765931_190000_Linux-x86-64.zip
 p6880880_190000_Linux-x86-64.zip
 ....
 
-. Configure deployment target file - hosts, global variables file - vars/vars.yml, and local DB VM variables file - host_vars/host_name.yml according to instructions in this section of TR-4992: link:https://docs.netapp.com/us-en/netapp-solutions/databases/automation_ora_c-series_nfs.html#parameter-files-configuration[Parameter files configuration^]. Comment out nfs_lif variable from local DB VM variable file.
+
+
+. An example of typical configuration for target hosts file - hosts.
 
 . Set up ssh keyless authentication between Ansible controller and database VMs, which requires to generate a ssh key pair and copy the public key to database VMs admin user root directory .ssh folder authorized_keys file. 
 +
 [source, cli]
 ssh-keygen
 
-. From Ansible controller, cloned automation toolkit home directory /home/admin/na_oracle_deploy_nf, execute prerequisites playbook.
+. Configure the user defined target host parameters files. An example of typical configuration for target hosts file - hosts.
++
+....
+#Oracle hosts
+[oracle]
+ora01 ansible_host=10.61.180.21 ansible_ssh_private_key_file=ora01.pem
+ora02 ansible_host=10.61.180.22 ansible_ssh_private_key_file=ora02.pem
+
+....
+
+. Configure the user defined local host specific parameters files. An example of typical configuration for local host_name.yml file - ora01.yml.
++
+....
+
+# Binary lun
+ora_bin: /dev/sdb
+
+# Host DB configuration
+ins_sid: "{{ oracle_sid }}1"
+asm_sid: +ASM1
+
+....
+
+. Configure the user defined global parameters file. An example of typical configuration for global parameters file - vars.yml
++
+....
+
+#######################################################################
+### ONTAP env specific config variables                             ###
+#######################################################################
+
+# ONTAP storage platform: on-prem, vmware-vvols
+ontap_platform: vmware-vvols
+
+# Prerequisite to create four vVolss in VMware vCenter
+# VCF_ORA_BINS - Oracle binary
+# VCF_ORA_CRS  - Oracle cluster registry and vote
+# VCF_ORA_DAT1 - Oracle data on node1
+# VCF_ORA_DAT2 - Oracle data on node2
+# VCF_ORA_LOGS - Oracle logs on node1 or node2
+
+# Oracle disks are added to VM from vVols: 1 binary disk, 3 CRS disks, 4 data disks, and 2 log disks.
+
+
+######################################################################
+### Linux env specific config variables                            ###
+######################################################################
+
+redhat_sub_username: acao@netapp.com
+redhat_sub_password: "NetApp!234"
+
+# Networking configuration
+cluster_pub_ip:
+  - {ip: 10.61.180.21, hostname: ora01}
+  - {ip: 10.61.180.22, hostname: ora02}
+
+cluster_pri_ip:
+  - {ip: 172.21.166.22, hostname: ora01-pri}
+  - {ip: 172.21.166.24, hostname: ora02-pri}
+
+cluster_vip_ip:
+  - {ip: 10.61.180.93, hostname: ora01-vip}
+  - {ip: 10.61.180.94, hostname: ora02-vip}
+
+cluster_scan_name: ntap-scan
+cluster_scan_ip:
+  - {ip: 10.61.180.90, hostname: ntap-scan}
+  - {ip: 10.61.180.91, hostname: ntap-scan}
+  - {ip: 10.61.180.92, hostname: ntap-scan}
+
+
+#####################################################################
+### DB env specific install and config variables                  ###
+#####################################################################
+
+# Shared Oracle RAC storage
+ora_crs:
+  - { device: /dev/sdc, name: ora_crs_01 }
+  - { device: /dev/sdd, name: ora_crs_02 }
+  - { device: /dev/sde, name: ora_crs_03 }
+
+ora_data:
+  - { device: /dev/sdf, name: ora_data_01 }
+  - { device: /dev/sdg, name: ora_data_02 }
+  - { device: /dev/sdh, name: ora_data_03 }
+  - { device: /dev/sdi, name: ora_data_04 }
+
+ora_logs:
+  - { device: /dev/sdj, name: ora_logs_01 }
+  - { device: /dev/sdk, name: ora_logs_02 }
+
+# Oracle RAC configuration
+
+oracle_sid: NTAP
+cluster_name: ntap-rac
+cluster_nodes: ora01,ora02
+cluster_domain: solutions.netapp.com
+grid_cluster_nodes: ora01:ora01-vip:HUB,ora02:ora02-vip:HUB
+network_interface_list: ens33:10.61.180.0:1,ens34:172.21.166.0:5
+memory_limit: 10240
+
+# Set initial password for all required Oracle passwords. Change them after installation.
+initial_pwd_all: "XXXXXXXX"
+
+....
+
+. From Ansible controller, cloned automation toolkit home directory /home/admin/na_oracle_deploy_rac, execute prerequisites playbook to setup ansible prerequisites.
 +
 [source, cli]
 ansible-playbook -i hosts 1-ansible_requirements.yml
@@ -420,22 +578,20 @@ ansible-playbook -i hosts 2-linux_config.yml -u admin -e @vars/vars.yml
 . Execute Oracle deployment playbook.
 +
 [source, cli]
-ansible-playbook -i hosts 4-oracle_config.yml -u admin -e @vars/vars.yml --skip-tags "ora_mount_points,enable_dnfs_client"
+ansible-playbook -i hosts 4-oracle_config.yml -u admin -e @vars/vars.yml 
 
 . Optionally, all above playbooks can be executed from a single playbook run as well.
 +
 [source, cli] 
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml --skip-tags "ora_mount_points,enable_dnfs_client"
+ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml 
+
 
 . Login to EM express to to validate Oracle after successful playbook execution. 
 +
 image:vcf_ora_vvol_em_02.png["Screenshot showing Oracle EM Express configuration."]
 image:vcf_ora_vvol_em_01.png["Screenshot showing Oracle EM Express configuration."]
 
-. Optionally, execute destroy playbook to remove database from DB VM.
-+
-[source, cli]
-ansible-playbook -i hosts 5-destroy.yml -u admin -e @vars/vars.yml
+
 
 
 ====
