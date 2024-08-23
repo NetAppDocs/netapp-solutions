@@ -44,6 +44,8 @@ This scenario requires the following components and configurations:
 * vSphere 8 clusters installed at both the primary and secondary locations with suitable networking for communications between environments. 
 * ONTAP storage systems at both the primary and secondary locations, with physical data ports on ethernet switches dedicated to NFS storage traffic.
 * ONTAP tools for VMware vSphere 10 is installed and has both vCenter servers registered.
+* VMware Site Replication Manager appliances have been installed for the primary and secondary sites.
+** Inventory mappings (network, folder, resource, storage policy) have been configured for SRM.
 
 
 NetApp recommends a redundant network designs for NFS, providing fault tolerance for storage systems, switches, networks adapters and host systems. It is common to deploy NFS with a single subnet or multiple subnets depending on the architectural requirements.
@@ -62,7 +64,7 @@ A SnapMirror relationship must be established between the source and destination
 
 Refer to ONTAP documentation starting https://docs.netapp.com/us-en/ontap/data-protection/snapmirror-replication-workflow-concept.html[HERE] for complete information on creating SnapMirror relationships for ONTAP volumes.
 
-Step-by-step instructions are outline in the following document, located https://docs.netapp.com/us-en/netapp-solutions/ehc/aws-guest-dr-solution-overview.html#assumptions-pre-requisites-and-component-overview[HERE]. These septs outline how to create cluster peer and SVM peer relationships and then a SnapMirror relationship for the specific volumes. These steps can be performed in ONTAP System Manager or using the ONTAP CLI.
+Step-by-step instructions are outline in the following document, located https://docs.netapp.com/us-en/netapp-solutions/ehc/aws-guest-dr-solution-overview.html#assumptions-pre-requisites-and-component-overview[HERE]. These steps outline how to create cluster peer and SVM peer relationships and then SnapMirror relationships for each volume. These steps can be performed in ONTAP System Manager or using the ONTAP CLI.
 
 ==== Configure the SRM appliance
 Complete the following steps to configure the SRM appliance and SRA adapter.
@@ -74,23 +76,22 @@ The following steps must be completed for both the primary and secondary sites.
 
 . In a web browser, navigate to https://<SRM_appliance_IP>:5480 and log in. Click on *Configure Appliance* to get started.
 +
-image::vmware-nfs-srm-image01[Configure appliance]
+image::vmware-nfs-srm-image01.png[Configure appliance]
 +
 {nbsp}
 . On the *Platform Services Controller* page of the Configure Site Recovery Manager wizard, fill in the credentials of the vCenter server to which SRM will be registered. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image02[platform services controller]
+image::vmware-nfs-srm-image02.png[platform services controller]
 +
 {nbsp}
-
 . On the *vCenter Server* page, view the connected vServer and click on *Next* to continue.
-
 . On the *Name and extension* page, fill in a name for the SRM site, an administrators email address, and the local host to be used by SRM. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image02[Configure appliance]
+image::vmware-nfs-srm-image03.png[Configure appliance]
 +
 {nbsp}
 . On the *Ready to complete* page review the summary of changes 
+====
 
 .Configure SRA on the SRM appliance
 [%collapsible]
@@ -100,12 +101,95 @@ Complete the following steps to configure the SRA on the SRM appliance:
 . Download the SRA for ONTAP tools 10 at the https://mysupport.netapp.com/site/products/all/details/otv10/downloads-tab[NetApp support site] and save the tar.gz file to a local folder.
 . From the SRM management appliance click on *Storage Replication Adapters* in the left hand menu and then on *New Adapter*.
 +
-image::vmware-nfs-srm-image03[Add new SRM adapter]
+image::vmware-nfs-srm-image04.png[Add new SRM adapter]
 +
 {nbsp}
 . Follow the steps outlined on the ONTAP tools 10 documentation site at https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/protect/configure-on-srm-appliance.html[Configure SRA on the SRM appliance]. Once complete, the SRA can communicate with SRA using the provided IP address and credentials of the vCenter server.
+====
 
+==== Configure Site Recovery for SRM
+Complete the following steps to configure Site Pairing, create Protection Groups, 
 
+.Configure Site Pairing for SRM
+[%collapsible]
+==== 
+The following step is completed in the vCenter client of the primary site.
+
+. In the vSphere client click on *Site Recovery* in the left hand menu. A new browser windows opens to the SRM management UI on the primary site.
++
+image::vmware-nfs-srm-image06.png[Site Recovery]
++
+{nbsp}
+. On the *Site Recovery* page, click on *NEW SITE PAIR*.
++
+image::vmware-nfs-srm-image07.png[Site Recovery]
++
+{nbsp}
+. On the *Pair type* page of the *New Pair wizard*, verify that the local vCenter server is selected and select the *Pair type*. Click on *Next* to continue.
++
+image::vmware-nfs-srm-image08.png[Pair type]
++
+{nbsp}
+. On the *Peer vCenter* page fill out the credentials of the vCenter at the secondary site and click on *Find vCenter Instances*. Verify the the vCenter instance has been discovered and click on *Next* to continue.
++
+image::vmware-nfs-srm-image09.png[Peer vCenter]
++
+{nbsp}
+. On the *Services* page, check the box next the proposed site pairing. Click on *Next* to continue.
++
+image::vmware-nfs-srm-image10.png[Services]
++
+{nbsp}
+. On the *Ready to complete* page, review the proposed configuration and then click on the *Finish* button to create the Site Pairing
+. The new Site Pair and its summary can be viewed on the Summary page.
++
+image::vmware-nfs-srm-image11.png[Site pair summary]
+====
+
+.Add an Array Pair for SRM
+[%collapsible]
+==== 
+The following step is completed in the Site Recovery interface of the primary site.
+
+. In the Site Recovery interface navigate to *Configure > Array Based Replication > Array Pairs* in the left hand menu. Click on *ADD* to get started.
++
+image::vmware-nfs-srm-image12.png[Array pairs]
++
+{nbsp}
+. On the *Storage replication adapter* page of the *Add Array Pair* wizard, verify the SRA adapter is present for the primary site and click on *Next* to continue.
++
+image::vmware-nfs-srm-image13.png[Add array pair]
++
+{nbsp}
+. On the *Local array manager* page, enter a name for the array at the primary site, the FQDN of the storage system, the SVM IP addresses serving NFS, and optionally, the names of specific volumes to be discovered. Click on *Next* to continue.
++
+image::vmware-nfs-srm-image14.png[Local array manager]
++
+{nbsp}
+. On the *Remote array manager* fill out the same information as the last step for the ONTAP storage system at the secondary site.
++
+image::vmware-nfs-srm-image15.png[Remote array manager]
++
+{nbsp}
+. On the *Array pairs* page, select the array pairs to enable and click on *Next* to continue.
++
+image::vmware-nfs-srm-image16.png[Array pairs]
++
+{nbsp}
+. Review the information on the *Ready to complete* page and click on *Finish* to create the array pair.
+====
+
+.Configure Protection Groups for SRM
+[%collapsible]
+==== 
+The following step is completed in the SRM Management interface of the primary site.
+
+. In the Site Recovery SRM Management  in the left hand menu. A new browser windows opens to the SRM management UI on the primary site.
++
+image::vmware-nfs-srm-image06[Site Recovery]
++
+{nbsp}
+====
 
 
 === Additional information
