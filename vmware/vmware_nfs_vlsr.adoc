@@ -11,9 +11,15 @@ summary:
 :linkattrs:
 :imagesdir: ./../media/
 
-== Use VMware Live Site Recovery for Disaster Recovery of NFS datastores
+== Use VMware Site Recovery Manager for Disaster Recovery of NFS datastores
 [.lead]
-The utilization of ONTAP tools and the Site Replication Adapter (SRA) in conjunction with VMware Live Site Recovery Manager (VLSR) brings significant value to disaster recovery efforts. ONTAP tools provide robust storage capabilities, including native high availability and scalability for the VASA Provider, supporting iSCSI and NFS vVols. This ensures data availability and simplifies the management of multiple VMware vCenter servers and ONTAP clusters. By integrating the SRA, organizations can achieve seamless replication and failover of virtual machines and data between sites, enabling efficient disaster recovery processes. The combination of ONTAP tools and the SRA empowers businesses to protect critical workloads, minimize downtime, and maintain business continuity in the face of unforeseen events or disasters.
+The utilization of ONTAP tools for VMware vSphere 10 and the Site Replication Adapter (SRA) in conjunction with VMware Site Recovery Manager (SRM) brings significant value to disaster recovery efforts. ONTAP tools 10 provide robust storage capabilities, including native high availability and scalability for the VASA Provider, supporting iSCSI and NFS vVols. This ensures data availability and simplifies the management of multiple VMware vCenter servers and ONTAP clusters. By integrating the SRA, organizations can achieve seamless replication and failover of virtual machines and data between sites, enabling efficient disaster recovery processes. The combination of ONTAP tools and the SRA empowers businesses to protect critical workloads, minimize downtime, and maintain business continuity in the face of unforeseen events or disasters.
+
+ONTAP tools 10 simplifies storage management and efficiency features, enhances availability, and reduces storage costs and operational overhead, whether you are using SAN or NAS. It uses best practices for provisioning datastores and optimizes ESXi host settings for NFS and block storage environments. For all these benefits, NetApp recommends this plug-in when using vSphere with systems running ONTAP software.
+
+The VASA Provider for ONTAP supports the VMware vStorage APIs for Storage Awareness (VASA) framework. VASA Provider connects vCenter Server with ONTAP to aid in provisioning and monitoring VM storage. It enables VMware Virtual Volumes (vVols) support and the management of storage capability profiles (including vVols replication capabilities) and individual VM vVols performance. It also provides alarms for monitoring capacity and compliance with the profiles. When used in conjunction with SRM, the VASA Provider for ONTAP enables support for vVols- based virtual machines without requiring the installation of an SRA adapter on the SRM server.
+
+The SRA is used together with SRM to manage the replication of VM data between production and disaster recovery sites for traditional VMFS and NFS datastores and also for the nondisruptive testing of DR replicas. It helps automate the tasks of discovery, recovery, and reprotection. It includes both an SRA server appliance and SRA adapters for the Windows SRM server and the SRM appliance.
 
 In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMware vSphere (OTV) to configure both an *NFS datastore*, and a *vVols datastore* for a VCF workload domain. 
 
@@ -21,16 +27,23 @@ In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMwar
 
 This scenario covers the following high level steps:
 
+* Add vCenter servers to SRM. 
 * Install the SRA adapter for ONTAP tools for VMware vSphere 10 and register with vCenters.
 * Create SnapMirror relationships between source and destination ONTAP storage systems
 * 
 
-Architecture
+=== Architecture
+
+https://docs.netapp.com/us-en/ontap-apps-dbs/vmware/vmware-srm-overview.html#why-use-ontap-with-srm[VMware Site Recovery Manager with ONTAP]
+
+
 
 === Prerequisites
 This scenario requires the following components and configurations:
 
-* ONTAP AFF storage systems at both the primary and secondary locations, with physical data ports on ethernet switches dedicated to storage traffic.
+* vSphere 8 clusters installed at both the primary and secondary locations with suitable networking for communications between environments. 
+* ONTAP storage systems at both the primary and secondary locations, with physical data ports on ethernet switches dedicated to NFS storage traffic.
+* ONTAP tools for VMware vSphere 10 is installed and has both vCenter servers registered.
 
 
 NetApp recommends a redundant network designs for NFS, providing fault tolerance for storage systems, switches, networks adapters and host systems. It is common to deploy NFS with a single subnet or multiple subnets depending on the architectural requirements.
@@ -42,22 +55,59 @@ For network guidance on using ONTAP with VMware vSphere refer to the https://doc
 This documentation demonstrates the process of creating a new SVM and specifying the IP address information to create multiple LIFs for NFS traffic. To add new LIFs to an existing SVM refer to link:https://docs.netapp.com/us-en/ontap/networking/create_a_lif.html[Create a LIF (network interface)].
 
 === Deployment Steps
-To deploy ONTAP Tools and use it to create a vVols and NFS datastore on the VCF management domain, complete the following steps:
+The following sections outline the deployment steps to implement and test a VMware Site Recovery Manager configuration with ONTAP storage system.
 
-==== Create SVM and LIFs on ONTAP storage system
-The following step is performed in ONTAP System Manager.
+==== Create SnapMirror relationship between ONTAP storage systems
+A SnapMirror relationship must be established between the source and destination ONTAP storage systems, for the datastore volumes to be protected.
 
-.Create the storage VM and LIFs
+Refer to ONTAP documentation starting https://docs.netapp.com/us-en/ontap/data-protection/snapmirror-replication-workflow-concept.html[HERE] for complete information on creating SnapMirror relationships for ONTAP volumes.
+
+Step-by-step instructions are outline in the following document, located https://docs.netapp.com/us-en/netapp-solutions/ehc/aws-guest-dr-solution-overview.html#assumptions-pre-requisites-and-component-overview[HERE]. These septs outline how to create cluster peer and SVM peer relationships and then a SnapMirror relationship for the specific volumes. These steps can be performed in ONTAP System Manager or using the ONTAP CLI.
+
+==== Configure the SRM appliance
+Complete the following steps to configure the SRM appliance and SRA adapter.
+
+.Connect the SRM appliance for primary and secondary sites
 [%collapsible]
 ==== 
+The following steps must be completed for both the primary and secondary sites. 
 
-Complete the following steps to create an SVM together with multiple LIFs for NFS traffic.
-
-. From ONTAP System Manager navigate to *Storage VMs* in the left-hand menu and click on *+ Add* to start. 
+. In a web browser, navigate to https://<SRM_appliance_IP>:5480 and log in. Click on *Configure Appliance* to get started.
 +
-image::vmware-vcf-asa-image01.png[Click +Add to start creating SVM]
+image::vmware-nfs-srm-image01[Configure appliance]
 +
 {nbsp}
+. On the *Platform Services Controller* page of the Configure Site Recovery Manager wizard, fill in the credentials of the vCenter server to which SRM will be registered. Click on *Next* to continue.
++
+image::vmware-nfs-srm-image02[platform services controller]
++
+{nbsp}
+
+. On the *vCenter Server* page, view the connected vServer and click on *Next* to continue.
+
+. On the *Name and extension* page, fill in a name for the SRM site, an administrators email address, and the local host to be used by SRM. Click on *Next* to continue.
++
+image::vmware-nfs-srm-image02[Configure appliance]
++
+{nbsp}
+
+. On the *Ready to complete* page review the summary of changes 
+
+
+.Configure SRA on the SRM appliance
+[%collapsible]
+==== 
+Complete the following steps to configure the SRA on the SRM appliance:
+
+. Download the SRA for ONTAP tools 10 at the https://mysupport.netapp.com/site/products/all/details/otv10/downloads-tab[NetApp support site] and save the tar.gz file to a local folder.
+
+. From the SRM management appliance click on *Storage Replication Adapters* in the left hand menu and then on *New Adapter*.
++
+image::vmware-nfs-srm-image03[Add new SRM adapter]
++
+{nbsp}
+
+. Follow the steps outlined on the ONTAP tools 10 documentation site at https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/protect/configure-on-srm-appliance.html[Configure SRA on the SRM appliance]. Once complete, the SRA can communicate with SRA using the provided IP address and credentials of the vCenter server.
 
 
 
