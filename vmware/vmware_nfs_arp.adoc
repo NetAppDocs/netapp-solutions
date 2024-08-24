@@ -1,0 +1,105 @@
+---
+sidebar: sidebar
+permalink: vmware/vmware_nfs_arp.html
+keywords: netapp, vmware, cloud, foundation, vcf, aff, all-flash, nfs, vvol, vvols, array, ontap tools, otv, ransomeware
+summary:
+---
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+== Autonomous Ransomware Protection for NFS Storage
+[.lead]
+
+Detecting ransomware as early as possible is crucial in preventing its spread and avoiding costly downtime. An effective ransomware detection strategy must incorporate multiple layers of protection at ESXi host and guest VM levels. While multiple security measures are implemented to create a comprehensive defense against ransomware attacks, ONTAP enables adding more layers of protection to the overall defense approach.  To name a few capabilities, it starts with Snapshots, Autonomous Ransomware Protection, tamperproof snapshots and so on.
+
+Let’s look at how the above-mentioned capabilities work with VMware to protect and recover the data against ransomware. To protect vSphere and guest VMs against attacks, it is essential to take several measures including segmenting, utilizing EDR/XDR/SIEM for endpoints and installing security updates and adhering to the appropriate hardening guidelines. Each virtual machine residing on a datastore also hosts a standard operating system. Ensure enterprise server anti-malware product suites are installed and regularly updated on them which is an essential component of multi-layered ransomware protection strategy. Along with this, enable Autonomous Ransomware Protection (ARP) on the NFS volume powering the datastore. ARP leverages built-in onbox ML that looks at volume workload activity plus data entropy to automatically detect ransomware. ARP is configurable through the ONTAP built-in management interface or system Manager and is enabled on a per-volume basis. 
+
+image::nfs-arp-image1.png[]
+
+NOTE: With the new NetApp ARP/AI, which is currently in tech preview, there is no need for a learning mode. Instead, it can go straight to active mode with its AI-powered ransomware detection capability.
+
+NOTE: With ONTAP One, all these feature sets are completely free. Access NetApp's robust suite of data protection, security and all the features that ONTAP offers without worrying about licensing barriers.
+
+Once in active mode, it starts looking for the abnormal volume activity that might potentially be ransomware. If abnormal activity is detected, an automatic Snapshot copy is immediately taken, which provides a restoration point as close as possible to the file infection. ARP can detect changes in VM specific file extensions on an NFS volume located outside of the VM when a new extension is added to the encrypted volume or a file's extension is modified. 
+
+image::nfs-arp-image2.png[]
+
+If a ransomware attack targets the virtual machine (VM) and alter files within the VM without making changes outside the VM, the Advanced Ransomware Protection (ARP) will still detect the threat if the default entropy of the VM is low, for example, for file types like .txt, .docx, or .mp4 files. Even though ARP creates a protective snapshot in this scenario, it does not generate a threat alert because the file extensions outside of the VM have not been tampered with. In such scenarios, the initial layers of defense would identify the anomaly, however ARP helps in creating a snapshot based on the entropy.
+
+For detailed information, refer to “ARP and Virtual machines” section in link:https://docs.netapp.com/us-en/ontap/anti-ransomware/use-cases-restrictions-concept.html#supported-configurations[ARP usecases and considerations].
+
+Moving from files to backup data, ransomware attacks are now increasingly targeting backups and snapshot recovery points by trying to delete them before starting to encrypt files. However, with ONTAP, this can be prevented by creating tamperproof snapshots on primary or secondary systems with link:https://docs.netapp.com/us-en/ontap/snaplock/snapshot-lock-concept.html[NetApp Snapshot™ copy locking]. 
+
+image::nfs-arp-image3.png[]
+
+These Snapshot copies can’t be deleted or changed by ransomware attackers or rogue administrators, so they’re available even after an attack. If the datastore or specific virtual machines are affected, SnapCenter can recover virtual machine data in seconds, minimizing organization’s downtime.
+
+image::nfs-arp-image4.png[]
+
+The above demonstrates how ONTAP storage adds an additional layer to the existing techniques, enhancing futureproofing of the environment.
+
+For additional information, view guidance for link:https://www.netapp.com/media/7334-tr4572.pdf[NetApp solutions for ransomware].
+
+Now if all these needs to be orchestrated and integrated with SIEM tools, then offtap service like BlueXP ransomware protection can be used. It is a service designed to safeguard data from ransomware. This service offers protection for application-based workloads such as Oracle, MySQL, VM datastores, and file shares on on-premises NFS storage. 
+
+In this example, NFS datastore “Src_NFS_DS04” is protected using BlueXP ransomware protection.
+
+image::nfs-arp-image5.png[]
+
+image::nfs-arp-image6.png[]
+
+For detailed information on to configure BlueXP ransomware protection, refer to link:https://docs.netapp.com/us-en/bluexp-ransomware-protection/rp-start-setup.html[Setup BlueXP ransomware protection] and link:https://docs.netapp.com/us-en/bluexp-ransomware-protection/rp-use-settings.html#add-amazon-web-services-as-a-backup-destination[Configure BlueXP ransomware protection settings].
+
+It’s time to walk through this with an example. In this walkthrough, the datastore “Src_NFS_DS04” is affected. 
+
+image::nfs-arp-image7.png[]
+
+ARP immediately triggered a snapshot on the volume upon detection.
+
+image::nfs-arp-image8.png[]
+
+image::nfs-arp-image9.png[]
+
+Once the forensic analysis is complete, then the restores can be done quickly and seamlessly using SnapCenter or BlueXP ransomware protection. With SnapCenter, go to the affected virtual machines and select the appropriate snapshot to restore.
+
+image::nfs-arp-image10.png[]
+
+This section looks at how BlueXP ransomware protection orchestrates recovery from a ransomware incident wherein the VM files are encrypted.
+
+NOTE: If the VM is managed by SnapCenter, BlueXP ransomware protection restores the VM back to its previous state using the VM-consistent process. 
+
+. Access BlueXP ransomware protection and an alert appears on the BlueXP ransomware protection Dashboard.
+
+. Click on the alert to review the incidents on that specific volume for the generated alert
++
+image::nfs-arp-image11.png[]
+
+. Mark the ransomware incident as ready for recovery (after incidents are neutralized) by selecting “Mark restore needed”
++
+image::nfs-arp-image12.png[]
++
+NOTE: The alert can be dismissed if the incident turns out to be false positive.
+
+. Got to Recovery tab and review the workload information in the Recovery page and select the datastore volume that is in the “Restore needed” state and select Restore.
++
+image::nfs-arp-image13.png[]
+
+. In this case, the restore scope is "By VM" (for SnapCenter for VMs, the restore scope is "By VM")
++
+image::nfs-arp-image14.png[]
+
+. Choose the restore point to use to restore the data and select Destination and click on Restore.
++
+image::nfs-arp-image15.png[]
+
+. From the top menu, select Recovery to review the workload on the Recovery page where the status of the operation moves through the states. Once restore is complete, the VM files are restored as shown below.
++
+image::nfs-arp-image16.png[]
+
+NOTE: The recovery can be performed from SnapCenter for VMware or SnapCenter plugin depending on the application. 
+
+The NetApp solution provides various effective tools for visibility, detection, and remediation, helping you to spot ransomware early, prevent this spread, and recover quickly, if necessary, to avoid costly downtime. Traditional layered defense solutions remain prevalent, as do third parties and partner solutions for visibility and detection. Effective remediation remains a crucial part of the response to any threat.
