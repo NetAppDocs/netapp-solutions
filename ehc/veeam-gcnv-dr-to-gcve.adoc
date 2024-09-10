@@ -1,7 +1,7 @@
 ---
 sidebar: sidebar
 permalink: ehc/veeam-gcnv-dr-to-gcve.html
-keywords: disaster recovery, avs, azure vmware solution, anf, azure netapp files, disaster recovery, dr, veeam, replication
+keywords: disaster recovery, avs, google cloud, gcp, gcve, gcnv, google cloud netapp volumes, netapp volumes, dr, veeam, replication
 summary:
 ---
 
@@ -21,7 +21,7 @@ This article describes how to use Veeam Backup & Replication to set up disaster 
 
 Google Cloud NetApp Volumes (GCNV) is a storage service from Google and NetApp that is available for Google Cloud. NetApp Volumes service provides high performance NFS/SMB storage. VMware certified NetApp Volumes NFS storage can be used as an external datastore for ESXi hosts in GCVE. Users are required to connect NetApp Volumes and GCVE services through VPC network peering (PSA). There are no network charges resulting from storage access within a region. Users can create NetApp Volumes volumes in the Google Cloud console and enable deletion protection before mounting volumes as datastores to their ESXi hosts.
 
-GCNV volume based NFS datastores can be used to replicate data from on-premises using any validated third-party solution that provides VM replication capability. By adding GCNV datastores, it enables cost optimized deployment instead of building a Google Cloud VMware Engine (GCVE) based SDDC with a large number of ESXi hosts to accommodate the storage. This approach is called a “Pilot Light Cluster”. A pilot light cluster is a minimal GCVE host configuration (3 x GCVE nodes) along with GCNV datastores capacity to allow for independent scaling to meet capacity requirements.
+GCNV volume based NFS datastores can be used to replicate data from on-premises using any validated third-party solution that provides VM replication capability. By adding GCNV datastores, it enables cost optimized deployment instead of building a Google Cloud VMware Engine (GCVE) based SDDC with a large number of ESXi hosts to accommodate the storage. This approach is called a “Pilot Light Cluster”. A pilot light cluster is a minimal GCVE host configuration (3 x GCVE ESXi hosts) along with GCNV datastores capacity to allow for independent scaling to meet capacity requirements.
 
 The objective is to sustain a cost-effective infrastructure with just the core components to manage a failover. A pilot light cluster can expand and add more GCVE hosts in the event of a failover. Once the failover is resolved and normal operations resume, the pilot light cluster can reduce its scale, returning to a low-cost operational mode.
 
@@ -29,21 +29,21 @@ The objective is to sustain a cost-effective infrastructure with just the core c
 
 This article describes how to use a Google Cloud NetApp Volumes datastore with Veeam Backup & Replication to set up disaster recovery for on-premises VMware VMs to GCVE using the Veeam VM replication software functionality. 
 
-Veeam Backup & Replication is a backup and replication application for virtual environments. When virtual machines are replicated, Veeam Backup & Replication is replicated from on AVS, the software will create an exact copy of the VMs in the native VMware vSphere format on the target GCVE SDDC cluster.  Veeam Backup & Replication will keep the copy synchronized with the original VM. Replication provides the best recovery time objective (RTO) as there is a mounted copy of a VM at the DR site in a ready-to-start state.  
+Veeam Backup & Replication is a backup and replication application for virtual environments. When virtual machines are replicated, Veeam Backup & Replication will create an exact copy of the VMs in the native VMware vSphere format on the target GCVE SDDC cluster.  Veeam Backup & Replication will keep the copy synchronized with the original VM. Replication provides the best recovery time objective (RTO) as there is a mounted copy of a VM at the DR site in a ready-to-start state.
 
 This replication mechanism ensures that the workloads can quickly start in GCVE in the case of a disaster event. The Veeam Backup & Replication software also optimizes traffic transmission for replication over WAN and slow connections. In addition, it also filters out duplicate data blocks, zero data blocks, swap files, and “excluded VM guest OS files”. The software will also compress the replica traffic. To prevent replication jobs from consuming the entire network bandwidth, WAN accelerators and network throttling rules can be utilized. 
 
-The replication process in Veeam Backup & Replication is job driven which means replication is performed by configuring replication jobs. In the case of a disaster event, failover can be triggered to recover the VMs by failing over to its replica copy. When failover is performed, a replicated VM takes over the role of the original VM. Failover can be performed to the latest state of a replica or to any of its good known restore points. This enables ransomware recovery or isolated testing as needed. Veeam Backup & Replication offers multiple options to handle different disaster recovery scenarios.
+The replication process in Veeam Backup & Replication is job driven which means replication is performed by configuring replication jobs. In the case of a disaster event, failover can be triggered to recover the VMs by failing over to its replica copy. When failover is performed, a replicated VM takes over the role of the original VM. Failover can be performed to the latest state of a replica or to any of its known good restore points. This enables ransomware recovery or isolated testing as needed. Veeam Backup & Replication offers multiple options to handle different disaster recovery scenarios.
 
 == Solution Overview
 
 This solution covers the following high level steps:
 
 . Create an NFS volume using Google Cloud NetApp Volumes
-. Follow GCP process to create GCVE datastore from NFS volume.
-. Set up replication job to create VM replicas using Veeam Backup and Replication.
-. Create failover plan and perform failover.
-. Switch back to production VMs once the disaster event is complete and primary site is Up.
+. Follow GCP process to create a GCVE datastore from the GCNV NFS volume.
+. Set up a replication job to create VM replicas using Veeam Backup & Replication.
+. Create a failover plan and perform failover.
+. Switch back to production VMs once the disaster event is complete and the primary site is up.
 
 For more information on using GCNV NFS volumes as datastores for GCVE, check out https://cloud.google.com/vmware-engine/docs/vmware-ecosystem/howto-cloud-volumes-datastores-gcve[Using NFS volume as vSphere datastore hosted by Google Cloud NetApp Volumes]. 
 
@@ -62,8 +62,6 @@ This solution requires the following components and configurations:
 . Ensure the Veeam Backup & Replication backup VM is connected to the source as well as the target GCVE SDDC clusters.
 . Ensure the Veeam Backup & Replication backup VM is connected to the Veeam Proxy server VMs at both the source and target GCVE clusters.
 . The backup server must be able to resolve short names and connect to source and target vCenters.
-
-
 
 NOTE: Veeam requires a GCVE solution user account with elevated privileges when adding the GCVE vCenter server to the Veeam Backup and Replication inventory. For more information refer to the Google Cloud Platform (GCP) documentation at https://cloud.google.com/vmware-engine/docs/private-clouds/classic-console/howto-elevate-privilege[Elevating VMware Enginer priviliges].
 
@@ -139,26 +137,46 @@ To replicate VMs, complete the following steps:
 
 . Open the Veeam Backup & Replication Console.
 
-. On the Home view. Right click the jobs node and select Replication Job > Virtual machine.
-
-. Specify a job name and select the appropriate advanced control checkbox. Click Next.
-* Select the Replica seeding check box if connectivity between on-premises and Azure has restricted bandwidth.
-* Select the Network remapping (for AVS SDDC sites with different networks) check box if segments on the GCVE SDDC do not match that of the on-premises site networks.
-* If the IP addressing scheme in on-premises production site differs from the scheme in the target AVS site, select the Replica re-IP (for DR sites with different IP addressing scheme) check box.
+. On the *Home* tab, click on *Replication Job > Virtual machine...*
 +
-image::dr-veeam-anf-image2.png[]
-
-. Select the VMs to be replicated to Azure NetApp Files datastore attached to a Azure VMware Solution SDDC in the *Virtual* Machines* step. The Virtual machines can be placed on vSAN to fill the available vSAN datastore capacity. In a pilot light cluster, the usable capacity of a 3-node cluster will be limited. The rest of the data can be easily placed on Azure NetApp Files datastores so that the VMs can recovered, and cluster can be expanded to meet the CPU/mem requirements. Click *Add*, then in the *Add Object* window select the necessary VMs or VM containers and click *Add*. Click *Next*.
+image::dr-veeam-gcnv-image06.png[create vm replication job]
 +
-image::dr-veeam-anf-image3.png[]
+{nbsp}
 
-. After that, select the destination as Azure VMware Solution SDDC cluster / host and the appropriate resource pool, VM folder and FSx for ONTAP datastore for VM replicas. Then click *Next*.
-+
-image::dr-veeam-anf-image4.png[]
+. On the *Name* page of the *New Replication Job* wizard, specify a job name and select the appropriate advanced control checkboxes.
 
-. In the next step, create the mapping between source and destination virtual network as needed.
+* Select the Replica seeding check box if connectivity between on-premises and GCP has restricted bandwidth.
+* Select the Network remapping (for GCVE SDDC sites with different networks) check box if segments on the GCVE SDDC do not match that of the on-premises site networks.
+* Select the Replica re-IP (for DR sites with different IP addressing scheme) check box if the IP addressing scheme in the on-premises production site differs from the scheme in the target GCVE site.
 +
-image::dr-veeam-anf-image5.png[]
+image::dr-veeam-gcnv-image07.png[name page]
++
+{nbsp}
+
+. On the *Virtual Machines* page, select the VMs to be replicated to the NetApp Volumes datastore attached to a GCVE SDDC. Click *Add*, then in the *Add Object* window select the necessary VMs or VM containers and click *Add*. Click *Next*.
+
+NOTE: The Virtual machines can be placed on vSAN to fill the available vSAN datastore capacity. In a pilot light cluster, the usable capacity of a 3-node vSAN cluster will be limited. The rest of the data can be easily placed on Google Cloud NetApp Volumes datastores so that the VMs can be recovered, and the cluster can later be expanded to meet the CPU/mem requirements.
++
+image::dr-veeam-gcnv-image08.png[select VMs to be replicated]
++
+{nbsp}
+
+. On the *Destination* page, select the destination as the GCVE SDDC cluster / hosts and the appropriate resource pool, VM folder and GCNV datastore for the VM replicas. Click *Next* to continue.
++
+image::dr-veeam-gcnv-image09.png[select destination details]
++
+{nbsp}
+
+. On the *Network* page, create the mapping between source and destination virtual network as needed.
++
+image::dr-veeam-gcnv-image10.png[network mapping]
++
+{nbsp}
+
+
+
+
+
 
 . In the *Job Settings* step, specify the backup repository that will store metadata for VM replicas, retention policy and so on. 
 
