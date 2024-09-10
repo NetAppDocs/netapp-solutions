@@ -57,6 +57,7 @@ image::dr-veeam-gcnv-image01.png[architecture diagram]
 
 This solution requires the following components and configurations:
 
+. NetApp volumes has a Storage Pool available with enough free capacity to accommodate the NFS volume to be created.
 . Veeam Backup and Replication software is running in an on-premises environment with appropriate network connectivity.
 . Ensure the Veeam Backup & Replication backup VM is connected to the source as well as the target GCVE SDDC clusters.
 . Ensure the Veeam Backup & Replication backup VM is connected to the Veeam Proxy server VMs at both the source and target GCVE clusters.
@@ -64,7 +65,7 @@ This solution requires the following components and configurations:
 
 NOTE: Veeam requires a GCVE solution user account with elevated privileges when adding the GCVE vCenter server to the Veeam Backup and Replication inventory. For more information refer to the Google Cloud Platform (GCP)
  documentation at https://cloud.google.com/vmware-engine/docs/private-clouds/classic-console/howto-elevate-privilege[Elevating VMware Enginer priviliges].
- 
+
 *PROVIDE MORE REFERENCES TO OUTSIDE INFORMATION HERE*
 ## . link:https://learn.microsoft.com/en-us/azure/azure-vmware/deploy-azure-vmware-solution?tabs=azure-portal[Deploy Azure VMware Solution (AVS)] private cloud and link:https://learn.microsoft.com/en-us/azure/azure-vmware/# ## attach-azure-netapp-files-to-azure-vmware-solution-hosts?tabs=azure-portal[attach Azure NetApp Files datastores] to Azure VMware Solution hosts.
 ##  +
@@ -88,21 +89,45 @@ Google Cloud NetApp Volumes is accessed from the Google Cloud Platform (GCP) con
 image::dr-veeam-gcnv-image02.png[create volume]
 +
 {nbsp}
+. In the *Create a volume* wizard, fill out all required information:
+* A name for the volume.
+* The Storage Pool on which to create the volume.
+* A share name used when mounting the NFS volume.
+* The capacity of the volume in GiB.
+* The storage protocol to be used.
+* The export rules for accessing the volume. This is the IP addresses of the ESXi adapters on the NFS network.
+* A snapshot schedule used to protect the volume using local snapshots.
+* Optionally, choose to backup the volume and/or create labels for the volume.
++
+image::dr-veeam-gcnv-image03.png[create volume]
++
+{nbsp}
++
+image::dr-veeam-gcnv-image04.png[create volume]
++
+{nbsp}
+Click on *Create* to finish creating the volume.
 
+. Once the volume is created, the NFS export path required to mount the volume can be viewed from the volume's properties page.
++
+image::dr-veeam-gcnv-image05.png[volume properties]
+====
 
-
-
-
-
-
-
-
-.Step 1: Replicate VMs
+.Mount the NFS datastore in GCVE
 [%collapsible]
 ====
-Veeam Backup & Replication leverages VMware vSphere snapshot capabilities/During replication, Veeam Backup & Replication requests VMware vSphere to create a VM snapshot. The VM snapshot is the point-in-time copy of a VM that includes virtual disks, system state, configuration and metadata. Veeam Backup & Replication uses the snapshot as a source of data for replication. 
+At the time of this writing the process to mount a datastore in GCVE involves opening a support ticket with GCP and having a backend administrator create the NFS datastore.
 
-To replicate VMs, follow the below steps:
+Refer to........... PROVIDE REFERENCE INFORMATION HERE.
+
+====
+
+.Replicate VMs to NFS datastore in GCVE
+[%collapsible]
+====
+Veeam Backup & Replication leverages VMware vSphere snapshot capabilities during replication, Veeam Backup & Replication requests VMware vSphere to create a VM snapshot. The VM snapshot is the point-in-time copy of a VM that includes virtual disks, system state, configuration and metadata. Veeam Backup & Replication uses the snapshot as a source of data for replication. 
+
+To replicate VMs, complete the following steps:
 
 . Open the Veeam Backup & Replication Console.
 
