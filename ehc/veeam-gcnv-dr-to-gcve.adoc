@@ -63,8 +63,9 @@ This solution requires the following components and configurations:
 . Ensure the Veeam Backup & Replication backup VM is connected to the Veeam Proxy server VMs at both the source and target GCVE clusters.
 . The backup server must be able to resolve short names and connect to source and target vCenters.
 
-NOTE: Veeam requires a GCVE solution user account with elevated privileges when adding the GCVE vCenter server to the Veeam Backup and Replication inventory. For more information refer to the Google Cloud Platform (GCP)
- documentation at https://cloud.google.com/vmware-engine/docs/private-clouds/classic-console/howto-elevate-privilege[Elevating VMware Enginer priviliges].
+
+
+NOTE: Veeam requires a GCVE solution user account with elevated privileges when adding the GCVE vCenter server to the Veeam Backup and Replication inventory. For more information refer to the Google Cloud Platform (GCP) documentation at https://cloud.google.com/vmware-engine/docs/private-clouds/classic-console/howto-elevate-privilege[Elevating VMware Enginer priviliges].
 
 *PROVIDE MORE REFERENCES TO OUTSIDE INFORMATION HERE*
 ## . link:https://learn.microsoft.com/en-us/azure/azure-vmware/deploy-azure-vmware-solution?tabs=azure-portal[Deploy Azure VMware Solution (AVS)] private cloud and link:https://learn.microsoft.com/en-us/azure/azure-vmware/# ## attach-azure-netapp-files-to-azure-vmware-solution-hosts?tabs=azure-portal[attach Azure NetApp Files datastores] to Azure VMware Solution hosts.
@@ -76,11 +77,16 @@ NOTE: Veeam requires a GCVE solution user account with elevated privileges when 
 The following sections outline the deployment steps to implement and test a VMware Site Recovery Manager configuration with ONTAP storage system.
 
 === Create GCNV NFS volume and datastore for GCVE
+Refer to https://cloud.google.com/vmware-engine/docs/vmware-ecosystem/howto-cloud-volumes-datastores-gcve[Using NFS volume as vSphere datastore hosted by Google Cloud NetApp Volumes] for an overview of how to Google Cloud NetApp Volumes as a datastore for GCVE.
+
+Complete the following steps to create and use an NFS datastore for GCVE using NetApp Volumes:
 
 .Create GCNV NFS volume
 [%collapsible]
 ====
 Google Cloud NetApp Volumes is accessed from the Google Cloud Platform (GCP) console.
+
+Refer to https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/create-volume[Create a volume] in the Google Cloud NetApp Volumes documentation for detailed information on this step.
 
 . In a web browser, navigate to https://console.cloud.google.com/ and log into your GCP console. Search for *NetApp Volumes* to get started.
 
@@ -95,6 +101,7 @@ image::dr-veeam-gcnv-image02.png[create volume]
 * A share name used when mounting the NFS volume.
 * The capacity of the volume in GiB.
 * The storage protocol to be used.
+* Check the box to *Block volume from deletion when clients are connected* (required by GCVE when mounting as a datastore).
 * The export rules for accessing the volume. This is the IP addresses of the ESXi adapters on the NFS network.
 * A snapshot schedule used to protect the volume using local snapshots.
 * Optionally, choose to backup the volume and/or create labels for the volume.
@@ -116,11 +123,12 @@ image::dr-veeam-gcnv-image05.png[volume properties]
 .Mount the NFS datastore in GCVE
 [%collapsible]
 ====
-At the time of this writing the process to mount a datastore in GCVE involves opening a support ticket with GCP and having a backend administrator create the NFS datastore.
+At the time of this writing the process to mount a datastore in GCVE requires opening a GCP support ticket to have the volume mounted as an NFS datastore.
 
-Refer to........... PROVIDE REFERENCE INFORMATION HERE.
-
+Refer to https://cloud.google.com/vmware-engine/docs/vmware-ecosystem/howto-cloud-volumes-datastores-gcve[Using NFS volume as vSphere datastore hosted by Google Cloud NetApp Volumes] for more information.
 ====
+
+=== Replicate VMs to GCVE and execute failover, failback plans
 
 .Replicate VMs to NFS datastore in GCVE
 [%collapsible]
@@ -135,7 +143,7 @@ To replicate VMs, complete the following steps:
 
 . Specify a job name and select the appropriate advanced control checkbox. Click Next.
 * Select the Replica seeding check box if connectivity between on-premises and Azure has restricted bandwidth.
-*Select the Network remapping (for AVS SDDC sites with different networks) check box if segments on Azure VMware Solution SDDC do not match that of on-premises site networks.
+* Select the Network remapping (for AVS SDDC sites with different networks) check box if segments on the GCVE SDDC do not match that of the on-premises site networks.
 * If the IP addressing scheme in on-premises production site differs from the scheme in the target AVS site, select the Replica re-IP (for DR sites with different IP addressing scheme) check box.
 +
 image::dr-veeam-anf-image2.png[]
@@ -175,7 +183,7 @@ image::dr-veeam-anf-image9.png[]
 For additional information for Veeam replication, refer link:https://helpcenter.veeam.com/docs/backup/vsphere/replication_process.html?ver=120[How Replication Works]
 ====
 
-.Step 2: Create a failover plan
+Create a failover plan
 [%collapsible]
 ====
 When the initial replication or seeding is complete, create the failover plan. Failover plan helps in performing failover for dependent VMs one by one or as a group automatically. Failover plan is the blueprint for the order in which the VMs are processed including the boot delays. The failover plan also helps to ensure that critical dependant VMs are already running. 
