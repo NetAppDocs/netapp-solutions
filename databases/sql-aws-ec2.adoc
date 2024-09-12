@@ -130,15 +130,15 @@ To create volumes and LUNs for SQL Server, complete the following steps:
 
 . Create an Amazon FSx for the NetApp ONTAP file system using the Standard Create option under Creation Method. This allows you to define FSxadmin and vsadmin credentials.
 +
-image::sql-awsec2-image1.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image1.png["Figure showing input/output dialog or representing written content"]
 
 . Specify the password for fsxadmin.
 +
-image::sql-awsec2-image2.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image2.png["Figure showing input/output dialog or representing written content"]
 
 . Specify the password for SVMs.
 +
-image::sql-awsec2-image3.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image3.png["Figure showing input/output dialog or representing written content"]
 
 . Create volumes by following the step listed in https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-volumes.html[Creating a volume on FSx for NetApp ONTAP^].
 +
@@ -177,7 +177,7 @@ Set-Service -Name msiscsi -StartupType Automatic
 Get-InitiatorPort | select NodeAddress
 ....
 +
-image::sql-awsec2-image4.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image4.png["Figure showing input/output dialog or representing written content"]
 
 . Connect to Storage virtual machines (SVM) using putty and create an iGroup.
 +
@@ -191,7 +191,7 @@ igroup create -igroup igrp_ws2019sql1 -protocol iscsi -ostype windows -initiator
 lun create -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -size 700GB -ostype windows_2008 -space-allocation enabled lun create -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -size 100GB -ostype windows_2008 -space-allocation enabled
 ....
 +
-image::sql-awsec2-image5.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image5.png["Figure showing input/output dialog or representing written content"]
 
 . To achieve I/O alignment with the OS partitioning scheme, use windows_2008 as the recommended LUN type. Refer https://docs.netapp.com/us-en/ontap/san-admin/io-misalignments-properly-aligned-luns-concept.html[here^] for additional information.
 
@@ -202,23 +202,23 @@ lun show
 lun map -path /vol/vol_awssqlprod01_data/lun_awssqlprod01_data -igroup igrp_awssqlprod01lun map -path /vol/vol_awssqlprod01_log/lun_awssqlprod01_log -igroup igrp_awssqlprod01
 ....
 +
-image::sql-awsec2-image6.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image6.png["Figure showing input/output dialog or representing written content"]
 
 . For a shared disk that uses the Windows Failover Cluster, run an SSH command to map the same LUN to the igroup that belong to all servers that participate in the Windows Failover Cluster.
 
 . Connect Windows Server to an SVM with an iSCSI target. Find the target IP address from AWS Portal.
 +
-image::sql-awsec2-image7.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image7.png["Figure showing input/output dialog or representing written content"]
 
 . From Server Manager and the Tools menu,  select the iSCSI Initiator. Select the Discovery tab and then select Discover Portal. Supply the iSCSI IP address from previous step and select Advanced. From Local Adapter, select Microsoft iSCSI Initiator. From Initiator IP, select the IP of the server. Then select OK to close all windows.
 +
-image::sql-awsec2-image8.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image8.png["Figure showing input/output dialog or representing written content"]
 
 . Repeat step 12 for the second iSCSI IP from the SVM.
 +
 . Select the *Targets* tab,  select *Connect*,  and select *Enable muti-path*.
 +
-image::sql-awsec2-image9.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image9.png["Figure showing input/output dialog or representing written content"]
 
 . For best performance, add more sessions; NetApp recommends creating five iSCSI sessions. Select *Properties *> *Add session *> *Advanced* and repeat step 12.
 +
@@ -227,7 +227,7 @@ $TargetPortals = ('10.2.1.167', '10.2.2.12')
 foreach ($TargetPortal in $TargetPortals) {New-IscsiTargetPortal -TargetPortalAddress $TargetPortal}
 ....
 +
-image::sql-awsec2-image10.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image10.png["Figure showing input/output dialog or representing written content"]
 
 *Best practices*
 
@@ -245,7 +245,7 @@ Connect-IscsiTarget -IsMultipathEnabled $true -NodeAddress $target.NodeAddress -
 }
 ....
 +
-image::sql-awsec2-image11.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image11.png["Figure showing input/output dialog or representing written content"]
 
 . Initialize disks with the following PowerShell command.
 +
@@ -254,7 +254,7 @@ $disks = Get-Disk | where PartitionStyle -eq raw
 foreach ($disk in $disks) {Initialize-Disk $disk.Number}
 ....
 +
-image::sql-awsec2-image12.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image12.png["Figure showing input/output dialog or representing written content"]
 
 . Run the Create Partition and Format Disk commands with PowerShell.
 +
@@ -315,7 +315,7 @@ For version compatibility, see the https://mysupport.netapp.com/matrix/[NetApp I
 ====
 The following figure depicts some considerations for creating the Microsoft SQL Server database storage layout when backing up with SnapCenter.
 
-image::sql-awsec2-image13.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image13.png["Figure showing input/output dialog or representing written content"]
 
 *Best practices*
 
@@ -344,15 +344,15 @@ After Installing SnapCenter, complete the following steps to set it up.
 
 . To set up credentials, select *Settings* > *New* and then enter the credential information.
 +
-image::sql-awsec2-image14.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image14.png["Figure showing input/output dialog or representing written content"]
 
 . Add the storage system by selecting Storage Systems > New and the provide the appropriate FSx for ONTAP storage information.
 +
-image::sql-awsec2-image15.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image15.png["Figure showing input/output dialog or representing written content"]
 
 . Add hosts by selecting *Hosts* > *Add*, and then provide the host information. SnapCenter automatically installs the Windows and SQL Server plug-in. This process might take some time.
 +
-image::sql-awsec2-image16.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image16.png["Figure showing input/output dialog or representing written content"]
 
 After all Plug-ins are installed, you must configure the log directory. This is the location where the transaction log backup resides. You can configure the log directory by selecting the host and then select configure the log directory.
 
@@ -368,11 +368,11 @@ The host log directory sizing formula assumes the following:
 * A system database backup that does not include the tempdb database
 * A 10% LUN overhead spacePlace the host log directory on a dedicated volume or LUN. The amount of data in the host log directory depends on the size of the backups and the number of days that backups are retained. 
 +
-image::sql-awsec2-image17.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image17.png["Figure showing input/output dialog or representing written content"]
 +
 If the LUNs have already been provisioned, you can select the mount point to represent the host log directory.
 +
-image::sql-awsec2-image18.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image18.png["Figure showing input/output dialog or representing written content"]
 ====
 
 Now you are ready to perform backup, restore and clone operations for SQL Server.
@@ -390,23 +390,23 @@ After placing the database and log files on the FSx ONTAP LUNs, SnapCenter can b
 
 . Select *Resources*, and then select *Microsoft SQL Server *on the drop-down menu on the top left. Select *Refresh Resources*.
 +
-image::sql-awsec2-image19.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image19.png["Figure showing input/output dialog or representing written content"]
 
 . Select the database to be backed up, then select *Next* and (**) to add the policy if one has not been created. Follow the *New SQL Server Backup Policy* to create a new policy.
 +
-image::sql-awsec2-image20.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image20.png["Figure showing input/output dialog or representing written content"]
 
 . Select the verification server if necessary. This server is the server that SnapCenter runs DBCC CHECKDB after a full backup has been created. Click *Next* for notification, and then select *Summary* to review. After reviewing, click *Finish*.
 +
-image::sql-awsec2-image21.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image21.png["Figure showing input/output dialog or representing written content"]
 
 . Click *Back up Now* to test the backup. In the pop- up windows, select *Backup*.
 +
-image::sql-awsec2-image22.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image22.png["Figure showing input/output dialog or representing written content"]
 
 . Select *Monitor* to verify that the backup has been completed.
 +
-image::sql-awsec2-image23.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image23.png["Figure showing input/output dialog or representing written content"]
 
 *Best Practices*
 
@@ -423,13 +423,13 @@ Complete the following steps to restore an individual database to a specific poi
 
 . Select Resources and then select the database that you would like to restore.
 +
-image::sql-awsec2-image24.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image24.png["Figure showing input/output dialog or representing written content"]
 
 . Select the backup name that the database needs to be restored from and then select restore.
 . Follow the *Restore* pop-up windows to restore the database.
 . Select *Monitor* to verify that the restore process is successful.
 +
-image::sql-awsec2-image25.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image25.png["Figure showing input/output dialog or representing written content"]
 ====
 
 .Considerations for an instance with a large number of small-to-large size databases
@@ -496,12 +496,12 @@ The following step are used to clone databases to the new SQL server instance ru
 . Select Resources, and then the database that you would like to clone.
 . Select the backup name that you would like to clone, and then select Clone.
 +
-image::sql-awsec2-image26.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image26.png["Figure showing input/output dialog or representing written content"]
 
 . Follow the Clone from Backup instructions by providing the new SQL Server instance on EC2 and instance name to finish the clone process.
 . Select Monitor to make sure that cloning is completed.
 +
-image::sql-awsec2-image27.png["Figure showing input/output dialog or representing written content"]
+image:sql-awsec2-image27.png["Figure showing input/output dialog or representing written content"]
 =====
 ====
 
