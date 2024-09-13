@@ -1,0 +1,85 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-n_use_case_openshift_virtualization_bpg.html
+keywords: OpenShift, OCP, Trident, NetApp ONTAP, Red Hat OpenShift, OpenShift Virtualization, CNV, Container Native Virtualization, Red Hat OpenShift Virtualization
+summary: Best practices recommendations for VMs in Red Hat OpenShift Virtualization 
+---
+
+= Best practices recommendations for VMs in Red Hat OpenShift Virtualization
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media/
+
+Author: Banu Sundhar, NetApp
+
+[.lead]
+This section describes the different factors you should consider when deploying new VMs or when importing existing VMs from a VMware environment into OpenShift Virtualization on OpenShift Container Platform.
+
+NetApp Cloud Insights is a cloud infrastructure monitoring tool that gives you visibility into your complete infrastructure. With Cloud Insights, you can monitor, troubleshoot, and optimize all your resources including your public clouds and your private data centers. For more information about NetApp Cloud Insights, refer to the https://docs.netapp.com/us-en/cloudinsights[Cloud Insights documentation].
+
+== VM performance
+
+When creating a new VM in OpenShift Virtualization, you need to consider the access pattern along with performance (IOPs and throughput) requirements of the workload that will run on the VM. This will influence the number of VMs you will need to run on the OpenShift Virtualization in an OpenShift Container platform and the type of storage that you need to use for the VM disks. 
+
+The type of storage you want to choose for your VM disks are influenced by the following factors:
+
+* The protocol access you need for data access of your workloads
+* The access modes you need (RWO vs RWX)
+* The performance characteristics you need for your workloads 
+
+See the Storage Configuration section for more details.
+
+== High Availability of VM workloads
+OpenShift Virtualization supports Live migrations of a VM. Live migration allows a running Virtual Machine Instance (VMI) to move to another node without interrupting the workload. Migration can be helpful for a smooth transition during cluster upgrades or any time a node needs to be drained for maintenance or configuration changes.
+Live migration requires the use of a shared storage solution that provides ReadWriteMany (RWX) access mode. The VM disks should be backed by storage option that provides RWX access mode. OpenShift Virtualization will check that a VMI is **live migratable** and if so the **evictionStrategy** will be set to **LiveMigrate**. See link:https://docs.openshift.com/container-platform/latest/virt/live_migration/virt-about-live-migration.html[About live migration section in Red Hat documentation] for details.
+
+It is important that you use a driver that supports RWX access mode. 
+See the Storage Configuration section for more details about what deivers support RWX access mode. 
+
+It is important that you use a driver that supports RWX access mode. 
+See the Storage Configuration section for more details about what drivers support RWX access mode. 
+
+== Storage Configuration 
+
+Trident CSI provisioner provides several drivers (nas, nas-economy, nas-flexgroup, san and san-economy) for provisioning storage backed by NetApp storage options. 
+Protocols used:
+* nas drivers use NAS protocols (NFS and SMB) 
+* san drivers use iSCSI or NVMe/TCP protocol
+
+The following can help you decide how you want the storage configuration based on the workload requirements and storage utilization.
+
+
+* nas driver creates one persistent volume (PV) on one FlexVolume.
+* nas-economy driver creates one PV on a qtree on a shared FlexVolume. (one FlexVolume for every 200 PVs, configurable between 50 and 300)
+* nas-flexgroup driver creates on one PV on one FlexGroup 
+* san driver creates one PV on LUN on a dedicated FlexVolume 
+* san-economy driver creates one PV on LUN on shared FlexVolume (one FlexVolume for every 100 PVs, configurable between 50 and 200)
+
+The following diagram illustrates this.
+image::redhat_openshift_bpg_image1.png[drivers]
+
+Also, the access modes supported by the drivers differ.
+
+The ONTAP nas drivers support 
+* Filesystem access and RWO, ROX, RWX, RWOP access modes. 
+ONTAP san drivers on the other hand support raw block as well as filesystem modes. 
+* In the raw block mode, it can support RWO, ROX, RWX, RWOP access modes. 
+* In the filesystem mode, only RWO, RWOP access modes are permitted.
+
+Live migration of OpenShift Virtualization VMs require the disks to have RWX access modes. So, it is important that you choose nas drivers or san drivers in raw block volume mode to create PVCs and PVs backed by ONTAP. 
+
+== Storage Configuration Best Practices:
+
+=== Dedicated SVMs:
+
+Storage Virtual Machines (SVMs) provide isolation and administrative separation between tenants on an ONTAP system. Dedicating an SVM to OpenShift containers and to OpenShift Virtualization VMs enables the delegation of privileges and enables applying best practices for limiting resource consumption.
+
+=== Limit the maximum volume count on the SVM:
+
+To prevent Trident from consuming all the available volumes on the storage system, you should set a limit on the SVM. You can do this from the command line:
+[source, cli]
+vserver modify -vserver <svm_name> -max-volumes <num_of_volumes>
+
+The max-volumes value is the total volumes provisioned across all the nodes in the ONTAP cluster, and not on an individual ONTAP node. As a result, you might encounter some conditions where an ONTAP cluster node might have far more or less Trident provisioned volumes than another node. To avoid this, ensure that equal number of aggregates from each node in the cluster are assigned to the SVM used by Trident.
