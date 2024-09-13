@@ -5,13 +5,13 @@ keywords: netapp, vmware, cloud, foundation, vcf, aff, all-flash, nfs, vvol, vvo
 summary:
 ---
 
+= Use VMware Site Recovery Manager for Disaster Recovery of NFS datastores
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
-:imagesdir: ./../media/
+:imagesdir: ../media/
 
-== Use VMware Site Recovery Manager for Disaster Recovery of NFS datastores
 [.lead]
 The utilization of ONTAP tools for VMware vSphere 10 and the Site Replication Adapter (SRA) in conjunction with VMware Site Recovery Manager (SRM) brings significant value to disaster recovery efforts. ONTAP tools 10 provide robust storage capabilities, including native high availability and scalability for the VASA Provider, supporting iSCSI and NFS vVols. This ensures data availability and simplifies the management of multiple VMware vCenter servers and ONTAP clusters. By using the SRA with VMware Site Recovery Manager, organizations can achieve seamless replication and failover of virtual machines and data between sites, enabling efficient disaster recovery processes. The combination of ONTAP tools and the SRA empowers businesses to protect critical workloads, minimize downtime, and maintain business continuity in the face of unforeseen events or disasters.
 
@@ -21,7 +21,7 @@ The SRA is used together with SRM to manage the replication of VM data between p
 
 In this scenario we will demonstrate how to deploy and use VMWare Site Recovery manager to protect datastores and run both a test and final failover to a secondary site. Reprotection and failback are also discussed.
 
-=== Scenario Overview
+== Scenario Overview
 
 This scenario covers the following high level steps:
 
@@ -32,13 +32,13 @@ This scenario covers the following high level steps:
 * Conduct test and final failover.
 * Discuss reprotection and failback.
 
-=== Architecture
+== Architecture
 The following diagram shows a typical VMware Site Recovery architecture with ONTAP tools for VMware vSphere 10 configured in a 3-node high availability configuration.
 
-image::vmware-nfs-srm-image05.png[Configure appliance]
+image:vmware-nfs-srm-image05.png[Configure appliance]
 {nbsp}
 
-=== Prerequisites
+== Prerequisites
 This scenario requires the following components and configurations:
 
 * vSphere 8 clusters installed at both the primary and secondary locations with suitable networking for communications between environments. 
@@ -55,17 +55,17 @@ For network guidance on using ONTAP with VMware vSphere refer to the https://doc
 
 For NetApp documentation on using ONTAP storage with VMware SRM refer to https://docs.netapp.com/us-en/ontap-apps-dbs/vmware/vmware-srm-overview.html#why-use-ontap-with-srm[VMware Site Recovery Manager with ONTAP]
 
-=== Deployment Steps
+== Deployment Steps
 The following sections outline the deployment steps to implement and test a VMware Site Recovery Manager configuration with ONTAP storage system.
 
-==== Create SnapMirror relationship between ONTAP storage systems
+=== Create SnapMirror relationship between ONTAP storage systems
 A SnapMirror relationship must be established between the source and destination ONTAP storage systems, for the datastore volumes to be protected.
 
 Refer to ONTAP documentation starting https://docs.netapp.com/us-en/ontap/data-protection/snapmirror-replication-workflow-concept.html[HERE] for complete information on creating SnapMirror relationships for ONTAP volumes.
 
 Step-by-step instructions are outline in the following document, located https://docs.netapp.com/us-en/netapp-solutions/ehc/aws-guest-dr-solution-overview.html#assumptions-pre-requisites-and-component-overview[HERE]. These steps outline how to create cluster peer and SVM peer relationships and then SnapMirror relationships for each volume. These steps can be performed in ONTAP System Manager or using the ONTAP CLI.
 
-==== Configure the SRM appliance
+=== Configure the SRM appliance
 Complete the following steps to configure the SRM appliance and SRA adapter.
 
 .Connect the SRM appliance for primary and secondary sites
@@ -73,20 +73,20 @@ Complete the following steps to configure the SRM appliance and SRA adapter.
 ==== 
 The following steps must be completed for both the primary and secondary sites. 
 
-. In a web browser, navigate to https://<SRM_appliance_IP>:5480 and log in. Click on *Configure Appliance* to get started.
+. In a web browser, navigate to `https://<SRM_appliance_IP>:5480` and log in. Click on *Configure Appliance* to get started.
 +
-image::vmware-nfs-srm-image01.png[Configure appliance]
+image:vmware-nfs-srm-image01.png[Configure appliance]
 +
 {nbsp}
 . On the *Platform Services Controller* page of the Configure Site Recovery Manager wizard, fill in the credentials of the vCenter server to which SRM will be registered. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image02.png[platform services controller]
+image:vmware-nfs-srm-image02.png[platform services controller]
 +
 {nbsp}
 . On the *vCenter Server* page, view the connected vServer and click on *Next* to continue.
 . On the *Name and extension* page, fill in a name for the SRM site, an administrators email address, and the local host to be used by SRM. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image03.png[Configure appliance]
+image:vmware-nfs-srm-image03.png[Configure appliance]
 +
 {nbsp}
 . On the *Ready to complete* page review the summary of changes 
@@ -100,13 +100,13 @@ Complete the following steps to configure the SRA on the SRM appliance:
 . Download the SRA for ONTAP tools 10 at the https://mysupport.netapp.com/site/products/all/details/otv10/downloads-tab[NetApp support site] and save the tar.gz file to a local folder.
 . From the SRM management appliance click on *Storage Replication Adapters* in the left hand menu and then on *New Adapter*.
 +
-image::vmware-nfs-srm-image04.png[Add new SRM adapter]
+image:vmware-nfs-srm-image04.png[Add new SRM adapter]
 +
 {nbsp}
 . Follow the steps outlined on the ONTAP tools 10 documentation site at https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/protect/configure-on-srm-appliance.html[Configure SRA on the SRM appliance]. Once complete, the SRA can communicate with SRA using the provided IP address and credentials of the vCenter server.
 ====
 
-==== Configure Site Recovery for SRM
+=== Configure Site Recovery for SRM
 Complete the following steps to configure Site Pairing, create Protection Groups, 
 
 .Configure Site Pairing for SRM
@@ -116,33 +116,33 @@ The following step is completed in the vCenter client of the primary site.
 
 . In the vSphere client click on *Site Recovery* in the left hand menu. A new browser windows opens to the SRM management UI on the primary site.
 +
-image::vmware-nfs-srm-image06.png[Site Recovery]
+image:vmware-nfs-srm-image06.png[Site Recovery]
 +
 {nbsp}
 . On the *Site Recovery* page, click on *NEW SITE PAIR*.
 +
-image::vmware-nfs-srm-image07.png[Site Recovery]
+image:vmware-nfs-srm-image07.png[Site Recovery]
 +
 {nbsp}
 . On the *Pair type* page of the *New Pair wizard*, verify that the local vCenter server is selected and select the *Pair type*. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image08.png[Pair type]
+image:vmware-nfs-srm-image08.png[Pair type]
 +
 {nbsp}
 . On the *Peer vCenter* page fill out the credentials of the vCenter at the secondary site and click on *Find vCenter Instances*. Verify the the vCenter instance has been discovered and click on *Next* to continue.
 +
-image::vmware-nfs-srm-image09.png[Peer vCenter]
+image:vmware-nfs-srm-image09.png[Peer vCenter]
 +
 {nbsp}
 . On the *Services* page, check the box next the proposed site pairing. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image10.png[Services]
+image:vmware-nfs-srm-image10.png[Services]
 +
 {nbsp}
 . On the *Ready to complete* page, review the proposed configuration and then click on the *Finish* button to create the Site Pairing
 . The new Site Pair and its summary can be viewed on the Summary page.
 +
-image::vmware-nfs-srm-image11.png[Site pair summary]
+image:vmware-nfs-srm-image11.png[Site pair summary]
 ====
 
 .Add an Array Pair for SRM
@@ -152,27 +152,27 @@ The following step is completed in the Site Recovery interface of the primary si
 
 . In the Site Recovery interface navigate to *Configure > Array Based Replication > Array Pairs* in the left hand menu. Click on *ADD* to get started.
 +
-image::vmware-nfs-srm-image12.png[Array pairs]
+image:vmware-nfs-srm-image12.png[Array pairs]
 +
 {nbsp}
 . On the *Storage replication adapter* page of the *Add Array Pair* wizard, verify the SRA adapter is present for the primary site and click on *Next* to continue.
 +
-image::vmware-nfs-srm-image13.png[Add array pair]
+image:vmware-nfs-srm-image13.png[Add array pair]
 +
 {nbsp}
 . On the *Local array manager* page, enter a name for the array at the primary site, the FQDN of the storage system, the SVM IP addresses serving NFS, and optionally, the names of specific volumes to be discovered. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image14.png[Local array manager]
+image:vmware-nfs-srm-image14.png[Local array manager]
 +
 {nbsp}
 . On the *Remote array manager* fill out the same information as the last step for the ONTAP storage system at the secondary site.
 +
-image::vmware-nfs-srm-image15.png[Remote array manager]
+image:vmware-nfs-srm-image15.png[Remote array manager]
 +
 {nbsp}
 . On the *Array pairs* page, select the array pairs to enable and click on *Next* to continue.
 +
-image::vmware-nfs-srm-image16.png[Array pairs]
+image:vmware-nfs-srm-image16.png[Array pairs]
 +
 {nbsp}
 . Review the information on the *Ready to complete* page and click on *Finish* to create the array pair.
@@ -185,32 +185,32 @@ The following step is completed in the Site Recovery interface of the primary si
 
 . In the Site Recovery interface click on the *Protection Groups* tab and then on *New Protection Group* to get started.
 +
-image::vmware-nfs-srm-image17.png[Site Recovery]
+image:vmware-nfs-srm-image17.png[Site Recovery]
 +
 {nbsp}
 . On the *Name and direction* page of the *New Protection Group* wizard, provide a name for the group and choose the site direction for protection of the data.
 +
-image::vmware-nfs-srm-image18.png[Name and direction]
+image:vmware-nfs-srm-image18.png[Name and direction]
 +
 {nbsp}
 . On the *Type* page select the protection group type (datastore, VM, or vVol) and select the array pair. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image19.png[Type]
+image:vmware-nfs-srm-image19.png[Type]
 +
 {nbsp}
 . On the *Datastore groups* page, select the datastores to include in the protection group. VMs currently residing on the datastore are displayed for each datastore selected. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image20.png[Datastore groups]
+image:vmware-nfs-srm-image20.png[Datastore groups]
 +
 {nbsp}
 . On the *Recovery plan* page, optionally choose to add the protection group to a recovery plan. In this case, the recovery plan is not yet created so *Do not add to recovery plan* is selected. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image21.png[Recovery plan]
+image:vmware-nfs-srm-image21.png[Recovery plan]
 +
 {nbsp}
 . On the *Ready to complete* page, review the new protection group parameters and click on *Finish* to create the group.
 +
-image::vmware-nfs-srm-image22.png[Recovery plan]
+image:vmware-nfs-srm-image22.png[Recovery plan]
 ====
 
 .Configure Recovery Plan for SRM
@@ -220,28 +220,28 @@ The following step is completed in the Site Recovery interface of the primary si
 
 . In the Site Recovery interface click on the *Recovery plan* tab and then on *New Recovery Plan* to get started.
 +
-image::vmware-nfs-srm-image23.png[New recovery plan]
+image:vmware-nfs-srm-image23.png[New recovery plan]
 +
 {nbsp}
 . On the *Name and direction* page of the *Create Recovery Plan* wizard, provide a name for the recovery plan and choose the direction between source and destination sites. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image24.png[Name and direction]
+image:vmware-nfs-srm-image24.png[Name and direction]
 +
 {nbsp}
 . On the *Protection groups* page, select the previously created protection groups to include in the recovery plan. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image25.png[Protection groups]
+image:vmware-nfs-srm-image25.png[Protection groups]
 +
 {nbsp}
 . On the *Test Networks* configure specific networks that will be used during the test of the plan. If no mapping exists or if no network is selected, an isolated test network will be created. Click on *Next* to continue.
 +
-image::vmware-nfs-srm-image26.png[Test networks]
+image:vmware-nfs-srm-image26.png[Test networks]
 +
 {nbsp}
 . On the *Ready to complete* page, review the chosen parameters and then click on *Finish* to create the recovery plan.
 ====
 
-=== Disaster recovery operations with SRM
+== Disaster recovery operations with SRM
 In this section various functions of using disaster recovery with SRM will be covered including, testing failover, performing failover, performing reprotection and failback.
 
 Refer to https://docs.netapp.com/us-en/ontap-apps-dbs/vmware/vmware-srm-operational_best_practices.html[Operational best practices] for more information on using ONTAP storage with SRM disaster recovery operations.
@@ -253,22 +253,22 @@ The following step is completed in the Site Recovery interface.
 
 . In the Site Recovery interface click on the *Recovery plan* tab and then select a recovery plan. Click on the *Test* button to begin testing failover to the secondary site.
 +
-image::vmware-nfs-srm-image27.png[Test failover]
+image:vmware-nfs-srm-image27.png[Test failover]
 +
 {nbsp}
 . You can view the progress of the test from the Site Recovery task pane as well the vCenter task pane. 
 +
-image::vmware-nfs-srm-image28.png[test failover in task pane]
+image:vmware-nfs-srm-image28.png[test failover in task pane]
 +
 {nbsp}
 . SRM sends commands via the SRA to the secondary ONTAP storage system. A FlexClone of the most recent snapshot is created and mounted at the secondary vSphere cluster. The newly mounted datastore can be viewed in the storage inventory. 
 +
-image::vmware-nfs-srm-image29.png[Newly mounted datastore]
+image:vmware-nfs-srm-image29.png[Newly mounted datastore]
 +
 {nbsp}
 . Once the test has completed, click on *Cleanup* to unmount the datastore and revert back to the original environment.
 +
-image::vmware-nfs-srm-image30.png[Newly mounted datastore]
+image:vmware-nfs-srm-image30.png[Newly mounted datastore]
 ====
 
 .Run Recovery Plan with SRM
@@ -278,12 +278,12 @@ Perform a full recovery and failover to the secondary site.
 
 . In the Site Recovery interface click on the *Recovery plan* tab and then select a recovery plan. Click on the *Run* button to begin failover to the secondary site.
 +
-image::vmware-nfs-srm-image31.png[Run failover]
+image:vmware-nfs-srm-image31.png[Run failover]
 +
 {nbsp} 
 . Once the failover is complete you can see the datastore mounted and the VMs registered at the secondary site.
 +
-image::vmware-nfs-srm-image32.png[Filover complete]
+image:vmware-nfs-srm-image32.png[Filover complete]
 ====
 
 Additional functions are possible in SRM once a failover has completed.
@@ -292,7 +292,7 @@ Additional functions are possible in SRM once a failover has completed.
 
 *Failback*: A failback operation is a reverse failover, returning operations to the original site. It's crucial to ensure that the original site has regained functionality before initiating the failback process. To ensure a smooth failback, it's recommended to conduct a test failover after completing the reprotection process and before executing the final failback. This practice serves as a verification step, confirming that the systems at the original site are fully capable of handling the operation. By following this approach, you can minimize risks and ensure a more reliable transition back to the original production environment.
 
-=== Additional information
+== Additional information
 
 For NetApp documentation on using ONTAP storage with VMware SRM refer to https://docs.netapp.com/us-en/ontap-apps-dbs/vmware/vmware-srm-overview.html#why-use-ontap-with-srm[VMware Site Recovery Manager with ONTAP]
 
