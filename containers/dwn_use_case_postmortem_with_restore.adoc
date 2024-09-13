@@ -4,6 +4,7 @@ permalink: containers/dwn_use_case_postmortem_with_restore.html
 keywords: NetApp Astra Control, Astra Control Center, Application, Trident, Astra Trident, Helm, Operator, ONTAP, OpenShift, Kubernetes, Red Hat OpenShift, DevOps, Data Protection, CI/CD, Clone, App Restore, Post-mortem Analysis
 summary: NetApp Astra Control Center offers a rich set of storage and application-aware data management services for stateful Kubernetes workloads, deployed in an on-prem environment, powered by NetApp’s trusted data protection technology.
 ---
+
 = Use Astra Control to facilitate post-mortem analysis and restore the application
 :hardbreaks:
 :nofooter:
@@ -20,7 +21,7 @@ In the link:dwn_use_case_integrated_data_protection.html[first use case], we dem
 
 In a traditional workflow, after encountering a failure when the application is upgraded to a new version, the development team would attempt to troubleshoot the issue in real time based on bug reports being provided by customers. Alternatively, at the first sign of trouble, the team could attempt to redeploy the application to a parallel debugging environment to take that process offline. They could redeploy an older code base from a previous version into production, which would restore the application to working order.
 
-image::dwn_image9.jpg[Traditional workflow]
+image:dwn_image9.jpg[Traditional workflow]
 
 Although this approach works, the team would have to make sure that the state of the broken production app matched that of the version seen in production when the issues occurred. They would also have to spend time promoting the known-good build into production by fetching code from their repository and redeploying the machine images to restore the application to a good running state. Also, in this scenario, we didn't consider whether the production database itself was corrupted by the faulty code. Ideally, there are separate backup processes in place for the database data, but must we assume that they’re consistent with the state of the application as it was published? This is where the benefits of stateful and application-consistent backups, restores and clones with Astra Control really show their value.
 
@@ -28,7 +29,7 @@ First, we can use Astra Control to facilitate post-mortem analysis on the state 
 
 Furthermore, Astra Control supports the in-place restore capability that allows us to restore the production application to a last acceptable backup (that preceded the afflicted version of code). The restored version assumes the position of the previous, buggy production application, in an application-consistent and stateful manner, including the ingress IP previously assigned. As a result, customers accessing the front end would be unaware of the transition to the backup version.
 
-image::dwn_image10.jpg[Post-mortem workflow]
+image:dwn_image10.jpg[Post-mortem workflow]
 
 == Use-case validation prerequisites
 
@@ -48,7 +49,7 @@ The following tools or platforms were deployed and configured as prerequisites:
 
 Considering that the application has been upgraded to a new version, the application in the production environment (`magento-prod`) isn’t behaving as intended after the upgrade. Let's assume that the data being returned by front-end queries doesn’t match the request or that the database has in fact been corrupted. To clone and restore the pipeline, complete the following steps:
 
-image::dwn_image12.jpg[Failed App]
+image:dwn_image12.jpg[Failed App]
 
 . Log into Jenkins and create a pipeline by clicking New Item and then Pipeline.
 
@@ -73,15 +74,15 @@ DEBUG_KUBERNETES_CLUSTER = 'ocp-vmw'
 
 . Click Build Now. The pipeline starts executing and progresses through the steps. The application is first cloned in the current state to a debug environment, and the application is then restored to the known-working backup.
 +
-image::dwn_image15.jpg[Post-mortem pipeline]
+image:dwn_image15.jpg[Post-mortem pipeline]
 
 . Verify that the cloned application is the bug-containing version.
 +
-image::dwn_image13.jpg[Failed Cloned App]
+image:dwn_image13.jpg[Failed Cloned App]
 
 . Verify that the production environment is restored to a working backup, and the application in production works as expected.
 +
-image::dwn_image14.jpg[Restored Prod App]
+image:dwn_image14.jpg[Restored Prod App]
 
 These two operations in tandem expedite the return to normal business operations. To see this use case in action, watch the video below.
 
