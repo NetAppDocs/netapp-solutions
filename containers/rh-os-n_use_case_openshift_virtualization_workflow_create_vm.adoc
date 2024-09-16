@@ -10,7 +10,7 @@ summary: Red Hat OpenShift Virtualization with NetApp ONTAP
 :nofooter:
 :icons: font
 :linkattrs:
-:imagesdir: ./../media/
+:imagesdir: ../media/
 
 [.lead]
 This section covers the how to create a virtual machine with Red Hat OpenShift Virtualization.
@@ -19,24 +19,42 @@ This section covers the how to create a virtual machine with Red Hat OpenShift V
 
 VMs are stateful deployments that require volumes to host the operating system and data. With CNV, because the VMs are run as pods, the VMs are backed by PVs hosted on NetApp ONTAP through Trident. These volumes are attached as disks and store the entire filesystem including the boot source of the VM.
 
-image::redhat_openshift_image52.jpg[Create VM architecture]
+image:redhat_openshift_image52.png[Create VM architecture]
 
-To create a virtual machine on the OpenShift cluster, complete the following steps:
+To quickly create a virtual machine on the OpenShift cluster, complete the following steps:
 
-.	Navigate to Workloads > Virtualization > Virtual Machines and click Create > With Wizard.
-.	Select the desired the operating system and click Next.
-.	If the selected operating system has no boot source configured, you must configure it. For Boot Source, select whether you want to import the OS image from an URL or from a registry and provide the corresponding details. Expand Advanced and select the Trident-backed StorageClass. Then click Next.
-+
+.	Navigate to Virtualization > Virtual Machines and click Create.
+.   Select From template.
+.	Select the desired operating system for which the boot source is available.
+.   Check the checkbox Start the VirtualMachine after creation.
+.   Click Quick create VirtualMachine.
 
-image::redhat_openshift_image53.JPG[Create boot source for VM]
+The virtual machine is created and started and comes to the *Running* state. It automatically creates a PVC and a corresponding PV for the boot disk using the default storage class. In order to be able to live migrate the VM in the future, you must ensure that the storage class used for the disks can support RWX volumes. This is a requirement for live migration. ontap-nas and ontap-san (volumeMode block for iSCSI and NVMe/TCP protocols) can support RWX access modes for the volumes created using the respective storage classes. 
 
-.	If the selected operating system already has a boot source configured, the previous step can be skipped.
-.	In the Review and Create pane, select the project you want to create the VM in and furnish the VM details. Make sure that the boot source is selected to be Clone and boot from CD-ROM with the appropriate PVC assigned for the selected OS.
-+
+To configure ontap-san storage class on the cluster see the link:https://docs.netapp.com/us-en/netapp-solutions/containers/rh-os-n_use_case_openshift_virtualization_workflow_vm_migration_using_mtv.html[Section for Migrating a VM from VMware to OpenShift Virtualization].
 
-image::redhat_openshift_image54.JPG[Create VM]
+NOTE: You can set up ontap NAS or iSCSI as the default storage class for the cluster. Clicking on Quick create VirtualMachine will use the default storage class to create the PVC and PV for the bootable root disk for the VM. If your default storage class is not ontap-nas or ontap-san, you can select the storage class for the disk, by selecting Customize VirtualMachine > Customize VirtualMachine parameters > Disks and then editing the disk to use the required storage class.  
 
-.	If you wish to customize the virtual machine, click Customize Virtual Machine and modify the required parameters.
+Typically block access mode is preferred compared to file systems while provisioning the VM disks.   
+
+To customize the virtual machine creation after you have selected the OS template, click on Customize VirtualMachine instead of Quick create.
+
+.   If the selected operating system has boot source configured, you can click on *Customize VirtualMachine parameters*.
+.	If the selected operating system has no boot source configured, you must configure it. You can see details about the procedures shown in the link:https://docs.openshift.com/container-platform/4.14/virt/virtual_machines/creating_vms_custom/virt-creating-vms-from-custom-images-overview.html[documentation].
+.   After Configuring the boot disk, you can click on *Customize  VirtualMachine parameters*.
+.   You can customize the VM from the tabs on this page. For eg. click on the *Disks* tab and then click on *Add disk* to add another disk to the VM. 
 .	Click Create Virtual Machine to create the virtual machine; this spins up a corresponding pod in the background.
 
-When a boot source is configured for a template or an operating system from an URL or from a registry, it creates a PVC in the `openshift-virtualization-os-images` project and downloads the KVM guest image to the PVC. You must make sure that template PVCs have enough provisioned space to accommodate the KVM guest image for the corresponding OS. These PVCs are then cloned and attached as rootdisks to virtual machines when they are created using the respective templates in any project.
+NOTE: When a boot source is configured for a template or an operating system from an URL or from a registry, it creates a PVC in the `openshift-virtualization-os-images` project and downloads the KVM guest image to the PVC. You must make sure that template PVCs have enough provisioned space to accommodate the KVM guest image for the corresponding OS. These PVCs are then cloned and attached as rootdisk to virtual machines when they are created using the respective templates in any project.
+
+
+
+image:rh-os-n_use_case_vm_create_1.png["Figure showing input/output dialog or representing written content"]
+
+image:rh-os-n_use_case_vm_create_2.png["Figure showing input/output dialog or representing written content"]
+
+image:rh-os-n_use_case_vm_create_3.png["Figure showing input/output dialog or representing written content"]
+
+image:rh-os-n_use_case_vm_create_4.png["Figure showing input/output dialog or representing written content"]
+
+image:rh-os-n_use_case_vm_create_5.png["Figure showing input/output dialog or representing written content"]
