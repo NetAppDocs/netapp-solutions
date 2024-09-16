@@ -5,7 +5,7 @@ keywords: disaster recovery, avs, google cloud, gcp, gcve, gcnv, google cloud ne
 summary:
 ---
 
-= Using Veeam Replication and Google Cloud NetApp Files datastore for disaster recovery to Google Cloud VMware Engine 
+= Using Veeam Replication and Google Cloud NetApp Volumes datastore for disaster recovery to Google Cloud VMware Engine 
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -15,13 +15,13 @@ summary:
 [.lead]
 A comprehensive disaster recovery plan is critical for businesses in times of crisis. Many organizations leverage cloud computing for daily operations and disaster recovery. This proactive approach can reduce or eliminate expensive business disruptions.
 
-This article describes how to use Veeam Backup & Replication to set up disaster recovery for on-premises VMware VMs to Google Cloud VMware Engine (GCVE) with Google Cloud NetApp Volumes (GCNV). 
+This article describes how to use Veeam Backup & Replication to set up disaster recovery for on-premises VMware VMs to Google Cloud VMware Engine (GCVE) with Google Cloud NetApp Volumes (NetApp Volumes). 
 
 == Overview
 
-Google Cloud NetApp Volumes (GCNV) is a storage service from Google and NetApp that is available for Google Cloud. NetApp Volumes service provides high performance NFS/SMB storage. VMware certified NetApp Volumes NFS storage can be used as an external datastore for ESXi hosts in GCVE. Users are required to connect NetApp Volumes and GCVE services through VPC network peering (PSA). There are no network charges resulting from storage access within a region. Users can create NetApp Volumes volumes in the Google Cloud console and enable deletion protection before mounting volumes as datastores to their ESXi hosts.
+Google Cloud NetApp Volumes is a storage service from Google and NetApp that is available for Google Cloud. NetApp Volumes service provides high performance NFS/SMB storage. VMware certified NetApp Volumes NFS storage can be used as an external datastore for ESXi hosts in GCVE. Users are required to connect NetApp Volumes and GCVE services through VPC network peering (PSA). There are no network charges resulting from storage access within a region. Users can create NetApp Volumes volumes in the Google Cloud console and enable deletion protection before mounting volumes as datastores to their ESXi hosts.
 
-GCNV volume based NFS datastores can be used to replicate data from on-premises using any validated third-party solution that provides VM replication capability. By adding GCNV datastores, it enables cost optimized deployment instead of building a Google Cloud VMware Engine (GCVE) based SDDC with a large number of ESXi hosts to accommodate the storage. This approach is called a “Pilot Light Cluster”. A pilot light cluster is a minimal GCVE host configuration (3 x GCVE ESXi hosts) along with GCNV datastores capacity to allow for independent scaling to meet capacity requirements.
+NetApp Volumes based NFS datastores can be used to replicate data from on-premises using any validated third-party solution that provides VM replication capability. By adding NetApp Volumes datastores, it enables cost optimized deployment instead of building a Google Cloud VMware Engine (GCVE) based SDDC with a large number of ESXi hosts to accommodate the storage. This approach is called a “Pilot Light Cluster”. A pilot light cluster is a minimal GCVE host configuration (3 x GCVE ESXi hosts) along with NetApp Volumes datastores capacity to allow for independent scaling to meet capacity requirements.
 
 The objective is to sustain a cost-effective infrastructure with just the core components to manage a failover. A pilot light cluster can expand and add more GCVE hosts in the event of a failover. Once the failover is resolved and normal operations resume, the pilot light cluster can reduce its scale, returning to a low-cost operational mode.
 
@@ -40,12 +40,12 @@ The replication process in Veeam Backup & Replication is job driven which means 
 This solution covers the following high level steps:
 
 . Create an NFS volume using Google Cloud NetApp Volumes
-. Follow GCP process to create a GCVE datastore from the GCNV NFS volume.
+. Follow GCP process to create a GCVE datastore from the NetApp Volumes NFS volume.
 . Set up a replication job to create VM replicas using Veeam Backup & Replication.
 . Create a failover plan and perform failover.
 . Switch back to production VMs once the disaster event is complete and the primary site is up.
 
-For more information on using GCNV NFS volumes as datastores for GCVE, check out https://cloud.google.com/vmware-engine/docs/vmware-ecosystem/howto-cloud-volumes-datastores-gcve[Using NFS volume as vSphere datastore hosted by Google Cloud NetApp Volumes]. 
+For more information on using NetApp Volumes NFS volumes as datastores for GCVE, check out https://cloud.google.com/vmware-engine/docs/vmware-ecosystem/howto-cloud-volumes-datastores-gcve[Using NFS volume as vSphere datastore hosted by Google Cloud NetApp Volumes]. 
 
 == Architecture
 
@@ -53,7 +53,7 @@ The following diagram shows the architecture of the solution presented in this d
 
 image::dr-veeam-gcnv-image01.png[architecture diagram]
 
-== Pre-requisites for Veeam Replication to GCVE and GCNV datastores
+== Pre-requisites for Veeam Replication to GCVE and NetApp Volumes datastores
 
 This solution requires the following components and configurations:
 
@@ -74,12 +74,12 @@ NOTE: Veeam requires a GCVE solution user account with elevated privileges when 
 
 The following sections outline the deployment steps to implement and test a VMware Site Recovery Manager configuration with ONTAP storage system.
 
-=== Create GCNV NFS volume and datastore for GCVE
+=== Create NetApp Volumes NFS volume and datastore for GCVE
 Refer to https://cloud.google.com/vmware-engine/docs/vmware-ecosystem/howto-cloud-volumes-datastores-gcve[Using NFS volume as vSphere datastore hosted by Google Cloud NetApp Volumes] for an overview of how to Google Cloud NetApp Volumes as a datastore for GCVE.
 
 Complete the following steps to create and use an NFS datastore for GCVE using NetApp Volumes:
 
-.Create GCNV NFS volume
+.Create NetApp Volumes NFS volume
 [%collapsible]
 ====
 Google Cloud NetApp Volumes is accessed from the Google Cloud Platform (GCP) console.
