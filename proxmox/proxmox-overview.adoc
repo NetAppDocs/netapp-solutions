@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
 permalink: proxmox/proxmox-overview.html
-keywords: NetApp Solutions, hybrid cloud, container workloads, containers, Red Hat OpenShift, RedHat OpenShift, VMware, ROSA, ACC, Astra Control Center, Advanced Cluster Management, ACM, Hub Cluster
+keywords: proxmox ve, kvm, qemu, lxc, vm,
 summary:
 ---
 
-= NetApp Hybrid Multicloud solutions for Red Hat OpenShift Container workloads
+= Overview of Proxmox Virtual Environment
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -13,46 +13,61 @@ summary:
 :imagesdir: ./../media/
 
 [.lead]
-NetApp is seeing a significant increase in customers modernizing their legacy enterprise applications and building new applications using containers and orchestration platforms built around Kubernetes. Red Hat OpenShift Container Platform is one example that we see adopted by many of our customers.
+Proxmox Virtual Environment is an open source Type-1 hypervisor (installed on bare metal servers) based on Debian Linux. It can host virtual machines (VM) as well as linux containers (LXC).
 
 == Overview
 
-As more and more customers begin adopting containers within their enterprises, NetApp is perfectly positioned to help serve the persistent storage needs of their stateful applications and classic data management needs such as data protection, data security, and data migration. However, these needs are met using different strategies, tools, and methods.
+Proxmox Virtual Environment(VE) supports both full VM and container based virtualization on same host. Kernel-based Virtual Machine (KVM) and Quick Emulator (QEMU) is utilized for the full VM virtualization. KVM handles compute and memory virtualization and QEMU takes care of other hardware components of virtual machine. Linux Containers (LXC) allows containers to be managed like VMs with data persistance across the reboots. 
 
-**NetApp ONTAP** based storage options listed below, deliver security, data protection, reliability, and flexibility for containers and Kubernetes deployments. 
+image:proxmox-overview-image01.png[VM and LXC on Proxmox host]
 
-* Self-managed storage in on-premises:
-** NetApp Fabric Attached Storage (FAS), NetApp All Flash FAS Arrays (AFF), NetApp All SAN Array (ASA) and ONTAP Select 
+=== Cluster Management 
 
-* Provider-managed storage in on-premises:
-** NetApp Keystone provides Storage as a Service (STaaS)
+The web based management portal is available on Proxmox VE node at port 8006. A collection of nodes can be joined together to form a cluster. The Proxmox VE configuration (/etc/pve) is shared among all nodes of the cluster. Proxmox VE uses https://pve.proxmox.com/wiki/Cluster_Manager[Corosync cluster engine] to manage the cluster. The management portal can be accessed from any node of the cluster.
 
-* Self-managed storage in the cloud:
-** NetApp Cloud Volumes ONTAP(CVO) provide self managed storage in the hyperscalers 
+image:proxmox-overview-image02.png[Management Interface]
 
-* Provider-managed storage in the cloud:
-** Cloud Volumes Service for Google Cloud (CVS), Azure NetApp Files (ANF), Amazon FSx for NetApp ONTAP  offer fully managed storage in the hyperscalers 
+A cluster enables VMs and Containers to be monitored and restarted on other nodes if hosting node fails. VM and containers needs to be configured for High Availability (HA). VMs and Containers can be hosted on specific subset of hosts by creating groups. The VM or container is hosted on host with highest priority. For more info, check https://pve.proxmox.com/wiki/High_Availability[HA manager]
 
-image::rhhc-ontap-features.png[]
+image:proxmox-overview-image03.png[HA Group priority]
 
-**NetApp BlueXP** enables you to manage all of your storage and data assets from a single control plane/interface.
+Authentication options include Linux PAM, Proxmox VE PAM, LDAP, Microsoft AD or OpenID. Permissions can be assigned via Roles and use of resource pools which is a collection of resources. For additional details, check https://pve.proxmox.com/pve-docs/chapter-pveum.html[Proxmox User Management]
 
-You can use BlueXP to create and administer cloud storage (for example, Cloud Volumes ONTAP and Azure NetApp Files), to move, protect, and analyze data, and to control many on-prem and edge storage devices.
+=== Storage
 
-**NetApp Astra Trident** is a CSI Compliant Storage Orchestrator that enable quick and easy consumption of persistent storage backed by a variety of the above-mentioned NetApp storage options. It is an open-source software maintained and supported by NetApp.
+A virtual machine consists of a configuration file (/etc/pve/qemu-server/<vm id>.conf) and virtual disk components. Supported virtual disk formats are raw, qcow2 and VMDK. QCOW2 can provide thin provisioning and snapshot capabilities on various storage types.
 
-image::rhhc-trident-features.png[]
+image:proxmox-overview-image04.png[VM disk formats]
 
-Business critical container workloads need more than just persistent volumes. Their data management requirements require protection and migration of the application kubernetes objects as well.
+LXC also has its own configuration file (/etc/pve/lxc/<container id>.conf) and container disk components. The data volume can be mounted from the supported storage types.
 
-NOTE: Application data includes kubernetes objects in addition to the user data: Some examples are as follows: 
-- kubernetes objects such as pods specs, PVCs, deployments, services
-- custom config objects such as config maps and secrets
-- persistent data such as Snapshot copies, backups, clones
-- custom resources such as CRs and CRDs
+image:proxmox-overview-image05.png[Container additional mount]
 
-**NetApp Astra Control**, available as both fully-managed and self-managed software, provides orchestration for robust application data management. Refer to the link:https://docs.netapp.com/us-en/astra-family/[Astra documentation] for additional details on the Astra family of products. 
+Support storage type includes local disk, NAS (SMB and NFS) and SAN (FC, iSCSI, NVMe-oF, etc.). For more details, check https://pve.proxmox.com/pve-docs/chapter-pvesm.html[Proxmox VE Storage]
 
-This reference documentation provides validation of migration and protection of container-based applications, deployed on RedHat OpenShift container platform, using NetApp Astra Control Center. In addition, the solution provides high-level details for the deployment and the use of Red Hat Advanced Cluster Management (ACM) for managing the container platforms. The document also highlights the details for the integration of NetApp storage with Red Hat OpenShift container platforms using Astra Trident CSI provisioner. Astra Control Center is deployed on the hub cluster and is used to manage the container applications and their persistent storage lifecycle. Finally, it provides a solution for replication and failover and fail-back for container workloads on managed Red Hat OpenShift clusters in AWS (ROSA) using Amazon FSx for NetApp ONTAP (FSxN) as persistent storage. 
+Every storage volume is configured with allowed content types. NAS volumes supports all content types while SAN support is limited to VM and Container images. 
 
+NOTE: Directory storage type also supports all content types.
 
+[frame=none, grid=none]
+|====
+|image:proxmox-overview-image06.png[Content types with NAS] | image:proxmox-overview-image07.png[Content types with SAN]
+|====
+
+=== Network
+
+Proxmox VE supports native Linux networking features like Linux bridge or Open vSwitch to implement Software Defined Networking (SDN). The Ethernet interfaces on the host can be bonded together to provide redundancy and high availability. For other options, refer https://pve.proxmox.com/pve-docs/chapter-sysadmin.html#_choosing_a_network_configuration[Proxmox VE documentation]
+
+image:proxmox-overview-image07.png[Bonded network]
+
+Guest networks can be configured at cluster level and changes are pushed to member hosts. Seperation is managed with Zones, VNets and Subnets. https://pve.proxmox.com/pve-docs/chapter-pvesdn.html[Zone] defines the network types like Simple,VLAN,VLAN Stacking,VXLAN,EVPN,etc.
+
+Depending on the type of the zone, the network behaves differently and offers specific features, advantages, and limitations.
+
+Use cases for SDN range from an isolated private network on each individual node to complex overlay networks across multiple PVE clusters on different locations.
+
+After configuring an VNet in the cluster-wide datacenter SDN administration interface, it is available as a common Linux bridge, locally on each node, to be assigned to VMs and Containers.
+
+=== Monitoring
+
+The stats about hosts, guests, storage, etc. can be pushed to external Graphite or Influxdb database. For details, refer https://pve.proxmox.com/pve-docs/chapter-sysadmin.html#external_metric_server[Proxmox VE documentation]
