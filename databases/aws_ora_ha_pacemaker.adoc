@@ -101,17 +101,13 @@ The following sections provide step-by-step procedures for deployment and config
 
 Deployment requires the following prerequisites.
 
-. A NetApp C-Series storage controller pair is racked, stacked, and latest version of ONTAP operating system is installed and configured. Refer to this setup guide as necessary: https://docs.netapp.com/us-en/ontap-systems/c400/install-detailed-guide.html#step-1-prepare-for-installation[Detailed guide - AFF C400^]
-
-. Provision two Linux VMs as Oracle DB servers. See the architecture diagram in the previous section for details about the environment setup. 
-
-. Provision a Windows server to run the NetApp SnapCenter UI tool with the latest version. Refer to the following link for details: link:https://docs.netapp.com/us-en/snapcenter/install/task_install_the_snapcenter_server_using_the_install_wizard.html[Install the SnapCenter Server^]
+. An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
 
 . Provision a Linux VM as the Ansible controller node with the latest version of Ansible and Git installed. Refer to the following link for details: link:../automation/getting-started.html[Getting Started with NetApp solution automation^] in section - 
 `Setup the Ansible Control Node for CLI deployments on RHEL / CentOS` or 
 `Setup the Ansible Control Node for CLI deployments on Ubuntu / Debian`. 
 +
-Enable ssh public/private key authentication between Ansible controller and database VMs.
+Enable ssh public/private key authentication between Ansible controller and EC2 instance DB VMs.
 
 . From Ansible controller admin user home directory, clone a copy of the NetApp Oracle deployment automation toolkit for NFS. 
 +
@@ -127,109 +123,304 @@ git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_nfs.git
 
 ====
 
-=== Configure Networking and SVM on C-Series for Oracle
+=== Provision EC2 instances and Amazon FSx ONTAP storage cluster
 [%collapsible]
 
 ====
 
-This section of deployment guide demonstrates best practices to set up networking and storage virtual machine (SVM) on C-Series controller for Oracle workload with NFS protocol using ONTAP System Manager UI.
+Although EC2 instance and Amazon FSx ONTAP can be provisioned from AWS console manually, it is recommended to use NetApp Terraform based automation toolkit to automate the provisioning of EC2 instances and FSx ONTAP storage cluster. Following are the detailed procedures. 
 
-. Login to ONTAP System Manager to review that after initial ONTAP cluster installation, broadcast domains have been configured with ethernet ports properly assigned to each domain. Generally, there should be a broadcast domain for cluster, a broadcast domain for management, and a broadcast domain for workload such as data.
+. From AWS CloudShell or Ansible controller VM, clone a copy of automation toolkit for EC2 and FSx ONTAP. 
 +
-image:automation_ora_c-series_nfs_net_01.png["This image provides screen shot for c-series controller config"]
-
-. From NETWORK - Ethernet Ports, click `Link Aggregate Group` to create a LACP link aggregate group port a0a, which provides load balance and failover among the member ports in the aggregate group port. There are 4 data ports - e0e, e0f, e0g, e0h available on C400 controllers.
-+
-image:automation_ora_c-series_nfs_net_02.png["This image provides screen shot for c-series controller config"]
-
-. Select the ethernet ports in the group, `LACP` for mode, and `Port` for load distribution.
-+
-image:automation_ora_c-series_nfs_net_03.png["This image provides screen shot for c-series controller config"]
-
-. Validate LACP port a0a created and broadcast domain `Data` is now operating on LACP port.
-+
-image:automation_ora_c-series_nfs_net_04.png["This image provides screen shot for c-series controller config"]
-image:automation_ora_c-series_nfs_net_05.png["This image provides screen shot for c-series controller config"]
-
-. From `Ethernet Ports`, click `VLAN` to add a VLAN on each controller node for Oracle workload on NFS protocol.
-+
-image:automation_ora_c-series_nfs_net_06.png["This image provides screen shot for c-series controller config"]
-image:automation_ora_c-series_nfs_net_07.png["This image provides screen shot for c-series controller config"]
-image:automation_ora_c-series_nfs_net_08.png["This image provides screen shot for c-series controller config"]
-
-. Login to C-Series controllers from cluster management IP via ssh to validate that network failover groups are configured correctly. ONTAP create and manage failover groups automatically.
-+
-....
-
-HCG-NetApp-C400-E9U9::> net int failover-groups show
-  (network interface failover-groups show)
-                                  Failover
-Vserver          Group            Targets
----------------- ---------------- --------------------------------------------
-Cluster
-                 Cluster
-                                  HCG-NetApp-C400-E9U9a:e0c,
-                                  HCG-NetApp-C400-E9U9a:e0d,
-                                  HCG-NetApp-C400-E9U9b:e0c,
-                                  HCG-NetApp-C400-E9U9b:e0d
-HCG-NetApp-C400-E9U9
-                 Data
-                                  HCG-NetApp-C400-E9U9a:a0a,
-                                  HCG-NetApp-C400-E9U9a:a0a-3277,
-                                  HCG-NetApp-C400-E9U9b:a0a,
-                                  HCG-NetApp-C400-E9U9b:a0a-3277
-                 Mgmt
-                                  HCG-NetApp-C400-E9U9a:e0M,
-                                  HCG-NetApp-C400-E9U9b:e0M
-3 entries were displayed.
-
-....
-
-. From `STORAGE - Storage VMs`, click +Add to create a SVM for Oracle.
-+
-image:automation_ora_c-series_nfs_svm_01.png["This image provides screen shot for c-series controller config"]
-
-. Name your Oracle SVM, check `Enable NFS` and `Allow NFS client access`.
-+
-image:automation_ora_c-series_nfs_svm_02.png["This image provides screen shot for c-series controller config"]
-
-. Add NFS export policy `Default` rules.
-+
-image:automation_ora_c-series_nfs_svm_03.png["This image provides screen shot for c-series controller config"]
-
-. In `NETWORK INTERFACE`, fill in IP address on each node for NFS lif addresses.
-+
-image:automation_ora_c-series_nfs_svm_04.png["This image provides screen shot for c-series controller config"]
-
-. Validate SVM for Oracle is up/running and NFS lifs status is active.
-+
-image:automation_ora_c-series_nfs_svm_05.png["This image provides screen shot for c-series controller config"]
-image:automation_ora_c-series_nfs_svm_06.png["This image provides screen shot for c-series controller config"]
-
-. From `STORAGE-Volumes` tab to add NFS volumes for Oracle database.
-+
-image:automation_ora_c-series_nfs_vol_01.png["This image provides screen shot for c-series controller config"]
-
-. Name your volume, assign capacity, and performance level.
-+
-image:automation_ora_c-series_nfs_vol_02.png["This image provides screen shot for c-series controller config"]
-
-. In `Access Permission`, choose the default policy created from previous step. Uncheck `Enable Snapshot Copies` as we prefer to use SnapCenter to create application consistent snapshots.
-+
-image:automation_ora_c-series_nfs_vol_03.png["This image provides screen shot for c-series controller config"]
-
-. Create three DB volumes for each DB server: server_name_u01 - binary, server_name_u02 - data, server_name_u03 - logs. 
-+
-image:automation_ora_c-series_nfs_vol_04.png["This image provides screen shot for c-series controller config"]
+[source, cli]
+git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_aws_fsx_ec2_deploy.git
 +
 [NOTE]
 
-The DB volume naming convention should strictly follow format as stated above to ensure automation to work correctly.
+If the toolkit is not executed from AWS CloudShell, AWS authentication may be required with your AWS account using AWS user account access/secret key pair.   
 
-This completes the C-series controller configuration for Oracle.
+. Review READme.md file included in the toolkit. Revise main.tf and associated parameter files as necessary for the required AWS resources.  
++
+....
+An example of main.tf:
+
+resource "aws_instance" "orapm01" {
+  ami                           = var.ami
+  instance_type                 = var.instance_type
+  subnet_id                     = var.subnet_id
+  key_name                      = var.ssh_key_name
+
+  root_block_device {
+    volume_type                 = "gp3"
+    volume_size                 = var.root_volume_size
+  }
+
+  tags = {
+    Name                        = var.ec2_tag1
+  }
+}
+
+resource "aws_instance" "orapm02" {
+  ami                           = var.ami
+  instance_type                 = var.instance_type
+  subnet_id                     = var.subnet_id
+  key_name                      = var.ssh_key_name
+
+  root_block_device {
+    volume_type                 = "gp3"
+    volume_size                 = var.root_volume_size
+  }
+
+  tags = {
+    Name                        = var.ec2_tag2
+  }
+}
+
+resource "aws_fsx_ontap_file_system" "fsx_01" {
+  storage_capacity              = var.fs_capacity
+  subnet_ids                    = var.subnet_ids
+  preferred_subnet_id           = var.preferred_subnet_id
+  throughput_capacity           = var.fs_throughput
+  fsx_admin_password            = var.fsxadmin_password
+  deployment_type               = var.deployment_type
+
+  disk_iops_configuration {
+    iops                        = var.iops
+    mode                        = var.iops_mode
+  }
+
+  tags                          = {
+    Name                        = var.fsx_tag
+  }
+}
+
+resource "aws_fsx_ontap_storage_virtual_machine" "svm_01" {
+  file_system_id                = aws_fsx_ontap_file_system.fsx_01.id
+  name                          = var.svm_name
+  svm_admin_password            = var.vsadmin_password
+}
+
+....
+
+. Validate and execute the Terraform plan. A successful execution would create two EC2 instances and A FSx ONTAP storage cluster in target AWS account. The automation output displays the EC2 instance IP address and FSx ONTAP cluster end points. 
++
+[source, cli]
+terraform plan -out=main.plan
++
+[source, cli]
+terraform apply main.plan
+
+
+This completes the EC2 instances and FSx ONTAP provisioning for Oracle.
 
 ====
-=== Automation parameter files
+
+=== Pacemaker cluster setup
+[%collapsible]
+
+====
+
+The High Availability Add-On for RHEL is a clustered system that provides reliability, scalability, and availability to critical production services such as Oracle database services. In this use case demonstration, a two-node Pacemaker cluster is set up and configured to support the high availability of an Oracle database in an active/passive clustering scenario.  
+
+Login to EC2 instances, as ec2-user, complete following tasks on both EC2 instances:
+
+. Remove the AWS Red Hat Update Infrastructure (RHUI) client.
++
+[source, cli]
+sudo -i yum -y remove rh-amazon-rhui-client*
+
+. Register the EC2 instance VMs with Red Hat.
++
+[source, cli]
+sudo subscription-manager register --username xxxxxxxx --password 'xxxxxxxx' --auto-attach
+
+. Enable RHEL high availability rpms.
++
+[source, cli]
+sudo subscription-manager config --rhsm.manage_repos=1
++
+[source, cli]
+sudo subscription-manager repos --enable=rhel-8-for-x86_64-highavailability-rpms
+
+. Install pacemaker and fence agant.
+[source, cli]
+sudo yum update -y
++
+sudo yum install pcs pacemaker fence-agents-aws
+
+. Create a password for hacluster user on all cluster nodes. Use the same password for all nodes.
++
+[source, cli]
+sudo passwd hacluster
+
+. Start the pcs service and enable it to start on boot.
++
+[source, cli]
+sudo systemctl start pcsd.service
++
+[source, cli]
+sudo systemctl enable pcsd.service
+
+. Validate pcsd service.
++
+[source, cli]
+sudo systemctl status pcsd
++
+....
+[ec2-user@ip-172-30-15-5 ~]$ sudo systemctl status pcsd
+● pcsd.service - PCS GUI and remote configuration interface
+   Loaded: loaded (/usr/lib/systemd/system/pcsd.service; enabled; vendor preset: disabled)
+   Active: active (running) since Tue 2024-09-10 18:50:22 UTC; 33s ago
+     Docs: man:pcsd(8)
+           man:pcs(8)
+ Main PID: 65302 (pcsd)
+    Tasks: 1 (limit: 100849)
+   Memory: 24.0M
+   CGroup: /system.slice/pcsd.service
+           └─65302 /usr/libexec/platform-python -Es /usr/sbin/pcsd
+
+Sep 10 18:50:21 ip-172-30-15-5.ec2.internal systemd[1]: Starting PCS GUI and remote configuration interface...
+Sep 10 18:50:22 ip-172-30-15-5.ec2.internal systemd[1]: Started PCS GUI and remote configuration interface.
+
+....
+
+. Add cluster nodes to host files.
++
+[source, cli]
+sudo vi /etc/hosts
++
+....
+[ec2-user@ip-172-30-15-5 ~]$ cat /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+# cluster nodes
+ip-172-30-15-5.ec2.internal     172.30.15.5
+ip-172-30-15-111.ec2.internal   172.30.15.111
+
+....
+
+. Install and configure awscli for connectivity to AWS account.
++
+[source, cli]
+sudo yum install awscli
++
+[source, cli]
+sudo aws configure
++
+....
+[ec2-user@ip-172-30-15-111 ]# sudo aws configure
+AWS Access Key ID [None]: XXXXXXXXXXXXXXXXX
+AWS Secret Access Key [None]: XXXXXXXXXXXXXXXX
+Default region name [None]: us-east-1
+Default output format [None]: json
+
+....
+
+. Install the resource-agents package if not installed already.
++
+[source, cli]
+sudo yum install resource-agents
+
+
+On only one of the cluster node, complete following tasks to create pcs cluster.
+
+. Authenticate the pcs user hacluster.
++
+[source, cli]
+sudo pcs host auth ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal
++
+....
+[ec2-user@ip-172-30-15-111 ~]$ sudo pcs host auth ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal
+Username: hacluster
+Password:
+ip-172-30-15-111.ec2.internal: Authorized
+ip-172-30-15-5.ec2.internal: Authorized
+
+....
+
+. Create the pcs cluster.
++
+[source, cli]
+sudo pcs cluster setup ora_ec2nfsx ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal
++
+....
+[ec2-user@ip-172-30-15-111 ~]$ sudo pcs cluster setup ora_ec2nfsx ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal
+No addresses specified for host 'ip-172-30-15-5.ec2.internal', using 'ip-172-30-15-5.ec2.internal'
+No addresses specified for host 'ip-172-30-15-111.ec2.internal', using 'ip-172-30-15-111.ec2.internal'
+Destroying cluster on hosts: 'ip-172-30-15-111.ec2.internal', 'ip-172-30-15-5.ec2.internal'...
+ip-172-30-15-5.ec2.internal: Successfully destroyed cluster
+ip-172-30-15-111.ec2.internal: Successfully destroyed cluster
+Requesting remove 'pcsd settings' from 'ip-172-30-15-111.ec2.internal', 'ip-172-30-15-5.ec2.internal'
+ip-172-30-15-111.ec2.internal: successful removal of the file 'pcsd settings'
+ip-172-30-15-5.ec2.internal: successful removal of the file 'pcsd settings'
+Sending 'corosync authkey', 'pacemaker authkey' to 'ip-172-30-15-111.ec2.internal', 'ip-172-30-15-5.ec2.internal'
+ip-172-30-15-111.ec2.internal: successful distribution of the file 'corosync authkey'
+ip-172-30-15-111.ec2.internal: successful distribution of the file 'pacemaker authkey'
+ip-172-30-15-5.ec2.internal: successful distribution of the file 'corosync authkey'
+ip-172-30-15-5.ec2.internal: successful distribution of the file 'pacemaker authkey'
+Sending 'corosync.conf' to 'ip-172-30-15-111.ec2.internal', 'ip-172-30-15-5.ec2.internal'
+ip-172-30-15-111.ec2.internal: successful distribution of the file 'corosync.conf'
+ip-172-30-15-5.ec2.internal: successful distribution of the file 'corosync.conf'
+Cluster has been successfully set up.
+
+....
+
+. Enable the cluster.
++
+sudo pcs cluster enable --all
++
+....
+[ec2-user@ip-172-30-15-111 ~]$ sudo pcs cluster enable --all
+ip-172-30-15-5.ec2.internal: Cluster Enabled
+ip-172-30-15-111.ec2.internal: Cluster Enabled
+
+....
+
+. Start and validate the cluster.
++
+[source, cli]
+sudo pcs cluster start --all
++
+[source, cli]
+sudo pcs status 
++
+....
+[ec2-user@ip-172-30-15-111 ~]$ sudo pcs status
+Cluster name: ora_ec2nfsx
+
+WARNINGS:
+No stonith devices and stonith-enabled is not false
+
+Cluster Summary:
+  * Stack: corosync (Pacemaker is running)
+  * Current DC: ip-172-30-15-111.ec2.internal (version 2.1.7-5.1.el8_10-0f7f88312) - partition with quorum
+  * Last updated: Wed Sep 11 15:43:23 2024 on ip-172-30-15-111.ec2.internal
+  * Last change:  Wed Sep 11 15:43:06 2024 by hacluster via hacluster on ip-172-30-15-111.ec2.internal
+  * 2 nodes configured
+  * 0 resource instances configured
+
+Node List:
+  * Online: [ ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal ]
+
+
+Full List of Resources:
+  * No resources
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+
+....
+
+This completes the Pacemaker cluster setup and initial configuration.
+
+====
+
+
+
+=== Automation parameter file
 [%collapsible]
 
 ====
