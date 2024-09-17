@@ -1,0 +1,66 @@
+---
+sidebar: sidebar
+permalink: cyber-vault/ontap-cyber-vault-powershell-considerations.html
+keywords: Cyber vault, powershell, script, configuration, validation, hardening
+summary: This is the NetApp ONTAP solution for configuring, hardening and validating a ONTAP based cyber vault
+---
+
+= >>> Level One Title
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media
+
+[.lead]
+>>> Placeholder for descriptive lead sentence or paragraph
+
+= Additional considerations
+
+== Cyber vault hardware sizing 
+
+The amount of disk space required for a ONTAP cyber vault destination volume depends on a variety of factors, the most important of which is the rate of change for data in the source volume. The backup schedule and the Snapshot schedule on the destination volume both affect disk usage on the destination volume, and rate of change on the source volume is not likely to be constant. It is a good idea to provide a buffer of additional storage capacity above that which is required to accommodate future changes in end-user or application behavior.
+
+Sizing a relationship for 1 month of retention in ONTAP requires calculating the storage requirements based on several factors, including the size of the primary dataset, the rate of data change (daily change rate), and the deduplication and compression savings (if applicable). 
+
+Here is the step-by-step approach:
+
+The first step is to know the size of the source volume(s) you are protecting with the cyber vault. This is the base amount of data that will initially replicate to the cyber vault destination. Next, estimate the daily change rate for the dataset. This is the percentage of data that changes every day. It is crucial to have a good understanding of how dynamic your data is.
+
+For example:
+
+* Primary dataset size = 5 TB
+* Daily change rate = 5% (0.05)
+* Deduplication and compression efficiency = 50% (0.50)
+
+Now, let us walk through the calculation:
+
+* Calculate the daily changed data:
+* Changed Data per Day = 5000*5% = 250GB
+* Calculate the total changed data for 30 days:
+* Total Changed Data for 30 Days} = 250GB * 14 = 3.5 TB
+* Calculate the total storage required:
+* total= 5TB + 3.5TB = 8.5TB
+* Apply deduplication and compression savings:
+* effective = 8.5TB * 50% = 4.25TB
+* Summary of Storage Needs
+
+- Without efficiency: require 8.5TB to store 30 days of the cyber vault data.
+
+- With 50% efficiency: require 4.25TB of storage after deduplication and compression.
+
+[NOTE]
+Snapshot copies may have additional overhead due to metadata, but this is usually minor.
+
+[NOTE]
+If multiple backups are taken per day, adjust the calculation by the number of Snapshot copies taken each day.
+
+[NOTE]
+Factor in data growth over time to ensure sizing is future proof.
+
+== Performance impact on primary / source
+
+Because the data transfer is a pull operation, the impact on primary storage performance can vary depending on the workload, data volume and the frequency of backups. However, the overall performance impact on the primary system is generally moderate and manageable, as data transfer is designed to offload data protection and backup tasks to the cyber vault storage system. During the initial relationship setup and the first full backup, a significant amount of data is transferred from the primary system to the cyber vault system (the SnapLock Compliance volume). This can lead to increased network traffic and I/O load on the primary system. Once the initial full backup is complete, ONTAP only needs to track and transfer blocks that have changed since the last backup. This results in a much smaller I/O load compared to the initial replication. Incremental updates are efficient and have minimal impact on primary storage performance. The vault process runs in the background, which reduces the chances of interference with the primary system's production workloads.
+
+* Ensuring the storage system has enough resources (CPU, memory and IOPs) to handle the additional load mitigates the performance impact.

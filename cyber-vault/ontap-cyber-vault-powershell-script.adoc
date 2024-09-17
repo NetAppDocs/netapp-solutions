@@ -1,0 +1,66 @@
+---
+sidebar: sidebar
+permalink: cyber-vault/ontap-cyber-vault-powershell-script.html
+keywords: Cyber vault, powershell, script, configuration, validation, hardening
+summary: This is the NetApp ONTAP solution for configuring, hardening and validating a ONTAP based cyber vault
+---
+
+= >>> Level One Title
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media
+
+[.lead]
+>>> Placeholder for descriptive lead sentence or paragraph
+
+= Configure, analyze, cron script
+
+== What this script does
+
+* Cluster peering
+* SVM peering
+* DP volume creation
+* SnapMirror relationship and initialization
+* Harden the ONTAP system used for the cyber vault
+* Quiesce and resume the relationship based on the transfer schedule
+* Validate the security settings periodically and generate a report showing any anomalies
+
+== How to use this script
+
+Download the script and to use the script, simply follow the below steps:
+
+* Launch Windows PowerShell as an administrator.
+* Navigate to the directory containing the script.
+* Execute the script using .\ syntax along with the required parameters
+
+[NOTE]
+Please ensure all information entered. On the first run (configure mode), it will ask for credentials for both, the production and the new cyber vault system. After that, it will create the SVM peering's (if not existent), the volumes and the SnapMirror between the system and initialize them.
+
+[NOTE]
+Cron mode can be used to schedule the quiesce and resume of data transfer.
+
+== Modes of operation
+
+The automation script provides 3 modes for execution - configure, analyze and cron.
+----
+if($SCRIPT_MODE -eq "configure") {
+        configure
+    } elseif ($SCRIPT_MODE -eq "analyze") {
+        analyze
+    } elseif ($SCRIPT_MODE -eq "cron") {
+        runCron
+    }
+----
+
+* Configure - Performs the validation checks and configures the system as air gapped.
+* Analyze - Automated monitoring and reporting feature to send out information to monitoring groups for anomalies and suspicious activities to ensure the configurations are not drifted. 
+* Cron - To enable disconnected infrastructure, cron mode automates disabling the LIF and quiesces the transfer relationship.
+
+It will take time to transfer the data in those selected volumes depending on both systems performance and the amount of data.
+
+----
+./script.ps1 -SOURCE_ONTAP_CLUSTER_MGMT_IP "172.21.166.157" -SOURCE_ONTAP_CLUSTER_NAME "NTAP915_Src" -SOURCE_VSERVER "svm_NFS" -SOURCE_VOLUME_NAME "Src_RP_Vol01" -DESTINATION_ONTAP_CLUSTER_MGMT_IP "172.21.166.159" -DESTINATION_ONTAP_CLUSTER_NAME "NTAP915_Destn" -DESTINATION_VSERVER "svm_nim_nfs" -DESTINATION_AGGREGATE_NAME "NTAP915_Destn_01_VM_DISK_1" -DESTINATION_VOLUME_NAME "Dst_RP_Vol01_Vault" -DESTINATION_VOLUME_SIZE "5g" -SNAPLOCK_MIN_RETENTION "15minutes" -SNAPLOCK_MAX_RETENTION "30minutes" -SNAPMIRROR_PROTECTION_POLICY "XDPDefault" -SNAPMIRROR_SCHEDULE "5min" -DESTINATION_CLUSTER_USERNAME "admin" -DESTINATION_CLUSTER_PASSWORD "PASSWORD123"
+----
