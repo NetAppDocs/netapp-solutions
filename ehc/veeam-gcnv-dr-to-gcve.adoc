@@ -233,7 +233,7 @@ image::dr-veeam-gcnv-image16.png[Create failover plan]
 
 . On the *General* page of the *New Failover Plan* wizard, provide a name and a description to the plan. Pre and Post-failover scripts can be added as required. For instance, run a script to shutdown VMs before starting the replicated VMs.
 +
-image::dr-veeam-gcnv-image17.png[General page]    STILL NEED TO CAPTURE IMAGE
+image::dr-veeam-gcnv-image17.png[General page]
 +
 {nbsp}
 
@@ -243,38 +243,37 @@ image::dr-veeam-gcnv-image18.png[virtual machines page]
 +
 {nbsp}
 +
-image::dr-veeam-gcnv-image19.png[Boot order and delays]    STILL NEED TO CAPTURE IMAGE
+image::dr-veeam-gcnv-image19.png[Boot order and delays]
 +
 {nbsp}
++
+Click on *Apply* to continue.
+
+. Finally review all of the failover plan settings and click on *Finish* to create the failover plan.
 
 For additional information on creating replication jobs, refer to link:https://helpcenter.veeam.com/docs/backup/vsphere/replica_job.html?ver=120[Creating Replication Jobs].
 ====
 
-
-
-
-
-
 .Run the failover plan
 [%collapsible]
 ====
-During failover, the source VM in the production site is switched over to its replica at the disaster recovery site. As part of the failover process, Veeam Backup & Replication restores the VM replica to the required restore point and moves all I/O activities from the source VM to its replica. Replicas can be used not only in case of a disaster, but also to simulate DR drills. During failover simulation, the source VM remains running. Once all the necessary tests have been conducted, you can undo the failover and return to normal operations.
+During failover, the source VM in the production site switches over to its replica at the disaster recovery site. As part of the process, Veeam Backup & Replication restores the VM replica to the required restore point and transfers all I/O activities from the source VM to its replica. Replicas serve not only for actual disasters but also for simulating DR drills. In failover simulation, the source VM continues running. Upon completion of necessary tests, the failover can be undone, returning operations to normal.
 
 NOTE: Make sure network segmentation is in place to avoid IP conflicts during failover.
 
-To start the failover plan, simply click in *Failover Plans* tab and right click on your failover plan. Select **Start*. This will failover using the latest restore points of VM replicas. To fail over to specific restore points of VM replicas, select *Start to*. 
+Complete the follow steps to start the failover plan:
 
-image::dr-veeam-anf-image13.png[]
+. To get started, in the *Home* view, click on *Replicas > Failover Plans* in the left-hand menu and then on the *Start* button. Alternately, the *Start to...* button can be used to failover to a prior restore point.
++
+image::dr-veeam-gcnv-image20.png[Start failover plan]
++
+{nbsp}
 
-image::dr-veeam-anf-image14.png[]
-
-The state of the VM replica changes from Ready to Failover and VMs will start on the destination Azure VMware Solution (AVS) SDDC cluster / host. 
-
-image::dr-veeam-anf-image15.png[]
-
-Once the failover is complete, the status of the VMs will change to “Failover”.
-
-image::dr-veeam-anf-image16.png[]
+. Monitor the progress of the failover in the *Executing failover plan* window.
++
+image::dr-veeam-gcnv-image21.png[Monitor failover progress]
++
+{nbsp}
 
 NOTE: Veeam Backup & Replication stops all replication activities for the source VM until its replica is returned to the Ready state. 
 
@@ -284,35 +283,57 @@ For detailed information about failover plans, refer link:https://helpcenter.vee
 .Failback to the production site
 [%collapsible]
 ====
-When the failover plan is running, it is considered as an intermediate step and needs to be finalized based on the requirement. The options include the following:
+Conducting a failover is considered an intermediate step and needs to be finalized based on the requirement. The options include the following:
 
-* *Failback to production* - switch back to the original VM and transfer all changes that took place while the VM replica was running to the original VM.
+* *Failback to production* - Revert to the original VM and synchronize all modifications made during the replica's active period back to the source VM.
 
-NOTE: When you perform failback, changes are only transferred but not published. Choose *Commit failback* (once the original VM is confirmed to work as expected) or Undo failback to get back to the VM replica If the original VM is not working as expected.
+NOTE: During failback, changes are transferred but not immediately applied. Select *Commit failback* once the original VM's functionality is verified. Alternatively, choose *Undo failback* to revert to the VM replica if the original VM exhibits unexpected behavior.
 
-* *Undo failover* - switch back to the original VM and discard all changes made to the VM replica while it was running.
+* *Undo failover* - Revert to the original VM, discarding all changes made to the VM replica during its operational period.
 
-* *Permanent Failover* - permanently switch from the original VM to a VM replica and use this replica as the original VM.
+* *Permanent Failover* - Permanently switch from the original VM to its replica, establishing the replica as the new primary VM for ongoing operations.
 
-In this demo, Failback to production was chosen. Failback to the original VM was selected during the Destination step of the wizard and “Power on VM after restoring” check box was enabled.
+In this scenario, the "Failback to production" option was selected. 
 
-image::dr-veeam-anf-image17.png[]
+Complete the following steps to perform a failback to the production site:
 
-image::dr-veeam-anf-image18.png[]
+. From the *Home* view, click on *Replicas > Active* in the left-hand menu. Select the VMs to be included and click on the *Failback to Production* button in the top menu.
++
+image::dr-veeam-gcnv-image22.png[Start failback]
++
+{nbsp}
 
-image::dr-veeam-anf-image19.png[]
+. On the *Replica* page of the *Failback* wizard, select the replicas to include in the failback job.
 
-image::dr-veeam-anf-image20.png[]
+. On the *Destination* page, select *Failback to the original VM* and click on *Next* to continue.
++
+image::dr-veeam-gcnv-image23.png[Failback to original VM]
++
+{nbsp}
 
-Failback commit is one of the ways to finalize failback operation. When failback is committed, it confirms that the changes sent to the VM which is failed back (the production VM) are working as expected. After the commit operation, Veeam Backup & Replication resumes replication activities for the production VM.
+. On the *Failback Mode* page, select *Auto* to start the failback as soon as possible.
++
+image::dr-veeam-gcnv-image24.png[Failback mode]
++
+{nbsp}
 
-For detailed information about the failback process, refer Veeam documentation for link:https://helpcenter.veeam.com/docs/backup/vsphere/failover_failback.html?ver=120[Failover and Failback for replication].
+. On the *Summary* page, choose whether to *Power on target VM after restoring* and then click on Finish to start the failback job.
++
+{nbsp}
 
-image::dr-veeam-anf-image21.png[]
+Failback commit finalizes the failback operation, confirming the successful integration of changes to the production VM. Upon commit, Veeam Backup & Replication resumes regular replication activities for the restored production VM. This changes the status of the restored replica from _Failback_ to _Ready_.
++
+
+. To commit failback, navigate to *Replicas > Active*, select the VMs to be committed, right click and select *Commit failback*.
+# +
+# image::dr-veeam-gcnv-image23.png[Commit failback]
+# +
+# {nbsp}
 
 After failback to production is successful, the VMs are all restored back to the original production site.
 
-image::dr-veeam-anf-image22.png[]
+
+For detailed information about the failback process, refer Veeam documentation for link:https://helpcenter.veeam.com/docs/backup/vsphere/failover_failback.html?ver=120[Failover and Failback for replication].
 ====
 
 == Conclusion
