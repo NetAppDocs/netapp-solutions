@@ -2,7 +2,7 @@
 sidebar: sidebar
 permalink: databases/aws_ora_ha_pacemaker.html
 keywords: Database, Oracle, AWS, EC2, FSx ONTAP, HA, Pacemaker
-summary: "This solution provides an overview and details for enabling Oracle high availability (HA) in AWS EC2 with Pacemaker clustering on Redhat Enterprise Linux (RHEL) and Amazon FSx ONTAP for the database storage via NFS protocol." 
+summary: "This solution provides an overview and details for enabling Oracle high availability (HA) in AWS EC2 with Pacemaker clustering on Redhat Enterprise Linux (RHEL) and Amazon FSx ONTAP for the database storage HA via NFS protocol." 
 ---
 
 = TR-4998: Oracle HA in AWS EC2 with Pacemaker Clustering and FSx ONTAP
@@ -15,11 +15,11 @@ summary: "This solution provides an overview and details for enabling Oracle hig
 Allen Cao, Niyaz Mohamed, NetApp
 
 [.lead]
-This solution provides an overview and details for enabling Oracle high availability (HA) in AWS EC2 with Pacemaker clustering on Redhat Enterprise Linux (RHEL) and Amazon FSx ONTAP for the database storage via NFS protocol.
+This solution provides an overview and details for enabling Oracle high availability (HA) in AWS EC2 with Pacemaker clustering on Redhat Enterprise Linux (RHEL) and Amazon FSx ONTAP for the database storage HA via NFS protocol.
 
 == Purpose
 
-Many customers who strive to self-manage and run Oracle in the public cloud need to overcome a few challenges. One of those challenges is enabling high availability for the Oracle database. Traditionally, Oracle customers rely on an Oracle database feature called "Real Application Cluster" or RAC for active-active transaction support on multiple cluster nodes. One failed node would not stall application processing. Unfortunately, Oracle RAC implementation is not readily available or supported in many popular public clouds such as AWS EC2. By leveraging built-in Pacemaker clustering in RHEL and Amazon FSx ONTAP, customers can achieve a viable alternative without RAC license cost for active-passive clustering on both compute and storage to support mission-critical Oracle database workload in the AWS cloud. 
+Many customers who strive to self-manage and run Oracle in the public cloud need to overcome a few challenges. One of those challenges is enabling high availability for the Oracle database. Traditionally, Oracle customers rely on an Oracle database feature called "Real Application Cluster" or RAC for active-active transaction support on multiple cluster nodes. One failed node would not stall application processing. Unfortunately, Oracle RAC implementation is not readily available or supported in many popular public clouds such as AWS EC2. By leveraging built-in Pacemaker clustering (PCS) in RHEL and Amazon FSx ONTAP, customers can achieve a viable alternative without Oracle RAC license cost for active-passive clustering on both compute and storage to support mission-critical Oracle database workload in the AWS cloud. 
 
 This documentation demonstrates the details of setting up Pacemaker clustering on RHEL, deploying Oracle database on EC2 and Amazon FSx ONTAP with NFS protocol, configuring Oracle resources in Pacemaker for HA, and wrapping up the demo with validation under most often encountered HA scenarios. The solution also provides information on fast Oracle database backup, restore, and clone with the NetApp SnapCenter UI tool. 
 
@@ -43,53 +43,57 @@ The testing and validation of this solution were performed in a lab setting that
 
 === Architecture
 
-image:automation_ora_c-series_nfs_archit.png["This image provides a detailed picture of the Oracle deployment configuration in AWS public cloud with iSCSI and ASM."]
+image:aws_ora_fsx_ec2_pcs_architecture.png["This image provides a detailed picture of Oracle HA in AWS EC2 with Pacemaker Clustering and FSx ONTAP."]
 
 === Hardware and software components
 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| NetApp C-Series C400 | ONTAP Version 9.13.1P3 | Two disk shelves / 24 disks with 278 TiB capacity 
-| VM for DB server | 4 vCPUs, 16GiB RAM | Two Linux VM instances for concurrent deployment 
-| VM for SnapCenter | 4 vCPUs, 16GiB RAM| One Windows VM instance 
+| Amazon FSx ONTAP storage | Current version offered by AWS | Single-AZ in us-east-1, 1024 GiB capacity, 128 MB/s throughput
+| EC2 instances for DB server | t2.xlarge/4vCPU/16G | Two EC2 T2 xlarge EC2 instances, one as primary DB server and the other as a standby DB server 
+| VM for Ansible controller | 4 vCPUs, 16GiB RAM| One Linux VM to run automated AWS EC2/FSx provisioning and Oracle deployment on NFS 
 
 3+^| *Software*
 | RedHat Linux | RHEL Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
-| Windows Server | 2022 DataCenter x64 Gen2 | Hosting SnapCenter server 
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
-| SnapCenter Server | Version 5.0 | Workgroup deployment 
-| Open JDK | Version java-11-openjdk | SnapCenter plugin requirement on DB VMs 
+| Pacemaker | Version 0.10.18 |  High Availability Add-On for RHEL 8.0 by RedHat
 | NFS | Version 3.0 | Oracle dNFS enabled
 | Ansible | core 2.16.2 | Python 3.6.8
 |===
 
-=== Oracle database configuration in the lab environment
+=== Oracle database active/passive configuration in the AWS EC2/FSx lab environment
 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| 
 | *Server* | *Database* | *DB Storage*
-| ora_01 | NTAP1(NTAP1_PDB1,NTAP1_PDB2,NTAP1_PDB3) | /u01, /u02, /u03 NFS mounts on C400 volumes
-| ora_02 | NTAP2(NTAP2_PDB1,NTAP2_PDB2,NTAP2_PDB3) | /u01, /u02, /u03 NFS mounts on C400 volumes
+| primary node: orapm01/ip-172.30.15.111 | NTAP(NTAP_PDB1,NTAP_PDB2,NTAP_PDB3) | /u01, /u02, /u03 NFS mounts on Amazon FSx ONTAP volumes
+| standby node: orapm02/ip-172.30.15.5 | NTAP(NTAP_PDB1,NTAP_PDB2,NTAP_PDB3) when failover | /u01, /u02, /u03 NFS mounts when failover
 |===
 
 === Key factors for deployment consideration
 
-* *Oracle database storage layout.* In this automated Oracle deployment, we provision three database volumes for each database to host Oracle binary, data, and logs by default. The volumes are mounted on Oracle DB server as /u01 - binary, /u02 - data, /u03 - logs via NFS. Dual control files are configured on /u02 and /u03 mount points for redundancy. 
+* *Amazon FSx ONTAP HA.* Amazon FSx ONTAP is provisioned in an HA pair of storage controllers in single or multiple availability zones by default. It provides storage redundancy in an active/passive fashion for mission-critical database workloads. The storage failover is transparent to the end user. User intervention is not required in the event of a storage failover.    
 
-* *Multiple DB servers deployment.* The automation solution can deploy an Oracle container database to multiple DB servers in a single Ansible playbook run. Regardless of the number of DB servers, the playbook execution remains the same. You can deploy multiple container databases to a single VM instance by repeating the deployment with different database instance IDs (Oracle SID). But ensure there is sufficient memory on the host to support deployed databases.  
+* *PCS resources group and resources ordering.* A resources group allows multiple resources with dependency to run on the same cluster node. The resource order enforces the resources startup order and the shutdown order in reverse. 
+
+* *Preferred node.* The Pacemaker cluster is purposely deployed in active/passive clustering (not a requirement by Pacemaker) and is in sync with FSx ONTAP clustering. The active EC2 instance is configured as a preferred node for Oracle resources when available with a location constraint. 
+
+* *Fence delay on standby node.* In a two-node PCS cluster, a quorum is artificially set as 1. In the event of a communication issue between the cluster nodes, either node could try to fence the other node, which can potentially cause data corruption. Setting up a delay on the standby node mitigates the issue and allows the primary node to continue providing services while the standby node is fenced. 
+
+* *Multi az deployment consideration.* The solution is deployed and validated in a single availability zone. For multi-az deployment, additional AWS networking resources are needed to move the PCS floating IP between the availability zones. 
+
+* *Oracle database storage layout.* In this solution demonstration, we provision three database volumes for the test database NTAP to host Oracle binary, data, and log. The volumes are mounted on the Oracle DB server as /u01 - binary, /u02 - data, and /u03 - log via NFS. Dual control files are configured on /u02 and /u03 mount points for redundancy. 
 
 * *dNFS configuration.* By using dNFS (available since Oracle 11g), an Oracle database running on a DB VM can drive significantly more I/O than the native NFS client. Automated Oracle deployment configures dNFS on NFSv3 by default.
-
-* *Load balancing on C400 controller pair.* Place Oracle database volumes on C400 controller nodes evenly to balance the workload. DB1 on controller 1, DB2 on controller 2, and so on. Mount the DB volumes to its local lif address.
 
 * *Database backup.* NetApp provides a SnapCenter software suite for database backup, restore, and cloning with a user-friendly UI interface. NetApp recommends implementing such a management tool to achieve fast (under a minute) snapshot backup, quick (minutes) database restore, and database clone.    
 
 == Solution deployment
 
-The following sections provide step-by-step procedures for automated Oracle 19c deployment and information for Oracle database protection and clone after deployment.    
+The following sections provide step-by-step procedures for deployment and configuration of Oracle database HA in AWS EC2 with Pacemaker clustering and Amazon FSx ONTAP for database storage protection.    
 
 === Prerequisites for deployment
 [%collapsible]
@@ -551,7 +555,7 @@ image:automation_ora_c-series_nfs_em_03.png["This image provides container datab
 
 ====
 
-NetApp recommends SnapCenter UI tool to manage Oracle database deployed in C-Series. Refer to TR-4979 link:aws_ora_fsx_vmc_guestmount.html#oracle-backup-restore-and-clone-with-snapcenter[Simplified, Self-managed Oracle in VMware Cloud on AWS with guest-mounted FSx ONTAP^] section `Oracle backup, restore, and clone with SnapCenter` for details on setting up SnapCenter and executing the database backup, restore, and clone workflows.
+NetApp recommends SnapCenter UI tool to manage Oracle database deployed in AWS EC2 and Amazon FSx ONTAP. Refer to TR-4979 link:aws_ora_fsx_vmc_guestmount.html#oracle-backup-restore-and-clone-with-snapcenter[Simplified, Self-managed Oracle in VMware Cloud on AWS with guest-mounted FSx ONTAP^] section `Oracle backup, restore, and clone with SnapCenter` for details on setting up SnapCenter and executing the database backup, restore, and clone workflows.
 
 ====
 
@@ -560,14 +564,17 @@ NetApp recommends SnapCenter UI tool to manage Oracle database deployed in C-Ser
 
 To learn more about the information described in this document, review the following documents and/or websites:
 
-* NetApp AFF C-Series
+* Configuring and managing high availability clusters
 +
-link:https://www.netapp.com/pdf.html?item=/media/81583-da-4240-aff-c-series.pdf[https://www.netapp.com/pdf.html?item=/media/81583-da-4240-aff-c-series.pdf^]
+link:https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/configuring_and_managing_high_availability_clusters/index[https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/configuring_and_managing_high_availability_clusters/index^]
 
 * NetApp Enterprise Database Solutions
 +
 link:https://docs.netapp.com/us-en/netapp-solutions/databases/index.html[https://docs.netapp.com/us-en/netapp-solutions/databases/index.html^]
 
+* Amazon FSx for NetApp ONTAP
++
+link:https://aws.amazon.com/fsx/netapp-ontap/?refid=3c5ce89c-8865-47a3-bec3-f6820351aa6d[https://aws.amazon.com/fsx/netapp-ontap/?refid=3c5ce89c-8865-47a3-bec3-f6820351aa6d^]
 
 * Deploying Oracle Direct NFS
 +
