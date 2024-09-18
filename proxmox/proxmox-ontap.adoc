@@ -65,8 +65,10 @@ to utilize high speed nics available on modern servers.
 
 === Proxmox VE storage types supported with ONTAP
 
-NAS protocols (NFS/SMB) supports all content types of Proxmox VE and typically configured once at datacenter level. ONTAP Snapshots can be made visible to access point in time copies of data from the client.
-Block storage with SAN protocols (FC/iSCSI/NVMe-oF) are typically configured per host basis & restricted to VM Disk and Container Image content types of Proxmox VE. 
+NAS protocols (NFS/SMB) supports all content types of Proxmox VE and typically configured once at datacenter level. Guest VMs can create disks of type raw,qcow2 or VMDK on NAS storage.
+ONTAP Snapshots can be made visible to access point in time copies of data from the client. 
+Block storage with SAN protocols (FC/iSCSI/NVMe-oF) are typically configured per host basis & restricted to VM Disk and Container Image content types of Proxmox VE. Guest VMs and Containers consume block storage as raw devices.
+
 [frame=all, grid=all]
 |====
 |Content Type| NFS | SMB/CIFS | FC | iSCSI | NVMe-oF
@@ -145,6 +147,7 @@ image:proxmox-ontap-image12.png[storage configuration file for NFS]
 
 **Virtualization Admin Tasks**
 
+. Make sure two linux bridges each on its own ethernet nic is configured (ideally on different VLANs).
 . Ensure multipath-tools is installed on all Proxmox VE hosts. Ensure it starts on boot.
 +
 [source,shell]
@@ -186,3 +189,72 @@ image:proxmox-ontap-image17.png[lvm storage navigation]
 image:proxmox-ontap-image18.png[lvm storage creation]
 . Here is the sample storage configuration file for LVM using iSCSI volume.
 image:proxmox-ontap-image19.png[lvm iscsi configuration]
+
+=== LVM with NVMe/TCP
+
+**Virtualization Admin Tasks**
+
+. Make sure two linux bridges each with its own ethernet device is configured (ideally on different VLANs).
+. On every Proxmox host on the cluster, execute the following command to collect the host initiator info.
++
+[source,shell]
+----
+nvme show-hostnqn
+----
+. Provide collected host nqn info to storage admin and request a nvme namespace of required size.
+
+**Storage Admin Tasks**
+
+If new to ONTAP, use System Manager for better experience.
+
+. Ensure SVM is available with NVMe protocol enabled. Refer https://docs.netapp.com/us-en/ontap/san-admin/create-nvme-namespace-subsystem-task.html[NVMe tasks on ONTAP 9 documentation]
+. Create the NVMe namespace.
+image:proxmox-ontap-image20.png[nvme namespace creation]
+. Create subsystem and assign host nqns (if using CLI). Follow the above reference link.
+. Notify virtualization admin that nvme namespace is created.
+
+**Virtualization Admin Tasks**
+
+. Navigate to shell on each Proxmox VE hosts in the cluster and create /etc/nvme/discovery.conf file and update the content specific to your environment.
++
+[source,shell]
+----
+root@pxmox01:~# cat /etc/nvme/discovery.conf 
+# Used for extracting default parameters for discovery
+#
+# Example:
+# --transport=<trtype> --traddr=<traddr> --trsvcid=<trsvcid> --host-traddr=<host-traddr> --host-iface=<host-iface>
+
+-t tcp -l 1800 -a 172.21.118.153
+-t tcp -l 1800 -a 172.21.118.154
+-t tcp -l 1800 -a 172.21.119.153
+-t tcp -l 1800 -a 172.21.119.154
+----
+. Login to nvme subsystem
++
+[source,shell]
+----
+nvme connect-all
+----
+. Inspect and collect device details.
++
+[source,shell]
+----
+nvme list
+nvme netapp ontapdevices
+nvme list-subsys
+lsblk -l
+----
+. Create volume group 
++
+[source,shell]
+----
+vgcreate pvens02 /dev/mapper/<device id>
+----
+. Go to Management UI (https:<proxmox node>:8006), click on datacenter, select storage, click Add and select LVM.
+image:proxmox-ontap-image17.png[lvm storage navigation]
+. Provide storage id name, choose existing volume group and pick the volume group that just created with cli. Remember to check the shared option.
+image:proxmox-ontap-image21.png[lvm on existing vg]
+. Here is the sample storage configuration file for LVM using NVMe/TCP
+image:proxmox-ontap-image22.png[lvm on nvme tcp configuration]
+
