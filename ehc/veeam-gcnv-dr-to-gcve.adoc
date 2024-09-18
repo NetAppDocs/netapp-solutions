@@ -63,12 +63,9 @@ This solution requires the following components and configurations:
 . Ensure the Veeam Backup & Replication backup VM is connected to the Veeam Proxy server VMs at both the source and target GCVE clusters.
 . The backup server must be able to resolve short names and connect to source and target vCenters.
 
-NOTE: Veeam requires a GCVE solution user account with elevated privileges when adding the GCVE vCenter server to the Veeam Backup and Replication inventory. For more information refer to the Google Cloud Platform (GCP) documentation at https://cloud.google.com/vmware-engine/docs/private-clouds/classic-console/howto-elevate-privilege[Elevating VMware Enginer priviliges].
+NOTE: Veeam requires a GCVE solution user account with elevated privileges when adding the GCVE vCenter server to the Veeam Backup and Replication inventory. For more information refer to the Google Cloud Platform (GCP) documentation at https://cloud.google.com/vmware-engine/docs/private-clouds/classic-console/howto-elevate-privilege[Elevating VMware Engine privileges].
 
-*PROVIDE MORE REFERENCES TO OUTSIDE INFORMATION HERE*
-## . link:https://learn.microsoft.com/en-us/azure/azure-vmware/deploy-azure-vmware-solution?tabs=azure-portal[Deploy Azure VMware Solution (AVS)] private cloud and link:https://learn.microsoft.com/en-us/azure/azure-vmware/# ## attach-azure-netapp-files-to-azure-vmware-solution-hosts?tabs=azure-portal[attach Azure NetApp Files datastores] to Azure VMware Solution hosts.
-##  +
-## A pilot-light environment set up with a minimal configuration can be used for DR purposes. VMs will fail over to this cluster in the event of an incident, and additional nodes can be added).
+For additional information refer to https://helpcenter.veeam.com/docs/backup/vsphere/replica_limitations.html?ver=120[Considerations and Limitations] in the Veeam Backup & Replication documentation.
 
 == Deployment steps
 
@@ -126,7 +123,7 @@ At the time of this writing the process to mount a datastore in GCVE requires op
 Refer to https://cloud.google.com/vmware-engine/docs/vmware-ecosystem/howto-cloud-volumes-datastores-gcve[Using NFS volume as vSphere datastore hosted by Google Cloud NetApp Volumes] for more information.
 ====
 
-=== Replicate VMs to GCVE and execute failover, failback plans
+=== Replicate VMs to GCVE and execute failover plan, and failback
 
 .Replicate VMs to NFS datastore in GCVE
 [%collapsible]
@@ -154,7 +151,7 @@ image::dr-veeam-gcnv-image07.png[name page]
 {nbsp}
 
 . On the *Virtual Machines* page, select the VMs to be replicated to the NetApp Volumes datastore attached to a GCVE SDDC. Click *Add*, then in the *Add Object* window select the necessary VMs or VM containers and click *Add*. Click *Next*.
-
++
 NOTE: The Virtual machines can be placed on vSAN to fill the available vSAN datastore capacity. In a pilot light cluster, the usable capacity of a 3-node vSAN cluster will be limited. The rest of the data can be easily placed on Google Cloud NetApp Volumes datastores so that the VMs can be recovered, and the cluster can later be expanded to meet the CPU/mem requirements.
 +
 image::dr-veeam-gcnv-image08.png[select VMs to be replicated]
@@ -319,19 +316,22 @@ image::dr-veeam-gcnv-image24.png[Failback mode]
 
 . On the *Summary* page, choose whether to *Power on target VM after restoring* and then click on Finish to start the failback job.
 +
+image::dr-veeam-gcnv-image25.png[Failback job summary]
++
 {nbsp}
 
 Failback commit finalizes the failback operation, confirming the successful integration of changes to the production VM. Upon commit, Veeam Backup & Replication resumes regular replication activities for the restored production VM. This changes the status of the restored replica from _Failback_ to _Ready_.
-+
 
 . To commit failback, navigate to *Replicas > Active*, select the VMs to be committed, right click and select *Commit failback*.
-# +
-# image::dr-veeam-gcnv-image23.png[Commit failback]
-# +
-# {nbsp}
-
++
+image::dr-veeam-gcnv-image26.png[Commit failback]
++
+{nbsp}
++
+image::dr-veeam-gcnv-image27.png[Commit failback successful]
++
+{nbsp}
 After failback to production is successful, the VMs are all restored back to the original production site.
-
 
 For detailed information about the failback process, refer Veeam documentation for link:https://helpcenter.veeam.com/docs/backup/vsphere/failover_failback.html?ver=120[Failover and Failback for replication].
 ====
@@ -342,4 +342,4 @@ Google Cloud NetApp Volumes datastore functionality empowers Veeam and other val
 
 To learn more about this process, feel free to follow the detailed walkthrough video.
 
-video::2855e0d5-97e7-430f-944a-b061015e9278[panopto, "Video walkthrough of the solution"]
+video::6cb79743-e2fd-4bc3-a42d-b1ee0189865e[panopto, "Video walkthrough of the solution"]
