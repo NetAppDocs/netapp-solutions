@@ -21,17 +21,21 @@ Proxmox VE hosts need to have FC, Ethernet or other supported interfaces cabled 
 
 **Common features**
 
+* Scale out Cluster
 * Secure Authentication and RBAC support
 * Zero trust multi admin support
 * Secure Multitenancy
 * Replicate data with SnapMirror.
 * Point in time copies with Snapshots.
+* Space efficient clones.
 * Storage efficiency features like dedupe, compression, etc.
 * Trident CSI support for Kubernetes
 * Snaplock
+* Tamperproof Snapshot copy locking
 * Encryption support
 * FabricPool to tier cold data to object store.
 * BlueXP and CloudInsights Integration.
+* Microsoft offloaded data transfer (ODX)
 
 **NAS**
 
@@ -56,11 +60,13 @@ to utilize high speed nics available on modern servers.
 * ASA models provide active/active multipathing and fast path failover.
 * Support for FC, iSCSI, NVMe-oF protocols.
 * Support for iSCSI CHAP mutual authentication
+* Selective LUN Map and Portset
 
 
 === Proxmox VE storage types supported with ONTAP
 
-NAS protocols (NFS/SMB) supports all content types of Proxmox VE and typically configured once at datacenter level. Block storage with SAN protocols (FC/iSCSI/NVMe-oF) are typically configured per host basis & restricted to VM Disk and Container Image content types of Proxmox VE.
+NAS protocols (NFS/SMB) supports all content types of Proxmox VE and typically configured once at datacenter level. ONTAP Snapshots can be made visible to access point in time copies of data from the client.
+Block storage with SAN protocols (FC/iSCSI/NVMe-oF) are typically configured per host basis & restricted to VM Disk and Container Image content types of Proxmox VE. 
 
 |====
 |Content Type| NFS | SMB/CIFS | FC | iSCSI | NVMe-oF
@@ -71,8 +77,8 @@ NAS protocols (NFS/SMB) supports all content types of Proxmox VE and typically c
 |CT Templates | Yes | Yes | No*| No* |No*
 |Snippets | Yes | Yes | No*| No* |No*
 |====
-/* Create a folder on cluster filesystem and use Directory storage type.
-/** use LVM storage type
+/* Requires cluster filesystem to create the shared folder and use Directory storage type.
+/** use LVM storage type. 
 
 === SMB/CIFS Storage 
 
@@ -81,6 +87,8 @@ To utilize SMB/CIFS file share, there are certain tasks that needs to be carried
 NOTE: Password will be saved in clear text file and accessible only to root user. Refer https://pve.proxmox.com/pve-docs/chapter-pvesm.html#storage_cifs[Proxmox VE documentation]
 
 **Storage Admin Tasks**
+
+If new to ONTAP, use System Manager Interface to complete these tasks for better experience.
 
 . Ensure SVM is enabled for SMB. Follow https://docs.netapp.com/us-en/ontap/smb-config/configure-access-svm-task.html[ONTAP 9 documentation] if need help.
 . Have at least two lifs per controller. Follow the steps from the above link. For reference, here is the screenshot of lifs that we use in our lab. 
@@ -103,3 +111,32 @@ image:proxmox-ontap-image05.png[SMB storage addition]
 image:proxmox-ontap-image06.png[multichannel setup]
 . Here is the content in /etc/pve/storage.cfg for the above tasks.
 image:proxmox-ontap-image07.png[storage configuration file for SMB]
+
+=== NFS Storage
+
+ONTAP supports all the NFS versions supported by Proxmox VE. To provide fault tolerance and performance enhancements, https://docs.netapp.com/us-en/ontap/nfs-trunking/index.html[session trunking] is utilized. To use session trunking, minimum NFS v4.1 is required.
+
+If new to ONTAP, use System Manager Interface to complete these tasks for better experience.
+
+**Storage Admin Tasks**
+
+. Ensure SVM is enabled for NFS. Refer https://docs.netapp.com/us-en/ontap/nfs-config/verify-protocol-enabled-svm-task.html[ONTAP 9 documentation]
+. Have at least two lifs per controller. Follow the steps from the above link. For reference, here is the screenshot of lifs that we use in our lab. 
+image:proxmox-ontap-image01.png[nas interface details]
+. Create or update NFS export policy providing access to Proxmox VE host IP addresses or subnet. Refer https://docs.netapp.com/us-en/ontap/nfs-config/create-export-policy-task.html[Export policy creation] and https://docs.netapp.com/us-en/ontap/nfs-config/add-rule-export-policy-task.html[Add rule to an export policy]
+. https://docs.netapp.com/us-en/ontap/nfs-config/create-volume-task.html[Create a volume]
+. https://docs.netapp.com/us-en/ontap/nfs-config/associate-export-policy-flexvol-task.html[Assign export policy to volume]
+image:proxmox-ontap-image08.png[NFS volume info]
+. Notify virtualization admin that NFS volume is ready.
+
+**Virtualization Admin Tasks**
+
+. Ensure at least two interface is configured in different VLANs (for fault tolerance). Use NIC bonding.
+. If using Management UI (https://<proxmox node>:8006), click on datacenter, select storage, click Add and select NFS.
+image:proxmox-ontap-image09.png[NFS storage navigation]
+. Fill in the details, After providing the server info, the NFS exports should populate and pick from the list. Remember to select the content options.
+image:proxmox-ontap-image10.png[NFS storage addition]
+. For session trunking, on every Proxmox VE hosts, update the /etc/fstab file to mount the same NFS export using different lif address along with max_connect and NFS version option.
+image:proxmox-ontap-image11.png[fstab entries for session trunk]
+. Here is the content in /etc/pve/storage.cfg for NFS.
+image:proxmox-ontap-image12.png[storage configuration file for NFS]
