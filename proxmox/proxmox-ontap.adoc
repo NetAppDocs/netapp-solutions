@@ -67,7 +67,7 @@ to utilize high speed nics available on modern servers.
 
 NAS protocols (NFS/SMB) supports all content types of Proxmox VE and typically configured once at datacenter level. ONTAP Snapshots can be made visible to access point in time copies of data from the client.
 Block storage with SAN protocols (FC/iSCSI/NVMe-oF) are typically configured per host basis & restricted to VM Disk and Container Image content types of Proxmox VE. 
-
+[frame=all, grid=all]
 |====
 |Content Type| NFS | SMB/CIFS | FC | iSCSI | NVMe-oF
 |Backups | Yes | Yes | No*| No* |No*
@@ -140,3 +140,49 @@ image:proxmox-ontap-image10.png[NFS storage addition]
 image:proxmox-ontap-image11.png[fstab entries for session trunk]
 . Here is the content in /etc/pve/storage.cfg for NFS.
 image:proxmox-ontap-image12.png[storage configuration file for NFS]
+
+=== LVM with iSCSI
+
+**Virtualization Admin Tasks**
+
+. Ensure multipath-tools is installed on all Proxmox VE hosts. Ensure it starts on boot.
++
+[source,shell]
+----
+apt list | grep multipath-tools
+# If need to install, execute the following line.
+apt-get install multipath-tools
+systemctl enable multipathd
+----
++
+. Collect the iscsi host iqn for all Proxmox VE hosts and provide that to Storage admin.
++
+[source,shell]
+----
+cat /etc/iscsi/initiator.name
+----
+
+**Storage Admin Tasks**
+
+If new to ONTAP, use System Manager for better experience.
+
+. Ensure SVM is available with iSCSI protocol enabled. Follow https://docs.netapp.com/us-en/ontap/san-admin/provision-storage.html[ONTAP 9 documentation]
+. Have two lifs per controller dedicated for iSCSI.
+image:proxmox-ontap-image13.png[iscsi interface details]
+. Create igroup and populate the host iscsi initiators.
+. Create the LUN with desired size on the SVM and present to igroup created in above step.
+image:proxmox-ontap-image14.png[iscsi lun details]
+. Notify virtualization admin that lun is created.
+
+**Virtualization Admin Tasks**
+
+. Go to Management UI (https:<proxmox node>:8006), click on datacenter, select storage, click Add and select iSCSI.
+image:proxmox-ontap-image15.png[iscsi storage navigation]
+. Provide storage id name, iSCSI lif address from ONTAP and should be able to pick the target when there is no communication issue. As our intention is not directly provide LUN access to guest vm, will uncheck that.
+image:proxmox-ontap-image16.png[iscsi storage type creation]
+. Now, click Add and select LVM.
+image:proxmox-ontap-image17.png[lvm storage navigation]
+. Provide storage id name, pick base storage that should match the one iSCSI storage we created above step. Pick the LUN for the base volume. Provide the volume group name. Ensure shared is selected.
+image:proxmox-ontap-image18.png[lvm storage creation]
+. Here is the sample storage configuration file for LVM using iSCSI volume.
+image:proxmox-ontap-image19.png[lvm iscsi configuration]
