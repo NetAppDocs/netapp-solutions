@@ -109,17 +109,6 @@ Deployment requires the following prerequisites.
 +
 Enable ssh public/private key authentication between Ansible controller and EC2 instance DB VMs.
 
-. From Ansible controller admin user home directory, clone a copy of the NetApp Oracle deployment automation toolkit for NFS. 
-+
-[source, cli]
-git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_nfs.git
-
-. Stage following Oracle 19c installation files on DB VM /tmp/archive directory with 777 permission.
-+
-      installer_archives:
-        - "LINUX.X64_193000_db_home.zip"
-        - "p34765931_190000_Linux-x86-64.zip"
-        - "p6880880_190000_Linux-x86-64.zip"
 
 ====
 
@@ -418,93 +407,846 @@ This completes the Pacemaker cluster setup and initial configuration.
 
 ====
 
+=== Pacemaker cluster fencing configuration
+[%collapsible]
 
+====
+Pacemaker fencing configuration is mandatory for a production cluster. It ensures that a malfunctioning node on your AWS EC2 cluster is automatically isolated, which prevents the node from consuming the cluster’s resources, compromising the cluster’s functionality, or corrupting shared data. This section demonstrates the configuration of cluster fencing using the fence_aws fencing agent.
 
-=== Automation parameter file
+. As root user, enter the following AWS metadata query to get the Instance ID for each EC2 instance node.
++
+[source, cli]
+echo $(curl -s http://169.254.169.254/latest/meta-data/instance-id)
++
+....
+[root@ip-172-30-15-111 ec2-user]# echo $(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+i-0d8e7a0028371636f
+
+or just get instance-id from AWS EC2 console
+....
+
+. Enter the following command to configure the fence device. Use the pcmk_host_map command to map the RHEL host name to the Instance ID. Use the AWS Access Key and AWS Secret Access Key that you previously used.
++
+[source, cli]
+sudo pcs stonith \
+create clusterfence fence_aws access_key=XXXXXXXXXXXXXXXXX secret_key=XXXXXXXXXXXXXXXXXX \
+region=us-east-1 pcmk_host_map="ip-172-30-15-111.ec2.internal:i-0d8e7a0028371636f;ip-172-30-15-5.ec2.internal:i-0bc54b315afb20a2e" \
+power_timeout=240 pcmk_reboot_timeout=480 pcmk_reboot_retries=4
+
+. Validate the fencing configuration.
++
+[source, cli]
+pcs status
++
+....
+[root@ip-172-30-15-111 ec2-user]# pcs status
+Cluster name: ora_ec2nfsx
+Cluster Summary:
+  * Stack: corosync (Pacemaker is running)
+  * Current DC: ip-172-30-15-111.ec2.internal (version 2.1.7-5.1.el8_10-0f7f88312) - partition with quorum
+  * Last updated: Wed Sep 11 21:17:18 2024 on ip-172-30-15-111.ec2.internal
+  * Last change:  Wed Sep 11 21:16:40 2024 by root via root on ip-172-30-15-111.ec2.internal
+  * 2 nodes configured
+  * 1 resource instance configured
+
+Node List:
+  * Online: [ ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal ]
+
+Full List of Resources:
+  * clusterfence        (stonith:fence_aws):     Started ip-172-30-15-111.ec2.internal
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+
+....
+
+. Set stonith-action to off instead of reboot at the cluster level. 
++
+[source, cli]
+pcs property set stonith-action=off
++
+....
+
+[root@ip-172-30-15-111 ec2-user]# pcs property config
+Cluster Properties:
+ cluster-infrastructure: corosync
+ cluster-name: ora_ec2nfsx
+ dc-version: 2.1.7-5.1.el8_10-0f7f88312
+ have-watchdog: false
+ last-lrm-refresh: 1726257586
+ stonith-action: off
+
+....
++
+[NOTE]
+
+With stonith-action set at off, the fenced cluster node will initially be shutdown. After the period defined in stonith power_timeout (240 seconds), the fenced node will be rebooted and rejoins the cluster.  
+
+. Set fence delay with 10 seconds delay on standby node. 
++
+[source, cli]
+pcs stonith update clusterfence pcmk_delay_base="ip-172-30-15-111.ec2.internal:0;ip-172-30-15-5.ec2.internal:10s"
++
+....
+[root@ip-172-30-15-111 ec2-user]# pcs stonith config
+Resource: clusterfence (class=stonith type=fence_aws)
+  Attributes: clusterfence-instance_attributes
+    access_key=XXXXXXXXXXXXXXXX
+    pcmk_delay_base=ip-172-30-15-111.ec2.internal:0;ip-172-30-15-5.ec2.internal:10s
+    pcmk_host_map=ip-172-30-15-111.ec2.internal:i-0d8e7a0028371636f;ip-172-30-15-5.ec2.internal:i-0bc54b315afb20a2e
+    pcmk_reboot_retries=4
+    pcmk_reboot_timeout=480
+    power_timeout=240
+    region=us-east-1
+    secret_key=XXXXXXXXXXXXXXXX
+  Operations:
+    monitor: clusterfence-monitor-interval-60s
+      interval=60s
+
+....
+
+[NOTE]
+
+Execute `pcs stonith refresh` command to refresh stopped stonith fence agent or clear failed stonith resource actions. 
+
+====
+
+=== Deploy Oracle database in PCS cluster
 [%collapsible]
 
 ====
 
-Ansible playbook executes database installation and configuration tasks with predefined parameters. For this Oracle automation solution, there are three user-defined parameter files that need user input before playbook execution.
+We recommend leveraging the NetApp-provided Ansible playbook to execute database installation and configuration tasks with predefined parameters on the PCS cluster. In this automated Oracle deployment, three user-defined parameter files need user input before playbook execution.
 
 * hosts - define targets that the automation playbook is running against.
 * vars/vars.yml - the global variable file that defines variables that apply to all targets.
 * host_vars/host_name.yml - the local variable file that defines variables that apply only to a named target. In our use case, these are the Oracle DB servers. 
 
-In addition to these user-defined variable files, there are several default variable files that contain default parameters that do not require change unless necessary. The following sections show how to configure the user-defined variable files.  
+In addition to these user-defined variable files, there are several default variable files that contain default parameters that do not require change unless necessary. The following shows the details of automated Oracle deployment in AWS EC2 and FSx ONTAP in a PCS clustering configuration. 
+
+. From Ansible controller admin user home directory, clone a copy of the NetApp Oracle deployment automation toolkit for NFS. 
++
+[source, cli]
+git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_oracle_deploy_nfs.git
++
+[NOTE]
+
+The Ansible controller can be located in the same VPC as the database EC2 instance or on-premises as long as there is network connectivity between them.
+
+. Fill in the user defined parameters in hosts parameter files. Following are example of typical host file configuration. 
++
+....
+
+[admin@ansiblectl na_oracle_deploy_nfs]$ cat hosts
+#Oracle hosts
+[oracle]
+orapm01 ansible_host=172.30.15.111 ansible_ssh_private_key_file=ec2-user.pem
+orapm02 ansible_host=172.30.15.5 ansible_ssh_private_key_file=ec2-user.pem
+
+....
+
+. Fill in the user defined parameters in vars/vars.yml parameter files. Following are example of typical vars.yml file configuration. 
++
+....
+
+[admin@ansiblectl na_oracle_deploy_nfs]$ cat vars/vars.yml
+######################################################################
+###### Oracle 19c deployment user configuration variables       ######
+###### Consolidate all variables from ONTAP, linux and oracle   ######
+######################################################################
+
+###########################################
+### ONTAP env specific config variables ###
+###########################################
+
+# Prerequisite to create three volumes in NetApp ONTAP storage from System Manager or cloud dashboard with following naming convention:
+# db_hostname_u01 - Oracle binary
+# db_hostname_u02 - Oracle data
+# db_hostname_u03 - Oracle redo
+# It is important to strictly follow the name convention or the automation will fail.
+
+
+###########################################
+### Linux env specific config variables ###
+###########################################
+
+redhat_sub_username: xxxxxxxx
+redhat_sub_password: "xxxxxxxx"
+
+
+####################################################
+### DB env specific install and config variables ###
+####################################################
+
+# Database domain name
+db_domain: ec2.internal
+
+# Set initial password for all required Oracle passwords. Change them after installation.
+initial_pwd_all: "xxxxxxxx"
+
+....
+
+. Fill in the user defined parameters in host_vars/host_name.yml parameter files. Following are example of typical host_vars/host_name.yml file configuration. 
++
+....
+
+[admin@ansiblectl na_oracle_deploy_nfs]$ cat host_vars/orapm01.yml
+# User configurable Oracle host specific parameters
+
+# Database SID. By default, a container DB is created with 3 PDBs within the CDB
+oracle_sid: NTAP
+
+# CDB is created with SGA at 75% of memory_limit, MB. Consider how many databases to be hosted on the node and
+# how much ram to be allocated to each DB. The grand total of SGA should not exceed 75% available RAM on node.
+memory_limit: 8192
+
+# Local NFS lif ip address to access database volumes
+nfs_lif: 172.30.15.95
+
+....
++
+[NOTE]
+
+nfs_lif address can be retrieved from FSx ONTAP cluster end points output from automated EC2 and FSx ONTAP deployment in previous section.
+
+. Create database volumes from AWS FSx console. Ensure to use PCS primary node host name (orapm01) as prefix for the volumes as demonstrated below.
++
+image:aws_ora_fsx_ec2_pcs_01.png["This image provides Amazon FSx ONTAP volume provisioning from AWS FSx console"]
+image:aws_ora_fsx_ec2_pcs_02.png["This image provides Amazon FSx ONTAP volume provisioning from AWS FSx console"]
+image:aws_ora_fsx_ec2_pcs_03.png["This image provides Amazon FSx ONTAP volume provisioning from AWS FSx console"]
+image:aws_ora_fsx_ec2_pcs_04.png["This image provides Amazon FSx ONTAP volume provisioning from AWS FSx console"]
+image:aws_ora_fsx_ec2_pcs_05.png["This image provides Amazon FSx ONTAP volume provisioning from AWS FSx console"]
+
+. Stage following Oracle 19c installation files on PCS primary node EC2 instance ip-172-30-15-111.ec2.internal /tmp/archive directory with 777 permission.
++
+      installer_archives:
+        - "LINUX.X64_193000_db_home.zip"
+        - "p34765931_190000_Linux-x86-64.zip"
+        - "p6880880_190000_Linux-x86-64.zip"
+
+. Execute playbook for Linux config for all nodes.
++
+[source, cli]
+ansible-playbook -i hosts 2-linux_config.yml -u ec2-user -e @vars/vars.yml
++
+....
+[admin@ansiblectl na_oracle_deploy_nfs]$ ansible-playbook -i hosts 2-linux_config.yml -u ec2-user -e @vars/vars.yml
+
+PLAY [Linux Setup and Storage Config for Oracle] ****************************************************************************************************************************************************************************************************************************************************************************
+
+TASK [Gathering Facts] ******************************************************************************************************************************************************************************************************************************************************************************************************
+ok: [orapm01]
+ok: [orapm02]
+
+TASK [linux : Configure RedHat 7 for Oracle DB installation] ****************************************************************************************************************************************************************************************************************************************************************
+skipping: [orapm01]
+skipping: [orapm02]
+
+TASK [linux : Configure RedHat 8 for Oracle DB installation] ****************************************************************************************************************************************************************************************************************************************************************
+included: /home/admin/na_oracle_deploy_nfs/roles/linux/tasks/rhel8_config.yml for orapm01, orapm02
+
+TASK [linux : Register subscriptions for RedHat Server] *********************************************************************************************************************************************************************************************************************************************************************
+ok: [orapm01]
+ok: [orapm02]
+.
+.
+.
+....
+
+. Execute playbook for oracle config only on primary node (comment out standby node in hosts file). 
++
+[source, cli]
+ansible-playbook -i hosts 4-oracle_config.yml -u ec2-user -e @vars/vars.yml --skip-tags "enable_db_start_shut"
++
+....
+[admin@ansiblectl na_oracle_deploy_nfs]$ ansible-playbook -i hosts 4-oracle_config.yml -u ec2-user -e @vars/vars.yml --skip-tags "enable_db_start_shut"
+
+PLAY [Oracle installation and configuration] ********************************************************************************************************************************************************************************************************************************************************************************
+
+TASK [Gathering Facts] ******************************************************************************************************************************************************************************************************************************************************************************************************
+ok: [orapm01]
+
+TASK [oracle : Oracle software only install] ********************************************************************************************************************************************************************************************************************************************************************************
+included: /home/admin/na_oracle_deploy_nfs/roles/oracle/tasks/oracle_install.yml for orapm01
+
+TASK [oracle : Create mount points for NFS file systems / Mount NFS file systems on Oracle hosts] ***************************************************************************************************************************************************************************************************************************
+included: /home/admin/na_oracle_deploy_nfs/roles/oracle/tasks/oracle_mount_points.yml for orapm01
+
+TASK [oracle : Create mount points for NFS file systems] ********************************************************************************************************************************************************************************************************************************************************************
+changed: [orapm01] => (item=/u01)
+changed: [orapm01] => (item=/u02)
+changed: [orapm01] => (item=/u03)
+.
+.
+.
+....
+
+. After database is deployed, comment out /u01, /u02, /u03 mounts in /etc/fstab on primary node since the mount points will be managed by PCS only.
++
+[source, cli]
+sudo vi /etc/fstab
++
+....
+
+[root@ip-172-30-15-111 ec2-user]# cat /etc/fstab
+UUID=eaa1f38e-de0f-4ed5-a5b5-2fa9db43bb38       /       xfs     defaults        0       0
+/mnt/swapfile swap swap defaults 0 0
+#172.30.15.95:/orapm01_u01 /u01 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
+#172.30.15.95:/orapm01_u02 /u02 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
+#172.30.15.95:/orapm01_u03 /u03 nfs rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536 0 0
+
+....
+
+. Copy /etc/oratab /etc/oraInst.loc, /home/oracle/.bash_profile to standby node. Ensure to maintain proper file ownership and permissions.
+
+. Shutdown database, listener, and umount /u01, /u02, /u03 on primary node.
++
+....
+
+[root@ip-172-30-15-111 ec2-user]# su - oracle
+Last login: Wed Sep 18 16:51:02 UTC 2024
+[oracle@ip-172-30-15-111 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Wed Sep 18 16:51:16 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> shutdown immediate;
+
+SQL> exit
+Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+[oracle@ip-172-30-15-111 ~]$ lsnrctl stop listener.ntap
+
+[oracle@ip-172-30-15-111 ~]$ exit
+logout
+[root@ip-172-30-15-111 ec2-user]# umount /u01
+[root@ip-172-30-15-111 ec2-user]# umount /u02
+[root@ip-172-30-15-111 ec2-user]# umount /u03
+
+....
+
+. Create mount points on standby node ip-172-30-15-5.
++
+[source, cli]
+mkdir /u01
+mkdir /u02
+mkdir /u03
+
+. Mount the FSx ONTAP database volumes on standby node ip-172-30-15-5.
++
+[source, cli]
+mount -t nfs 172.30.15.95:/orapm01_u01 /u01 -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
++
+[source, cli]
+mount -t nfs 172.30.15.95:/orapm01_u02 /u02 -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
++
+[source, cli]
+mount -t nfs 172.30.15.95:/orapm01_u03 /u03 -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
++
+....
+
+[root@ip-172-30-15-5 ec2-user]# df -h
+Filesystem                 Size  Used Avail Use% Mounted on
+devtmpfs                   7.7G     0  7.7G   0% /dev
+tmpfs                      7.7G   33M  7.7G   1% /dev/shm
+tmpfs                      7.7G   17M  7.7G   1% /run
+tmpfs                      7.7G     0  7.7G   0% /sys/fs/cgroup
+/dev/xvda2                  50G   21G   30G  41% /
+tmpfs                      1.6G     0  1.6G   0% /run/user/1000
+172.30.15.95:/orapm01_u01   48T   47T  844G  99% /u01
+172.30.15.95:/orapm01_u02  285T  285T  844G 100% /u02
+172.30.15.95:/orapm01_u03  190T  190T  844G 100% /u03
+
+....
+
+. Changed to oracle user, relink binary.
++
+....
+
+[root@ip-172-30-15-5 ec2-user]# su - oracle
+Last login: Thu Sep 12 18:09:03 UTC 2024 on pts/0
+[oracle@ip-172-30-15-5 ~]$ env | grep ORA
+ORACLE_SID=NTAP
+ORACLE_HOME=/u01/app/oracle/product/19.0.0/NTAP
+[oracle@ip-172-30-15-5 ~]$ cd $ORACLE_HOME/bin
+[oracle@ip-172-30-15-5 bin]$ ./relink
+writing relink log to: /u01/app/oracle/product/19.0.0/NTAP/install/relinkActions2024-09-12_06-21-40PM.log
+
+....
+
+. Copy dnfs lib back to odm folder. Relink could lose the dfns library file.
++
+....
+
+[oracle@ip-172-30-15-5 odm]$ cd /u01/app/oracle/product/19.0.0/NTAP/rdbms/lib/odm
+[oracle@ip-172-30-15-5 odm]$ cp ../../../lib/libnfsodm19.so .
+
+....
+
+. Start database to validate on standby node ip-172-30-15-5.
++
+....
+
+[oracle@ip-172-30-15-5 odm]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Thu Sep 12 18:30:04 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+Connected to an idle instance.
+
+SQL> startup;
+ORACLE instance started.
+
+Total System Global Area 6442449688 bytes
+Fixed Size                  9177880 bytes
+Variable Size            1090519040 bytes
+Database Buffers         5335154688 bytes
+Redo Buffers                7598080 bytes
+Database mounted.
+Database opened.
+SQL> select name, open_mode from v$database;
+
+NAME      OPEN_MODE
+--------- --------------------
+NTAP      READ WRITE
+
+SQL> show pdbs
+
+    CON_ID CON_NAME                       OPEN MODE  RESTRICTED
+---------- ------------------------------ ---------- ----------
+         2 PDB$SEED                       READ ONLY  NO
+         3 NTAP_PDB1                      READ WRITE NO
+         4 NTAP_PDB2                      READ WRITE NO
+         5 NTAP_PDB3                      READ WRITE NO
+
+
+....
+
+. Shutdown db and failback database to primary node ip-172-30-15-111.
++
+....
+
+SQL> shutdown immediate;
+Database closed.
+Database dismounted.
+ORACLE instance shut down.
+SQL> exit
+
+[root@ip-172-30-15-5 ec2-user]# df -h
+Filesystem                 Size  Used Avail Use% Mounted on
+devtmpfs                   7.7G     0  7.7G   0% /dev
+tmpfs                      7.7G   33M  7.7G   1% /dev/shm
+tmpfs                      7.7G   17M  7.7G   1% /run
+tmpfs                      7.7G     0  7.7G   0% /sys/fs/cgroup
+/dev/xvda2                  50G   21G   30G  41% /
+tmpfs                      1.6G     0  1.6G   0% /run/user/1000
+172.30.15.95:/orapm01_u01   48T   47T  844G  99% /u01
+172.30.15.95:/orapm01_u02  285T  285T  844G 100% /u02
+172.30.15.95:/orapm01_u03  190T  190T  844G 100% /u03
+
+[root@ip-172-30-15-5 ec2-user]# umount /u01
+[root@ip-172-30-15-5 ec2-user]# umount /u02
+[root@ip-172-30-15-5 ec2-user]# umount /u03
+[root@ip-172-30-15-5 ec2-user]#
+
+[root@ip-172-30-15-111 ec2-user]# mount -t nfs 172.30.15.95:/orapm01_u01 /u01 -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
+mount: (hint) your fstab has been modified, but systemd still uses
+       the old version; use 'systemctl daemon-reload' to reload.
+[root@ip-172-30-15-111 ec2-user]# mount -t nfs 172.30.15.95:/orapm01_u02 /u02 -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
+mount: (hint) your fstab has been modified, but systemd still uses
+       the old version; use 'systemctl daemon-reload' to reload.
+[root@ip-172-30-15-111 ec2-user]# mount -t nfs 172.30.15.95:/orapm01_u03 /u03 -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
+mount: (hint) your fstab has been modified, but systemd still uses
+       the old version; use 'systemctl daemon-reload' to reload.
+[root@ip-172-30-15-111 ec2-user]# df -h
+Filesystem                 Size  Used Avail Use% Mounted on
+devtmpfs                   7.7G     0  7.7G   0% /dev
+tmpfs                      7.8G   48M  7.7G   1% /dev/shm
+tmpfs                      7.8G   33M  7.7G   1% /run
+tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/xvda2                  50G   29G   22G  58% /
+tmpfs                      1.6G     0  1.6G   0% /run/user/1000
+172.30.15.95:/orapm01_u01   48T   47T  844G  99% /u01
+172.30.15.95:/orapm01_u02  285T  285T  844G 100% /u02
+172.30.15.95:/orapm01_u03  190T  190T  844G 100% /u03
+[root@ip-172-30-15-111 ec2-user]# su - oracle
+Last login: Thu Sep 12 18:13:34 UTC 2024 on pts/1
+[oracle@ip-172-30-15-111 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Thu Sep 12 18:38:46 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+Connected to an idle instance.
+
+SQL> startup;
+ORACLE instance started.
+
+Total System Global Area 6442449688 bytes
+Fixed Size                  9177880 bytes
+Variable Size            1090519040 bytes
+Database Buffers         5335154688 bytes
+Redo Buffers                7598080 bytes
+Database mounted.
+Database opened.
+SQL> exit
+Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+[oracle@ip-172-30-15-111 ~]$ lsnrctl start listener.ntap
+
+LSNRCTL for Linux: Version 19.0.0.0.0 - Production on 12-SEP-2024 18:39:17
+
+Copyright (c) 1991, 2022, Oracle.  All rights reserved.
+
+Starting /u01/app/oracle/product/19.0.0/NTAP/bin/tnslsnr: please wait...
+
+TNSLSNR for Linux: Version 19.0.0.0.0 - Production
+System parameter file is /u01/app/oracle/product/19.0.0/NTAP/network/admin/listener.ora
+Log messages written to /u01/app/oracle/diag/tnslsnr/ip-172-30-15-111/listener.ntap/alert/log.xml
+Listening on: (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=ip-172-30-15-111.ec2.internal)(PORT=1521)))
+Listening on: (DESCRIPTION=(ADDRESS=(PROTOCOL=ipc)(KEY=EXTPROC1521)))
+
+Connecting to (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ip-172-30-15-111.ec2.internal)(PORT=1521)))
+STATUS of the LISTENER
+------------------------
+Alias                     listener.ntap
+Version                   TNSLSNR for Linux: Version 19.0.0.0.0 - Production
+Start Date                12-SEP-2024 18:39:17
+Uptime                    0 days 0 hr. 0 min. 0 sec
+Trace Level               off
+Security                  ON: Local OS Authentication
+SNMP                      OFF
+Listener Parameter File   /u01/app/oracle/product/19.0.0/NTAP/network/admin/listener.ora
+Listener Log File         /u01/app/oracle/diag/tnslsnr/ip-172-30-15-111/listener.ntap/alert/log.xml
+Listening Endpoints Summary...
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=ip-172-30-15-111.ec2.internal)(PORT=1521)))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=ipc)(KEY=EXTPROC1521)))
+The listener supports no services
+The command completed successfully
+
+....
 
 ====
 
-=== Parameter files configuration
+=== Configure Oracle resources for PCS management
 [%collapsible]
 
 ====
 
-. Ansible target `hosts` file configuration:
-+
-include::../_include/automation_ora_nfs_hosts.adoc[]
+The goal of configuring Pacemaker clustering is to set up an active/passive high-availability solution for running Oracle in AWS EC2 and FSx ONTAP environment with minimal user intervention in the event of a failure. The following demonstrates Oracle resources configuration for PCS management. 
 
-. Global `vars/vars.yml` file configuration
+. As root user on primary EC2 instance ip-172-30-15-111,  create a secondary private IP address with an unused private IP address in the VPC CIDR block as floating IP. In the process, create an oracle resource group that the secondary private IP address will belong to.
 +
-include::../_include/automation_ora_nfs_vars.adoc[]
+[source, cli]
+pcs resource create privip ocf:heartbeat:awsvip secondary_private_ip=172.30.15.33 --group oracle
++
+....
 
-. Local DB server `host_vars/host_name.yml` configuration such as ora_01.yml, ora_02.yml ...
+[root@ip-172-30-15-111 ec2-user]# pcs status
+Cluster name: ora_ec2nfsx
+Cluster Summary:
+  * Stack: corosync (Pacemaker is running)
+  * Current DC: ip-172-30-15-111.ec2.internal (version 2.1.7-5.1.el8_10-0f7f88312) - partition with quorum
+  * Last updated: Fri Sep 13 16:25:35 2024 on ip-172-30-15-111.ec2.internal
+  * Last change:  Fri Sep 13 16:25:23 2024 by root via root on ip-172-30-15-111.ec2.internal
+  * 2 nodes configured
+  * 2 resource instances configured
+
+Node List:
+  * Online: [ ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal ]
+
+Full List of Resources:
+  * clusterfence        (stonith:fence_aws):     Started ip-172-30-15-111.ec2.internal
+  * Resource Group: oracle:
+    * privip    (ocf::heartbeat:awsvip):         Started ip-172-30-15-5.ec2.internal
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+
+....
 +
-include::../_include/automation_ora_nfs_host_vars.adoc[]
+[NOTE]
+
+If the privip happens to be created on standby cluster node, move it to primary node as shown below.
+
+. Move a resource between cluster nodes.
++
+[source, cli]
+pcs resource move privip ip-172-30-15-111.ec2.internal
++
+....
+
+[root@ip-172-30-15-111 ec2-user]# pcs resource move privip ip-172-30-15-111.ec2.internal
+Warning: A move constraint has been created and the resource 'privip' may or may not move depending on other configuration
+[root@ip-172-30-15-111 ec2-user]# pcs status
+Cluster name: ora_ec2nfsx
+
+WARNINGS:
+Following resources have been moved and their move constraints are still in place: 'privip'
+Run 'pcs constraint location' or 'pcs resource clear <resource id>' to view or remove the constraints, respectively
+
+Cluster Summary:
+  * Stack: corosync (Pacemaker is running)
+  * Current DC: ip-172-30-15-111.ec2.internal (version 2.1.7-5.1.el8_10-0f7f88312) - partition with quorum
+  * Last updated: Fri Sep 13 16:26:38 2024 on ip-172-30-15-111.ec2.internal
+  * Last change:  Fri Sep 13 16:26:27 2024 by root via root on ip-172-30-15-111.ec2.internal
+  * 2 nodes configured
+  * 2 resource instances configured
+
+Node List:
+  * Online: [ ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal ]
+
+Full List of Resources:
+  * clusterfence        (stonith:fence_aws):     Started ip-172-30-15-111.ec2.internal
+  * Resource Group: oracle:
+    * privip    (ocf::heartbeat:awsvip):         Started ip-172-30-15-111.ec2.internal (Monitoring)
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+
+....
+
+. Create a vip for Oracle.
++
+[source, cli]
+pcs resource create vip ocf:heartbeat:IPaddr2 ip=172.30.15.33 cidr_netmask=25 nic=eth0 op monitor interval=10s --group oracle
++
+....
+
+[root@ip-172-30-15-111 ec2-user]# pcs resource create vip ocf:heartbeat:IPaddr2 ip=172.30.15.33 cidr_netmask=25 nic=eth0 op monitor interval=10s --group oracle
+[root@ip-172-30-15-111 ec2-user]# pcs status
+Cluster name: ora_ec2nfsx
+
+WARNINGS:
+Following resources have been moved and their move constraints are still in place: 'privip'
+Run 'pcs constraint location' or 'pcs resource clear <resource id>' to view or remove the constraints, respectively
+
+Cluster Summary:
+  * Stack: corosync (Pacemaker is running)
+  * Current DC: ip-172-30-15-111.ec2.internal (version 2.1.7-5.1.el8_10-0f7f88312) - partition with quorum
+  * Last updated: Fri Sep 13 16:27:34 2024 on ip-172-30-15-111.ec2.internal
+  * Last change:  Fri Sep 13 16:27:24 2024 by root via root on ip-172-30-15-111.ec2.internal
+  * 2 nodes configured
+  * 3 resource instances configured
+
+Node List:
+  * Online: [ ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal ]
+
+Full List of Resources:
+  * clusterfence        (stonith:fence_aws):     Started ip-172-30-15-111.ec2.internal
+  * Resource Group: oracle:
+    * privip    (ocf::heartbeat:awsvip):         Started ip-172-30-15-111.ec2.internal
+    * vip       (ocf::heartbeat:IPaddr2):        Started ip-172-30-15-111.ec2.internal
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+
+....
+
+. As oracle user, update listener.ora and tnsnames.ora file to point to vip address. Restart the listener. Bounce database if needed for DB to register with listener.
++
+[source, cli]
+vi $ORACLE_HOME/network/admin/listener.ora
++
+vi $ORACLE_HOME/network/admin/tnsnames.ora
++
+....
+
+[oracle@ip-172-30-15-111 admin]$ cat listener.ora
+# listener.ora Network Configuration File: /u01/app/oracle/product/19.0.0/NTAP/network/admin/listener.ora
+# Generated by Oracle configuration tools.
+
+LISTENER.NTAP =
+  (DESCRIPTION_LIST =
+    (DESCRIPTION =
+      (ADDRESS = (PROTOCOL = TCP)(HOST = 172.30.15.33)(PORT = 1521))
+      (ADDRESS = (PROTOCOL = IPC)(KEY = EXTPROC1521))
+    )
+  )
+
+[oracle@ip-172-30-15-111 admin]$ cat tnsnames.ora
+# tnsnames.ora Network Configuration File: /u01/app/oracle/product/19.0.0/NTAP/network/admin/tnsnames.ora
+# Generated by Oracle configuration tools.
+
+NTAP =
+  (DESCRIPTION =
+    (ADDRESS = (PROTOCOL = TCP)(HOST = 172.30.15.33)(PORT = 1521))
+    (CONNECT_DATA =
+      (SERVER = DEDICATED)
+      (SERVICE_NAME = NTAP.ec2.internal)
+    )
+  )
+
+LISTENER_NTAP =
+  (ADDRESS = (PROTOCOL = TCP)(HOST = 172.30.15.33)(PORT = 1521))
+
+
+[oracle@ip-172-30-15-111 admin]$ lsnrctl status listener.ntap
+
+LSNRCTL for Linux: Version 19.0.0.0.0 - Production on 13-SEP-2024 18:28:17
+
+Copyright (c) 1991, 2022, Oracle.  All rights reserved.
+
+Connecting to (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=172.30.15.33)(PORT=1521)))
+STATUS of the LISTENER
+------------------------
+Alias                     listener.ntap
+Version                   TNSLSNR for Linux: Version 19.0.0.0.0 - Production
+Start Date                13-SEP-2024 18:15:51
+Uptime                    0 days 0 hr. 12 min. 25 sec
+Trace Level               off
+Security                  ON: Local OS Authentication
+SNMP                      OFF
+Listener Parameter File   /u01/app/oracle/product/19.0.0/NTAP/network/admin/listener.ora
+Listener Log File         /u01/app/oracle/diag/tnslsnr/ip-172-30-15-111/listener.ntap/alert/log.xml
+Listening Endpoints Summary...
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=172.30.15.33)(PORT=1521)))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=ipc)(KEY=EXTPROC1521)))
+  (DESCRIPTION=(ADDRESS=(PROTOCOL=tcps)(HOST=ip-172-30-15-111.ec2.internal)(PORT=5500))(Security=(my_wallet_directory=/u01/app/oracle/product/19.0.0/NTAP/admin/NTAP/xdb_wallet))(Presentation=HTTP)(Session=RAW))
+Services Summary...
+Service "21f0b5cc1fa290e2e0636f0f1eacfd43.ec2.internal" has 1 instance(s).
+  Instance "NTAP", status READY, has 1 handler(s) for this service...
+Service "21f0b74445329119e0636f0f1eacec03.ec2.internal" has 1 instance(s).
+  Instance "NTAP", status READY, has 1 handler(s) for this service...
+Service "21f0b83929709164e0636f0f1eacacc3.ec2.internal" has 1 instance(s).
+  Instance "NTAP", status READY, has 1 handler(s) for this service...
+Service "NTAP.ec2.internal" has 1 instance(s).
+  Instance "NTAP", status READY, has 1 handler(s) for this service...
+Service "NTAPXDB.ec2.internal" has 1 instance(s).
+  Instance "NTAP", status READY, has 1 handler(s) for this service...
+Service "ntap_pdb1.ec2.internal" has 1 instance(s).
+  Instance "NTAP", status READY, has 1 handler(s) for this service...
+Service "ntap_pdb2.ec2.internal" has 1 instance(s).
+  Instance "NTAP", status READY, has 1 handler(s) for this service...
+Service "ntap_pdb3.ec2.internal" has 1 instance(s).
+  Instance "NTAP", status READY, has 1 handler(s) for this service...
+The command completed successfully
+
+....
+
+. Add /u01, /u02, /u03 mount points to oracle resource group.
++
+[source, cli]
+pcs resource create u01 ocf:heartbeat:Filesystem device='172.30.15.95:/orapm01_u01' directory='/u01' fstype='nfs' options='rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536' --group oracle
++
+[source, cli]
+pcs resource create u02 ocf:heartbeat:Filesystem device='172.30.15.95:/orapm01_u02' directory='/u02' fstype='nfs' options='rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536' --group oracle
++
+[source, cli]
+pcs resource create u03 ocf:heartbeat:Filesystem device='172.30.15.95:/orapm01_u03' directory='/u03' fstype='nfs' options='rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536' --group oracle
+
+. Create monitor user ID in oracle DB.
++
+....
+
+[root@ip-172-30-15-111 ec2-user]# su - oracle
+Last login: Fri Sep 13 18:12:24 UTC 2024 on pts/0
+[oracle@ip-172-30-15-111 ~]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Fri Sep 13 19:08:41 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> CREATE USER c##ocfmon IDENTIFIED BY "XXXXXXXX";
+
+User created.
+
+SQL> grant connect to c##ocfmon;
+
+Grant succeeded.
+
+SQL> exit
+Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+....
+
+. Add database to oracle resource group.
++
+[source, cli]
+pcs resource create ntap ocf:heartbeat:oracle sid='NTAP' home='/u01/app/oracle/product/19.0.0/NTAP' user='oracle' monuser='C##OCFMON' monpassword='XXXXXXXX' monprofile='DEFAULT' --group oracle
+
+. Add database listener to oracle resource group.
++
+[source, cli]
+pcs resource create listener ocf:heartbeat:oralsnr sid='NTAP' listener='listener.ntap' --group=oracle
+
+. Update all resources location constraints in oracle resource group to primary node as preferred node.
++
+pcs constraint location privip prefers ip-172-30-15-111.ec2.internal
+pcs constraint location vip prefers ip-172-30-15-111.ec2.internal
+pcs constraint location u01 prefers ip-172-30-15-111.ec2.internal
+pcs constraint location u02 prefers ip-172-30-15-111.ec2.internal
+pcs constraint location u03 prefers ip-172-30-15-111.ec2.internal
+pcs constraint location ntap prefers ip-172-30-15-111.ec2.internal
+pcs constraint location listener prefers ip-172-30-15-111.ec2.internal
+
+. Validate Oracle resources configuration.
++
+[source, cli]
+pcs status
++
+....
+
+[root@ip-172-30-15-111 ec2-user]# pcs status
+Cluster name: ora_ec2nfsx
+Cluster Summary:
+  * Stack: corosync (Pacemaker is running)
+  * Current DC: ip-172-30-15-111.ec2.internal (version 2.1.7-5.1.el8_10-0f7f88312) - partition with quorum
+  * Last updated: Fri Sep 13 19:25:32 2024 on ip-172-30-15-111.ec2.internal
+  * Last change:  Fri Sep 13 19:23:40 2024 by root via root on ip-172-30-15-111.ec2.internal
+  * 2 nodes configured
+  * 8 resource instances configured
+
+Node List:
+  * Online: [ ip-172-30-15-5.ec2.internal ip-172-30-15-111.ec2.internal ]
+
+Full List of Resources:
+  * clusterfence        (stonith:fence_aws):     Started ip-172-30-15-111.ec2.internal
+  * Resource Group: oracle:
+    * privip    (ocf::heartbeat:awsvip):         Started ip-172-30-15-111.ec2.internal
+    * vip       (ocf::heartbeat:IPaddr2):        Started ip-172-30-15-111.ec2.internal
+    * u01       (ocf::heartbeat:Filesystem):     Started ip-172-30-15-111.ec2.internal
+    * u02       (ocf::heartbeat:Filesystem):     Started ip-172-30-15-111.ec2.internal
+    * u03       (ocf::heartbeat:Filesystem):     Started ip-172-30-15-111.ec2.internal
+    * ntap      (ocf::heartbeat:oracle):         Started ip-172-30-15-111.ec2.internal
+    * listener  (ocf::heartbeat:oralsnr):        Started ip-172-30-15-111.ec2.internal
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+
+
+....
 
 ====
 
-=== Playbook execution
-[%collapsible]
-
-====
-
-There are a total of five playbooks in the automation toolkit. Each performs different task blocks and serves different purposes.
-
-      0-all_playbook.yml - execute playbooks from 1-4 in one playbook run.
-      1-ansible_requirements.yml - set up Ansible controller with required libs and collections.
-      2-linux_config.yml - execute Linux kernel configuration on Oracle DB servers.
-      4-oracle_config.yml - install and configure Oracle on DB servers and create a container database. 
-      5-destroy.yml - optional to undo the environment to dismantle all. 
-
-There are three options to run the playbooks with the following commands. 
-
-. Execute all deployment playbooks in one combined run.
-+
-[source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml
-
-. Execute playbooks one at a time with the number sequence from 1-4.
-+
-[source, cli]] 
-ansible-playbook -i hosts 1-ansible_requirements.yml -u admin -e @vars/vars.yml
-+
-[source, cli] 
-ansible-playbook -i hosts 2-linux_config.yml -u admin -e @vars/vars.yml
-+
-[source, cli]
-ansible-playbook -i hosts 4-oracle_config.yml -u admin -e @vars/vars.yml
-
-. Execute 0-all_playbook.yml with a tag.
-+
-[source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t ansible_requirements
-+
-[source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t linux_config
-+
-[source, cli]
-ansible-playbook -i hosts 0-all_playbook.yml -u admin -e @vars/vars.yml -t oracle_config
-
-. Undo the environment
-+
-[source, cli]
-ansible-playbook -i hosts 5-destroy.yml -u admin -e @vars/vars.yml
-
-
-====
-
-=== Post execution validation
+=== Post deployment HA validation
 [%collapsible]
 
 ====
