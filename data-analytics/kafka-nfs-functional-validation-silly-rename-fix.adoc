@@ -4,12 +4,13 @@ permalink: data-analytics/kafka-nfs-functional-validation-silly-rename-fix.html
 keywords: validation setup, architecture flow, testing methodology
 summary: "For the functional validation, we showed that a Kafka cluster with an NFSv3 mount for storage fails to perform Kafka operations like partition redistribution, whereas another cluster mounted on NFSv4 with the fix can perform the same operations without any disruptions."
 ---
+
 = Functional validation - Silly rename fix
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
-:imagesdir: ./../media/
+:imagesdir: ../media/
 
 //
 // This file was created with NDAC Version 2.0 (August 17, 2020)
@@ -41,7 +42,7 @@ a|* 3 x zookeepers – t3.xlarge
 
 The following figure show the architectural configuration for this solution.
 
-image::kafka-nfs-image1.png["This images shows the AWS topology containing a VPC containing three private subnets with a producer swarm, the Kafka cluster, and CVO instance respectively."]
+image:kafka-nfs-image1.png["This images shows the AWS topology containing a VPC containing three private subnets with a producer swarm, the Kafka cluster, and CVO instance respectively."]
 
 == Architectural flow
 
@@ -70,11 +71,11 @@ aws-shantanclastrecall-aws::*> volume create -vserver kafka_svm -volume kafka_fg
 +
 Cluster 1:
 +
-image::kafka-nfs-image2.png["This screenshot shows the demo topic created on Cluster 1."]
+image:kafka-nfs-image2.png["This screenshot shows the demo topic created on Cluster 1."]
 +
 Cluster 2:
 +
-image::kafka-nfs-image3.png["This screenshot shows the demo topic created on Cluster 2."]
+image:kafka-nfs-image3.png["This screenshot shows the demo topic created on Cluster 2."]
 
 . Data was loaded into these newly created topics for both clusters. This was done using the producer-perf-test toolkit that comes in the default Kafka package:
 +
@@ -89,7 +90,7 @@ image::kafka-nfs-image3.png["This screenshot shows the demo topic created on Clu
 +
 A successful health check for brokers on both clusters is shown in the next screenshot:
 +
-image::kafka-nfs-image4.png["This screenshot shows the readout for a successful health check on both brokers."]
+image:kafka-nfs-image4.png["This screenshot shows the readout for a successful health check on both brokers."]
 +
 . To trigger the failure condition that causes Kafka clusters using NFSv3 storage volumes to crash, we initiated the partition reassignment process on both clusters.  Partition reassignment was performed using `kafka-reassign-partitions.sh`. The detailed process is as follows:
 .. To reassign the partitions for a topic in a Kafka cluster, we generated the proposed reassignment config JSON (this was performed for both the clusters).
@@ -107,15 +108,15 @@ kafka-reassign-partitions --bootstrap-server=172.30.0.198:9092,172.30.0.163:9092
 
 . After a few minutes when the reassignment was completed, another health check on the brokers showed that cluster using NFSv3 storage volumes had run into a silly rename issue and had crashed, whereas Cluster 1 using NetApp ONTAP NFSv4.1 storage volumes with the fix continued operations without any disruptions.
 +
-image::kafka-nfs-image5.png["This screenshot shows the output from a crashed broker."]
+image:kafka-nfs-image5.png["This screenshot shows the output from a crashed broker."]
 +
 ** Cluster1-Broker-1 is alive.
 ** Cluster2-broker-1 is dead.
 
 . Upon checking the Kafka log directories, it was clear that Cluster 1 using NetApp ONTAP NFSv4.1 storage volumes with the fix had clean partition assignment, while Cluster 2 using generic NFSv3 storage did not due to silly rename issues, which led to the crash. The following picture shows partition rebalancing of Cluster 2, which resulted in a silly rename issue on NFSv3 storage.
 +
-image::kafka-nfs-image6.png["This screenshot shows the log output for Cluster 2 crashing."]
+image:kafka-nfs-image6.png["This screenshot shows the log output for Cluster 2 crashing."]
 +
 The following picture shows a clean partition rebalancing of Cluster 1 using NetApp NFSv4.1 storage.
 +
-image::kafka-nfs-image7.png["This screenshot shows the log output for a successful clean partition assignment for Cluster 1 whereas"]
+image:kafka-nfs-image7.png["This screenshot shows the log output for a successful clean partition assignment for Cluster 1 whereas"]
