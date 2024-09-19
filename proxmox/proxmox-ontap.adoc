@@ -128,14 +128,26 @@ image:proxmox-ontap-image03.png[SMB share info]
 . Collect the SMB server, share name and credential to use for the share authentication.
 . Ensure at least two interface is configured in different VLANs (for fault tolerance) and NIC supports RSS.
 . If using Management UI (https://<proxmox node>:8006), click on datacenter, select storage, click Add and select SMB/CIFS.
++
 image:proxmox-ontap-image04.png[SMB storage navigation]
-. Fill in the details, the share name should auto populate. Ensure all content are selected. Click Add.
-image:proxmox-ontap-image05.png[SMB storage addition]
-. To enable multichannel option, goto shell on any one of the nodes on the cluster and type pvesm set pvesmb01 --options multichannel,max_channels=4
-image:proxmox-ontap-image06.png[multichannel setup]
-. Here is the content in /etc/pve/storage.cfg for the above tasks.
-image:proxmox-ontap-image07.png[storage configuration file for SMB]
++
+{nbsp}
 
+. Fill in the details, the share name should auto populate. Ensure all content are selected. Click Add.
++
+image:proxmox-ontap-image05.png[SMB storage addition]
++
+{nbsp}
+
+. To enable multichannel option, goto shell on any one of the nodes on the cluster and type pvesm set pvesmb01 --options multichannel,max_channels=4
++
+image:proxmox-ontap-image06.png[multichannel setup]
++
+{nbsp}
+
+. Here is the content in /etc/pve/storage.cfg for the above tasks.
++
+image:proxmox-ontap-image07.png[storage configuration file for SMB]
 ====
 
 === NFS Storage
@@ -150,14 +162,25 @@ If new to ONTAP, use System Manager Interface to complete these tasks for better
 
 . Ensure SVM is enabled for NFS. Refer https://docs.netapp.com/us-en/ontap/nfs-config/verify-protocol-enabled-svm-task.html[ONTAP 9 documentation]
 . Have at least two lifs per controller. Follow the steps from the above link. For reference, here is the screenshot of lifs that we use in our lab. 
++
 image:proxmox-ontap-image01.png[nas interface details]
++
+{nbsp}
+
 . Create or update NFS export policy providing access to Proxmox VE host IP addresses or subnet. Refer https://docs.netapp.com/us-en/ontap/nfs-config/create-export-policy-task.html[Export policy creation] and https://docs.netapp.com/us-en/ontap/nfs-config/add-rule-export-policy-task.html[Add rule to an export policy]
 . https://docs.netapp.com/us-en/ontap/nfs-config/create-volume-task.html[Create a volume]. Remember to check the option to distribute data across the cluster to use FlexGroup.
++
 image:proxmox-ontap-image23.png[FlexGroup option]
-. https://docs.netapp.com/us-en/ontap/nfs-config/associate-export-policy-flexvol-task.html[Assign export policy to volume]
-image:proxmox-ontap-image08.png[NFS volume info]
-. Notify virtualization admin that NFS volume is ready.
++
+{nbsp}
 
+. https://docs.netapp.com/us-en/ontap/nfs-config/associate-export-policy-flexvol-task.html[Assign export policy to volume]
++
+image:proxmox-ontap-image08.png[NFS volume info]
++
+{nbsp}
+
+. Notify virtualization admin that NFS volume is ready.
 ====
 
 .**Virtualization Admin Tasks**
@@ -166,14 +189,26 @@ image:proxmox-ontap-image08.png[NFS volume info]
 
 . Ensure at least two interface is configured in different VLANs (for fault tolerance). Use NIC bonding.
 . If using Management UI (https://<proxmox node>:8006), click on datacenter, select storage, click Add and select NFS.
++
 image:proxmox-ontap-image09.png[NFS storage navigation]
-. Fill in the details, After providing the server info, the NFS exports should populate and pick from the list. Remember to select the content options.
-image:proxmox-ontap-image10.png[NFS storage addition]
-. For session trunking, on every Proxmox VE hosts, update the /etc/fstab file to mount the same NFS export using different lif address along with max_connect and NFS version option.
-image:proxmox-ontap-image11.png[fstab entries for session trunk]
-. Here is the content in /etc/pve/storage.cfg for NFS.
-image:proxmox-ontap-image12.png[storage configuration file for NFS]
++
+{nbsp}
 
+. Fill in the details, After providing the server info, the NFS exports should populate and pick from the list. Remember to select the content options.
++
+image:proxmox-ontap-image10.png[NFS storage addition]
++
+{nbsp}
+
+. For session trunking, on every Proxmox VE hosts, update the /etc/fstab file to mount the same NFS export using different lif address along with max_connect and NFS version option.
++
+image:proxmox-ontap-image11.png[fstab entries for session trunk]
++
+{nbsp}
+
+. Here is the content in /etc/pve/storage.cfg for NFS.
++
+image:proxmox-ontap-image12.png[storage configuration file for NFS]
 ====
 
 === LVM with iSCSI
@@ -199,7 +234,6 @@ systemctl enable multipathd
 ----
 cat /etc/iscsi/initiator.name
 ----
-
 ====
 
 .**Storage Admin Tasks**
@@ -223,16 +257,32 @@ image:proxmox-ontap-image14.png[iscsi lun details]
 ====
 
 . Go to Management UI (https:<proxmox node>:8006), click on datacenter, select storage, click Add and select iSCSI.
++
 image:proxmox-ontap-image15.png[iscsi storage navigation]
-. Provide storage id name, iSCSI lif address from ONTAP and should be able to pick the target when there is no communication issue. As our intention is not directly provide LUN access to guest vm, will uncheck that.
-image:proxmox-ontap-image16.png[iscsi storage type creation]
-. Now, click Add and select LVM.
-image:proxmox-ontap-image17.png[lvm storage navigation]
-. Provide storage id name, pick base storage that should match the one iSCSI storage we created above step. Pick the LUN for the base volume. Provide the volume group name. Ensure shared is selected.
-image:proxmox-ontap-image18.png[lvm storage creation]
-. Here is the sample storage configuration file for LVM using iSCSI volume.
-image:proxmox-ontap-image19.png[lvm iscsi configuration]
++
+{nbsp}
 
+. Provide storage id name, iSCSI lif address from ONTAP and should be able to pick the target when there is no communication issue. As our intention is not directly provide LUN access to guest vm, will uncheck that.
++
+image:proxmox-ontap-image16.png[iscsi storage type creation]
++
+{nbsp}
+
+. Now, click Add and select LVM.
++
+image:proxmox-ontap-image17.png[lvm storage navigation]
++
+{nbsp}
+
+. Provide storage id name, pick base storage that should match the one iSCSI storage we created above step. Pick the LUN for the base volume. Provide the volume group name. Ensure shared is selected.
++
+image:proxmox-ontap-image18.png[lvm storage creation]
++
+{nbsp}
+
+. Here is the sample storage configuration file for LVM using iSCSI volume.
++
+image:proxmox-ontap-image19.png[lvm iscsi configuration]
 ====
 
 === LVM with NVMe/TCP
@@ -256,10 +306,13 @@ If new to ONTAP, use System Manager for better experience.
 
 . Ensure SVM is available with NVMe protocol enabled. Refer https://docs.netapp.com/us-en/ontap/san-admin/create-nvme-namespace-subsystem-task.html[NVMe tasks on ONTAP 9 documentation]
 . Create the NVMe namespace.
++
 image:proxmox-ontap-image20.png[nvme namespace creation]
++
+{nbsp}
+
 . Create subsystem and assign host nqns (if using CLI). Follow the above reference link.
 . Notify virtualization admin that nvme namespace is created.
-
 ====
 
 .**Virtualization Admin Tasks**
@@ -303,11 +356,19 @@ lsblk -l
 vgcreate pvens02 /dev/mapper/<device id>
 ----
 . Go to Management UI (https:<proxmox node>:8006), click on datacenter, select storage, click Add and select LVM.
++
 image:proxmox-ontap-image17.png[lvm storage navigation]
-. Provide storage id name, choose existing volume group and pick the volume group that just created with cli. Remember to check the shared option.
-image:proxmox-ontap-image21.png[lvm on existing vg]
-. Here is the sample storage configuration file for LVM using NVMe/TCP
-image:proxmox-ontap-image22.png[lvm on nvme tcp configuration]
++
+{nbsp}
 
+. Provide storage id name, choose existing volume group and pick the volume group that just created with cli. Remember to check the shared option.
++
+image:proxmox-ontap-image21.png[lvm on existing vg]
++
+{nbsp}
+
+. Here is the sample storage configuration file for LVM using NVMe/TCP
++
+image:proxmox-ontap-image22.png[lvm on nvme tcp configuration]
 ====
 
