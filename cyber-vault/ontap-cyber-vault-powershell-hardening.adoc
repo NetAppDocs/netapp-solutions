@@ -4,6 +4,7 @@ permalink: cyber-vault/ontap-cyber-vault-powershell-hardening.html
 keywords: Cyber vault, powershell, script, configuration, validation, hardening
 summary: This is the NetApp ONTAP solution for configuring, hardening and validating a ONTAP based cyber vault
 ---
+
 = ONTAP cyber vault hardening with PowerShell
 
 :hardbreaks:
@@ -34,7 +35,7 @@ ONTAP provides a set of controls that allow to harden the ONTAP storage. Use the
 . Enable global FIPS.
 . Telnet and Remote Shell (RSH) should be disabled.
 . Lock default admin account.
-. Verify the data LIFs have been disabled and secure remote access points.
+. Disable data LIFs and secure remote access points.
 . Disable and remove unused or extraneous protocols and services.
 . Encrypt network traffic.
 . Use the principle of least privilege when setting up superuser and administrative roles.
@@ -172,58 +173,43 @@ function configureMultiAdminApproval {
 }
 
 function additionalSecurityHardening {
-
     try {
         $command = "set -privilege advanced -confirmations off;security protocol modify -application telnet -enabled false;"
         logMessage -message "Disabling Telnet"
         Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command $command
         logMessage -message "Disabled Telnet" -type "SUCCESS"
 
-        # removing default intercluster services
-        logMessage -message "Checking if service backup-ndmp-control exists in $DESTINATION_ONTAP_CLUSTER_NAME default intercluster"
-        $networkServicePolicy = Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command "set -privilege advanced; network interface service-policy show -vserver $DESTINATION_ONTAP_CLUSTER_NAME"
-        if ($networkServicePolicy.Value -match "backup-ndmp-control:") {
-            $command = "set -privilege advanced -confirmations off;remove-service -vserver $DESTINATION_ONTAP_CLUSTER_NAME -policy default-intercluster -service backup-ndmp-control"
-            logMessage -message "Removing service backup-ndmp-control"
-            Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command $command  -ErrorAction Stop
-            logMessage -message "Successfully removed service backup-ndmp-control" -type "SUCCESS"
-        } else {
-            logMessage -message "Service backup-ndmp-control does not exists in $DESTINATION_ONTAP_CLUSTER_NAME default management" -type "SUCCESS"
-        }
-
-        $command = "set -privilege advanced -confirmations off;network interface service-policy modify-service -vserver cluster2 -policy default-intercluster -service intercluster-core -allowed-addresses $SOURCE_ONTAP_ALLOWED_INTERCLUSTER_IPS;"
-        logMessage -message "Restricting IP addresses $SOURCE_ONTAP_ALLOWED_INTERCLUSTER_IPS for intercluster-core"
-        Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command $command -ErrorAction Stop
-        logMessage -message "Successfully restricted IP addresses $SOURCE_ONTAP_ALLOWED_INTERCLUSTER_IPS for intercluster-core" -type "SUCCESS"
-
-        # removing default management services
-        foreach($item in $DEFAULT_MANAGEMENT_SERVICES_TO_DISABLE) {
-            logMessage -message "Checking if service $item exists in $DESTINATION_ONTAP_CLUSTER_NAME default management"
-            $networkServicePolicy = Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command "set -privilege advanced; network interface service-policy show -vserver $DESTINATION_ONTAP_CLUSTER_NAME"
-            if ($networkServicePolicy.Value -match "$($item):") {
-                $command = "set -privilege advanced -confirmations off;remove-service -vserver $DESTINATION_ONTAP_CLUSTER_NAME -policy default-management -service $item"
-                logMessage -message "Removing service $item"
-                Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command $command -ErrorAction Stop
-                logMessage -message "Successfully removed service $item" -type "SUCCESS"
-            } else {
-                logMessage -message "Service $item does not exists in $DESTINATION_ONTAP_CLUSTER_NAME default management" -type "SUCCESS"
-            }
-        }
-
-        $command = "set -privilege advanced -confirmations off;network interface service-policy modify-service -vserver cluster2 -policy default-management -service management-core -allowed-addresses $ALLOWED_IPS;"
-        logMessage -message "Restricting IP addresses $ALLOWED_IPS for Cluster management core"
-        Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command $command -ErrorAction Stop
-        logMessage -message "Successfully restricted IP addresses $ALLOWED_IPS for Cluster management core" -type "SUCCESS"
+        #$command = "set -privilege advanced -confirmations off;security config modify -interface SSL -is-fips-enabled true;"
+        #logMessage -message "Enabling Global FIPS"
+        ##Invoke-SSHCommand -SessionId $sshSession.SessionId -Command $command -ErrorAction Stop
+        #logMessage -message "Enabled Global FIPS" -type "SUCCESS"
 
         $command = "set -privilege advanced -confirmations off;network interface service-policy modify-service -vserver cluster2 -policy default-management -service management-https -allowed-addresses $ALLOWED_IPS;"
         logMessage -message "Restricting IP addresses $ALLOWED_IPS for Cluster management HTTPS"
-        Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command $command -ErrorAction Stop
+        Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command $command
         logMessage -message "Successfully restricted IP addresses $ALLOWED_IPS for Cluster management HTTPS" -type "SUCCESS"
 
-        $command = "set -privilege advanced -confirmations off;network interface service-policy modify-service -vserver cluster2 -policy default-management -service management-ssh -allowed-addresses $ALLOWED_IPS;"
-        logMessage -message "Restricting IP addresses $ALLOWED_IPS for Cluster management SSH"
-        Invoke-NcSsh -Name $DESTINATION_ONTAP_CLUSTER_MGMT_IP -Credential $DESTINATION_ONTAP_CREDS -Command $command -ErrorAction Stop
-        logMessage -message "Successfully restricted IP addresses $ALLOWED_IPS for Cluster management SSH" -type "SUCCESS"
+        #logMessage -message "Checking if audit logs volume audit_logs exists"
+        #$volume = Get-NcVol -Vserver $DESTINATION_VSERVER -Name audit_logs -ErrorAction Stop
+
+        #if($volume) {
+        #    logMessage -message "Volume audit_logs already exists! Skipping creation"
+        #} else {
+        #    # Create audit logs volume
+        #    logMessage -message "Creating audit logs volume : audit_logs"
+        #    New-NcVol -Name audit_logs -Aggregate $DESTINATION_AGGREGATE_NAME -Size 5g -ErrorAction Stop | Select-Object -Property Name, State, TotalSize, Aggregate, Vserver
+        #    logMessage -message "Volume audit_logs created successfully" -type "SUCCESS"
+        #}
+
+        ## Mount audit logs volume to path /vol/audit_logs
+        #logMessage -message "Creating junction path for volume audit_logs at path /vol/audit_logs for vServer $DESTINATION_VSERVER"
+        #Mount-NcVol -VserverContext $DESTINATION_VSERVER -Name audit_logs -JunctionPath /audit_logs | Select-Object -Property Name, -JunctionPath
+        #logMessage -message "Created junction path for volume audit_logs at path /vol/audit_logs for vServer $DESTINATION_VSERVER" -type "SUCCESS"
+        
+        #logMessage -message "Enabling audit logging for vServer $DESTINATION_VSERVER at path /vol/audit_logs"
+        #$command = "set -privilege advanced -confirmations off;vserver audit create -vserver $DESTINATION_VSERVER -destination /audit_logs -format xml;"
+        #Invoke-SSHCommand -SessionI  $sshSession.SessionId -Command $command -ErrorAction Stop
+        #logMessage -message "Successfully enabled audit logging for vServer $DESTINATION_VSERVER at path /vol/audit_logs"
     
     } catch {
         handleError -errorMessage $_.Exception.Message
