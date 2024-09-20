@@ -126,7 +126,7 @@ git clone https://bitbucket.ngage.netapp.com/scm/ns-bb/na_aws_fsx_ec2_deploy.git
 +
 [NOTE]
 
-If the toolkit is not executed from AWS CloudShell, AWS authentication may be required with your AWS account using AWS user account access/secret key pair.   
+If the toolkit is not executed from AWS CloudShell, AWS CLI authentication is required with your AWS account using AWS user account access/secret key pair.   
 
 . Review READme.md file included in the toolkit. Revise main.tf and associated parameter files as necessary for the required AWS resources.  
 +
@@ -211,7 +211,7 @@ This completes the EC2 instances and FSx ONTAP provisioning for Oracle.
 
 The High Availability Add-On for RHEL is a clustered system that provides reliability, scalability, and availability to critical production services such as Oracle database services. In this use case demonstration, a two-node Pacemaker cluster is set up and configured to support the high availability of an Oracle database in an active/passive clustering scenario.  
 
-Login to EC2 instances, as ec2-user, complete following tasks on both EC2 instances:
+Login to EC2 instances, as ec2-user, complete following tasks on `both` EC2 instances:
 
 . Remove the AWS Red Hat Update Infrastructure (RHUI) client.
 +
@@ -235,6 +235,7 @@ sudo subscription-manager repos --enable=rhel-8-for-x86_64-highavailability-rpms
 [source, cli]
 sudo yum update -y
 +
+[source, cli]
 sudo yum install pcs pacemaker fence-agents-aws
 
 . Create a password for hacluster user on all cluster nodes. Use the same password for all nodes.
@@ -284,9 +285,9 @@ sudo vi /etc/hosts
 ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
 
 # cluster nodes
-ip-172-30-15-5.ec2.internal     172.30.15.5
-ip-172-30-15-111.ec2.internal   172.30.15.111
-
+172.30.15.111   ip-172-30-15-111.ec2.internal
+172.30.15.5     ip-172-30-15-5.ec2.internal     
+   
 ....
 
 . Install and configure awscli for connectivity to AWS account.
@@ -312,7 +313,7 @@ Default output format [None]: json
 sudo yum install resource-agents
 
 
-On only one of the cluster node, complete following tasks to create pcs cluster.
+On `only one` of the cluster node, complete following tasks to create pcs cluster.
 
 . Authenticate the pcs user hacluster.
 +
@@ -357,6 +358,7 @@ Cluster has been successfully set up.
 
 . Enable the cluster.
 +
+[source, cli]
 sudo pcs cluster enable --all
 +
 ....
@@ -411,7 +413,7 @@ This completes the Pacemaker cluster setup and initial configuration.
 [%collapsible]
 
 ====
-Pacemaker fencing configuration is mandatory for a production cluster. It ensures that a malfunctioning node on your AWS EC2 cluster is automatically isolated, which prevents the node from consuming the cluster’s resources, compromising the cluster’s functionality, or corrupting shared data. This section demonstrates the configuration of cluster fencing using the fence_aws fencing agent.
+Pacemaker fencing configuration is mandatory for a production cluster. It ensures that a malfunctioning node on your AWS EC2 cluster is automatically isolated, thus preventing the node from consuming the cluster’s resources, compromising the cluster’s functionality, or corrupting shared data. This section demonstrates the configuration of cluster fencing using the fence_aws fencing agent.
 
 . As root user, enter the following AWS metadata query to get the Instance ID for each EC2 instance node.
 +
@@ -425,7 +427,7 @@ i-0d8e7a0028371636f
 or just get instance-id from AWS EC2 console
 ....
 
-. Enter the following command to configure the fence device. Use the pcmk_host_map command to map the RHEL host name to the Instance ID. Use the AWS Access Key and AWS Secret Access Key that you previously used.
+. Enter the following command to configure the fence device. Use the pcmk_host_map command to map the RHEL host name to the Instance ID. Use the AWS Access Key and the AWS Secret Access Key of the AWS user account that you previously used for AWS authentication.
 +
 [source, cli]
 sudo pcs stonith \
@@ -484,7 +486,7 @@ Cluster Properties:
 
 With stonith-action set to off, the fenced cluster node will initially be shutdown. After the period defined in stonith power_timeout (240 seconds), the fenced node will be rebooted and rejoins the cluster.  
 
-. Set fence delay with 10 seconds delay on standby node. 
+. Set fence delay to 10 seconds for standby node. 
 +
 [source, cli]
 pcs stonith update clusterfence pcmk_delay_base="ip-172-30-15-111.ec2.internal:0;ip-172-30-15-5.ec2.internal:10s"
@@ -518,7 +520,7 @@ Execute `pcs stonith refresh` command to refresh stopped stonith fence agent or 
 
 ====
 
-We recommend leveraging the NetApp-provided Ansible playbook to execute database installation and configuration tasks with predefined parameters on the PCS cluster. In this automated Oracle deployment, three user-defined parameter files need user input before playbook execution.
+We recommend leveraging the NetApp-provided Ansible playbook to execute database installation and configuration tasks with predefined parameters on the PCS cluster. For this automated Oracle deployment, three user-defined parameter files need user input before playbook execution.
 
 * hosts - define targets that the automation playbook is running against.
 * vars/vars.yml - the global variable file that defines variables that apply to all targets.
@@ -626,7 +628,7 @@ image:aws_ora_fsx_ec2_pcs_05.png["This image provides Amazon FSx ONTAP volume pr
         - "p34765931_190000_Linux-x86-64.zip"
         - "p6880880_190000_Linux-x86-64.zip"
 
-. Execute playbook for Linux config for all nodes.
+. Execute playbook for Linux config for `all nodes`.
 +
 [source, cli]
 ansible-playbook -i hosts 2-linux_config.yml -u ec2-user -e @vars/vars.yml
@@ -655,7 +657,7 @@ ok: [orapm02]
 .
 ....
 
-. Execute playbook for oracle config only on primary node (comment out standby node in hosts file). 
+. Execute playbook for oracle config `only on primary node` (comment out standby node in hosts file). 
 +
 [source, cli]
 ansible-playbook -i hosts 4-oracle_config.yml -u ec2-user -e @vars/vars.yml --skip-tags "enable_db_start_shut"
@@ -858,7 +860,6 @@ tmpfs                      1.6G     0  1.6G   0% /run/user/1000
 [root@ip-172-30-15-5 ec2-user]# umount /u01
 [root@ip-172-30-15-5 ec2-user]# umount /u02
 [root@ip-172-30-15-5 ec2-user]# umount /u03
-[root@ip-172-30-15-5 ec2-user]#
 
 [root@ip-172-30-15-111 ec2-user]# mount -t nfs 172.30.15.95:/orapm01_u01 /u01 -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536
 mount: (hint) your fstab has been modified, but systemd still uses
@@ -1022,7 +1023,7 @@ Daemon Status:
 
 ....
 
-. Create a vip for Oracle.
+. Create a virtual IP (vip) for Oracle. Virtual IP will float between primary and standby node as needed. 
 +
 [source, cli]
 pcs resource create vip ocf:heartbeat:IPaddr2 ip=172.30.15.33 cidr_netmask=25 nic=eth0 op monitor interval=10s --group oracle
@@ -1066,6 +1067,7 @@ Daemon Status:
 [source, cli]
 vi $ORACLE_HOME/network/admin/listener.ora
 +
+[source, cli]
 vi $ORACLE_HOME/network/admin/tnsnames.ora
 +
 ....
@@ -1140,6 +1142,7 @@ Service "ntap_pdb3.ec2.internal" has 1 instance(s).
   Instance "NTAP", status READY, has 1 handler(s) for this service...
 The command completed successfully
 
+**Oracle listener now listens on vip for database connection**
 ....
 
 . Add /u01, /u02, /u03 mount points to oracle resource group.
@@ -1153,7 +1156,7 @@ pcs resource create u02 ocf:heartbeat:Filesystem device='172.30.15.95:/orapm01_u
 [source, cli]
 pcs resource create u03 ocf:heartbeat:Filesystem device='172.30.15.95:/orapm01_u03' directory='/u03' fstype='nfs' options='rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=65536,wsize=65536' --group oracle
 
-. Create monitor user ID in oracle DB.
+. Create a PCS monitor user ID in oracle DB.
 +
 ....
 
@@ -1327,7 +1330,7 @@ Daemon Status:
 
 ....
 
-. Simulate an unmanaged database listener failure by killing listener process and observe that PCS monitored the listener failure and restarted it in a few seconds.
+. Simulate an database listener failure by killing listener process and observe that PCS monitored the listener failure and restarted it in a few seconds.
 +
 ....
 
@@ -1398,7 +1401,7 @@ The command completed successfully
 
 ....
 
-. Simulate an unmanaged database failure by killing the pmon process and observe that PCS monitored the databadse failure and restarted it in a few seconds.
+. Simulate an database failure by killing the pmon process and observe that PCS monitored the databadse failure and restarted it in a few seconds.
 +
 ....
 
@@ -1705,7 +1708,7 @@ SQL>
 
 ....
 
-This completes the Oracle HA validation and solution demonstration in AWS EC2 Pacemaker clustering with Amazon FSx ONTAP as database storage backend.
+This completes the Oracle HA validation and solution demonstration in AWS EC2 with Pacemaker clustering and Amazon FSx ONTAP as database storage backend.
 
 ====
 
