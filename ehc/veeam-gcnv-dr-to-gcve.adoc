@@ -19,7 +19,7 @@ This article describes how to use Veeam Backup & Replication to set up disaster 
 
 == Overview
 
-Google Cloud NetApp Volumes is a storage service from Google and NetApp that is available for Google Cloud. NetApp Volumes service provides high performance NFS/SMB storage. VMware certified NetApp Volumes NFS storage can be used as an external datastore for ESXi hosts in GCVE. Users are required to connect NetApp Volumes and GCVE services through VPC network peering (PSA). There are no network charges resulting from storage access within a region. Users can create NetApp Volumes volumes in the Google Cloud console and enable deletion protection before mounting volumes as datastores to their ESXi hosts.
+Google Cloud NetApp Volumes is a storage service from Google and NetApp that is available for Google Cloud. NetApp Volumes service provides high performance NFS/SMB storage. VMware certified NetApp Volumes NFS storage can be used as an external datastore for ESXi hosts in GCVE. Users are required to make a peering connection between their GCVE private cloud and NetApp Volumes project. There are no network charges resulting from storage access within a region. Users can create NetApp Volumes volumes in the Google Cloud console and enable deletion protection before mounting volumes as datastores to their ESXi hosts.
 
 NetApp Volumes based NFS datastores can be used to replicate data from on-premises using any validated third-party solution that provides VM replication capability. By adding NetApp Volumes datastores, it enables cost optimized deployment instead of building a Google Cloud VMware Engine (GCVE) based SDDC with a large number of ESXi hosts to accommodate the storage. This approach is called a “Pilot Light Cluster”. A pilot light cluster is a minimal GCVE host configuration (3 x GCVE ESXi hosts) along with NetApp Volumes datastores capacity to allow for independent scaling to meet capacity requirements.
 
@@ -45,11 +45,13 @@ This solution covers the following high level steps:
 . Create a failover plan and perform failover.
 . Switch back to production VMs once the disaster event is complete and the primary site is up.
 
+NOTE: When creating a volume in NetApp Volumes, for use as a GCVE datastore, only NFS v3 is supported.
+
 For more information on using NetApp Volumes NFS volumes as datastores for GCVE, check out https://cloud.google.com/vmware-engine/docs/vmware-ecosystem/howto-cloud-volumes-datastores-gcve[Using NFS volume as vSphere datastore hosted by Google Cloud NetApp Volumes]. 
 
 == Architecture
 
-The following diagram shows the architecture of the solution presented in this documentation. A recommended best practice is to have a Veeam Backup & Replication server located at both the on-premises site and in the GCVE SDDC. Backup and recovery is performed and managed by the Veeam server on-premises, and replication is managed the Veeam server in the GCVE SDDC. This architecture provides the highest availability when a failure occurs in the primary datacenter.
+The following diagram shows the architecture of the solution presented in this documentation. A recommended best practice is to have a Veeam Backup & Replication server located at both the on-premises site and in the GCVE SDDC. Backup and recovery is performed and managed by the Veeam server on-premises, and replication is managed by the Veeam server in the GCVE SDDC. This architecture provides the highest availability when a failure occurs in the primary datacenter.
 
 image::dr-veeam-gcnv-image01.png[architecture diagram]
 
@@ -57,11 +59,13 @@ image::dr-veeam-gcnv-image01.png[architecture diagram]
 
 This solution requires the following components and configurations:
 
-. NetApp volumes has a Storage Pool available with enough free capacity to accommodate the NFS volume to be created.
+. NetApp Volumes has a Storage Pool available with enough free capacity to accommodate the NFS volume to be created.
 . Veeam Backup and Replication software is running in an on-premises environment with appropriate network connectivity.
 . Ensure the Veeam Backup & Replication backup VM is connected to the source as well as the target GCVE SDDC clusters.
 . Ensure the Veeam Backup & Replication backup VM is connected to the Veeam Proxy server VMs at both the source and target GCVE clusters.
 . The backup server must be able to resolve short names and connect to source and target vCenters.
+
+Users are required to make a peering connection between their GCVE private cloud and NetApp Volumes project using the VPC Network peering or Private connections pages within the VMware Engine Cloud console UI.
 
 NOTE: Veeam requires a GCVE solution user account with elevated privileges when adding the GCVE vCenter server to the Veeam Backup and Replication inventory. For more information refer to the Google Cloud Platform (GCP) documentation, https://cloud.google.com/vmware-engine/docs/private-clouds/classic-console/howto-elevate-privilege[Elevating VMware Engine privileges].
 
@@ -100,6 +104,8 @@ image::dr-veeam-gcnv-image02.png[create volume]
 * The export rules for accessing the volume. This is the IP addresses of the ESXi adapters on the NFS network.
 * A snapshot schedule used to protect the volume using local snapshots.
 * Optionally, choose to backup the volume and/or create labels for the volume.
++
+NOTE: When creating a volume in NetApp Volumes, for use as a GCVE datastore, only NFS v3 is supported.
 +
 image::dr-veeam-gcnv-image03.png[create volume]
 +
@@ -208,7 +214,7 @@ For additional information on Veeam replication, refer to link:https://helpcente
 .Create a failover plan
 [%collapsible]
 ====
-When the initial replication or seeding is complete, create the failover plan. Failover plan helps in performing failover for dependent VMs one by one or as a group automatically. Failover plan is the blueprint for the order in which the VMs are processed including the boot delays. The failover plan also helps to ensure that critical dependant VMs are already running. 
+When the initial replication or seeding is complete, create the failover plan. Failover plan helps in performing failover for dependent VMs one by one or as a group automatically. Failover plan is the blueprint for the order in which the VMs are processed including the boot delays. The failover plan also helps to ensure that critical dependent VMs are already running. 
 
 After completing the initial replication or seeding, create a failover plan. This plan serves as a strategic blueprint for orchestrating the failover of dependent VMs, either individually or as a group. It defines the processing order of VMs, incorporates necessary boot delays, and ensures that critical dependent VMs are operational before others. By implementing a well-structured failover plan, organizations can streamline their disaster recovery process, minimizing downtime and maintaining the integrity of interdependent systems during a failover event.
 
