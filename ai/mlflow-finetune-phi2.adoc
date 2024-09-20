@@ -1,0 +1,80 @@
+---
+sidebar: sidebar
+permalink: ai/aicp_example_notebooks_and_pipelines.html
+keywords: Jupyter Notebook, MLFlow, NetApp DataOps Toolkit, LLM, 
+summary: Fine-tune a Large Language Model with MLFlow on Jupyter Hub
+---
+
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../media/
+
+[.lead]
+This section describes the steps involved in fine tuning a Large Language Model (LLM) with MLFlow using Jupyter Hub. 
+This is intended to serve as an example to show a training job that incorporates NetApp storage and NetApp Intelligent data infrastructure for customer use-cases such as Retrieval Augmented Generation (RAG).
+
+== Prerequisites
+
+This section outlines the prerequisites to fine-tune a language model using jupyter hub. In order to do so, it is assumed you have already installed the relevant libraries and packages necessary to train or fine-tune the model. 
+Some of the libraries used in this example include, but are not limited to: 
+- transformers
+- peft (Parameter Efficient Fine Tuning)
+- accelerate
+These are libraries belonging to HuggingFace. Additional libraries include matplotlib, SciPy, Einops among others. 
+
+It is also assumed you have access to the base model and its weights through HuggingFace. You can find a list of available models on https://huggingface.co/models[HuggingFace].
+
+Lastly, you will also need access to a Jupyter Hub account with appropriate storage. It is advisable to have access to a GPU server (for higher compute requirements).
+
+This fine-tuning example is inspired by a collection of notebook guides and examples developed by the https://github.com/brevdev/notebooks[brevdev team].
+
+
+== Data Loading and Experiment Setup
+
+Store all data (documents and text) in the same shared folder as the notebook for easy retrieval. 
+Convert the documents into .json format for data processing and training. 
+
+Once the data is processed, ensure that your GPU(s) has sufficient RAM to be able to load the model along with the data. In this example, we use a NVIDIA TESLA T4 GPU with 16GB RAM for fine-tuning Microsoft's https://huggingface.co/microsoft/phi-2[phi-2] of size 2.7 billion parameters. Depending on the model you use and amount of data, you might need a higher amount of RAM/additional GPUs in case you want to build a distributed training setup. 
+
+image:tesla-t4.png[GPU specifications used in this example]
+
+In this example, https://huggingface.co/docs/diffusers/main/en/training/lora[LoRA] is leveraged to ensure the model adheres to resource constraints. If compute is not a constraint, full fine-tuning can be performed.  
+
+
+== Results and Future Work
+
+The following table shows the training loss and corresponding validation loss for phi-2 trained on NetApp Solutions dataset (internal solutions engineering blogs/articles). As observed, the validation loss decreases alongside the training loss as the number of epochs increase. 
+
+image:phi2-results.png[Training loss and Validation loss for Phi-2]
+
+A couple of sample prompts used to evaluate the fine-tuned language model are as follows - 
+*1. Describe the advantages of using NetApp FlexGroup volumes for AI training datasets.*
+
+The response to this prompt is the following - 
+"NetApp FlexGroup volumes provide several benefits when used for AI training datasets, including:
+- *Scalability*: FlexGroup volumes can scale horizontally to accommodate large amounts of data and compute resources required for AI training. This enables organizations to train models on larger datasets without worrying about resource limitations.
+- *Data consistency*: FlexGroup volumes ensure data consistency across multiple nodes in a cluster by providing a single namespace for all data. This ensures that data is always available and consistent across different nodes, which is critical for AI applications that require access to data from multiple sources.
+- *Performance*: FlexGroup volumes are optimized for high-performance storage, making them ideal for storing large datasets required for AI training. The volume's performance characteristics include low latency, high throughput, and high availability, ensuring that data is accessed quickly and reliably during training.
+- *Security*: FlexGroup volumes provide built-in security features such as encryption, access control, and data protection, ensuring that sensitive data is protected throughout its lifecycle. This is particularly important for AI applications that handle sensitive data such as personal information or financial data.
+Overall, NetApp FlexGroup volumes offer a scalable, secure, and high-performing solution for storing and managing AI training datasets."
+
+*2. What advantages and features does ONTAP 9 provide? Give specific instances of them.*
+
+The response to this prompt is the following -
+"ONTAP 9 provides the following advantages and features:
+- *High performance*, with a throughput of up to 1 TB/s per node for data transfer between nodes and storage volumes.
+- *High availability*, with 99.999% uptime and high availability across multiple nodes.
+- *Scalability*, with the ability to scale horizontally by adding more nodes or increasing the number of disks on each node.
+- *Flexibility*, with the ability to use different types of storage volumes, such as SSDs, HDDs, or NVMe drives, depending on the workload requirements.
+- *Security*, with the ability to implement various security policies, such as encryption, access control, and auditing, to protect the data and resources in the cluster.
+- Support for advanced features, such as *data deduplication, compression, and replication*, to optimize the performance and reduce the cost of storing and transferring large amounts of data."
+
+
+The responses demonstrate that the fine-tuned model has richer context from the dataset it was trained on compared to the base model and elicits a more relevant output. 
+
+This example was intended to show that training a language model on custom/proprietary data with a small amount of computer resource is still possible. 
+Future work includes training a larger language model (order of >10B parameter) on organization-wide data leveraging a much larger GPU setup (distributed system network of GPUs). 
+
+link:mlrun_configure_working_environment.adoc[Next: ML Run Working Environment]
