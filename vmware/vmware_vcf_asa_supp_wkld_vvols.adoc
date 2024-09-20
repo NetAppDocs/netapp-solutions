@@ -5,22 +5,21 @@ keywords: netapp, vmware, cloud, foundation, vcf, aff, all-flash, nfs, vvol, vvo
 summary:
 ---
 
+= Use ONTAP Tools to configure supplemental storage (vVols) for VCF Workload Domains
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
-:imagesdir: ./../media/
+:imagesdir: ../media/
 
 [.lead]
-In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMware vSphere (OTV) to configure a *vVols datastore* for a VCF workload domain. 
+In this scenario we will demonstrate how to deploy and use ONTAP Tools for VMware vSphere to configure a *vVols datastore* for a VCF workload domain. 
 
 *iSCSI* is used as the storage protocol for the vVols datastore.
 
 Author: Josh Powell
 
-== Use ONTAP Tools to configure supplemental storage (vVols) for VCF Workload Domains
-
-=== Scenario Overview
+== Scenario Overview
 
 This scenario covers the following high level steps:
 
@@ -30,7 +29,7 @@ This scenario covers the following high level steps:
 * Deploy ONTAP Tools on the VI workload domain.
 * Create a new vVols datastore on the VI workload domain.
 
-=== Prerequisites
+== Prerequisites
 This scenario requires the following components and configurations:
 
 * An ONTAP ASA storage system with physical data ports on ethernet switches dedicated to storage traffic.
@@ -51,10 +50,10 @@ TIP: In situations where multiple VMkernel adapters are configured on the same I
 
 For additional information on using VMFS iSCSI datastores with VMware refer to link:vsphere_ontap_auto_block_iscsi.html[vSphere VMFS Datastore - iSCSI Storage backend with ONTAP].
 
-=== Deployment Steps
+== Deployment Steps
 To deploy ONTAP Tools and use it to create a vVols datastore on the VCF management domain, complete the following steps:
 
-==== Create SVM and LIFs on ONTAP storage system
+=== Create SVM and LIFs on ONTAP storage system
 The following step is performed in ONTAP System Manager.
 
 .Create the storage VM and LIFs
@@ -84,7 +83,7 @@ image:vmware-vcf-asa-image03.png[Fill out network info for LIFs]
 image:vmware-vcf-asa-image04.png[Enable SVM account and Finish]
 ====
 
-==== Set up networking for iSCSI on ESXi hosts
+=== Set up networking for iSCSI on ESXi hosts
 The following steps are performed on the VI Workload Domain cluster using the vSphere client. In this case vCenter Single Sign-On is being used so the vSphere client is common across the management and workload domains.
 
 .Create Distributed Port Groups for iSCSI traffic
@@ -160,17 +159,17 @@ image:vmware-vcf-asa-image34.png[Review VMkernel selections]
 . Repeat this process to create a VMkernel adapter for the second iSCSI network.
 ====
 
-==== Deploy and use ONTAP Tools to configure storage
-The following steps are performed on the VCF management domain cluster using the vSphere client and involve deploying OTV, creating a vVols iSCSI datastore, and migrating management VM's to the new datastore.
+=== Deploy and use ONTAP Tools to configure storage
+The following steps are performed on the VCF management domain cluster using the vSphere client and involve deploying ONTAP Tools, creating a vVols iSCSI datastore, and migrating management VM's to the new datastore.
 
-For VI workload domains, OTV is installed to the VCF Management Cluster but registered with the vCenter associated with the VI workload domain. 
+For VI workload domains, ONTAP Tools is installed to the VCF Management Cluster but registered with the vCenter associated with the VI workload domain. 
 
 For additional information on deploying and using ONTAP Tools in a multiple vCenter environment refer to link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/configure/concept_requirements_for_registering_vsc_in_multiple_vcenter_servers_environment.html[Requirements for registering ONTAP tools in multiple vCenter Servers environment].
 
 .Deploy ONTAP tools for VMware vSphere
 [%collapsible]
 ==== 
-ONTAP tools for VMware vSphere (OTV) is deployed as a VM appliance and provides an integrated vCenter UI for managing ONTAP storage. 
+ONTAP tools for VMware vSphere is deployed as a VM appliance and provides an integrated vCenter UI for managing ONTAP storage. 
 
 Complete the following to Deploy ONTAP tools for VMware vSphere:
 
@@ -201,10 +200,10 @@ image:vmware-vcf-aff-image24.png[Select network]
 +
 {nbsp}
 . On the Customize template page fill out all required information:
-* Password to be used for administrative access to OTV.
+* Password to be used for administrative access to ONTAP Tools.
 * NTP server IP address.
-* OTV maintenance account password.
-* OTV Derby DB password.
+* ONTAP Tools maintenance account password.
+* ONTAP Tools Derby DB password.
 * Do not check the box to *Enable VMware Cloud Foundation (VCF)*. VCF mode is not required for deploying supplemental storage.
 * FQDN or IP address of the vCenter appliance for the *VI Workload Domain*
 * Credentials for the vCenter appliance of the *VI Workload Domain*
@@ -217,7 +216,7 @@ image:vmware-vcf-aff-image25.png[Customize OTV template 1]
 image:vmware-vcf-asa-image35.png[Customize OTV template 2]
 +
 {nbsp}
-. Review all information on the Ready to complete  page and the click Finish to begin deploying the OTV appliance.
+. Review all information on the Ready to complete  page and the click Finish to begin deploying the ONTAP Tools appliance.
 ====
 
 .Add a storage system to ONTAP Tools.
@@ -225,24 +224,24 @@ image:vmware-vcf-asa-image35.png[Customize OTV template 2]
 ==== 
 . Access NetApp ONTAP Tools by selecting it from the main menu in the vSphere client.
 +
-image::vmware-asa-image6.png[NetApp ONTAP Tools]
+image:vmware-asa-image6.png[NetApp ONTAP Tools]
 +
 {nbsp}
-. From the *INSTANCE* drop down menu in the ONTAP Tool interface, select the OTV instance associated with the workload domain to be managed.
+. From the *INSTANCE* drop down menu in the ONTAP Tool interface, select the ONTAP Tools instance associated with the workload domain to be managed.
 +
 image:vmware-vcf-asa-image36.png[Choose OTV instance]
 +
 {nbsp}
 . In ONTAP Tools select *Storage Systems* from the left hand menu and then press *Add*.
 +
-image::vmware-vcf-asa-image37.png[Add storage system]
+image:vmware-vcf-asa-image37.png[Add storage system]
 +
 {nbsp}
 . Fill out the IP Address, credentials of the storage system and the port number. Click on *Add* to start the discovery process.
 +
 NOTE: vVol requires ONTAP cluster credentials rather than SVM credentials. For more information refer to https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/configure/task_add_storage_systems.html[Add storage systems] In the ONTAP Tools documentation.
 +
-image::vmware-vcf-asa-image38.png[Provide storage system credentials]
+image:vmware-vcf-asa-image38.png[Provide storage system credentials]
 ====
 
 .Create a storage capability profile in ONTAP Tools
@@ -254,31 +253,31 @@ To create a storage capability profile in ONTAP Tools complete the following ste
 
 . In ONTAP Tools select *Storage capability profile* from the left-hand menu and then press *Create*.
 +
-image::vmware-vcf-asa-image39.png[Storage capability profile]
+image:vmware-vcf-asa-image39.png[Storage capability profile]
 
 . In the *Create Storage Capability profile* wizard provide a name and description of the profile and click on *Next*.
 +
-image::vmware-asa-image10.png[Add name for SCP]
+image:vmware-asa-image10.png[Add name for SCP]
 
 . Select the platform type and to specify the storage system is to be an All-Flash SAN Array set *Asymmetric* to false.
 +
-image::vmware-asa-image11.png[Platorm for SCP]
+image:vmware-asa-image11.png[Platorm for SCP]
 
 . Next, select choice of protocol or *Any* to allow all possible protocols. Click *Next* to continue.
 +
-image::vmware-asa-image12.png[Protocol for SCP]
+image:vmware-asa-image12.png[Protocol for SCP]
 
 . The *performance* page allows setting of quality of service in form of minimum and maximum IOPs allowed.
 +
-image::vmware-asa-image13.png[QoS for SCP]
+image:vmware-asa-image13.png[QoS for SCP]
 
 . Complete the *storage attributes* page selecting storage efficiency, space reservation, encryption and any tiering policy as needed. 
 +
-image::vmware-asa-image14.png[Attributes for SCP]
+image:vmware-asa-image14.png[Attributes for SCP]
 
 . Finally, review the summary and click on Finish to create the profile. 
 +
-image::vmware-vcf-asa-image40.png[Summary for SCP]
+image:vmware-vcf-asa-image40.png[Summary for SCP]
 ====
 
 .Create a vVols datastore in ONTAP Tools
@@ -288,26 +287,26 @@ To create a vVols datastore in ONTAP Tools complete the following steps:
 
 . In ONTAP Tools select *Overview* and from the *Getting Started* tab click on *Provision* to start the wizard.
 +
-image::vmware-vcf-asa-image41.png[Provision datastore]
+image:vmware-vcf-asa-image41.png[Provision datastore]
 
 . On the *General* page of the New Datastore wizard select the vSphere datacenter or cluster destination. Select *vVols* as the datastore type, fill out a name for the datastore, and select *iSCSI* as the protocol. Click on *Next* to continue.
 +
-image::vmware-vcf-asa-image42.png[General page]
+image:vmware-vcf-asa-image42.png[General page]
 
 . On the *Storage system* page select the select a storage capability profile, the storage system and SVM. Click on *Next* to continue.
 +
-image::vmware-vcf-asa-image43.png[Storage system]
+image:vmware-vcf-asa-image43.png[Storage system]
 
 . On the *Storage attributes* page select to create a new volume for the datastore and fill out the storage attributes of the volume to be created. Click on *Add* to create the volume and then *Next* to continue.
 +
-image::vmware-vcf-asa-image44.png[Storage attributes]
+image:vmware-vcf-asa-image44.png[Storage attributes]
 
 . Finally, review the summary and click on *Finish* to start the vVol datastore creation process.
 +
-image::vmware-vcf-asa-image45.png[Summary page]
+image:vmware-vcf-asa-image45.png[Summary page]
 ====
 
-=== Additional information
+== Additional information
 
 For information on configuring ONTAP storage systems refer to the link:https://docs.netapp.com/us-en/ontap[ONTAP 9 Documentation] center.
 
