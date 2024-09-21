@@ -5,19 +5,19 @@ keywords: netapp, proxmox, proxmox ve, all-flash, nfs, iscsi, ontap, storage, af
 summary:
 ---
 
+= Proxmox VE with ONTAP
 :hardbreaks:
 :nofooter:
 :icons: font
 :linkattrs:
-:imagesdir: ./../media/
+:imagesdir: ../media/
 
-== Proxmox VE with ONTAP
 [.lead]
 Shared storage in Proxmox Virtual Environment(VE) reduces the time for VM live migration, and makes for a better target for backups and consistent templates across the environment. ONTAP storage can serve the needs of Proxmox VE host environments as well as for guest file, block and object storage demands.
 
 Proxmox VE hosts need to have FC, Ethernet, or other supported interfaces cabled to switches and have communication to ONTAP logical interfaces.
 
-=== High-level ONTAP Features
+== High-level ONTAP Features
 
 **Common features**
 
@@ -62,26 +62,28 @@ Proxmox VE hosts need to have FC, Ethernet, or other supported interfaces cabled
 * Selective LUN Map and Portset.
 
 
-=== Proxmox VE storage types supported with ONTAP
+== Proxmox VE storage types supported with ONTAP
 
 NAS protocols (NFS/SMB) support all content types of Proxmox VE and are typically configured once at the datacenter level. Guest VMs can use disks of type raw, qcow2, or VMDK on NAS storage.
 ONTAP Snapshots can be made visible, to access point in time copies of data from the client. 
 Block storage with SAN protocols (FC/iSCSI/NVMe-oF) are typically configured on a per host basis and are restricted to the VM Disk and Container Image content types supported by Proxmox VE. Guest VMs and Containers consume block storage as raw devices.
 
-[frame=all, grid=all]
-|====
-|Content Type| NFS | SMB/CIFS | FC | iSCSI | NVMe-oF
-|Backups | Yes | Yes | No*| No* |No*
-|VM Disks | Yes | Yes | Yes** | Yes** | Yes**
-|CT Volumes | Yes | Yes | Yes** | Yes** | Yes**
-|ISO Images | Yes | Yes | No*| No* |No*
-|CT Templates | Yes | Yes | No*| No* |No*
-|Snippets | Yes | Yes | No*| No* |No*
-|====
-/* Requires cluster filesystem to create the shared folder and use Directory storage type.
-/** use LVM storage type. 
+[width=100%,cols="25% 15% 15% 15% 15% 15%", frame=all, grid=all, options="header"]
+|===
+| Content Type | NFS | SMB/CIFS | FC | iSCSI | NVMe-oF
+| Backups | Yes | Yes a| No^1^ a| No^1^ a| No^1^
+| VM Disks | Yes | Yes a| Yes^2^ a| Yes^2^ a| Yes^2^
+| CT Volumes | Yes | Yes a| Yes^2^ a| Yes^2^ a| Yes^2^
+| ISO Images | Yes | Yes a| No^1^ a| No^1^ a| No^1^
+| CT Templates | Yes | Yes a| No^1^ a| No^1^ a| No^1^
+| Snippets | Yes | Yes a| No^1^ a| No^1^ a| No^1^
+|===
 
-=== SMB/CIFS Storage 
+*Notes:*
+1 - Requires cluster filesystem to create the shared folder and use Directory storage type.
+2 - use LVM storage type. 
+
+== SMB/CIFS Storage 
 
 To utilize SMB/CIFS file shares, there are certain tasks that needs to be carried out by the storage admin and the virtualization admin can mount the share using Proxmox VE UI or from shell. SMB multichannel provides fault tolerance and boosts performance. For more details, refer to https://www.netapp.com/pdf.html?item=/media/17136-tr4740.pdf[TR4740 - SMB 3.0 Multichannel]
 
@@ -127,7 +129,7 @@ image:proxmox-ontap-image03.png[SMB share info]
 
 . Collect the SMB server, share name and credentials to use for the share authentication.
 . Ensure at least two interface are configured in different VLANs (for fault tolerance) and NIC supports RSS.
-. If using Management UI (https://<proxmox node>:8006), click on datacenter, select storage, click Add and select SMB/CIFS.
+. If using Management UI `https://<proxmox node>:8006`, click on datacenter, select storage, click Add and select SMB/CIFS.
 +
 image:proxmox-ontap-image04.png[SMB storage navigation]
 +
@@ -150,7 +152,7 @@ image:proxmox-ontap-image06.png[multichannel setup]
 image:proxmox-ontap-image07.png[storage configuration file for SMB]
 ====
 
-=== NFS Storage
+== NFS Storage
 
 ONTAP supports all the NFS versions supported by Proxmox VE. To provide fault tolerance and performance enhancements, ensure https://docs.netapp.com/us-en/ontap/nfs-trunking/index.html[session trunking] is utilized. To use session trunking, minimum NFS v4.1 is required.
 
@@ -188,7 +190,7 @@ image:proxmox-ontap-image08.png[NFS volume info]
 ====
 
 . Ensure at least two interface is configured in different VLANs (for fault tolerance). Use NIC bonding.
-. If using Management UI (https://<proxmox node>:8006), click on datacenter, select storage, click Add and select NFS.
+. If using Management UI `https://<proxmox node>:8006`, click on datacenter, select storage, click Add and select NFS.
 +
 image:proxmox-ontap-image09.png[NFS storage navigation]
 +
@@ -211,7 +213,7 @@ image:proxmox-ontap-image11.png[fstab entries for session trunk]
 image:proxmox-ontap-image12.png[storage configuration file for NFS]
 ====
 
-=== LVM with iSCSI
+== LVM with iSCSI
 
 To configure Logical Volume Manager for shared storage across Proxmox hosts, complete for the following tasks:
 
@@ -246,9 +248,11 @@ If new to ONTAP, use System Manager for a better experience.
 
 . Ensure SVM is available with iSCSI protocol enabled. Follow https://docs.netapp.com/us-en/ontap/san-admin/provision-storage.html[ONTAP 9 documentation]
 . Have two lifs per controller dedicated for iSCSI.
++
 image:proxmox-ontap-image13.png[iscsi interface details]
 . Create igroup and populate the host iscsi initiators.
 . Create the LUN with desired size on the SVM and present to igroup created in above step.
++
 image:proxmox-ontap-image14.png[iscsi lun details]
 . Notify virtualization admin that lun is created.
 ====
@@ -257,7 +261,7 @@ image:proxmox-ontap-image14.png[iscsi lun details]
 [%collapsible]
 ====
 
-. Go to Management UI (https:<proxmox node>:8006), click on datacenter, select storage, click Add and select iSCSI.
+. Go to Management UI `https:<proxmox node>:8006`, click on datacenter, select storage, click Add and select iSCSI.
 +
 image:proxmox-ontap-image15.png[iscsi storage navigation]
 +
@@ -361,7 +365,7 @@ lsblk -l
 ----
 vgcreate pvens02 /dev/mapper/<device id>
 ----
-. Go to Management UI (https:<proxmox node>:8006), click on datacenter, select storage, click Add and select LVM.
+. Go to Management UI `https:<proxmox node>:8006`, click on datacenter, select storage, click Add and select LVM.
 +
 image:proxmox-ontap-image17.png[lvm storage navigation]
 +
