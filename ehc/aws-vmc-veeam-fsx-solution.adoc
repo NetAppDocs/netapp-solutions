@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
 permalink: ehc/aws-vmc-veeam-fsx-solution.html
-keywords: disaster recovery, vmc, vmware cloud, aws, amazon web services, nfs datastore, fsxn, fsx for ontap, fsx for netapp ontap, backup, restore, sql server, oracle
+keywords: disaster recovery, vmc, vmware cloud, aws, amazon web services, nfs datastore, fsxn, FSx ONTAP, FSx ONTAP, backup, restore, sql server, oracle
 summary:
 ---
 
-= Veeam Backup & Restore in VMware Cloud, with Amazon FSx for ONTAP
+= Veeam Backup & Restore in VMware Cloud, with Amazon FSx ONTAP
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -14,23 +14,23 @@ summary:
 
 
 [.lead]
-Veeam Backup & Replication is an effective and reliable solution for protecting data in VMware Cloud. This solution demonstrates the proper setup and configuration for using Veeam Backup and Replication to backup and restore application VMs residing on FSx for ONTAP NFS datastores in VMware Cloud.
+Veeam Backup & Replication is an effective and reliable solution for protecting data in VMware Cloud. This solution demonstrates the proper setup and configuration for using Veeam Backup and Replication to backup and restore application VMs residing on FSx ONTAP NFS datastores in VMware Cloud.
 
 Author: Josh Powell - NetApp Solutions Engineering
 
 == Overview
 
-VMware Cloud (in AWS) supports the use of NFS datastores as supplemental storage, and FSx for NetApp ONTAP is a secure solution for customers who need to store large amounts of data for their cloud applications that can scale independent of the number of ESXi hosts in the SDDC cluster. This integrated AWS storage service offers highly efficient storage with all of the traditional NetApp ONTAP capabilities. 
+VMware Cloud (in AWS) supports the use of NFS datastores as supplemental storage, and FSx ONTAP is a secure solution for customers who need to store large amounts of data for their cloud applications that can scale independent of the number of ESXi hosts in the SDDC cluster. This integrated AWS storage service offers highly efficient storage with all of the traditional NetApp ONTAP capabilities. 
 
 === Use Cases
 This solution addresses the following use cases:
 
-* Backup and restore of Windows and Linux virtual machines hosted in VMC using FSx for NetApp ONTAP as a backup repository.
-* Backup and restore of Microsoft SQL Server application data using FSx for NetApp ONTAP as a backup repository.
-* Backup and restore of Oracle application data using FSx for Netapp ONTAP as a backup repository.
+* Backup and restore of Windows and Linux virtual machines hosted in VMC using FSx ONTAP as a backup repository.
+* Backup and restore of Microsoft SQL Server application data using FSx ONTAP as a backup repository.
+* Backup and restore of Oracle application data using FSx ONTAP as a backup repository.
 
-=== NFS Datastores Using Amazon FSx for ONTAP 
-All virtual machines in this solution reside on FSx for ONTAP supplemental NFS datastores. Using FSx for ONTAP as a supplemental NFS datastore has several benefits. For example, it allows you to:
+=== NFS Datastores Using Amazon FSx ONTAP 
+All virtual machines in this solution reside on FSx ONTAP supplemental NFS datastores. Using FSx ONTAP as a supplemental NFS datastore has several benefits. For example, it allows you to:
 
 * Create a scalable and highly available file system in the cloud without the need for complex setup and management.
 * Integrate with your existing VMware environment, allowing you to use familiar tools and processes to manage your cloud resources.
@@ -39,10 +39,10 @@ All virtual machines in this solution reside on FSx for ONTAP supplemental NFS d
 .Solution Deployment Overview
 [%collapsible]
 =====
-This list provides the high level steps necessary to configure Veeam Backup & Replication, execute backup and restore jobs using FSx for ONTAP as a backup repository, and perform restores of SQL Server and Oracle VMs and databases:
+This list provides the high level steps necessary to configure Veeam Backup & Replication, execute backup and restore jobs using FSx ONTAP as a backup repository, and perform restores of SQL Server and Oracle VMs and databases:
 
-. Create the FSx for ONTAP file system to be used as iSCSI backup repository for Veeam Backup & Replication.
-. Deploy Veeam Proxy to distribute backup workloads and mount iSCSI backup repositories hosted on FSx for ONTAP.
+. Create the FSx ONTAP file system to be used as iSCSI backup repository for Veeam Backup & Replication.
+. Deploy Veeam Proxy to distribute backup workloads and mount iSCSI backup repositories hosted on FSx ONTAP.
 . Configure Veeam Backup Jobs to backup SQL Server, Oracle, Linux and Windows virtual machines.
 . Restore SQL Server virtual machines and individual databases.
 . Restore Oracle virtual machines and individual databases.
@@ -51,16 +51,16 @@ This list provides the high level steps necessary to configure Veeam Backup & Re
 .Prerequisites
 [%collapsible]
 =====
-The purpose of this solution is to demonstrate data protection of virtual machines running in VMware Cloud and located on NFS Datastores hosted by FSx for NetApp ONTAP. This solution assumes the following components are configured and ready for use:
+The purpose of this solution is to demonstrate data protection of virtual machines running in VMware Cloud and located on NFS Datastores hosted by FSx ONTAP. This solution assumes the following components are configured and ready for use:
 
-. FSx for ONTAP filesystem with one or more NFS datastores connected to VMware Cloud.
+. FSx ONTAP filesystem with one or more NFS datastores connected to VMware Cloud.
 . Microsoft Windows Server VM with Veeam Backup & Replication software installed.
 * vCenter server has been discovered by the Veeam Backup & Replication server using their IP address or fully qualified domain name.
 . Microsoft Windows Server VM to be installed with Veeam Backup Proxy components during the solution deployment.
-. Microsoft SQL Server VMs with VMDKs and application data residing on FSx for ONTAP NFS datastores. For this solution we had two SQL databases on two separate VMDKs.
+. Microsoft SQL Server VMs with VMDKs and application data residing on FSx ONTAP NFS datastores. For this solution we had two SQL databases on two separate VMDKs.
 * Note: As a best practice database and transaction log files are placed on separate drives as this will improve performance and reliability. This is in part due to the fact that transaction logs are written sequentially, whereas database files are written randomly.
-. Oracle Database VMs with VMDKs and application data residing on FSx for ONTAP NFS datastores.
-. Linux and Windows file server VMs with VMDKs residing on FSx for ONTAP NFS datastores.
+. Oracle Database VMs with VMDKs and application data residing on FSx ONTAP NFS datastores.
+. Linux and Windows file server VMs with VMDKs residing on FSx ONTAP NFS datastores.
 . Veeam requires specific TCP ports for communication between servers and components in the backup environment. On Veeam backup infrastructure components, the required firewall rules are automatically created. 
 For a full listing of the network port requirements refer to the Ports section of the https://helpcenter.veeam.com/docs/backup/vsphere/used_ports.html?zoom_highlight=network+ports&ver=120[Veeam Backup and Replication User Guide for VMware vSphere].
 =====
@@ -83,13 +83,13 @@ image:aws-vmc-veeam-00.png[Solution Architecture Diagram]
 // Identify the hardware and software components along with the appropriate hardware level or software versions
 // Use the 3rd column if there is a related link that can be provided for more information
 
-The purpose of this solution is to demonstrate data protection of virtual machines running in VMware Cloud and located on NFS Datastores hosted by FSx for NetApp ONTAP. This solution assumes the following components are already configured and ready for use:
+The purpose of this solution is to demonstrate data protection of virtual machines running in VMware Cloud and located on NFS Datastores hosted by FSx ONTAP. This solution assumes the following components are already configured and ready for use:
 
-* Microsoft Windows VM's located on an FSx for ONTAP NFS Datastore
-* Linux (CentOS) VM's located on an FSx for ONTAP NFS Datastore
-* Microsoft SQL Server VM's located on an FSx for ONTAP NFS Datastore
+* Microsoft Windows VM's located on an FSx ONTAP NFS Datastore
+* Linux (CentOS) VM's located on an FSx ONTAP NFS Datastore
+* Microsoft SQL Server VM's located on an FSx ONTAP NFS Datastore
 ** Two databases hosted on separate VMDK's
-* Oracle VM's located on an FSx for ONTAP NFS Datastore
+* Oracle VM's located on an FSx ONTAP NFS Datastore
 =====
 
 == Solution Deployment
@@ -98,11 +98,11 @@ The purpose of this solution is to demonstrate data protection of virtual machin
 // Include screenshots, demo videos, etc. that make the steps as simple and clear as possible.
 // DO NOT overdo it with screenshots - where options are "obvious", a screenshot might not be necessary.
 
-In this solution we provide detailed instructions for deploying and validating a solution utilizing Veeam Backup and Replication software to perform backup and recovery of SQL Server, Oracle, and Windows and Linux file server virtual machines in a VMware Cloud SDDC on AWS. The Virtual Machines in this solution reside on a supplemental NFS datastore hosted by FSx for ONTAP. In addition, a separate FSx for ONTAP file system is used to host iSCSI volumes that will be used for Veeam backup repositories. 
+In this solution we provide detailed instructions for deploying and validating a solution utilizing Veeam Backup and Replication software to perform backup and recovery of SQL Server, Oracle, and Windows and Linux file server virtual machines in a VMware Cloud SDDC on AWS. The Virtual Machines in this solution reside on a supplemental NFS datastore hosted by FSx ONTAP. In addition, a separate FSx ONTAP file system is used to host iSCSI volumes that will be used for Veeam backup repositories. 
 
-We will go over FSx for ONTAP file system creation, mounting iSCSI volumes to be used as backup repositories, creating and running backup jobs, and performing VM and database restores.
+We will go over FSx ONTAP file system creation, mounting iSCSI volumes to be used as backup repositories, creating and running backup jobs, and performing VM and database restores.
 
-For detailed information on FSx for NetApp ONTAP refer to the https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx for ONTAP User Guide^].
+For detailed information on FSx ONTAP refer to the https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx ONTAP User Guide^].
 
 For detailed information on Veeam Backup and Replication refer to the https://www.veeam.com/documentation-guides-datasheets.html?productId=8&version=product%3A8%2F221[Veeam Help Center Technical Documentation^] site.
 
@@ -161,22 +161,22 @@ image:aws-vmc-veeam-10.png[Configure network traffic rules]
 
 === Configure storage and Backup Repositories
 
-The primary Veeam Backup server and Veeam Proxy server have access to a backup repository in the form of direct connected storage. In this section we cover creating an FSx for ONTAP file system, mounting iSCSI LUNs to the Veeam servers and creating Backup Repositories.
+The primary Veeam Backup server and Veeam Proxy server have access to a backup repository in the form of direct connected storage. In this section we cover creating an FSx ONTAP file system, mounting iSCSI LUNs to the Veeam servers and creating Backup Repositories.
 
-.Create FSx for ONTAP file system
+.Create FSx ONTAP file system
 [%collapsible]
 =====
-Create an FSx for ONTAP file system that will be used to host the iSCSI volumes for the Veeam Backup Repositories.
+Create an FSx ONTAP file system that will be used to host the iSCSI volumes for the Veeam Backup Repositories.
 
 . In the AWS console, Go to FSx and then *Create file system* 
 +
-image:aws-vmc-veeam-01.png[Create FSx for ONTAP File System]
+image:aws-vmc-veeam-01.png[Create FSx ONTAP File System]
 
-. Select *Amazon FSx for NetApp ONTAP* and then *Next* to continue. 
+. Select *Amazon FSx ONTAP* and then *Next* to continue. 
 +
-image:aws-vmc-veeam-02.png[Select Amazon FSx for NetApp ONTAP]
+image:aws-vmc-veeam-02.png[Select Amazon FSx ONTAP]
 
-. Fill in the file system name, deployment type, SSD storage capacity and the VPC in which the FSx for ONTAP cluster will reside. This must be a VPC configured to communicate with the virtual machine network in VMware Cloud. Click on *Next*.
+. Fill in the file system name, deployment type, SSD storage capacity and the VPC in which the FSx ONTAP cluster will reside. This must be a VPC configured to communicate with the virtual machine network in VMware Cloud. Click on *Next*.
 +
 image:aws-vmc-veeam-03.png[Fill out File System Info]
 
@@ -186,11 +186,11 @@ image:aws-vmc-veeam-03.png[Fill out File System Info]
 .Configure and mount iSCSI LUNs
 [%collapsible]
 =====
-Create and configure the iSCSI LUNs on FSx for ONTAP and mount to the Veeam backup and proxy servers. These LUNs will later be used to create Veeam backup repositories.
+Create and configure the iSCSI LUNs on FSx ONTAP and mount to the Veeam backup and proxy servers. These LUNs will later be used to create Veeam backup repositories.
 
-NOTE: Creating an iSCSI LUN on FSx for ONTAP is a multi-step process. The first step of creating the volumes can be accomplished in the Amazon FSx Console or with the NetApp ONTAP CLI.
+NOTE: Creating an iSCSI LUN on FSx ONTAP is a multi-step process. The first step of creating the volumes can be accomplished in the Amazon FSx Console or with the NetApp ONTAP CLI.
 
-NOTE: For more information on using FSx for ONTAP, see the https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx for ONTAP User Guide^].
+NOTE: For more information on using FSx ONTAP, see the https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx ONTAP User Guide^].
 
 . From the NetApp ONTAP CLI create the initial volumes using the following command:
 +
@@ -407,13 +407,13 @@ image:aws-vmc-veeam-36.png[Select a restore point from the list]
 
 VMware Cloud is a powerful platform for running business-critical applications and storing sensitive data. A secure data protection solution is essential for businesses that rely on VMware Cloud to ensure business continuity and help protect against cyber threats and data loss. By choosing a reliable and robust data protection solution, businesses can be confident that their critical data is safe and secure, no matter what.
 
-The use case presented in this documentation focuses on proven data protection technologies that highlight the integration between NetApp, VMware, and Veeam. FSx for ONTAP is supported as supplemental NFS datastores for VMware Cloud in AWS and is used for all virtual machine and application data. Veeam Backup & Replication is a comprehensive data protection solution designed to help businesses improve, automate, and streamline their backup and recovery processes. Veeam is used in conjunction with iSCSI backup target volumes, hosted on FSx for ONTAP, to provide a secure and easy to manage data protection solution for application data residing in VMware Cloud. 
+The use case presented in this documentation focuses on proven data protection technologies that highlight the integration between NetApp, VMware, and Veeam. FSx ONTAP is supported as supplemental NFS datastores for VMware Cloud in AWS and is used for all virtual machine and application data. Veeam Backup & Replication is a comprehensive data protection solution designed to help businesses improve, automate, and streamline their backup and recovery processes. Veeam is used in conjunction with iSCSI backup target volumes, hosted on FSx ONTAP, to provide a secure and easy to manage data protection solution for application data residing in VMware Cloud. 
 
 
 == Additional Information
 To learn more about the technologies presented in this solution refer to the following additional information.
 
-* https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx for ONTAP User Guide^]
+* https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[FSx ONTAP User Guide^]
 * https://www.veeam.com/documentation-guides-datasheets.html?productId=8&version=product%3A8%2F221[Veeam Help Center Technical Documentation^]
 * https://www.veeam.com/kb2414[VMware Cloud on AWS Support. Considerations and Limitations]
 
