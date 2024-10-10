@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
 permalink: ai/mlops_fsxn_s3_integration.html
-keywords: FSxN, MLOps, NetApp ONTAP, SageMaker, AWS S3
-summary: This post provides a guide on configuring FSxN as a private S3 bucket using AWS SageMaker.
+keywords: FSx ONTAP, MLOps, NetApp ONTAP, SageMaker, AWS S3
+summary: This post provides a guide on configuring FSx ONTAP as a private S3 bucket using AWS SageMaker.
 ---
 
-= Part 1 - Integrating AWS FSx for NetApp ONTAP (FSxN) as a private S3 bucket into AWS SageMaker
+= Part 1 - Integrating Amazon FSx for NetApp ONTAP (FSx ONTAP) as a private S3 bucket into AWS SageMaker
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -13,16 +13,16 @@ summary: This post provides a guide on configuring FSxN as a private S3 bucket u
 :imagesdir: ../media/
 
 [.lead]
-This section provides a guide on configuring FSxN as a private S3 bucket using AWS SageMaker.
+This section provides a guide on configuring FSx ONTAP as a private S3 bucket using AWS SageMaker.
 
 *Author(s):* 
 Jian Jian (Ken), Senior Data & Applied Scientist, NetApp
 
 == Introduction
 
-Using SageMaker as an example, this page provides guidance on configuring FSxN as a private S3 bucket.
+Using SageMaker as an example, this page provides guidance on configuring FSx ONTAP as a private S3 bucket.
 
-For more information about FSxN, please take a look at this presentation (link:http://youtube.com/watch?v=mFN13R6JuUk[Video Link])
+For more information about FSx ONTAP, please take a look at this presentation (link:http://youtube.com/watch?v=mFN13R6JuUk[Video Link])
 
 == User Guide
 === Server creation
@@ -36,19 +36,19 @@ image:mlops_fsxn_s3_integration_1.png[AWS SageMaker Notebook Instance console]
 . In the creation page,
 Enter the *Notebook instance name*
 Expand the *Network* panel
-Leave other entries default and select a *VPC*, *Subnet*, and *Security group(s)*. (This *VPC* and *Subnet* will be used to create FSxN file system later)
+Leave other entries default and select a *VPC*, *Subnet*, and *Security group(s)*. (This *VPC* and *Subnet* will be used to create FSx ONTAP file system later)
 Click the orange button *Create notebook instance* at the bottom right.
 +
 image:mlops_fsxn_s3_integration_2.png[Create notebook instance]
 
-==== Create an FSxN File System
+==== Create an FSx ONTAP File System
 . Open AWS console. In the search panel, search Fsx and click the service *FSx*.
 +
 image:mlops_fsxn_s3_integration_3.png[FSx Panel]
 . Click *Create file system*.
 +
 image:mlops_fsxn_s3_integration_4.png[Create file system]
-. Select the first card *FSx for NetApp ONTAP* and click *Next*.
+. Select the first card *FSx ONTAP* and click *Next*.
 +
 image:mlops_fsxn_s3_integration_5.png[Select file system type]
 . In the details configuration page.
@@ -88,12 +88,12 @@ image:mlops_fsxn_s3_integration_15.png[AWS SageMaker Notebook instance console]
 . In the Jupyter Lab page, open a new *Terminal*.
 +
 image:mlops_fsxn_s3_integration_16.png[Jupyter Lab welcome page]
-. Enter the ssh command ssh <admin user name>@<ONTAP server IP> to login to the FSxN ONTAP file system. (The user name and IP address are retrieved from the step 2)
+. Enter the ssh command ssh <admin user name>@<ONTAP server IP> to login to the FSx ONTAP file system. (The user name and IP address are retrieved from the step 2)
 Please use the password used when creating the *Storage virtual machine*.
 +
 image:mlops_fsxn_s3_integration_17.png[Jupyter Lab terminal]
 . Execute the commands in the following order.
-We use *fsxn-ontap* as the name for the *FSxN private S3 bucket name*.
+We use *fsxn-ontap* as the name for the *FSx ONTAP private S3 bucket name*.
 Please use the *storage virtual machine name* for the *-vserver* argument.
 +
 [source,bash]
@@ -109,7 +109,7 @@ vserver object-store-server bucket create fsxn-ontap -vserver fsxn-svm-demo -typ
 +
 image:mlops_fsxn_s3_integration_18.png[Jupyter Lab terminal output]
 
-. Execute the below commands to retrieve the endpoint IP and credentials for FSxN private S3.
+. Execute the below commands to retrieve the endpoint IP and credentials for FSx ONTAP private S3.
 +
 [source,bash]
 ----
@@ -128,7 +128,7 @@ image:mlops_fsxn_s3_integration_19.png[Jupyter Lab terminal]
 . In SageMaker Notebook instance, create a new Jupyter notebook.
 +
 image:mlops_fsxn_s3_integration_20.png[Open a new Jupyter notebook]
-. Use the below code as a work around solution to upload files to FSxN private S3 bucket.
+. Use the below code as a work around solution to upload files to FSx ONTAP private S3 bucket.
 For a comprehensive code example please refer to this notebook.
 link:https://nbviewer.jupyter.org/github/NetAppDocs/netapp-solutions/blob/main/media/mlops_fsxn_s3_integration_0.ipynb[fsxn_demo.ipynb]
 +
@@ -140,7 +140,7 @@ seed: int = 77                                              # Random seed
 bucket_name: str = 'fsxn-ontap'                             # The bucket name in ONTAP
 aws_access_key_id = '<Your ONTAP bucket key id>'            # Please get this credential from ONTAP
 aws_secret_access_key = '<Your ONTAP bucket access key>'    # Please get this credential from ONTAP
-fsx_endpoint_ip: str = '<Your FSxN IP address>'             # Please get this IP address from FSXN
+fsx_endpoint_ip: str = '<Your FSx ONTAP IP address>'        # Please get this IP address from FSx ONTAP
 # -------- Manual configurations --------
 
 # Workaround
@@ -149,17 +149,17 @@ fsx_endpoint_ip: str = '<Your FSxN IP address>'             # Please get this IP
 !sudo mount -t nfs $fsx_endpoint_ip:/vol1 /home/ec2-user/SageMaker/vol1
 !sudo chmod 777 /home/ec2-user/SageMaker/vol1
 
-## Authentication for FSxN as a Private S3 Bucket
+## Authentication for FSx ONTAP as a Private S3 Bucket
 !aws configure set aws_access_key_id $aws_access_key_id
 !aws configure set aws_secret_access_key $aws_secret_access_key
 
-## Upload file to the FSxN Private S3 Bucket
+## Upload file to the FSx ONTAP Private S3 Bucket
 %%capture
 local_file_path: str = <Your local file path>
 
 !aws s3 cp --endpoint-url http://$fsx_endpoint_ip /home/ec2-user/SageMaker/$local_file_path  s3://$bucket_name/$local_file_path
 
-# Read data from FSxN Private S3 bucket
+# Read data from FSx ONTAP Private S3 bucket
 ## Initialize a s3 resource client
 import boto3
 
@@ -189,22 +189,22 @@ bucket = s3_client.Bucket(bucket_name)
 binary_data = bucket.Object(data.filename).get()['Body']
 ----
 
-This concludes the integration between FSxN and the SageMaker instance.
+This concludes the integration between FSx ONTAP and the SageMaker instance.
 
 == Useful debugging checklist
-* Ensure that the SageMaker Notebook instance and FSxN file system are in the same VPC.
+* Ensure that the SageMaker Notebook instance and FSx ONTAP file system are in the same VPC.
 * Remember to run the *set dev* command on ONTAP to set the privilege level to *dev*.
 
 == FAQ (As of Sep 27, 2023)
-Q: Why am I getting the error "*An error occurred (NotImplemented) when calling the CreateMultipartUpload operation: The s3 command you requested is not implemented*" when uploading files to FSxN?
+Q: Why am I getting the error "*An error occurred (NotImplemented) when calling the CreateMultipartUpload operation: The s3 command you requested is not implemented*" when uploading files to FSx ONTAP?
 
-A: As a private S3 bucket, FSxN supports uploading files up to 100MB. When using the S3 protocol, files larger than 100MB are divided into 100MB chunks, and the 'CreateMultipartUpload' function is called. However, the current implementation of FSxN private S3 does not support this function.
+A: As a private S3 bucket, FSx ONTAP supports uploading files up to 100MB. When using the S3 protocol, files larger than 100MB are divided into 100MB chunks, and the 'CreateMultipartUpload' function is called. However, the current implementation of FSx ONTAP private S3 does not support this function.
 
-Q: Why am I getting the error "*An error occurred (AccessDenied) when calling the PutObject operations: Access Denied*" when uploading files to FSxN?
+Q: Why am I getting the error "*An error occurred (AccessDenied) when calling the PutObject operations: Access Denied*" when uploading files to FSx ONTAP?
 
-A: To access the FSxN private S3 bucket from a SageMaker Notebook instance, switch the AWS credentials to the FSxN credentials. However, granting write permission to the instance requires a workaround solution that involves mounting the bucket and running the 'chmod' shell command to change the permissions.
+A: To access the FSx ONTAP private S3 bucket from a SageMaker Notebook instance, switch the AWS credentials to the FSx ONTAP credentials. However, granting write permission to the instance requires a workaround solution that involves mounting the bucket and running the 'chmod' shell command to change the permissions.
 
-Q: How can I integrate the FSxN private S3 bucket with other SageMaker ML services?
+Q: How can I integrate the FSx ONTAP private S3 bucket with other SageMaker ML services?
 
-A: Unfortunately, the SageMaker services SDK does not provide a way to specify the endpoint for the private S3 bucket. As a result, FSxN S3 is not compatible with SageMaker services such as Sagemaker Data Wrangler, Sagemaker Clarify, Sagemaker Glue, Sagemaker Athena, Sagemaker AutoML, and others.
+A: Unfortunately, the SageMaker services SDK does not provide a way to specify the endpoint for the private S3 bucket. As a result, FSx ONTAP S3 is not compatible with SageMaker services such as Sagemaker Data Wrangler, Sagemaker Clarify, Sagemaker Glue, Sagemaker Athena, Sagemaker AutoML, and others.
 
