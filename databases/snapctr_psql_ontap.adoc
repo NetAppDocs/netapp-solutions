@@ -254,39 +254,106 @@ image:snapctr_psql_bkup_19.png["This image provides database backup for SnapCent
 
 ====
 
-Database recovery via SnapCenter restores a snapshot copy of the database volume image point-in-time. The database is then rolled forward to a desired point by SCN/timestamp or a point as allowed by available archive logs in the backup set. The following section demonstrates the workflow of database recovery with SnapCenter UI. 
+In this database recovery demonstration, we showcase a point-in-time recovery of the PostgreSQL database cluster. First, create a SnapShot backup of database volume on ONTAP storage using SnapCenter. Then, login to the database, create a test table, write down the time stamp, and drop the test table. Now initiate a recovery from the backup and pass the timestamp when the test table is created to recover the dropped table. The following captures the details of the workflow and validation of PostgreSQL database recovery with SnapCenter UI. 
 
-. From `Resources` tab, open the database `Primary Backup(s)` page. Choose the snapshot of database data volume, then click on `Restore` button to launch database recovery workflow. Note the SCN number or timestamp in the backup sets if you like to run the recovery by Oracle SCN or timestamp.
+. Login to PostgreSQL as `postgres` user. Create, then drop a test table.
 +
-image:snapctr_ora_azure_anf_restore_01.png["This image provides database restore for SnapCenter server"]
+....
+postgres=# \dt
+Did not find any relations.
 
-. Select `Restore Scope`. For a container database, SnapCenter is flexible to perform a full container database (All Datafiles), pluggable databases, or tablespaces level restore. 
-+
-image:snapctr_ora_azure_anf_restore_02.png["This image provides database restore for SnapCenter server"]
 
-. Select `Recovery Scope`. `All logs` means to apply all available archive logs in the backup set. Point-in-time recovery by SCN or timestamp are also available.
-+
-image:snapctr_ora_azure_anf_restore_03.png["This image provides database restore for SnapCenter server"] 
+postgres=# create table test (id integer, dt timestamp, event varchar(100));
+CREATE TABLE
+postgres=# \dt
+        List of relations
+ Schema | Name | Type  |  Owner
+--------+------+-------+----------
+ public | test | table | postgres
+(1 row)
 
-. The `PreOps` allows execution of scripts against database before restore/recovery operation.
-+
-image:snapctr_ora_azure_anf_restore_04.png["This image provides database restore for SnapCenter server"]
+postgres=# insert into test values (1, now(), 'test PostgreSQL point in time recovery with SnapCenter');
+INSERT 0 1
 
-. The `PostOps` allows execution of scripts against database after restore/recovery operation.
+postgres=# select * from test;
+ id |             dt             |                         event
+----+----------------------------+--------------------------------------------------------
+  1 | 2024-10-08 17:55:41.657728 | test PostgreSQL point in time recovery with SnapCenter
+(1 row)
+
+postgres=# drop table test;
+DROP TABLE
+postgres=# \dt
+Did not find any relations.
+
+postgres=# select current_time;
+    current_time
+--------------------
+ 17:59:20.984144+00
+
+....
+
+. From `Resources` tab, open the database backup page. Select the SnapShot backup to be restored. Then, click on `Restore` button to launch database recovery workflow. Note the timestamp of the backup when perform a point-in-time recovery.
 +
-image:snapctr_ora_azure_anf_restore_05.png["This image provides database restore for SnapCenter server"]
+image:snapctr_psql_restore_01.png["This image provides database restore for SnapCenter server"]
+
+. Select `Restore scope`. AT this moment, a complete resource is only option.
++
+image:snapctr_psql_restore_02.png["This image provides database restore for SnapCenter server"]
+
+. For `Recovery Scope`, choose `Recover to point in time` and input the timestamp that recovery is rolled forward up to.
++
+image:snapctr_psql_restore_03.png["This image provides database restore for SnapCenter server"] 
+
+. The `PreOps` allows execution of scripts against database before restore/recovery operation or just leave it black.
++
+image:snapctr_psql_restore_04.png["This image provides database restore for SnapCenter server"]
+
+. The `PostOps` allows execution of scripts against database after restore/recovery operation or just leave it black.
++
+image:snapctr_psql_restore_05.png["This image provides database restore for SnapCenter server"]
 
 . Notification via email if desired.
 +
-image:snapctr_ora_azure_anf_restore_06.png["This image provides database restore for SnapCenter server"]
+image:snapctr_psql_restore_06.png["This image provides database restore for SnapCenter server"]
 
-. Restore job summary
+. Review job summary and `Finish` to start restore job.
 +
-image:snapctr_ora_azure_anf_restore_07.png["This image provides database restore for SnapCenter server"]
+image:snapctr_psql_restore_07.png["This image provides database restore for SnapCenter server"]
 
 . Click on running job to open `Job Details` window. The job status can also be opened and viewed from the `Monitor` tab.
 +
-image:snapctr_ora_azure_anf_restore_08.png["This image provides database restore for SnapCenter server"]
+image:snapctr_psql_restore_08.png["This image provides database restore for SnapCenter server"]
+
+. Login to PostgreSQL as `postgres` user and validate that the test table has been recovered.
++
+....
+
+[postgres@psql01 ~]$ psql
+psql (14.13)
+Type "help" for help.
+
+postgres=# \dt
+        List of relations
+ Schema | Name | Type  |  Owner
+--------+------+-------+----------
+ public | test | table | postgres
+(1 row)
+
+postgres=# select * from test;
+ id |             dt             |                         event
+----+----------------------------+--------------------------------------------------------
+  1 | 2024-10-08 17:55:41.657728 | test PostgreSQL point in time recovery with SnapCenter
+(1 row)
+
+postgres=# select now();
+              now
+-------------------------------
+ 2024-10-08 18:22:33.767208+00
+(1 row)
+
+
+....
 
 ====
 
