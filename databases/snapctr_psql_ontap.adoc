@@ -2,7 +2,7 @@
 sidebar: sidebar
 permalink: databases/snapctr_psql_ontap.html
 keywords: Database, PostgreSQL, ONTAP, backup, recovery, clone, SnapCenter
-summary: "The solution provides an overview and details for PostgreSQL database backup, restore, and clone on ONTAP storage in the public cloud or on-premises via the NetApp SnapCenter database management UI tool." 
+summary: "The solution provides an overview and details for PostgreSQL database backup, recovery, and clone on ONTAP storage in the public cloud or on-premises via the NetApp SnapCenter database management UI tool." 
 ---
 
 = TR-5000: PostgreSQL Database Backup, Recovery, and Clone on ONTAP with SnapCenter
@@ -15,7 +15,7 @@ summary: "The solution provides an overview and details for PostgreSQL database 
 Allen Cao, Niyaz Mohamed, NetApp
 
 [.lead]
-The solution provides an overview and details for PostgreSQL database backup, restore, and clone on ONTAP storage in the public cloud or on-premises via the NetApp SnapCenter database management UI tool.
+The solution provides an overview and details for PostgreSQL database backup, recovery, and clone on ONTAP storage in the public cloud or on-premises via the NetApp SnapCenter database management UI tool.
 
 == Purpose
 
@@ -108,11 +108,11 @@ The following sections provide step-by-step procedures for SnapCenter deployment
 
 ====
 
-We recommend to go through online link:https://docs.netapp.com/us-en/snapcenter/index.html[SnapCenter Software documentation^] before proceeding to SnapCenter installation and configuration: . Following provides a high level summary of steps for installation and setup of SnapCenter software for Oracle on Azure ANF. 
+We recommend to go through online link:https://docs.netapp.com/us-en/snapcenter/index.html[SnapCenter Software documentation^] before proceeding to SnapCenter installation and configuration: . Following provides a high level summary of steps for installation and setup of SnapCenter software for PostgreSQL on ONTAP. 
 
 . From SnapCenter Windows server, download and install latest java JDK from link:https://www.java.com/en/[Get Java for desktop applications^]. Turn off Windows firewall.
 
-. From SnapCenter Windows server, download and install or update SnapCenter Windows prerequisites: PowerShell - PowerShell-7.4.3-win-x64.msi and .Net hosting package - dotnet-hosting-8.0.6-win.
+. From SnapCenter Windows server, download and install or update SnapCenter 6.0 Windows prerequisites: PowerShell - PowerShell-7.4.3-win-x64.msi and .Net hosting package - dotnet-hosting-8.0.6-win.
 
 . From SnapCenter Windows server, download and install latest version (currently 6.0) of SnapCenter installation executable from NetApp support site: link:https://mysupport.netapp.com/site/[NetApp | Support^].
 
@@ -147,8 +147,12 @@ image:snapctr_ora_azure_anf_setup_07.png["This image provides Roles for SnapCent
 . From `Settings-Credential`, create credentials for SnapCenter management targets. In this demo use case, they are linux user admin for login to DB server VM and postgres credential for PostgreSQL access.
 +
 image:snapctr_psql_setup_host_01.png["This image provides Credentials for SnapCenter server"]
++
+[NOTE]
 
-. From `Storage Systems` tab, add `ONTAP cluster` with ONTAP cluster admin credential. For Azure NetApp Files, you will need to create a specific credential for for capacity pool access.  
+Reset PostgreSQL user postgres password before creating the credential. 
+
+. From `Storage Systems` tab, add `ONTAP cluster` with ONTAP cluster admin credential. For Azure NetApp Files, you will need to create a specific credential for capacity pool access.  
 +
 image:snapctr_psql_setup_ontap_01.png["This image provides Azure NetApp Files for SnapCenter server"]
 image:snapctr_psql_setup_ontap_02.png["This image provides Azure NetApp Files for SnapCenter server"]
@@ -238,7 +242,7 @@ image:snapctr_psql_bkup_15.png["This image provides database backup for SnapCent
 +
 image:snapctr_psql_bkup_16.png["This image provides database backup for SnapCenter server"]
 
-. Backup is executed according to the backup schedule or from cluster backup topology, click on `Backup Now` to trigger a on-demand backup.
+. Backup is executed according to the backup schedule or from cluster backup topology, click on `Backup Now` to trigger a manual on-demand backup.
 +
 image:snapctr_psql_bkup_17_1.png["This image provides database backup for SnapCenter server"]
 image:snapctr_psql_bkup_17.png["This image provides database backup for SnapCenter server"]
@@ -254,7 +258,7 @@ image:snapctr_psql_bkup_19.png["This image provides database backup for SnapCent
 
 ====
 
-In this database recovery demonstration, we showcase a point-in-time recovery of the PostgreSQL database cluster. First, create a SnapShot backup of database volume on ONTAP storage using SnapCenter. Then, login to the database, create a test table, write down the time stamp, and drop the test table. Now initiate a recovery from the backup and pass the timestamp when the test table is created to recover the dropped table. The following captures the details of the workflow and validation of PostgreSQL database recovery with SnapCenter UI. 
+In this database recovery demonstration, we showcase a point-in-time recovery of the PostgreSQL database cluster. First, create a SnapShot backup of database volume on ONTAP storage using SnapCenter. Then, login to the database, create a test table, write down the time stamp, and drop the test table. Now initiate a recovery from the backup up to the timestamp when the test table is created to recover the dropped table. The following captures the details of the workflow and validation of PostgreSQL database point-in-time recovery with SnapCenter UI. 
 
 . Login to PostgreSQL as `postgres` user. Create, then drop a test table.
 +
@@ -293,7 +297,7 @@ postgres=# select current_time;
 
 ....
 
-. From `Resources` tab, open the database backup page. Select the SnapShot backup to be restored. Then, click on `Restore` button to launch database recovery workflow. Note the timestamp of the backup when perform a point-in-time recovery.
+. From `Resources` tab, open the database backup page. Select the SnapShot backup to be restored. Then, click on `Restore` button to launch database recovery workflow. Note the timestamp of the backup when performing a point-in-time recovery.
 +
 image:snapctr_psql_restore_01.png["This image provides database restore for SnapCenter server"]
 
