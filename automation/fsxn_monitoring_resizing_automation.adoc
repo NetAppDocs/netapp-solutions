@@ -1,11 +1,11 @@
 ---
 sidebar: sidebar
 permalink: automation/fsxn_monitoring_resizing_automation.html
-keywords: AWS, FSX, FSxN, automation, FSxN monitoring, FSxN automation, FSxN resizing, FSx for NetApp ONTAP monitoring, FSx for ONTAP monitoring
-summary: This page describes the automation around monitoring AWS FSxN and auto-resizing based on threshold. 
+keywords: AWS, FSX, FSx ONTAP, automation, FSx ONTAP monitoring, FSx ONTAP automation, FSx ONTAP resizing, FSx ONTAP monitoring, FSx ONTAP monitoring
+summary: This page describes the automation around monitoring AWS FSx ONTAP and auto-resizing based on threshold. 
 ---
 
-= FSx for ONTAP Monitoring and Auto-Resizing using AWS Lambda Function
+= FSx ONTAP Monitoring and Auto-Resizing using AWS Lambda Function
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -13,13 +13,13 @@ summary: This page describes the automation around monitoring AWS FSxN and auto-
 :imagesdir: ../media/
 
 [.lead]
-This page describes the automation around monitoring AWS FSxN and auto-resizing based on threshold. 
+This page describes the automation around monitoring AWS FSx ONTAP and auto-resizing based on threshold. 
 
-== Overview: Monitoring and Auto-Resizing FSx for ONTAP via AWS Lambda function
+== Overview: Monitoring and Auto-Resizing FSx ONTAP via AWS Lambda function
 
-FSx for ONTAP is a first-party enterprise-grade cloud storage service available on AWS that provides highly reliable, scalable, high-performing and feature-rich file storage built on the popular NetApp ONTAP file system. 
+FSx ONTAP is a first-party enterprise-grade cloud storage service available on AWS that provides highly reliable, scalable, high-performing and feature-rich file storage built on the popular NetApp ONTAP file system. 
 
-FSx for ONTAP provides a seamless deployment and management experience. No storage expertise is required to get started. To simplify monitoring, an AWS lambda function (to automate resizing of total storage capacity, volume size or LUN size based on threshold) can be used.  This document provides a step-by-step guide to creating an automated setup that monitors FSx for ONTAP at regular intervals, notifies and resizes when a user-specified threshold is crossed and notifies the administrator of the resizing activity. 
+FSx ONTAP provides a seamless deployment and management experience. No storage expertise is required to get started. To simplify monitoring, an AWS lambda function (to automate resizing of total storage capacity, volume size or LUN size based on threshold) can be used.  This document provides a step-by-step guide to creating an automated setup that monitors FSx ONTAP at regular intervals, notifies and resizes when a user-specified threshold is crossed and notifies the administrator of the resizing activity. 
 
 .Features
 [%collapsible]
@@ -27,7 +27,7 @@ FSx for ONTAP provides a seamless deployment and management experience. No stora
 The solution provides the following features:
 
 * Ability to monitor:
-** Usage of overall Storage Capacity of FSx for ONTAP
+** Usage of overall Storage Capacity of FSx ONTAP
 ** Usage of each volume (thin provisioned / thick provisioned)
 ** Usage of each LUN (thin provisioned / thick provisioned)
 * Ability to resize any of the above when a user-defined threshold is breached
@@ -37,7 +37,7 @@ The solution provides the following features:
 * Ability to monitor the checks at a regular interval
 * Ability to use the solution with or without internet access
 * Ability to deploy manually or using AWS CloudFormation Template
-* Ability to monitor multiple FSx for ONTAP filesystems in a single VPC
+* Ability to monitor multiple FSx ONTAP filesystems in a single VPC
 =====
 
 .Pre-requisites
@@ -45,15 +45,15 @@ The solution provides the following features:
 =====
 Before you begin, ensure that the following prerequisites are met: 
 
-* FSx for ONTAP is deployed
-* Private subnet with connectivity to FSx for ONTAP
-* "fsxadmin" password has been set for FSx for ONTAP
+* FSx ONTAP is deployed
+* Private subnet with connectivity to FSx ONTAP
+* "fsxadmin" password has been set for FSx ONTAP
 =====
 
 .High-Level Architecture
 [%collapsible]
 =====
-* AWS Lambda Function makes API calls to FSx for ONTAP for retrieving and updating the size of Storage Capacity, Volumes and LUNs. 
+* AWS Lambda Function makes API calls to FSx ONTAP for retrieving and updating the size of Storage Capacity, Volumes and LUNs. 
 * "fsxadmin" password stored as secure string in AWS SSM Parameter Store for an added layer of security.
 * AWS SES (Simple Email Service) is used to notify end-users when a resizing event occurs.
 * If deploying the solution in a VPC without internet access, VPC Endpoints for AWS SSM, FSx and SES are set up to allow Lambda to reach these services via AWS internal network.
@@ -65,7 +65,7 @@ image:fsxn-monitoring-resizing-architecture.png[This image depicts the high-leve
 
 === Automated Deployment
 
-NOTE: Covers single FSx for ONTAP filesystem.  
+NOTE: Covers single FSx ONTAP filesystem.  
 
 Follow the series of steps to complete the automated deployment of this solution:
 
@@ -141,7 +141,7 @@ image:fsxn-monitoring-resizing-email-2.png[This image depicts the Email Notifica
 
 === Manual Deployment
 
-NOTE: Supports monitoring multiple FSx for ONTAP filesystems in a single VPC.  
+NOTE: Supports monitoring multiple FSx ONTAP filesystems in a single VPC.  
 
 Follow the series of steps to complete the manual deployment of this solution:
 
@@ -177,10 +177,10 @@ Tier: Standard
 Type: SecureString
 KMS key source: My current account
   KMS Key ID: <Use the default one selected>
-Value: <Enter the password for "fsxadmin" user configured on FSx for ONTAP>
+Value: <Enter the password for "fsxadmin" user configured on FSx ONTAP>
 ----
 Click on *Create parameter*.
-Repeat the above steps for all FSx for ONTAP filesystems to be monitored.
+Repeat the above steps for all FSx ONTAP filesystems to be monitored.
 
 image:fsxn-monitoring-resizing-ssm-parameter.png[This image depicts the SSM parameter creation window on AWS console.]
 
@@ -231,7 +231,7 @@ image:fsxn-monitoring-resizing-vpc-endpoint-create-2.png[This image depicts the 
 .Step 6: Create and setup the AWS Lambda Function
 [%collapsible]
 =====
-. Navigate to AWS Console > *AWS Lambda* > *Functions* and click on *Create function* in the same region as FSx for ONTAP
+. Navigate to AWS Console > *AWS Lambda* > *Functions* and click on *Create function* in the same region as FSx ONTAP
 
 . Use the default *Author from scratch* and update the following fields:
 +
@@ -242,7 +242,7 @@ Architecture: x86_64
 Permissions: Select "Create a new role with basic Lambda permissions"
 Advanced Settings:
   Enable VPC: Checked
-    VPC: <Choose either the same VPC as FSx for ONTAP or a VPC that can access both FSx for ONTAP and the internet via a private subnet>
+    VPC: <Choose either the same VPC as FSx ONTAP or a VPC that can access both FSx ONTAP and the internet via a private subnet>
     Subnets: <Choose 2 private subnets that have NAT gateway attached pointing to public subnets with internet gateway and subnets that have internet access>
     Security Group: <Choose a Security Group>
 ----
@@ -282,11 +282,11 @@ image:fsxn-monitoring-resizing-layers-added.png[This image depicts the added lay
 +
 |===
 | *Name* | *Type* | *Description*
-| *fsxList* | List | (Required) List of all FSx for ONTAP filesystems to be monitored. 
+| *fsxList* | List | (Required) List of all FSx ONTAP filesystems to be monitored. 
 Include all the file systems in the list for monitoring and auto-resizing.
-| *fsxMgmtIp* | String | (Required) Enter the "Management endpoint - IP address" from the FSx for ONTAP console on AWS.
-| *fsxId* | String | (Required) Enter the "File system ID" from the FSx for ONTAP console on AWS.
-| *username* | String | (Required) Enter the FSx for ONTAP "ONTAP administrator username" from FSx for ONTAP console on AWS. 
+| *fsxMgmtIp* | String | (Required) Enter the "Management endpoint - IP address" from the FSx ONTAP console on AWS.
+| *fsxId* | String | (Required) Enter the "File system ID" from the FSx ONTAP console on AWS.
+| *username* | String | (Required) Enter the FSx ONTAP "ONTAP administrator username" from FSx ONTAP console on AWS. 
 | *resize_threshold* | Integer | (Required) Enter the threshold percentage from 0-100. This threshold will be used to measure Storage Capacity, Volume and LUN usage and when the % use of any increases above this threshold, resize activity will occur.
 | *fsx_password_ssm_parameter* | String | (Required) Enter the path name used in AWS Parameter Store for storing "fsxadmin" password.
 | *warn_notification* | Bool | (Required) Set this variable to True to receive a notification when Storage Capacity/Volume/LUN usage exceeds 75% but is less than the threshold.
@@ -321,5 +321,5 @@ image:fsxn-monitoring-resizing-eventbridge.png[This image depicts the event brid
 
 == Conclusion
 
-With the provided solution, it is easy to set up a monitoring solution that regularly monitors FSx for ONTAP Storage, resizes it based on a user-specified threshold and provides an alerting mechanism. This makes the process of using and monitoring FSx for ONTAP seamless freeing up administrators to focus on business-critical activities while storage grows automatically when required.
+With the provided solution, it is easy to set up a monitoring solution that regularly monitors FSx ONTAP Storage, resizes it based on a user-specified threshold and provides an alerting mechanism. This makes the process of using and monitoring FSx ONTAP seamless freeing up administrators to focus on business-critical activities while storage grows automatically when required.
 

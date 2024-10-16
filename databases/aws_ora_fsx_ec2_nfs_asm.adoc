@@ -21,11 +21,11 @@ This solution provides overview and details for Oracle database deployment and p
 
 ASM (Automatic Storage Management) is a popular Oracle storage volume manager that is employed in many Oracle installations. It is also Oracle's recommended storage management solution. It provides an alternative to conventional volume managers and file systems. Since Oracle version 11g, ASM has been packaged with grid infrastructure rather than a database. As a result, in order to utilize Oracle ASM for storage management without RAC, you must install Oracle grid infrastructure in a standalone server, also known as Oracle Restart. Doing so certainly adds more complexity in an otherwise simpler Oracle database deployment. However, as the name implies, when Oracle is deployed in Restart mode, any failed Oracle services are restarted after a host reboot without user intervention, which provides a certain degree of high availability or HA functionality.
 
-Oracle ASM is generally deployed in FC, iSCSI storage protocols and luns as raw storage devices. However, ASM on NFS protocol and NFS file system is also supported configuration by Oracle. In this documentation, we demonstrate how to deploy an Oracle 19c database with the NFS protocol and Oracle ASM in an Amazon FSx for ONTAP storage environment with EC2 compute instances. We also demonstrate how to use the NetApp SnapCenter service through the NetApp BlueXP console to backup, restore, and clone your Oracle database for dev/test or other use cases for storage-efficient database operation in the AWS public cloud.  
+Oracle ASM is generally deployed in FC, iSCSI storage protocols and luns as raw storage devices. However, ASM on NFS protocol and NFS file system is also supported configuration by Oracle. In this documentation, we demonstrate how to deploy an Oracle 19c database with the NFS protocol and Oracle ASM in an Amazon FSx ONTAP storage environment with EC2 compute instances. We also demonstrate how to use the NetApp SnapCenter service through the NetApp BlueXP console to backup, restore, and clone your Oracle database for dev/test or other use cases for storage-efficient database operation in the AWS public cloud.  
 
 This solution addresses the following use cases:
 
-* Oracle database deployment in Amazon FSx for ONTAP storage and EC2 compute instances with NFS/ASM 
+* Oracle database deployment in Amazon FSx ONTAP storage and EC2 compute instances with NFS/ASM 
 * Testing and validating an Oracle workload in the public AWS cloud with NFS/ASM
 * Testing and validating Oracle database Restart functionalities deployed in AWS
 
@@ -68,7 +68,7 @@ image:aws_ora_fsx_ec2_nfs_asm_architecture.png["This image provides a detailed p
 
 * *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi-zone deployment further enhances high availability in the event of failure in a single AWS zone. 
 
-* *FSx storage cluster sizing.* An Amazon FSx for ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
+* *FSx storage cluster sizing.* An Amazon FSx ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
 
 * *Oracle data and logs layout.* In our tests and validations, we deployed two ASM disk groups for data and logs respectively. Within the +DATA asm disk group, we provisioned four disks in a data NFS file system mount point. Within the +LOGS asm disk group, we provisioned two disks in a logs NFS file system mount point. For large database deployment, ASM disk groups can be built to span multiple FSx file systems with ASM NFS disks distributed through multiple NFS mount points anchored on FSx file systems. This particular setup is designed to meet database throughput over 4GBps throughput and 160,000 raw SSD IOPS requirement.   
 
@@ -92,7 +92,7 @@ Deployment requires the following prerequisites.
 
 . From the AWS EC2 console, you must deploy two EC2 Linux instances, one as the primary Oracle DB server and an optional alternative clone target DB server. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
 
-. From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host the Oracle database volumes. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
+. From the AWS EC2 console, deploy Amazon FSx ONTAP storage HA clusters to host the Oracle database volumes. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx ONTAP file systems^] for step-by-step instructions.
 
 . Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution.
 +
@@ -919,7 +919,7 @@ NAME                           STATE       ALLOCATION_UNIT_SIZE   TOTAL_MB    FR
 DATA                           MOUNTED                  4194304      81920      73536
 LOGS                           MOUNTED                  4194304      81920      81640
 
-This completes Oracle 19c version 19.18 Restart deployment on an Amazon FSx for ONTAP and EC2 compute instance with NFS/ASM. If desired, NetApp recommends relocating the Oracle control file and online log files to the +LOGS disk group. 
+This completes Oracle 19c version 19.18 Restart deployment on an Amazon FSx ONTAP and EC2 compute instance with NFS/ASM. If desired, NetApp recommends relocating the Oracle control file and online log files to the +LOGS disk group. 
 ....
 
 ====
@@ -945,7 +945,7 @@ link:https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/install
 link:https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/installing-and-configuring-oracle-database-using-response-files.html#GUID-D53355E9-E901-4224-9A2A-B882070EDDF7[https://docs.oracle.com/en/database/oracle/oracle-database/19/ladbi/installing-and-configuring-oracle-database-using-response-files.html#GUID-D53355E9-E901-4224-9A2A-B882070EDDF7^]
 
 
-* Amazon FSx for NetApp ONTAP
+* Amazon FSx ONTAP
 +
 link:https://aws.amazon.com/fsx/netapp-ontap/[https://aws.amazon.com/fsx/netapp-ontap/^]
 
