@@ -1,0 +1,97 @@
+---
+sidebar: sidebar
+permalink: containers/rh-os-n_use_case_openshift_virtualization_deployment_rosa_initial_setup.html
+keywords: OpenShift, OCP, Trident, NetApp ONTAP, Red Hat OpenShift, OpenShift Virtualization, ROSA, CNV, Container Native Virtualization, Red Hat OpenShift Virtualization
+summary: Red Hat OpenShift Virtualization on ROSA
+---
+
+= Initial Setup 
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media/
+
+[.lead]
+This section shows how to set up the default storage class to be trident-csi and the default VolumeSnapshotClass to be the FSx Volume Snapshot class. 
+Then it shows how to create a VM from a template  and then connect and login to it using the guest credentials.
+
+
+Ensure default Storage Class is set to trident-csi
+image:redhat_openshift_ocpv_rosa_image1.png[OCP-v default storage Class]
+
+Ensure default VolumeSnapShotClasses is set as shown
+image:redhat_openshift_ocpv_rosa_image2.png[OCP-v default VolumeSnapshot Class]
+
+If the defaults are not set, you can set it up either from the console or from command line
+[source, cli]
+$ oc patch storageclass trident-csi -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
+
+[source, cli]
+$ oc patch VolumeSnapshotClasses fsx-snapclass -p '{"metadata": {"annotations": {"snapshot.storage.kubernetes.io/is-default-class": "true"}}}'
+
+= Create a VM from the template
+
+Use the web console to create a VM from a template.
+From the RedHat OpenShiftService on AWS console, create a virtual machine. There are templates available on the cluster that can be used to create the VM.
+In the screenshot below, we choose fedora VM from this list. Give the VM a name,and then click on **Customize Virtual Machine**. Select the **Disks** tab and click on **Add disks**.
+Change the name of the disk preferably to something meaningful, ensure that **trident-csi** is selected for storage class. Click on **Save**. Click on **Create VirtualMachine**
+
+After a few minutes, the VM is in the running state
+image:redhat_openshift_ocpv_rosa_image3.png[OCP-v Create VM from template]
+
+image:redhat_openshift_ocpv_rosa_image4.png[OCP-v template sources available]
+
+image:redhat_openshift_ocpv_rosa_image5.png[OCP-v Customize VM]
+
+image:redhat_openshift_ocpv_rosa_image6.png[OCP-v Disks tab]
+
+image:redhat_openshift_ocpv_rosa_image7.png[OCP-v Add disk]
+
+image:redhat_openshift_ocpv_rosa_image8.png[OCP-v VM running]
+
+= Review all the objects created for the VM
+
+The storage disks.
+image:redhat_openshift_ocpv_rosa_image9.png[OCP-v Storage Disks]
+
+The file systems of the VM will show the Partitions, File system type and the Mount points.
+image:redhat_openshift_ocpv_rosa_image10.png[OCP-v FileSystems]
+
+2 PVCs are created for the VM, one from the boot disk and one for the hot plug disk.
+image:redhat_openshift_ocpv_rosa_image11.png[OCP-v VM PVCs]
+
+The PVC for the boot disk shows that the Access mode is ReadWriteMany, and the Storage Class is trident-csi.
+image:redhat_openshift_ocpv_rosa_image12.png[OCP-v VM boot disk PVC]
+
+Similarly, the PVC for the hot-plug disk shows that the Access mode is ReadWriteMany, and the Storage Class is trident-csi.
+image:redhat_openshift_ocpv_rosa_image13.png[OCP-v VM hotplug disk PVC]
+
+In the screenshot below we can see that the pod for the VM has a Status of Running.
+image:redhat_openshift_ocpv_rosa_image14.png[OCP-v VM running]
+
+Here we can see the two Volumes associated with the VM pod and the 2 PVCs associated with them.
+image:redhat_openshift_ocpv_rosa_image15.png[OCP-v VM PVCs and PVs]
+
+= Connect to the VM
+
+Click on ‘Open web console’ button, and login using Guest Credentials
+image:redhat_openshift_ocpv_rosa_image16.png[OCP-v VM connect]
+
+image:redhat_openshift_ocpv_rosa_image17.png[OCP-v login]
+
+Issue the following commands
+
+[source, cli]
+$ df (to display information about the disk space usage on a file system).
+
+[source, cli]
+$ dd if=/dev/urandom of=random.dat bs=1M count=10240 (to create a file called random.dat in the home dir and fill it with random data).
+
+The disk is filled with 11 GB of data.
+image:redhat_openshift_ocpv_rosa_image18.png[OCP-v VM fill the disk]
+
+Use vi to create a sample text file that we will use to test.
+image:redhat_openshift_ocpv_rosa_image19.png[OCP-v create a file]
+
+
