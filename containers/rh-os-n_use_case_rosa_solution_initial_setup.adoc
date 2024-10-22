@@ -20,16 +20,16 @@ summary: Red Hat OpenShift Service on AWS with NetApp ONTAP
 Create a multi-AZ FSx for NetApp ONTAP in the same VPC as the ROSA cluster. There are several ways to do this. The details of creating  FSxN using a CloudFormation Stack are provided
 
 **a.Clone the GitHub  repository**
-[source,cli]
+[source]
 $ git clone https://github.com/aws-samples/rosa-fsx-netapp-ontap.git
 
 **b.Run the CloudFormation Stack**
 Run the command below by replacing the parameter values with your own values:
 
-[source,cli]
+[source]
 $ cd rosa-fsx-netapp-ontap/fsx
 
-[source,cli]
+[source]
 $ aws cloudformation create-stack \
   --stack-name ROSA-FSXONTAP \
   --template-body file://./FSxONTAP.yaml \
@@ -64,14 +64,14 @@ image:redhat_openshift_container_rosa_image2.png[FSxN created]
 
 **2.Install and configure Trident CSI driver for the ROSA cluster**
 
-**a.Add the Astra Trident Helm repository**
+**a.Add the Trident Helm repository**
 
-[source,cli]
+[source]
 $ helm repo add netapp-trident https://netapp.github.io/trident-helm-chart
 
 **b.Install trident using helm**
 
-[source,cli]
+[source]
 $ helm install trident netapp-trident/trident-operator --version 100.2406.0 --create-namespace --namespace trident
 
 NOTE: Depending on the version you install, the version parameter will need to be changed in the command shown. Refer to the link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-helm.html[documentation] for the correct version number. For additional methods of installing Trident, refer to the Trident link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy.html[documentation]. 
@@ -103,11 +103,11 @@ image:redhat_openshift_container_rosa_image4.png[AWS secrets Manager]
 image:redhat_openshift_container_rosa_image5.png[retrieve secret]
 
 **b.Next, add the secret for the SVM credentials to the ROSA cluster using the following command**
-[source,cli]
+[source]
 $ oc apply -f svm_secret.yaml
 
 You can verify that the secret has been added in the trident namespace using the following command
-[source,cli]
+[source]
 $ oc get secrets -n trident |grep backend-fsx-ontap-nas-secret
 
 image:redhat_openshift_container_rosa_image6.png[secret applied]
@@ -119,14 +119,14 @@ For this, move into the **fsx** directory of your cloned Git repository. Open th
 **svm** with the SVM name. Create the backend object using the following command.
 
 Create the backend object using the following command.
-[source,cli]
+[source]
 $ oc apply -f backend-ontap-nas.yaml
 
 NOTE: You can get the Management DNS name, NFS DNS name and the SVM name from the Amazon FSx Console as shown in the screenshot below
 
 image:redhat_openshift_container_rosa_image7.png[get lifs]
 
-**d)Now, run the following command to verify that the backend object has been created and Phase is showing Bound and Status is Success**
+**d. Now, run the following command to verify that the backend object has been created and Phase is showing Bound and Status is Success**
 
 image:redhat_openshift_container_rosa_image8.png[create backend]
 
@@ -180,7 +180,7 @@ image:redhat_openshift_container_rosa_image11.png[create test PVC using Trident]
 **5. Deploy a sample Postgresql stateful application**
 
 **a. Use helm to install postgresql**
-[source,cli]
+[source]
 $ helm install postgresql bitnami/postgresql -n postgresql --create-namespace
 
 image:redhat_openshift_container_rosa_image12.png[install postgresql]
@@ -196,11 +196,11 @@ image:redhat_openshift_container_rosa_image15.png[postgresql pv]
 **c. Deploy a Postgresql client**
 
 **Use the following command to get the password for the postgresql server that was installed.**
-[source,cli]
+[source]
 $ export POSTGRES_PASSWORD=$(kubectl get secret --namespace postgresql postgresql -o jsoata.postgres-password}" | base64 -d)
 
 **Use the following command to run a postgresql client and connect to the  server using the password**
-[source,cli]
+[source]
 $ kubectl run postgresql-client --rm --tty -i --restart='Never' --namespace postgresql --image docker.io/bitnami/postgresql:16.2.0-debian-11-r1 --env="PGPASSWORD=$POSTGRES_PASSWORD" \
 > --command -- psql --host postgresql -U postgres -d postgres -p 5432
 
