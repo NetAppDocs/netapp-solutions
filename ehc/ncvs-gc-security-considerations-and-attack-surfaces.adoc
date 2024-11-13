@@ -47,7 +47,7 @@ Two areas with potential security risks include cluster administration (what hap
 
 Storage provided as a service removes the added risk of exposure to administrators by removing that access to end users outside of the cloud data center. Instead, the only configuration done is for the data access plane by customers. Each tenant manages their own volumes, and no tenant can reach other Google Cloud NetApp Volumes instances. The service is managed by automation, with a very small list of trusted administrators given access to the systems through the processes covered in the section link:ncvs-gc-service-operation.html[“Service operation.”]
 
-The GCNV-Performance service type offers cross-region replication as an option to provide data protection to a different region in the event of a region failure. In those cases, Google Cloud NetApp Volumes can be failed over to the unaffected region to maintain data access.
+The NetApp Volumes-Performance service type offers cross-region replication as an option to provide data protection to a different region in the event of a region failure. In those cases, Google Cloud NetApp Volumes can be failed over to the unaffected region to maintain data access.
 
 === Service upgrades
 
@@ -61,12 +61,12 @@ For information about the administrator team that performs these service upgrade
 
 Data-at-rest encryption is important to protect sensitive data in the event of a disk that is stolen, returned, or repurposed. Data in Google Cloud NetApp Volumes is protected at rest by using software-based encryption.
 
-* Google-generated keys are used for GCNV-SW.
-* For GCNV-Performance, the per-volume keys are stored in a key manager built into Google Cloud NetApp Volumes, which uses NetApp ONTAP CryptoMod to generate AES-256 encryption keys. CryptoMod is listed on the CMVP FIPS 140-2 validated modules list. See https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4144[FIPS 140-2 Cert #4144^].
+* Google-generated keys are used for NetApp Volumes-SW.
+* For NetApp Volumes-Performance, the per-volume keys are stored in a key manager built into Google Cloud NetApp Volumes, which uses NetApp ONTAP CryptoMod to generate AES-256 encryption keys. CryptoMod is listed on the CMVP FIPS 140-2 validated modules list. See https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4144[FIPS 140-2 Cert #4144^].
 
-Starting in November 2021, preview Customer-managed Encryption (CMEK) functionality was made available for GCNV-Performance. This functionality allows you to encrypt the per-volume keys with per-project, per-region master-keys that are hosted in Google Key Management Service (KMS). KMS enables you to attach external key managers.
+Starting in November 2021, preview Customer-managed Encryption (CMEK) functionality was made available for NetApp Volumes-Performance. This functionality allows you to encrypt the per-volume keys with per-project, per-region master-keys that are hosted in Google Key Management Service (KMS). KMS enables you to attach external key managers.
 
-For details about how to configure KMS for GCNV-Performance, https://cloud.google.com/architecture/partners/netapp-cloud-volumes/customer-managed-keys?hl=en_US[see the Google Cloud NetApp Volumes documentation^].
+For details about how to configure KMS for NetApp Volumes-Performance, https://cloud.google.com/architecture/partners/netapp-cloud-volumes/customer-managed-keys?hl=en_US[see the Google Cloud NetApp Volumes documentation^].
 
 For more information about architecture, see the section link:ncvs-gc-cloud-volumes-service-architecture.html[“Google Cloud NetApp Volumes architecture.”]
 
@@ -121,15 +121,15 @@ Because Snapshot copies in Google Cloud NetApp Volumes are read-only, they canno
 
 Google Cloud NetApp Volumes provides standard NAS client backup capabilities (such as backups over NFS or SMB).
 
-* GCNV-Performance offers cross-region volume replication to other GCNV-Performance volumes. For more information, see https://cloud.google.com/architecture/partners/netapp-cloud-volumes/volume-replication?hl=en_US[volume replication^] in the Google Cloud NetApp Volumes documentation.
-* GCNV-SW offers service-native volume backup/restore capabilities. For more information, see https://cloud.google.com/architecture/partners/netapp-cloud-volumes/back-up?hl=en_US[cloud backup^] in the Google Cloud NetApp Volumes documentation.
+* NetApp Volumes-Performance offers cross-region volume replication to other NetApp Volumes-Performance volumes. For more information, see https://cloud.google.com/architecture/partners/netapp-cloud-volumes/volume-replication?hl=en_US[volume replication^] in the Google Cloud NetApp Volumes documentation.
+* NetApp Volumes-SW offers service-native volume backup/restore capabilities. For more information, see https://cloud.google.com/architecture/partners/netapp-cloud-volumes/back-up?hl=en_US[cloud backup^] in the Google Cloud NetApp Volumes documentation.
 
 Volume replication provides an exact copy of the source volume for fast failover in the case of a disaster, including ransomware events.
 
 [[cross-region-replication]]
 === Cross-region replication
 
-GCNV-Performance enables you to securely replicate volumes across Google Cloud regions for data protection and archive use cases by using TLS1.2 AES 256 GCM encryption on a NetApp-controlled backend service network using specific interfaces used for replication running on Google’s network. A primary (source) volume contains the active production data and replicates to a secondary (destination) volume to provide an exact replica of the primary dataset.
+NetApp Volumes-Performance enables you to securely replicate volumes across Google Cloud regions for data protection and archive use cases by using TLS1.2 AES 256 GCM encryption on a NetApp-controlled backend service network using specific interfaces used for replication running on Google’s network. A primary (source) volume contains the active production data and replicates to a secondary (destination) volume to provide an exact replica of the primary dataset.
 
 Initial replication transfers all blocks, but updates only transmit the changed blocks in a primary volume. For instance, if a 1TB database that resides on a primary volume is replicated to the secondary volume, then 1TB of space is transferred on the initial replication. If that database has a few hundred rows (hypothetically, a few MB) that change between the initialization and the next update, only the blocks with the changed rows are replicated to the secondary (a few MB). This helps to make sure that the transfer times remain low and keeps replication charges down.
 

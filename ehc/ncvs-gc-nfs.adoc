@@ -50,7 +50,7 @@ When using NFSv4.1, the root user might display as nobody when running directory
 
 In Linux, the root account has access to all commands, files, and folders in a Linux-based file system. Because of the power of this account, security best practices often require the root user to be disabled or restricted in some fashion. In NFS exports, the power a root user has over the files and folders can be controlled in Google Cloud NetApp Volumes through export policies and rules and a concept known as root squash.
 
-Root squashing ensures that the root user accessing an NFS mount is squashed to the anonymous numeric user 65534 (see the section “<<The anonymous user>>”) and is currently only available when using GCNV-Performance by selecting Off for root access during export policy rule creation. If the root user is squashed to the anonymous user, it no longer has access to run chown or https://en.wikipedia.org/wiki/Setuid[setuid/setgid commands (the sticky bit)^] on files or folders in the NFS mount, and files or folders created by the root user show the anon UID as the owner/group. In addition, NFSv4 ACLs cannot be modified by the root user. However, the root user still has access to chmod and deleted files that it does not have explicit permissions for. If you want to limit access to a root user’s file and folder permissions, consider using a volume with NTFS ACLs, creating a Windows user named `root`, and applying the desired permissions to the files or folders.
+Root squashing ensures that the root user accessing an NFS mount is squashed to the anonymous numeric user 65534 (see the section “<<The anonymous user>>”) and is currently only available when using NetApp Volumes-Performance by selecting Off for root access during export policy rule creation. If the root user is squashed to the anonymous user, it no longer has access to run chown or https://en.wikipedia.org/wiki/Setuid[setuid/setgid commands (the sticky bit)^] on files or folders in the NFS mount, and files or folders created by the root user show the anon UID as the owner/group. In addition, NFSv4 ACLs cannot be modified by the root user. However, the root user still has access to chmod and deleted files that it does not have explicit permissions for. If you want to limit access to a root user’s file and folder permissions, consider using a volume with NTFS ACLs, creating a Windows user named `root`, and applying the desired permissions to the files or folders.
 
 == The anonymous user
 
@@ -64,10 +64,10 @@ Because of the differences in usernames across Linux and Google Cloud NetApp Vol
 
 Initial export/share access for NFS mounts is controlled through host- based export policy rules contained within an export policy. A host IP, host name, subnet, netgroup, or domain is defined to allow access to mount the NFS share and the level of access allowed to the host. Export policy rule configuration options depend on the Google Cloud NetApp Volumes level.
 
-For GCNV-SW, the following options are available for export-policy configuration:
+For NetApp Volumes-SW, the following options are available for export-policy configuration:
 
 * *Client match.* Comma-separated list of IP addresses, comma-separated list of hostnames, subnets, netgroups, domain names.
-* *RO/RW access rules.* Select read/write or read only to control level of access to export.GCNV-Performance provides the following options:
+* *RO/RW access rules.* Select read/write or read only to control level of access to export.NetApp Volumes-Performance provides the following options:
 
 * *Client match.* Comma-separated list of IP addresses, comma-separated list of hostnames, subnets, netgroups, domain names.
 * *RO/RW access rules.* Select read/write or read only to control level of access to export.
@@ -92,7 +92,7 @@ Mode bit permissions cover only owner, group, and everyone else in the semantics
 * NTFS security style volumes (CIFS server required) with valid UNIX to Windows user mappings.
 * NFSv4.1 ACLs applied using an admin client mounting NFSv4.1 to apply ACLs.
 
-Both methods require an LDAP connection for UNIX identity management and a valid UNIX user and group information populated (see the section link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#ldap[“LDAP”]) and are only available with GCNV-Performance instances. To use NTFS security style volumes with NFS, you must use dual-protocol (SMB and NFSv3) or dual-protocol (SMB and NFSv4.1), even if no SMB connections are made. To use NFSv4.1 ACLs with NFSv3 mounts, you must select `Both (NFSv3/NFSv4.1)` as the protocol type.
+Both methods require an LDAP connection for UNIX identity management and a valid UNIX user and group information populated (see the section link:ncvs-gc-other-nas-infrastructure-service-dependencies.html#ldap[“LDAP”]) and are only available with NetApp Volumes-Performance instances. To use NTFS security style volumes with NFS, you must use dual-protocol (SMB and NFSv3) or dual-protocol (SMB and NFSv4.1), even if no SMB connections are made. To use NFSv4.1 ACLs with NFSv3 mounts, you must select `Both (NFSv3/NFSv4.1)` as the protocol type.
 
 Regular UNIX mode bits don’t provide the same level of granularity in permissions that NTFS or NFSv4.x ACLs provide. The following table compares the permission granularity between NFSv3 mode bits and NFSv4.1 ACLs. For information about NFSv4.1 ACLs, see https://linux.die.net/man/5/nfs4_acl[nfs4_acl - NFSv4 Access Control Lists^].
 
@@ -148,7 +148,7 @@ NFSv3 user and group IDs come across the wire as numeric IDs rather than names. 
 
 With NFSv3, the client and server never have to confirm that the user attempting a read or write with a numeric ID is a valid user; it is just implicitly trusted. This opens the file system up to potential breaches simply by spoofing any numeric ID. To prevent security holes like this, there are a few options available to Google Cloud NetApp Volumes.
 
-* Implementing Kerberos for NFS forces users to authenticate with a username and password or keytab file to get a Kerberos ticket to allow access into a mount. Kerberos is available with GCNV-Performance instances and only with NFSv4.1.
+* Implementing Kerberos for NFS forces users to authenticate with a username and password or keytab file to get a Kerberos ticket to allow access into a mount. Kerberos is available with NetApp Volumes-Performance instances and only with NFSv4.1.
 * Limiting the list of hosts in your export policy rules limits which NFSv3 clients have access to the Google Cloud NetApp Volumes volume.
 * Using dual-protocol volumes and applying NTFS ACLs to the volume forces NFSv3 clients to resolve numeric IDs to valid UNIX usernames to authenticate properly to access mounts. This requires enabling LDAP and configuring UNIX user and group identities.
 * Squashing the root user limits the damage a root user can do to an NFS mount but does not completely remove risk.  For more information, see the section “<<The root user>>.”
