@@ -51,12 +51,11 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| FSx ONTAP storage | Current version offered by AWS | One FSx HA cluster in the same VPC and availability zone
-| EC2 instance for compute | t2.xlarge/4vCPU/16G | Three EC2 T2 xlarge EC2 instances, one as primary DB server, one as standby DB server, and the third as a clone DB server 
+| Azure NetApp Files | Current version offered by Microsoft | Two 2 TiB Capacity Pools, Standard Service Level, Auto QoS 
+| Azure VMs for DB Servers | Standard B4ms (4 vcpus, 16 GiB memory) | Three DB VMs, one as primary DB server, one as standby DB server, and the third as a clone DB server 
 
 3+^| *Software*
-| RedHat Linux | RHEL-8.6.0_HVM-20220503-x86_64-2-Hourly2-GP2 | Deployed RedHat subscription for testing
-| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
+| RedHat Linux | Red Hat Enterprise Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 |===
@@ -67,13 +66,13 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 |===
 3+^| 
 | *Database* | *DB_UNIQUE_NAME* | *Oracle Net Service Name*
-| Primary | db1_NY | db1_NY.demo.netapp.com
-| Physical Standby | db1_LA | db1_LA.demo.netapp.com 
+| Primary | NTAP_NY | NTAP_NY.internal.cloudapp.net
+| Standby | NTAP_LA | NTAP_LA.internal.cloudapp.net 
 |===
 
 === Key factors for deployment consideration
 
-* *How Oracle Standby Database FlexClone Works.* AWS FSx ONTAP FlexClone provides shared copies of the same standby database volumes that are writable. The copies of the volumes are actually pointers that link back to original data blocks until a new write initiates on the clone. ONTAP then allocates new storage blocks for the new writes. Any read IOs are serviced by original data blocks under active replication. Thus, the clone are very storage efficient that can be used for many other use cases with minimal and incremental new storage allocation for new write IOs. This provides tremendous storage cost saving by substantially reducing Active Data Guard storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to standby FSx storage in order to maintain Oracle performance at high level. 
+* *Standby Database Clone.* While receiving and applying transaction logs from primary database, physical standby database can be cloned and mounted on a DB VM to support other workloads such as DEV, TEST, or Report. The clone can be a thin or thick clone. At this moment, ANF only support thick clone, which is a full copy of standby database. The ANF thin clone option will be released shortly. For a thinly cloned copies of database volumes, it shares the same DB volumes of standby database and utilize copy-on-write technology to service write IOs. Thus, the clone are very storage efficient that can be used for many other use cases with minimal and incremental new storage allocation for new write IOs. This provides tremendous storage cost saving by substantially reducing Active Data Guard storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to standby ANF storage in order to maintain Oracle performance at high level. 
 
 * *Oracle Software Requirements.* In general, a physical standby database must have the same Database Home version as the primary database including Patch Set Exceptions (PSEs), Critical Patch Updates (CPUs), and Patch Set Updates (PSUs), unless an Oracle Data Guard Standby-First Patch Apply process is in progress (as described in My Oracle Support note 1265700.1 at link:http://support.oracle.com.[support.oracle.com^]
 
@@ -81,13 +80,10 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 
 * *Force Logging Mode.* To protect against unlogged direct writes in the primary database that cannot be propagated to the standby database, turn on FORCE LOGGING at the primary database before performing data file backups for standby creation. 
 
-* *Database Storage Management.* For operational simplicity, Oracle recommends that when you set up Oracle Automatic Storage Management (Oracle ASM) and Oracle Managed Files (OMF) in an Oracle Data Guard configuration that you set it up symmetrically on the primary and standby database(s).  
+* *Azure VM Sizing.* In these tests and validations, we used an Azure VM - Standard_B4ms with 4 vCPUs and16 GiB memory. You need to size the Azure DB VM appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
 
-* *EC2 compute instances.* In these tests and validations, we used an AWS EC2 t2.xlarge instance as the Oracle database compute instance. NetApp recommends using a M5 type EC2 instance as the compute instance for Oracle in production deployment because it is optimized for database workload. You need to size the EC2 instance appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
+* *Azure NetApp Files Configuration.* Azure NetApp Files are allocated in the Azure NetApp storage account as `Capacity Pools`. In these tests and validations, we deployed a 2 TiB capacity pool to host Oracle primary at the East region and a standby database at the West 2 region. ANF capacity pool has three service levels: Standard, Premium, and Ultra.  The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level. For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement and sizing the database capacity pool accordingly. At a capacity pool creation, you can set QoS to Auto or Manual and data encryption at rest Single or Double.   
 
-* *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi-zone deployment further enhances high availability in the event of failure in a single AWS zone. 
-
-* *FSx storage cluster sizing.* An Amazon FSx ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
 
 == Solution deployment
 
