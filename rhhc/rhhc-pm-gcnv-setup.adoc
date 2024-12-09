@@ -1,0 +1,72 @@
+---
+sidebar: sidebar
+permalink: rhhc/rhhc-pm-gcnv-setup.html
+keywords: NetApp Solutions, Redhat OpenShift Dedicated, Red hat OpenShift, redhat openshift container platform, ocp, openshift container platform, Advanced Cluster Management, ACM, Hub Cluster, containers, container workloads, VMware, customer managed storage, ONTAP, Google Cloud, Google Cloud NetApp Volumes
+summary:
+---
+
+= Deploy and configure OpenShift Dedicated on Google Cloud with Google Cloud NetApp Volumes
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media/
+
+[.lead]
+This section describes a high-level workflow of setting up OpenShift Dedicated (OSD) clusters on the Google Cloud platform. It shows NetApp Trident using Google Cloud NetApp Volumes as the storage backend to provide persistent volumes for stateful applications running with Kubernetes.
+
+Here is a diagram that depicts an OSD cluster deployed on Google Cloud and using NetApp Volumes as the backend storage.
+
+image:rhhc-osd-with-gcnv.png["Figure showing input/output dialog or representing written content"]
+
+The setup process can be broken down into the following steps:
+
+.Install OSD clusters in Google Cloud
+
+* If you wish to use an existing VPC for the cluster, you must create the VPC, two subnets, a cloud router, and two GCP cloud NATs for the OSD cluster. Refer link:https://cloud.redhat.com/experts/gcp/osd_preexisting_vpc/[here] for instructions. 
+* Refer link:https://docs.openshift.com/dedicated/osd_install_access_delete_cluster/creating-a-gcp-cluster.html#osd-create-gcp-cluster-ccs_osd-creating-a-cluster-on-gcp[here] for instructions to install OSD clusters on GCP using the Customer Cloud Subscription (CCS) billing model. OSD is also included on Google Cloud Marketplace. A video showing how to install OSD using the Google Cloud Marketplace solution is located link:https://www.youtube.com/watch?v=p9KBFvMDQJM[here]. 
+
+.Enable Google Cloud NetApp Volumes
+
+* Refer link:https://cloud.google.com/netapp/volumes/docs/get-started/configure-access/workflow[here] for information on setting up access to Google Cloud NetApp Volumes.  Follow all the steps up to and including 
+
+* Create a storage pool. Refer link:https://cloud.google.com/netapp/volumes/docs/get-started/quickstarts/create-storage-pool#create_a_storage_pool[here] for information on how to set up a storage pool on Google Cloud NetApp Volumes. Volumes for the stateful Kubernetes applications running on OSD will be created within the storage pool.
+
+.Install Trident on OSD clusters (using Helm chart)
+
+* Use a Helm chart to install Trident on OSD clusters. Refer link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-helm.html#critical-information-about-astra-trident-24-06[here] for instructions on how to install the Helm Chart. The helm chart may be found link:https://github.com/NetApp/trident/tree/master/helm/trident-operator[here].
+
+.Integration of NetApp Volumes with NetApp Trident for OSD clusters
+
+Create backend and storage classes using Trident (for Google Cloud NetApp Volumes)
+
+* Refer here for details about creating backend.
+* If any of the current storage classes in kubernetes are marked as default, remove that annotation by editing the storage class.
+* Create at least one storage class for NetApp volumes with the Astra Trident CSI provisioner. Make exactly one of the storage classes the default using an annotation. This will allow a PVC to use this storage class when it is not explicitly called out in the PVC manifest. An example with the annotation is shown below. 
+
+[source]
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gcnv-standard-k8s
+  annotations:
+    storageclass.kubernetes.io/is-default-class: “true”
+provisioner: csi.trident.netapp.io
+parameters:
+  backendType: "google-cloud-netapp-volumes"
+  trident.netapp.io/nasType: "nfs"
+allowVolumeExpansion: true
+
+.Deploy an application using OpenShift GitOps (Argo CD)
+
+* Install OpenShift GitOps operator on the cluster. Refer to instructions link:https://docs.openshift.com/gitops/1.13/installing_gitops/installing-openshift-gitops.html[here].
+* SetUp a new Argo CD instance for the cluster. Refer to instructions link:https://docs.openshift.com/gitops/1.13/argocd_instance/setting-up-argocd-instance.html[here].
+
+Open the console of Argo CD and deploy an app.
+As an example, you can deploy a Jenkins App using Argo CD with a Helm Chart.
+When creating the application, the following details were provided:
+Project: default
+cluster: 'https://kubernetes.default.svc' (without the quotes)
+Namespace: Jenkins
+The url for the Helm Chart: 'https://charts.bitnami.com/bitnami' (without the quotes)
+

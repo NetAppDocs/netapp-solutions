@@ -46,7 +46,7 @@ The testing and validation of this solution was performed in an AWS FSx ONTAP an
 
 === Architecture
 
-image:aws_ora_fsx_ec2_vldb_architecture.png["This image provides a detailed picture of the Oracle VLDB incremental merge implementation in AWS public cloud with FSxN."]
+image:aws_ora_fsx_ec2_vldb_architecture.png["This image provides a detailed picture of the Oracle VLDB incremental merge implementation in AWS public cloud with FSx ONTAP."]
 
 === Hardware and software components
 
@@ -77,7 +77,7 @@ image:aws_ora_fsx_ec2_vldb_architecture.png["This image provides a detailed pict
 
 * *FSx storage HA clusters single- or multi-zone deployment.* In these tests and validations, we deployed an FSx HA cluster in a single AWS availability zone. For production deployment, NetApp recommends deploying an FSx HA pair in two different availability zones. An FSx HA cluster is alway provisioned in a HA pair that is sync mirrored in a pair of active-passive file systems to provide storage-level redundancy. Multi-zone deployment further enhances high availability in the event of failure in a single AWS zone. 
 
-* *FSx storage cluster sizing.* An Amazon FSx for ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
+* *FSx storage cluster sizing.* An Amazon FSx ONTAP storage file system provides up to 160,000 raw SSD IOPS, up to 4GBps throughput, and a maximum of 192TiB capacity. However, you can size the cluster in terms of provisioned IOPS, throughput, and the storage limit (minimum 1,024 GiB) based on your actually requirements at the time of deployment. The capacity can be adjusted dynamically on the fly without affecting application availability.   
 
 * *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For multiple FSx file systems deployment for a VLDB, dNFS multi-path to different FSx NFS file systems should be properly configured.   
 
@@ -104,7 +104,7 @@ Deployment requires the following prerequisites.
 
 . From the AWS EC2 console, you must deploy two EC2 Linux instances, one as the primary Oracle DB server and an optional alternative clone target DB server. See the architecture diagram in the previous section for more details about the environment setup. Also review the link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
 
-. From the AWS EC2 console, deploy Amazon FSx for ONTAP storage HA clusters to host the NFS volumes that stores the Oracle database standby image copy. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx for ONTAP file systems^] for step-by-step instructions.
+. From the AWS EC2 console, deploy Amazon FSx ONTAP storage HA clusters to host the NFS volumes that stores the Oracle database standby image copy. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx ONTAP file systems^] for step-by-step instructions.
 
 . Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution. The template can be easily revised for your own deployment requirements.
 +
@@ -184,7 +184,7 @@ mkdir /nfsfsxn/oracopy
 [source, cli]
 mkdir /nfsfsxn/archlog
 
-. Login to Oracle database via sqlplus, enable block change tracking for faster incremental backup and change Oracle flash recovery area to FSxN mount if it is currently on primary storage. This allows the RMAN default control file/spfile autobackup and archived logs to be backed up to FSxN NFS mount for recovery.
+. Login to Oracle database via sqlplus, enable block change tracking for faster incremental backup and change Oracle flash recovery area to FSx ONTAP mount if it is currently on primary storage. This allows the RMAN default control file/spfile autobackup and archived logs to be backed up to FSx ONTAP NFS mount for recovery.
 +
 [source, cli]
 sqlplus / as sysdba
@@ -891,7 +891,7 @@ SQL>
 [%collapsible]
 
 ====
-In a failure when both primary storage and EC2 DB instance host are lost, the recovery can not be conducted from the original server. Fortunately, you still have an Oracle database backup image copy on the redundant FSxN NFS file system. You could quickly provision another identical EC2 DB instance and easily mount the image copy of your VLDB to the new EC2 DB host via NFS to run recovery. In this section, we will demonstrate the step-by-step procedures for doing so.
+In a failure when both primary storage and EC2 DB instance host are lost, the recovery can not be conducted from the original server. Fortunately, you still have an Oracle database backup image copy on the redundant FSx ONTAP NFS file system. You could quickly provision another identical EC2 DB instance and easily mount the image copy of your VLDB to the new EC2 DB host via NFS to run recovery. In this section, we will demonstrate the step-by-step procedures for doing so.
 
 
 . Insert a row to test table we have created previously for Oracle database restoring to alternative host validation.
@@ -923,7 +923,7 @@ SQL> alter session set container=db1_pdb1;
 Session altered.
 
 
-SQL> insert into test values(2, sysdate, 'test recovery on a new EC2 instance host with image copy on FSxN');
+SQL> insert into test values(2, sysdate, 'test recovery on a new EC2 instance host with image copy on FSx ONTAP');
 
 1 row created.
 
@@ -945,13 +945,13 @@ test oracle incremental merge switch to copy
 
          2
 30-MAY-23 05.23.11.000000 PM
-test recovery on a new EC2 instance host with image copy on FSxN
+test recovery on a new EC2 instance host with image copy on FSx ONTAP
 
 
 SQL>
 ....
 
-. As oracle user, run RMAN incremental backup and merge to flush the transaction to backup set on FSxN NFS mount.
+. As oracle user, run RMAN incremental backup and merge to flush the transaction to backup set on FSx ONTAP NFS mount.
 +
 ....
 [oracle@ip-172-30-15-99 ~]$ rman target / nocatalog
@@ -975,9 +975,9 @@ RMAN> @rman_bkup_merge.cmd
 Toolkit: link:https://github.com/NetApp-Automation/na_oracle19c_deploy[na_oracle19c_deploy^]
 Documentation: link:marketing_overview.html#awxtower-deployments[Automated Deployment of Oracle19c for ONTAP on NFS^]
 
-. Configure oracle environment similiarly to primary EC2 DB instance host ora_01, such as oratab, oraInst.loc, and oracle user .bash_profile. It is a good practice to backup those files to FSxN NFS mount point.
+. Configure oracle environment similiarly to primary EC2 DB instance host ora_01, such as oratab, oraInst.loc, and oracle user .bash_profile. It is a good practice to backup those files to FSx ONTAP NFS mount point.
 
-. The Oracle database backup image copy on FSxN NFS mount is stored on a FSx cluster that spans AWS availability zones for redundancy, high avilability, and high performance. The NFS file system can be easily mounted to a new server as far as the networking is reachable. The following procedures mount the image copy of an Oracle VLDB backup to newly provsioned EC2 DB instance host for recovery.
+. The Oracle database backup image copy on FSx ONTAP NFS mount is stored on a FSx cluster that spans AWS availability zones for redundancy, high avilability, and high performance. The NFS file system can be easily mounted to a new server as far as the networking is reachable. The following procedures mount the image copy of an Oracle VLDB backup to newly provsioned EC2 DB instance host for recovery.
 +
 As ec2-user, create the mount point.
 +
@@ -988,7 +988,7 @@ As ec2-user, mount the NFS volume that stored Oracle VLDB backup image copy.
 [source, cli]
 sudo mount 172.30.15.19:/ora_01_copy /nfsfsxn -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=262144,wsize=262144,nointr
 
-. Validate the Oracle database backup image copy on FSxN NFS mount point.
+. Validate the Oracle database backup image copy on FSx ONTAP NFS mount point.
 +
 ....
 [ec2-user@ip-172-30-15-124 ~]$ ls -ltr /nfsfsxn/oracopy
@@ -1064,7 +1064,7 @@ total 78940700
 
 ....
 
-. Verify the available Oracle archived logs on the FSxN NFS mount for recovery and note the last log file log sequency number. In this case, it is 175. Our recovery point is up to log sequency number 176.
+. Verify the available Oracle archived logs on the FSx ONTAP NFS mount for recovery and note the last log file log sequency number. In this case, it is 175. Our recovery point is up to log sequency number 176.
 +
 ....
  [ec2-user@ip-172-30-15-124 ~]$ ls -ltr /nfsfsxn/archlog/DB1/archivelog/2023_05_30
@@ -1111,7 +1111,7 @@ total 5714400
 
 . As oracle user, set ORACLE_HOME variable to current Oracle installation on new EC2 instance DB host ora_02, ORACLE_SID to primary Oracle instance SID. In this case, it is db1.
 
-. As oracle user, create a generic Oracle init file in $ORACLE_HOME/dbs directory with proper admin directories configured. Most importantly, have Oracle `flash recovery area` point to FSxN NFS mount path as defined in primary Oracle VLDB instance.  `flash recovery area` configuration is demonstrated in section `Setup Oracle RMAN incremental merge to image copy on FSx`. Set the Oracle control file to FSx ONTAP NFS file system.
+. As oracle user, create a generic Oracle init file in $ORACLE_HOME/dbs directory with proper admin directories configured. Most importantly, have Oracle `flash recovery area` point to FSx ONTAP NFS mount path as defined in primary Oracle VLDB instance.  `flash recovery area` configuration is demonstrated in section `Setup Oracle RMAN incremental merge to image copy on FSx`. Set the Oracle control file to FSx ONTAP NFS file system.
 +
 [source, cli]
 vi $ORACLE_HOME/dbs/initdb1.ora
@@ -1614,14 +1614,14 @@ SQL> select * from test;
         ID DT                                                                          EVENT
 ---------- --------------------------------------------------------------------------- ----------------------------------------------------------------------------------------------------
          1 18-MAY-23 02.35.37.000000 PM                                                test oracle incremental merge switch to copy
-         2 30-MAY-23 05.23.11.000000 PM                                                test recovery on a new EC2 instance host with image copy on FSxN
+         2 30-MAY-23 05.23.11.000000 PM                                                test recovery on a new EC2 instance host with image copy on FSx ONTAP
 ....
 
 . Other post recovery tasks
 +
 ....
 
-Add FSxN NFS mount to fstab so that the NFS file system will be mounted when EC2 instance host rebooted.
+Add FSx ONTAP NFS mount to fstab so that the NFS file system will be mounted when EC2 instance host rebooted.
 
 As EC2 user, vi /etc/fstab and add following entry:
 
@@ -1631,7 +1631,7 @@ Update the Oracle init file from primary databse init file backup that is restor
 
 ....
 
-This completes the Oracle VLDB database recovery from backup image copy on FSxN NFS file system to a new EC2 DB instance host.
+This completes the Oracle VLDB database recovery from backup image copy on FSx ONTAP NFS file system to a new EC2 DB instance host.
 
 ====
 
@@ -1645,7 +1645,7 @@ Another benefit of using AWS FSx ONTAP for staging Oracle VLDB image copy is tha
 . We begin with inserting a row into the same test table we have created before.
 +
 ....
- SQL> insert into test values (3, sysdate, 'test clone on a new EC2 instance host with image copy on FSxN');
+ SQL> insert into test values (3, sysdate, 'test clone on a new EC2 instance host with image copy on FSx ONTAP');
 
 1 row created.
 
@@ -1663,7 +1663,7 @@ test oracle incremental merge switch to copy
 
          2
 30-MAY-23 05.23.11.000000 PM
-test recovery on a new EC2 instance host with image copy on FSxN
+test recovery on a new EC2 instance host with image copy on FSx ONTAP
 
         ID
 ----------
@@ -1674,7 +1674,7 @@ EVENT
 
          3
 05-JUN-23 03.19.46.000000 PM
-test clone on a new EC2 instance host with image copy on FSxN
+test clone on a new EC2 instance host with image copy on FSx ONTAP
 
 
 SQL>
@@ -2288,8 +2288,8 @@ SQL> select * from test;
         ID DT                                                                          EVENT
 ---------- --------------------------------------------------------------------------- ----------------------------------------------------------------
          1 18-MAY-23 02.35.37.000000 PM                                                test oracle incremental merge switch to copy
-         2 30-MAY-23 05.23.11.000000 PM                                                test recovery on a new EC2 instance host with image copy on FSxN
-         3 05-JUN-23 03.19.46.000000 PM                                                test clone on a new EC2 instance host with image copy on FSxN
+         2 30-MAY-23 05.23.11.000000 PM                                                test recovery on a new EC2 instance host with image copy on FSx ONTAP
+         3 05-JUN-23 03.19.46.000000 PM                                                test clone on a new EC2 instance host with image copy on FSx ONTAP
 
 SQL>
 
@@ -2461,7 +2461,7 @@ link:https://support.oracle.com/knowledge/Oracle%20Database%20Products/745798_1.
 link:https://docs.oracle.com/en/database/oracle/oracle-database/19/bradv/getting-started-rman.html[https://docs.oracle.com/en/database/oracle/oracle-database/19/bradv/getting-started-rman.html^]
 
 
-* Amazon FSx for NetApp ONTAP
+* Amazon FSx ONTAP
 +
 link:https://aws.amazon.com/fsx/netapp-ontap/[https://aws.amazon.com/fsx/netapp-ontap/^]
 

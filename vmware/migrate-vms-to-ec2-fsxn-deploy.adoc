@@ -2,10 +2,10 @@
 sidebar: sidebar
 permalink: vmware/migrate-vms-to-ec2-fsxn-deploy.html
 keywords: netapp, vmware, amazon, ec2, fsxn, migration, iscsi, deploy
-summary: "This technical report covers how to migrate on-premises VMware vSphere VMs to an Amazon EC2 instance with data disks placed on FSx for ONTAP iSCSI LUNs using the MigrateOps 'data-mobility-as-code' functionality of Cirrus Migrate Cloud (CMC)."
+summary: "This technical report covers how to migrate on-premises VMware vSphere VMs to an Amazon EC2 instance with data disks placed on FSx ONTAP iSCSI LUNs using the MigrateOps 'data-mobility-as-code' functionality of Cirrus Migrate Cloud (CMC)."
 ---
 
-= Migrate VMs to Amazon EC2 using FSxN: Deployment Guide
+= Migrate VMs to Amazon EC2 using Amazon FSx for ONTAP: Deployment Guide
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -15,25 +15,25 @@ summary: "This technical report covers how to migrate on-premises VMware vSphere
 [.lead]
 This article describes the deployment procedure for this migration solutions.  
 
-== Configure FSx for ONTAP and Cirrus Data for migration operations
+== Configure FSx ONTAP and Cirrus Data for migration operations
 
-This https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/getting-started-step1.html[step-by-step deployment guide] shows how to add FSx for ONTAP volume to a VPC. Since these steps are sequential in nature, make sure they are covered in order.
+This https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/getting-started-step1.html[step-by-step deployment guide] shows how to add FSx ONTAP volume to a VPC. Since these steps are sequential in nature, make sure they are covered in order.
 
 For the purposes of this demonstration, “DRaaSDemo” is the name of the file system created.
 
 image:migrate-ec2-fsxn-image02.png["Image of the demonstration file system user interface"]
 
-Once your AWS VPC is configured and FSx for ONTAP is provisioned based on your performance requirements, log in to link:http://cloud.cirrusdata.com/[cloud.cirrusdata.com] and link:https://customer.cirrusdata.com/cdc/kb/articles/get-started-with-cirrus-data-cloud-4eDqjIxQpg[create a new project] or access an existing project. 
+Once your AWS VPC is configured and FSx ONTAP is provisioned based on your performance requirements, log in to link:http://cloud.cirrusdata.com/[cloud.cirrusdata.com] and link:https://customer.cirrusdata.com/cdc/kb/articles/get-started-with-cirrus-data-cloud-4eDqjIxQpg[create a new project] or access an existing project. 
 
 image:migrate-ec2-fsxn-image03.png["Image of the Cirrus Data projects user interface"]
 
-Before creating the recipe for MigrationOps, AWS Cloud should be added as an integration. CMC provides built-in integration with FSx for ONTAP and AWS. The integration for FSx for ONTAP provides the following automated functionalities:
+Before creating the recipe for MigrationOps, AWS Cloud should be added as an integration. CMC provides built-in integration with FSx ONTAP and AWS. The integration for FSx ONTAP provides the following automated functionalities:
 
-*Prepare your FSx for ONTAP file system:*
+*Prepare your FSx ONTAP file system:*
 
 * Create new volumes and LUNs that match the source volumes
 
-*Note*: A destination disk in the FSx for ONTAP FS model is a “LUN” that is created on a “Volume” that has enough capacity to contain the LUN plus a reasonable amount of overhead for facilitating snapshots and meta-data. The CMC automation takes care of all these details to create the appropriate Volume and the LUN with optional user-defined parameters.
+*Note*: A destination disk in the FSx ONTAP FS model is a “LUN” that is created on a “Volume” that has enough capacity to contain the LUN plus a reasonable amount of overhead for facilitating snapshots and meta-data. The CMC automation takes care of all these details to create the appropriate Volume and the LUN with optional user-defined parameters.
 
 * Create Host entity (called iGroups in FSx) with the Host Initiator IQN
 * Map newly created volumes to appropriate host entities using mappings
@@ -46,7 +46,7 @@ Before creating the recipe for MigrationOps, AWS Cloud should be added as an int
 * Adjust system settings, if necessary, according to vendor best practices, e.g. with udev settings on Linux.
 * Create and manage iSCSI connections such as persistent/favorite iSCSI targets on Windows.
 
-To configure CMC Integration for FSx for ONTAP and AWS, perform the following steps:
+To configure CMC Integration for FSx ONTAP and AWS, perform the following steps:
 
 . Log in to the Cirrus Data Cloud portal.
 
@@ -54,7 +54,7 @@ To configure CMC Integration for FSx for ONTAP and AWS, perform the following st
 
 . Navigate to Integrations -> Goodies.
 
-. Scroll to find FSx for NetApp ONTAP and click ADD INTEGRATION.
+. Scroll to find FSx ONTAP and click ADD INTEGRATION.
 +
 image:migrate-ec2-fsxn-image04.png["Image of the Cirrus Data 'Add Integration' user interface"]
 
@@ -62,7 +62,7 @@ image:migrate-ec2-fsxn-image04.png["Image of the Cirrus Data 'Add Integration' u
 +
 image:migrate-ec2-fsxn-image05.png["Image of the Cirrus Data 'Add Integration' user interface"]
 
-. Once the integration is created, during the creation of a new migration session, select Auto Allocate Destination Volumes to automatically allocate new volumes on FSx for ONTAP.
+. Once the integration is created, during the creation of a new migration session, select Auto Allocate Destination Volumes to automatically allocate new volumes on FSx ONTAP.
 +
 *Note*: New LUNs will be created with the same size as the source volume's size, unless “Migrate to Smaller Volumes” is enabled for the migration.
 +
@@ -74,7 +74,7 @@ image:migrate-ec2-fsxn-image05.png["Image of the Cirrus Data 'Add Integration' u
 +
 image:migrate-ec2-fsxn-image06.png["Image of the Cirrus Data 'Add Integration' user interface"]
 +
-*Note*: This integration is used while migrating virtual machines from on-premises storage to AWS along with FSx for ONTAP integration.
+*Note*: This integration is used while migrating virtual machines from on-premises storage to AWS along with FSx ONTAP integration.
 +
 *Note*: Use management relays to communicate with Cirrus Data Cloud if there is no direct outbound connection for production instances to be migrated.
 
@@ -92,7 +92,7 @@ Guest VMware VMs residing on vCenter in on-premises data center:
 
 image:migrate-ec2-fsxn-image07.png["Image of the VMware virtual machines that will be migrated"]
 
-This demonstration will migrate the application VMDKs from each VM to an automatically provisioned and mapped iSCSI volume from FSx for ONTAP. The OS VMDK in this case will be migrated to an Amazon EBS volume as Amazon EC2 instances support this Amazon EBS only as the boot disk.
+This demonstration will migrate the application VMDKs from each VM to an automatically provisioned and mapped iSCSI volume from FSx ONTAP. The OS VMDK in this case will be migrated to an Amazon EBS volume as Amazon EC2 instances support this Amazon EBS only as the boot disk.
 
 *Note*: The scale factor with this migration approach is the network bandwidth and the pipe connecting on-premises to AWS VPC. Since each VM has 1:1 host session configured, the overall migration performance depends on two factors:
 
@@ -121,7 +121,7 @@ The YAML provides the operation name, notes (description) along with the recipe 
 ----
 operations:
     -   name: Win2016 SQL server to AWS
-        notes: Migrate OS to AWS with EBS and Data to FSx for ONTAP
+        notes: Migrate OS to AWS with EBS and Data to FSx ONTAP
         recipe: MIGRATEOPS_AWS_COMPUTE
         config:
             system_name: Win2016-123
@@ -145,7 +145,7 @@ operations:
                             netapp:
                                 qos_policy_name: ""
                 migration:
-                    session_description: Migrate OS to AWS with EBS and Data to FSx for ONTAP
+                    session_description: Migrate OS to AWS with EBS and Data to FSx ONTAP
                     qos_level: MODERATE
                 cutover:
                     stop_applications:
@@ -221,7 +221,7 @@ Let’s look at the migrated Amazon EC2 instance running the Windows Server OS a
 . All new database records added during migration can be found in the newly migrated database.
 . The old storage is now offline.
 
-*Note*: With just one click to submit the data mobility operation as code, and a click to approve the cutover, the VM has successfully migrated from on-premises VMware to an Amazon EC2 instance using FSx for ONTAP and its iSCSI capabilities.
+*Note*: With just one click to submit the data mobility operation as code, and a click to approve the cutover, the VM has successfully migrated from on-premises VMware to an Amazon EC2 instance using FSx ONTAP and its iSCSI capabilities.
 
 *Note*: Due to AWS API limitation, the converted VMs would be shown as “Ubuntu.” This is strictly a display issue and does not affect functionality of the migrated instance. An upcoming release will address this issue.
 

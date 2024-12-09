@@ -5,7 +5,7 @@ keywords: microsoft SQL server, AWS, EC2, FSx ONTAP
 summary:
 ---
 
-= TR-4923: SQL Server on AWS EC2 using Amazon FSx for NetApp ONTAP
+= TR-4923: SQL Server on AWS EC2 using Amazon FSx ONTAP
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -19,19 +19,19 @@ summary:
 //
 
 [.lead]
-This solution covers the deployment of SQL Server on AWS EC2 using Amazon FSx for NetApp ONTAP.
+This solution covers the deployment of SQL Server on AWS EC2 using Amazon FSx ONTAP.
 
 Authors: Pat Sinthusan and Niyaz Mohamed, NetApp
 
 == Introduction
 
-Many companies that would like to migrate applications from on-premises to the cloud find that the effort is hindered by the differences in capabilities offered by on-premises storage systems and cloud storage services. That gap has made migrating enterprise applications such as Microsoft SQL Server much more problematic. In particular, gaps in the services needed to run an enterprise application such as robust snapshots, storage efficiency capabilities, high availability, reliability, and consistent performance have forced customers to make design tradeoffs or forgo application migration. With FSx for NetApp ONTAP, customers no longer need to compromise. FSx for NetApp ONTAP is a native (1st party) AWS service sold, supported, billed, and fully managed by AWS. It uses the power of NetApp ONTAP to provide the same enterprise grade storage and data management capabilities NetApp has provided on-premises for three decades in AWS as a managed service.
+Many companies that would like to migrate applications from on-premises to the cloud find that the effort is hindered by the differences in capabilities offered by on-premises storage systems and cloud storage services. That gap has made migrating enterprise applications such as Microsoft SQL Server much more problematic. In particular, gaps in the services needed to run an enterprise application such as robust snapshots, storage efficiency capabilities, high availability, reliability, and consistent performance have forced customers to make design tradeoffs or forgo application migration. With FSx ONTAP, customers no longer need to compromise. FSx ONTAP is a native (1st party) AWS service sold, supported, billed, and fully managed by AWS. It uses the power of NetApp ONTAP to provide the same enterprise grade storage and data management capabilities NetApp has provided on-premises for three decades in AWS as a managed service.
 
 With SQL Server on EC2 instances, database administrators can access and customize their database environment and the underlying operating system. A SQL Server on EC2 instance in combination with https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[AWS FSx ONTAP^] to store the database files, enables high performance, data management, and a simple and easy migration path using block-level replication. Therefore, you can run your complex database on AWS VPC with an easy lift-and-shift approach, fewer clicks, and no schema conversions.
  
-== Benefits of using Amazon FSx for NetApp ONTAP with SQL Server
+== Benefits of using Amazon FSx ONTAP with SQL Server
 
-Amazon FSx for NetApp ONTAP is the ideal file storage for SQL Server deployments in AWS. Benefits include the following:
+Amazon FSx ONTAP is the ideal file storage for SQL Server deployments in AWS. Benefits include the following:
 
 * Consistent high performance and throughput with low latency
 * Intelligent caching with NVMe cache to improve performance
@@ -45,18 +45,18 @@ Amazon FSx for NetApp ONTAP is the ideal file storage for SQL Server deployments
 * Shorter downtime during migration and overcoming migration challenges with file-level or I/O-level copy
 * Reducing MTTR by finding the root cause after a major release or patch update
 
-Deploying SQL Server databases on FSx ONTAP with the iSCSI protocol, as is commonly used on-premises, provides an ideal database storage environment with superior performance, storage efficiency, and data-management capabilities. Using multiple iSCSI sessions, assuming a 5% working set size, fitting a Flash Cache delivers over 100K IOPs with the FSx ONTAP service. This configuration provides complete control over performance for the most demanding applications. SQL Server running on smaller EC2 instances connected to FSx for ONTAP can perform the same as SQL Server running on a much larger EC2 instance, because only network bandwidth limits are applied against FSx for ONTAP. Reducing the size of instances also reduces the compute cost, which provides a TCO-optimised deployment. The combination of SQL using iSCSI, SMB3.0 with multichannel, continuous availability shares on FSx for ONTAP provides great advantages for SQL workloads.
+Deploying SQL Server databases on FSx ONTAP with the iSCSI protocol, as is commonly used on-premises, provides an ideal database storage environment with superior performance, storage efficiency, and data-management capabilities. Using multiple iSCSI sessions, assuming a 5% working set size, fitting a Flash Cache delivers over 100K IOPs with the FSx ONTAP service. This configuration provides complete control over performance for the most demanding applications. SQL Server running on smaller EC2 instances connected to FSx ONTAP can perform the same as SQL Server running on a much larger EC2 instance, because only network bandwidth limits are applied against FSx ONTAP. Reducing the size of instances also reduces the compute cost, which provides a TCO-optimised deployment. The combination of SQL using iSCSI, SMB3.0 with multichannel, continuous availability shares on FSx ONTAP provides great advantages for SQL workloads.
 
 == Before you begin
 
-The combination of Amazon FSx for NetApp ONTAP and SQL Server on EC2 instance enables the creation of enterprise-level database storage designs that can meet todays most demanding application requirements. To optimize both technologies, it is vital to understand SQL Server I/O patterns and characteristics. A well-designed storage layout for a SQL Server database supports the performance of SQL Server and the management of the SQL Server infrastructure. A good storage layout also allows the initial deployment to be successful and the environment to grow smoothly over time as your business grows.
+The combination of Amazon FSx ONTAP and SQL Server on EC2 instance enables the creation of enterprise-level database storage designs that can meet todays most demanding application requirements. To optimize both technologies, it is vital to understand SQL Server I/O patterns and characteristics. A well-designed storage layout for a SQL Server database supports the performance of SQL Server and the management of the SQL Server infrastructure. A good storage layout also allows the initial deployment to be successful and the environment to grow smoothly over time as your business grows.
 
 === Prerequisites
 
 Before you complete the steps in this document, you should have the following prerequisites:
 
 * An AWS account
-* Appropriate IAM roles to provision EC2 and FSx for ONTAP
+* Appropriate IAM roles to provision EC2 and FSx ONTAP
 * A Windows Active Directory domain on EC2
 * All SQL Server nodes must be able to communicate with each other
 * Make sure DNS resolution works and host names can be resolved. If not, use host file entry.
@@ -94,7 +94,7 @@ With FSx ONTAP, procuring storage is the easiest task and can be performed by up
 
 With this configuration, the total size of the volumes can be greater than the actual storage available in the file system. If the LUNs or Snapshot copies require more space than is available in the volume, the volumes automatically grow, taking more space from the containing file system. Autogrow allows FSx ONTAP to automatically increase the size of the volume up to a maximum size that you predetermine. There must be space available in the containing file system to support the automatic growth of the volume. Therefore, with autogrow enabled, you should monitor the free space in the containing filesystem and update the file system when needed.
 
-Along with this, set the https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/What_does_the_LUN_option_space_alloc_do%3F[space-allocation^] option on LUN to enabled so that FSx ONTAP notifies the EC2 host when the volume has run out of space and the LUN in the volume cannot accept writes. Also, this option enables FSx for ONTAP to reclaim space automatically when the SQL Server on EC2 host deletes data. The space-allocation option is set to disabled by default.
+Along with this, set the https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/ONTAP_OS/What_does_the_LUN_option_space_alloc_do%3F[space-allocation^] option on LUN to enabled so that FSx ONTAP notifies the EC2 host when the volume has run out of space and the LUN in the volume cannot accept writes. Also, this option enables FSx ONTAP to reclaim space automatically when the SQL Server on EC2 host deletes data. The space-allocation option is set to disabled by default.
 
 [NOTE]
 If a space-reserved LUN is created in a none-guaranteed volume, then the LUN behaves the same as a non-space-reserved LUN. This is because a none-guaranteed volume has no space to allocate to the LUN; the volume itself can only allocate space as it is written to due to its none guarantee.
@@ -140,7 +140,7 @@ image:sql-awsec2-image2.png["Figure showing input/output dialog or representing 
 +
 image:sql-awsec2-image3.png["Figure showing input/output dialog or representing written content"]
 
-. Create volumes by following the step listed in https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-volumes.html[Creating a volume on FSx for NetApp ONTAP^].
+. Create volumes by following the step listed in https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-volumes.html[Creating a volume on FSx ONTAP^].
 +
 *Best practices*
 +
@@ -328,7 +328,7 @@ image:sql-awsec2-image13.png["Figure showing input/output dialog or representing
 
 In addition to the performance benefit of segregating the user database layout into different volumes, the database also significantly affects the time required to back up and restore. Having separate volumes for data and log files significantly improves the restore time as compared to a volume hosting multiple user data files. Similarly, user databases with a high I/O intensive application are prone to an increase in the backup time. A more detailed explanation about backup and restore practices is provided later in this document. 
 
-NOTE: Starting with SQL Server 2012 (11.x), system databases (Master, Model, MSDB, and TempDB), and Database Engine user databases can be installed with an SMB file server as a storage option. This applies to both stand-alone SQL Server and SQL Server failover cluster installations. This enables you to use FSx for ONTAP with all its performance and data management capabilities, including volume capacity, performance scalability, and data protection features, which SQL Server can take advantage of. Shares used by the application servers must be configured with the continuously available property set and the volume should be created with NTFS security style. NetApp Snapcenter cannot be used with databases placed on SMB shares from FSx for ONTAP.
+NOTE: Starting with SQL Server 2012 (11.x), system databases (Master, Model, MSDB, and TempDB), and Database Engine user databases can be installed with an SMB file server as a storage option. This applies to both stand-alone SQL Server and SQL Server failover cluster installations. This enables you to use FSx ONTAP with all its performance and data management capabilities, including volume capacity, performance scalability, and data protection features, which SQL Server can take advantage of. Shares used by the application servers must be configured with the continuously available property set and the volume should be created with NTFS security style. NetApp Snapcenter cannot be used with databases placed on SMB shares from FSx ONTAP.
 
 NOTE: For SQL Server databases that do not use SnapCenter to perform backups, Microsoft recommends placing the data and log files on separate drives. For applications that simultaneously update and request data, the log file is write intensive, and the data file (depending on your application) is read/write intensive. For data retrieval, the log file is not needed. Therefore, requests for data can be satisfied from the data file placed on its own drive.
 
@@ -346,7 +346,7 @@ After Installing SnapCenter, complete the following steps to set it up.
 +
 image:sql-awsec2-image14.png["Figure showing input/output dialog or representing written content"]
 
-. Add the storage system by selecting Storage Systems > New and the provide the appropriate FSx for ONTAP storage information.
+. Add the storage system by selecting Storage Systems > New and the provide the appropriate FSx ONTAP storage information.
 +
 image:sql-awsec2-image15.png["Figure showing input/output dialog or representing written content"]
 
@@ -467,7 +467,7 @@ In addition to the full backup, NetApp recommends that you configure a transacti
 ====
 To restore a database onto another location on a dev or test environment or to create a copy for business analysis purposes, the NetApp best practice is to leverage the cloning methodology to create a copy of the database on the same instance or an alternate instance.
 
-The cloning of databases that are 500GB on an iSCSI disk hosted on a FSx for ONTAP environment typically takes less than five minutes. After cloning is complete, the user can then perform all the required read/write operation on the cloned database. Most of the time is consumed for disk scanning (diskpart). The NetApp cloning procedure typically take less than 2 minutes regardless of the size of the databases.
+The cloning of databases that are 500GB on an iSCSI disk hosted on a FSx ONTAP environment typically takes less than five minutes. After cloning is complete, the user can then perform all the required read/write operation on the cloned database. Most of the time is consumed for disk scanning (diskpart). The NetApp cloning procedure typically take less than 2 minutes regardless of the size of the databases.
 
 The cloning of a database can be performed with the dual method: you can create a clone from the latest backup or you can use clone life-cycle management through which the latest copy can be made available on the secondary instance.
 
@@ -490,7 +490,7 @@ The following steps can be used to clone databases to the new database name in t
 The following step are used to clone databases to the new SQL server instance running on EC2:
 
 . Create a new SQL Server on EC2 in the same VPC.
-. Enable the iSCSI protocol and MPIO, and then setup the iSCSI connection to FSx for ONTAP by following step 3 and 4 in the section “Create volumes and LUNs for SQL Server.”
+. Enable the iSCSI protocol and MPIO, and then setup the iSCSI connection to FSx ONTAP by following step 3 and 4 in the section “Create volumes and LUNs for SQL Server.”
 . Add a new SQL Server on EC2 into SnapCenter by follow step 3 in the section “Installing and setup for SnapCenter.”
 . Select Resource > View Instance, and then select Refresh Resource.
 . Select Resources, and then the database that you would like to clone.
@@ -642,11 +642,11 @@ Run the file `EnableMPIO.ps1` first and the second script executes automatically
 
 == Where to find additional information
 
-* Amazon FSx for NetApp ONTAP
+* Amazon FSx ONTAP
 
 https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html[https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html^]
 
-* Getting Started with FSx for NetApp ONTAP
+* Getting Started with FSx ONTAP
 
 https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/getting-started.html[https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/getting-started.html^]
 

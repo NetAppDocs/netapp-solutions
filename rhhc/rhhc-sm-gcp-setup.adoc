@@ -5,7 +5,7 @@ keywords: NetApp Solutions, redhat OpenShift, red hat OpenShift, redhat openshif
 summary:
 ---
 
-== Deploy and configure the Red Hat OpenShift Container platform on GCP
+== Deploy and configure the Red Hat OpenShift Container Platform on Google Cloud
 :hardbreaks:
 :nofooter:
 :icons: font
@@ -13,7 +13,7 @@ summary:
 :imagesdir: ../media/
 
 [.lead]
-This section describes a high-level workflow of how to set up and manage OpenShift Clusters in GCP  and deploy stateful applications on them. It shows the use of NetApp Cloud Volumes ONTAP storage with the help of Astra Trident to provide persistent volumes. Details are provided about the use of Astra Control Center to perform data protection and migration activities for the stateful applications.
+This section describes a high-level workflow of how to set up and manage OpenShift Clusters in GCP  and deploy stateful applications on them. It shows the use of Google Cloud NetApp Volumes and NetApp Cloud Volumes ONTAP storage with the help of Trident to provide persistent volumes.
 
 Here is a diagram that shows the clusters deployed on GCP and connected to the data center using a VPN.
 
@@ -23,9 +23,8 @@ NOTE: There are several ways of deploying Red Hat OpenShift Container platform c
 
 The setup process can be broken down into the following steps:
 
-.Install an OCP cluster on GCP from the CLI.
-[%collapsible]
-====
+.Install an OCP cluster on GCP from the CLI
+
 * Ensure that you have met all the prerequisites stated link:https://docs.openshift.com/container-platform/4.13/installing/installing_gcp/installing-gcp-default.html[here]. 
 
 * For the VPN connectivity between on-premises and GCP, a pfsense VM was created and configured. For instructions, see https://docs.netgate.com/pfsense/en/latest/recipes/ipsec-s2s-psk.html[here].
@@ -48,28 +47,25 @@ The setup process can be broken down into the following steps:
 
 ** The installation of the cluster completes and will provide a kubeconfig file and username and password to login to the console of the cluster.
 
-====
-.Deploy Cloud Volumes ONTAP in GCP using BlueXP. 
-[%collapsible]
-====
+.Deploy Google Cloud NetApp Volumes
+
+* Google Cloud NetApp Volumes can be added to your projects as outlined link:https://cloud.google.com/netapp/volumes/docs/discover/overview[here]. 
+
+.Deploy Cloud Volumes ONTAP in GCP using BlueXP 
+
 * Install a connector in Google Cloud. Refer to instructions https://docs.netapp.com/us-en/bluexp-setup-admin/task-install-connector-google-bluexp-gcloud.html[here]. 
 
 * Deploy a CVO instance in Google Cloud using the connector. Refer to instructions here. https://docs.netapp.com/us-en/bluexp-cloud-volumes-ontap/task-getting-started-gcp.html
 
-====
-.Install Astra Trident in the OCP Cluster in GCP
-[%collapsible]
-====
-* There are many methods to deploy Astra Trident as shown https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy.html[here].
+.Install Trident in the OCP Cluster in GCP
 
-* For this project, Astra Trident was installed by deploying Astra Trident Operator manually using the instructions https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-operator.html[here].
+* There are many methods to deploy Trident as shown https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy.html[here].
 
-* Create backend and a storage classes. Refer to instructions link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-postdeployment.html[here]. 
+* For this project, Trident was installed by deploying Trident Operator manually using the instructions https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-operator.html[here].
 
-====
-.Add the OCP cluster on GCP to the Astra Control Center.
-[%collapsible]
-====
+* Create backend and a storage classes. Refer to instructions link:https://docs.netapp.com/us-en/trident/trident-use/backends.html[here]. 
+
+.Add the OCP cluster on GCP to the Astra Control Center
 
 * Create a separate KubeConfig file with a cluster role that contains the minimum permissions necessary for a cluster to be managed by Astra Control. The instructions can be found
 link:https://docs.netapp.com/us-en/astra-control-center/get-started/setup_overview.html#create-a-cluster-role-kubeconfig[here].
@@ -77,15 +73,14 @@ link:https://docs.netapp.com/us-en/astra-control-center/get-started/setup_overvi
 * Add the cluster to Astra Control Center following the instructions 
 link:https://docs.netapp.com/us-en/astra-control-center/get-started/setup_overview.html#add-cluster[here]
 
-====
 .Using CSI Topology feature of Trident for multi-zone architectures
 
-Cloud providers, today, enable Kubernetes/OpenShift cluster administrators to spawn nodes of the clusters that are zone based. Nodes can be located in different availability zones within a region, or across various regions. To facilitate the provisioning of volumes for workloads in a multi-zone architecture, Astra Trident uses CSI Topology. Using the CSI Topology feature, access to volumes can be limited to a subset of nodes, based on regions and availability zones. Refer link:https://docs.netapp.com/us-en/trident/trident-use/csi-topology.html[here] for additional details. 
+Cloud providers, today, enable Kubernetes/OpenShift cluster administrators to spawn nodes of the clusters that are zone based. Nodes can be located in different availability zones within a region, or across various regions. To facilitate the provisioning of volumes for workloads in a multi-zone architecture, Trident uses CSI Topology. Using the CSI Topology feature, access to volumes can be limited to a subset of nodes, based on regions and availability zones. Refer link:https://docs.netapp.com/us-en/trident/trident-use/csi-topology.html[here] for additional details. 
 
 NOTE: Kubernetes supports two volume binding modes: 
-- When **_VolumeBindingMode_ is set to _Immediate_** (default), Astra Trident creates the volume without any topology awareness. Persistent Volumes are created without having any dependency on the requesting pod’s scheduling requirements.
+- When **_VolumeBindingMode_ is set to _Immediate_** (default), Trident creates the volume without any topology awareness. Persistent Volumes are created without having any dependency on the requesting pod’s scheduling requirements.
 - When **_VolumeBindingMode_ set to _WaitForFirstConsumer_**, the creation and binding of a Persistent Volume for a PVC is delayed until a pod that uses the PVC is scheduled and created. This way, volumes are created to meet the scheduling constraints that are enforced by topology requirements.
-Astra Trident storage backends can be designed to selectively provision volumes based on availability zones (Topology-aware backend). For StorageClasses that make use of such a backend, a volume would only be created if requested by an application that is scheduled in a supported region/zone. (Topology-aware StorageClass)
+Trident storage backends can be designed to selectively provision volumes based on availability zones (Topology-aware backend). For StorageClasses that make use of such a backend, a volume would only be created if requested by an application that is scheduled in a supported region/zone. (Topology-aware StorageClass)
 Refer link:https://docs.netapp.com/us-en/trident/trident-use/csi-topology.html[here] for additional details. 
 
 [underline]#*Demonstration Video*#
