@@ -58,6 +58,7 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 | RedHat Linux | Red Hat Enterprise Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
+| SnapCenter | Version 6.0.1 | Build 6.0.1.4487
 |===
 
 === Oracle Data Guard configuration with hypothetical NY to LA DR setup
@@ -84,18 +85,13 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 
 * *Azure NetApp Files Configuration.* Azure NetApp Files are allocated in the Azure NetApp storage account as `Capacity Pools`. In these tests and validations, we deployed a 2 TiB capacity pool to host Oracle primary at the East region and a standby database at the West 2 region. ANF capacity pool has three service levels: Standard, Premium, and Ultra.  The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level. For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement and sizing the database capacity pool accordingly. At a capacity pool creation, you can set QoS to Auto or Manual and data encryption at rest Single or Double.   
 
+* *dNFS Configuration.* By using dNFS, an Oracle database running on an Azure Virtual Machine with ANF storage can drive significantly more I/O than the native NFS client. Automated Oracle deployment using the NetApp automation toolkit automatically configures dNFS on NFSv3.
 
 == Solution deployment
 
-It is assumed that you already have your primary Oracle database deployed in AWS EC2 environment within a VPC as the starting point for setting up Data Guard. The primary database is deployed using Oracle ASM for storage management.  Two ASM disk groups - +DATA and +LOGS are created for Oracle data files, log files, and control file etc. For details on Oracle deployment in AWS with ASM, please refer to following technical reports for help. 
+It is assumed that you already have your primary Oracle database deployed in an Azure VM environment within a VNet as the starting point for setting up the Oracle Data Guard. Ideally, the primary database is deployed on ANF storage with NFS mount. Three NFS mount points are created for the Oracle database storage: mount /u01 for the Oracle binary files, mount /u02 for the Oracle data files and a control file, mount /u03 for the Oracle log files, and a redundant control file. 
 
-* link:aws_ora_fsx_ec2_deploy_intro.html[Oracle Database Deployment on EC2 and FSx Best Practices^]
-
-* link:aws_ora_fsx_ec2_iscsi_asm.html[Oracle Database Deployment and Protection in AWS FSx/EC2 with iSCSI/ASM^]
-
-* link:aws_ora_fsx_ec2_nfs_asm.html[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^]
-
-Your primary Oracle database can be running either on an FSx ONTAP or any other storage of choices within the AWS EC2 ecosystem. The following section provides step-by-step deployment procedures for setting up Oracle Data Guard between a primary EC2 DB instance with ASM storage to a standby EC2 DB instance with ASM storage.    
+Your primary Oracle database can also be running on a NetApp ONTAP storage or any other storage of choices either within the Azure ecosystem or a private data center. The following section provides step-by-step deployment procedures for setting up Oracle Data Guard between a primary Oracle DB in Azure with ANF storage to a physical standby Oracle DB in Azure with ANF storage.    
 
 === Prerequisites for deployment
 [%collapsible]
@@ -103,20 +99,35 @@ Your primary Oracle database can be running either on an FSx ONTAP or any other 
 
 Deployment requires the following prerequisites.
 
-. An AWS account has been set up, and the necessary VPC and network segments have been created within your AWS account.
+. An Azure cloud account has been set up, and the necessary VNet and network subnets have been created within your Azure account.
 
-. From the AWS EC2 console, you need to deploy minimum three EC2 Linux instances, one as the primary Oracle DB instance, one as standby Oracle DB instance, and an clone target DB instance for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the AWS link:https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html[User Guide for Linux instances^] for more information.
+. From the Azure cloud portal console, you need to deploy minimum three Azure Linux VMs, one as the primary Oracle DB server, one as standby Oracle DB server, and an clone target DB server for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the Microsoft link:https://azure.microsoft.com/en-us/products/virtual-machines[Azure Virtual Machines^] for more information. 
 
-. From the AWS EC2 console, deploy Amazon FSx ONTAP storage HA clusters to host Oracle volumes that stores the Oracle standby database. If you are not familiar with the deployment of FSx storage, see the documentation link:https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/creating-file-systems.html[Creating FSx ONTAP file systems^] for step-by-step instructions.
+. The primary Oracle database should have been installed and configured in the primary Oracle DB server. On the other hand, in the standby Oracle DB server or the clone Oracle DB server, only Oracle software is installed and no Oracle databases are created. Ideally, the Oracle files directories layout should be exactly matching on all Oracle DB servers. For details on NetApp recommendation for the Oracle deployment in Azure and ANF, please refer to the following technical reports for help. 
 
-. Steps 2 and 3 can be performed using the following Terraform automation toolkit, which creates an EC2 instance named `ora_01` and an FSx file system named `fsx_01`. Review the instruction carefully and change the variables to suit your environment before execution. The template can be easily revised for your own deployment requirements.
+* link:automation_ora_anf_nfs.html[TR-4987: Simplified, Automated Oracle Deployment on Azure NetApp Files with NFS^]
 +
-[source, cli]
-git clone https://github.com/NetApp-Automation/na_aws_fsx_ec2_deploy.git
-
 [NOTE]
 
-Ensure that you have allocated at least 50G in EC2 instance root volume in order to have sufficient space to stage Oracle installation files.
+Ensure that you have allocated at least 128G in the Azure VMs root volume in order to have sufficient space to stage Oracle installation files.
+
+. From the Azure cloud portal console, deploy two ANF storage capacity pools to host Oracle database volumes. The ANF storage capacity pools should be situated in different regions to mimic a true DataGuard configuration. If you are not familiar with the deployment of ANF storage, see the documentation link:https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-quickstart-set-up-account-create-volumes?tabs=azure-portal[Quickstart: Set up Azure NetApp Files and create an NFS volume^] for step-by-step instructions.
++
+image:azure_ora_anf_dg_anf_01.png["Screenshot showing Azure environment configuration."]
+
+. When the primary Oracle database and the standby Oracle database are situated in two different regions, a VPN gateway should be configured to allow data traffic flow between two separate VNets. Detailed networking configuration in Azure is beyond the scope of this document. Following screen shots provides some reference on how the VPN gateways are configured, connected, and the data traffics flow are confirmed in the lab. 
++
+Lab VPN gateways:
+image:azure_ora_anf_dg_vnet_01.png["Screenshot showing Azure environment configuration."]
++
+The primary vnet gateway:
+image:azure_ora_anf_dg_vnet_02.png["Screenshot showing Azure environment configuration."]
++
+Vnet gateway connection status:
+image:azure_ora_anf_dg_vnet_03.png["Screenshot showing Azure environment configuration."]
++
+Validate the traffic flows are established (click on three dots to open the page):
+image:azure_ora_anf_dg_vnet_04.png["Screenshot showing Azure environment configuration."]
 
 ====
 
