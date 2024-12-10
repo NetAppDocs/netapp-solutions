@@ -136,13 +136,42 @@ image:azure_ora_anf_dg_vnet_04.png["Screenshot showing Azure environment configu
 
 ====
 
-In this demonstration, we have setup a primary Oracle database called db1 on the primary EC2 DB instance with two ASM disk groups in standalone Restart configuration with data files in ASM disk group +DATA and flash recovery area in ASM disk group +LOGS. Following illustrates the detailed procedures for setting up primary database for Data Guard. All steps should be executed as database owner - oracle user.
+In this demonstration, we have setup a primary Oracle database called NTAP on the primary Azure DB server with three NFS mount points: /u01 for the Oracle binary, /u02 for the Oracle data files, and an Oracle control file, /u03 for the Oracle active logs, archived log files, and a redundant Oracle control file. Following illustrates the detailed procedures for setting up primary database for the Oracle Data Guard protection. All steps should be executed as the Oracle database owner or the default `oracle` user.
 
-. Primary database db1 configuration on primary EC2 DB instance ip-172-30-15-45. The ASM disk groups can be on any type of storage within EC2 ecosystem. 
+. The primary database NTAP on the primary Azure DB server orap.internal.cloudapp.net is initially deployed as a standalone database with the ANF as database storage.  
 +
 ....
 
-[oracle@ip-172-30-15-45 ~]$ cat /etc/oratab
+orap.internal.cloudapp.net:
+resource group: ANFAVSRG
+Location: East US
+size: Standard B4ms (4 vcpus, 16 GiB memory)
+OS: Linux (redhat 8.6)
+pub_ip: 172.190.207.231
+pri_ip: 10.0.0.4
+
+[oracle@orap ~]$ df -h
+Filesystem                 Size  Used Avail Use% Mounted on
+devtmpfs                   7.7G  4.0K  7.7G   1% /dev
+tmpfs                      7.8G     0  7.8G   0% /dev/shm
+tmpfs                      7.8G  209M  7.5G   3% /run
+tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/mapper/rootvg-rootlv   22G  413M   22G   2% /
+/dev/mapper/rootvg-usrlv    10G  2.1G  8.0G  21% /usr
+/dev/sda1                  496M  181M  315M  37% /boot
+/dev/mapper/rootvg-homelv  2.0G   47M  2.0G   3% /home
+/dev/sda15                 495M  5.8M  489M   2% /boot/efi
+/dev/mapper/rootvg-varlv   8.0G  1.1G  7.0G  13% /var
+/dev/mapper/rootvg-tmplv    12G  120M   12G   1% /tmp
+/dev/sdb1                   32G   49M   30G   1% /mnt
+10.0.2.36:/orap-u02        500G  7.7G  493G   2% /u02
+10.0.2.36:/orap-u03        450G  6.1G  444G   2% /u03
+10.0.2.36:/orap-u01        100G  9.9G   91G  10% /u01
+
+[oracle@orap ~]$ cat /etc/oratab
+#
+
+
 
 # This file is used by ORACLE utilities.  It is created by root.sh
 # and updated by either Database Configuration Assistant while creating
@@ -162,208 +191,239 @@ In this demonstration, we have setup a primary Oracle database called db1 on the
 # Multiple entries with the same $ORACLE_SID are not allowed.
 #
 #
-+ASM:/u01/app/oracle/product/19.0.0/grid:N
-db1:/u01/app/oracle/product/19.0.0/db1:N
+NTAP:/u01/app/oracle/product/19.0.0/NTAP:N
 
-[oracle@ip-172-30-15-45 ~]$ /u01/app/oracle/product/19.0.0/grid/bin/crsctl stat res -t
---------------------------------------------------------------------------------
-Name           Target  State        Server                   State details
---------------------------------------------------------------------------------
-Local Resources
---------------------------------------------------------------------------------
-ora.DATA.dg
-               ONLINE  ONLINE       ip-172-30-15-45          STABLE
-ora.LISTENER.lsnr
-               ONLINE  ONLINE       ip-172-30-15-45          STABLE
-ora.LOGS.dg
-               ONLINE  ONLINE       ip-172-30-15-45          STABLE
-ora.asm
-               ONLINE  ONLINE       ip-172-30-15-45          Started,STABLE
-ora.ons
-               OFFLINE OFFLINE      ip-172-30-15-45          STABLE
---------------------------------------------------------------------------------
-Cluster Resources
---------------------------------------------------------------------------------
-ora.cssd
-      1        ONLINE  ONLINE       ip-172-30-15-45          STABLE
-ora.db1.db
-      1        ONLINE  ONLINE       ip-172-30-15-45          Open,HOME=/u01/app/o
-                                                             racle/product/19.0.0
-                                                             /db1,STABLE
-ora.diskmon
-      1        OFFLINE OFFLINE                               STABLE
-ora.driver.afd
-      1        ONLINE  ONLINE       ip-172-30-15-45          STABLE
-ora.evmd
-      1        ONLINE  ONLINE       ip-172-30-15-45          STABLE
---------------------------------------------------------------------------------
+
 
 ....
 
-. From sqlplus, enable forced logging on primary.
+. Login primary DB server as the oracle user. Login database from sqlplus, enable forced logging on primary.
 +
 [source, cli]
 alter database force logging;
++
+....
+[oracle@orap admin]$ sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Tue Nov 26 20:12:02 2024
+Version 19.18.0.0.0
+
+Copyright (c) 1982, 2022, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.18.0.0.0
+
+SQL> alter database force logging;
+
+Database altered.
+
+....
 
 . From sqlplus, enable flashback on primary. Flashback allows easy reinstate primary database as a standby after a failover. 
 +
 [source, cli]
 alter database flashback on;
++
+....
 
-. Configure redo transport authentication using Oracle password file - create a pwd file on the primary using orapwd utility if not set and copy over to standby database $ORACLE_HOME/dbs directory.
+SQL> alter database flashback on;
 
-. Create standby redo logs on the primary DB with same size as current online log file. Log groups are one more than online log file groups. The primary database can then quickly transition to the standby role and begin receiving redo data, if necessary. 
+Database altered.
+
+....
+
+. Configure redo transport authentication using Oracle password file - create a pwd file on the primary using orapwd utility if it is not set and copy it over to standby database $ORACLE_HOME/dbs directory.
+
+. Create standby redo logs on the primary DB with same size as current online log file. Log groups are one more than online log file groups. The primary database then can quickly transition to the standby role when a failover happens and begins to receive redo data. Repeat the following command four times to create four standby log files.
 +
 [source, cli]
 alter database add standby logfile thread 1 size 200M;
 +
 ....
-Validate after standby logs addition:
+SQL> alter database add standby logfile thread 1 size 200M;
 
+Database altered.
+
+SQL> /
+
+Database altered.
+
+SQL> /
+
+Database altered.
+
+SQL> /
+
+Database altered.
+
+
+SQL> set lin 200
+SQL> col member for a80
 SQL> select group#, type, member from v$logfile;
 
     GROUP# TYPE    MEMBER
----------- ------- ------------------------------------------------------------
-         3 ONLINE  +DATA/DB1/ONLINELOG/group_3.264.1145821513
-         2 ONLINE  +DATA/DB1/ONLINELOG/group_2.263.1145821513
-         1 ONLINE  +DATA/DB1/ONLINELOG/group_1.262.1145821513
-         4 STANDBY +DATA/DB1/ONLINELOG/group_4.286.1146082751
-         4 STANDBY +LOGS/DB1/ONLINELOG/group_4.258.1146082753
-         5 STANDBY +DATA/DB1/ONLINELOG/group_5.287.1146082819
-         5 STANDBY +LOGS/DB1/ONLINELOG/group_5.260.1146082821
-         6 STANDBY +DATA/DB1/ONLINELOG/group_6.288.1146082825
-         6 STANDBY +LOGS/DB1/ONLINELOG/group_6.261.1146082827
-         7 STANDBY +DATA/DB1/ONLINELOG/group_7.289.1146082835
-         7 STANDBY +LOGS/DB1/ONLINELOG/group_7.262.1146082835
+---------- ------- --------------------------------------------------------------------------------
+         3 ONLINE  /u03/orareco/NTAP/onlinelog/redo03.log
+         2 ONLINE  /u03/orareco/NTAP/onlinelog/redo02.log
+         1 ONLINE  /u03/orareco/NTAP/onlinelog/redo01.log
+         4 STANDBY /u03/orareco/NTAP/onlinelog/o1_mf_4__2m115vkv_.log
+         5 STANDBY /u03/orareco/NTAP/onlinelog/o1_mf_5__2m3c5cyd_.log
+         6 STANDBY /u03/orareco/NTAP/onlinelog/o1_mf_6__2m4d7dhh_.log
+         7 STANDBY /u03/orareco/NTAP/onlinelog/o1_mf_7__2m5ct7g1_.log
 
-11 rows selected.
 ....
 
 . From sqlplus, create a pfile from spfile for editing.
 +
 [source, cli]
-create pfile='/home/oracle/initdb1.ora' from spfile;
+create pfile='/home/oracle/initNTAP.ora' from spfile;
 
 . Revise the pfile and add following parameters.
 +
+[source, cli]
+vi /home/oracle/initNTAP.ora
++
 ....
-DB_NAME=db1
-DB_UNIQUE_NAME=db1_NY
-LOG_ARCHIVE_CONFIG='DG_CONFIG=(db1_NY,db1_LA)'
-LOG_ARCHIVE_DEST_1='LOCATION=USE_DB_RECOVERY_FILE_DEST VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=db1_NY'
-LOG_ARCHIVE_DEST_2='SERVICE=db1_LA ASYNC VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE) DB_UNIQUE_NAME=db1_LA'
+Add following parameter if not exist:
+
+DB_NAME=NTAP
+DB_UNIQUE_NAME=NTAP_NY
+LOG_ARCHIVE_CONFIG='DG_CONFIG=(NTAP_NY,NTAP_LA)'
+LOG_ARCHIVE_DEST_1='LOCATION=USE_DB_RECOVERY_FILE_DEST VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=NTAP_NY'
+LOG_ARCHIVE_DEST_2='SERVICE=NTAP_LA ASYNC VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE) DB_UNIQUE_NAME=NTAP_LA'
 REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE
-FAL_SERVER=db1_LA
+FAL_SERVER=NTAP_LA
 STANDBY_FILE_MANAGEMENT=AUTO
 ....
 
-. From sqlplus, create spfile in ASM +DATA directory from revised pfile in /home/oracle directory.
+. From sqlplus, recreate spfile from revised pfile to overwrite the existing spfile in $ORACLE_HOME/dbs directory.
 +
 [source, cli]
-create spfile='+DATA' from pfile='/home/oracle/initdb1.ora';
+create spfile='$ORACLE_HOME/dbs/spfileNTAP.ora' from pfile='/home/oracle/initNTAP.ora';
 
-. Locate the newly created spfile under +DATA disk group(using asmcmd utility if necessary). Use srvctl to modify grid to start database from new spfile as shown below.
+. Modify Oracle tnsnames.ora in $ORACLE_HOME/network/admin directory to add db_unique_name for name resolution.
++
+[source, cli]
+vi $ORACLE_HOME/network/admin/tnsnames.ora
 +
 ....
-[oracle@ip-172-30-15-45 db1]$ srvctl config database -d db1
-Database unique name: db1
-Database name: db1
-Oracle home: /u01/app/oracle/product/19.0.0/db1
-Oracle user: oracle
-Spfile: +DATA/DB1/PARAMETERFILE/spfile.270.1145822903
-Password file:
-Domain: demo.netapp.com
-Start options: open
-Stop options: immediate
-Database role: PRIMARY
-Management policy: AUTOMATIC
-Disk Groups: DATA
-Services:
-OSDBA group:
-OSOPER group:
-Database instance: db1
-[oracle@ip-172-30-15-45 db1]$ srvctl modify database -d db1 -spfile +DATA/DB1/PARAMETERFILE/spfiledb1.ora
-[oracle@ip-172-30-15-45 db1]$ srvctl config database -d db1
-Database unique name: db1
-Database name: db1
-Oracle home: /u01/app/oracle/product/19.0.0/db1
-Oracle user: oracle
-Spfile: +DATA/DB1/PARAMETERFILE/spfiledb1.ora
-Password file:
-Domain: demo.netapp.com
-Start options: open
-Stop options: immediate
-Database role: PRIMARY
-Management policy: AUTOMATIC
-Disk Groups: DATA
-Services:
-OSDBA group:
-OSOPER group:
-Database instance: db1
-....
-
-. Modify tnsnames.ora to add db_unique_name for name resolution.
-+
-....
-# tnsnames.ora Network Configuration File: /u01/app/oracle/product/19.0.0/db1/network/admin/tnsnames.ora
+# tnsnames.ora Network Configuration File: /u01/app/oracle/product/19.0.0/NTAP/network/admin/tnsnames.ora
 # Generated by Oracle configuration tools.
 
-db1_NY =
+NTAP_NY =
   (DESCRIPTION =
-    (ADDRESS = (PROTOCOL = TCP)(HOST = ip-172-30-15-45.ec2.internal)(PORT = 1521))
+    (ADDRESS = (PROTOCOL = TCP)(HOST = orap.internal.cloudapp.net)(PORT = 1521))
     (CONNECT_DATA =
       (SERVER = DEDICATED)
-      (SID = db1)
+      (SID = NTAP)
     )
   )
 
-db1_LA =
+NTAP_LA =
   (DESCRIPTION =
-    (ADDRESS = (PROTOCOL = TCP)(HOST = ip-172-30-15-67.ec2.internal)(PORT = 1521))
+    (ADDRESS = (PROTOCOL = TCP)(HOST = oras.internal.cloudapp.net)(PORT = 1521))
     (CONNECT_DATA =
       (SERVER = DEDICATED)
-      (SID = db1)
+      (SID = NTAP)
     )
   )
 
-LISTENER_DB1 =
-  (ADDRESS = (PROTOCOL = TCP)(HOST = ip-172-30-15-45.ec2.internal)(PORT = 1521))
+LISTENER_NTAP =
+  (ADDRESS = (PROTOCOL = TCP)(HOST = orap.internal.cloudapp.net)(PORT = 1521))
 ....
++
+[NOTE]
+If you choose to name your Azure DB server differently than the default, add the names to local host file for host name resolution.
 
-. Add data guard service name db1_NY_DGMGRL.demo.netapp for primary database to listener.ora file.
+. Add data guard service name NTAP_NY_DGMGRL.internal.cloudapp.net for the primary database to listener.ora file.
++
+[source, cli]
+vi $ORACLE_HOME/network/admin/listener.ora
++
 ....
-#Backup file is  /u01/app/oracle/crsdata/ip-172-30-15-45/output/listener.ora.bak.ip-172-30-15-45.oracle line added by Agent
-# listener.ora Network Configuration File: /u01/app/oracle/product/19.0.0/grid/network/admin/listener.ora
+# listener.ora Network Configuration File: /u01/app/oracle/product/19.0.0/NTAP/network/admin/listener.ora
 # Generated by Oracle configuration tools.
 
-LISTENER =
+LISTENER.NTAP =
   (DESCRIPTION_LIST =
     (DESCRIPTION =
-      (ADDRESS = (PROTOCOL = TCP)(HOST = ip-172-30-15-45.ec2.internal)(PORT = 1521))
+      (ADDRESS = (PROTOCOL = TCP)(HOST = orap.internal.cloudapp.net)(PORT = 1521))
       (ADDRESS = (PROTOCOL = IPC)(KEY = EXTPROC1521))
     )
   )
 
-SID_LIST_LISTENER =
+SID_LIST_LISTENER.NTAP =
   (SID_LIST =
     (SID_DESC =
-      (GLOBAL_DBNAME = db1_NY_DGMGRL.demo.netapp.com)
-      (ORACLE_HOME = /u01/app/oracle/product/19.0.0/db1)
-      (SID_NAME = db1)
+      (GLOBAL_DBNAME = NTAP_NY_DGMGRL.internal.cloudapp.net)
+      (ORACLE_HOME = /u01/app/oracle/product/19.0.0/NTAP)
+      (SID_NAME = NTAP)
     )
   )
 
-ENABLE_GLOBAL_DYNAMIC_ENDPOINT_LISTENER=ON              # line added by Agent
-VALID_NODE_CHECKING_REGISTRATION_LISTENER=ON            # line added by Agent
 ....
 
-. Shutdown and restart database with srvctl and validate that data guard parameters are now active.
+. Shutdown and restart database via sqlplus and validate that data guard parameters are now active.
 +
 [source, cli]
-srvctl stop database -d db1
+shutdown immediate;
 +
 [source, cli]
-srvctl start database -d db1
+startup;
++
+....
+SQL> show parameter name
+
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- ------------------------------
+cdb_cluster_name                     string
+cell_offloadgroup_name               string
+db_file_name_convert                 string
+db_name                              string      NTAP
+db_unique_name                       string      NTAP_NY
+global_names                         boolean     FALSE
+instance_name                        string      NTAP
+lock_name_space                      string
+log_file_name_convert                string
+pdb_file_name_convert                string
+processor_group_name                 string
+
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- ------------------------------
+service_names                        string      NTAP_NY.internal.cloudapp.net
+SQL> sho parameter log_archive_dest
+
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- ------------------------------
+log_archive_dest                     string
+log_archive_dest_1                   string      LOCATION=USE_DB_RECOVERY_FILE_
+                                                 DEST VALID_FOR=(ALL_LOGFILES,A
+                                                 LL_ROLES) DB_UNIQUE_NAME=NTAP_
+                                                 NY
+log_archive_dest_10                  string
+log_archive_dest_11                  string
+log_archive_dest_12                  string
+log_archive_dest_13                  string
+log_archive_dest_14                  string
+log_archive_dest_15                  string
+
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- ------------------------------
+log_archive_dest_16                  string
+log_archive_dest_17                  string
+log_archive_dest_18                  string
+log_archive_dest_19                  string
+log_archive_dest_2                   string      SERVICE=NTAP_LA ASYNC VALID_FO
+                                                 R=(ONLINE_LOGFILES,PRIMARY_ROL
+                                                 E) DB_UNIQUE_NAME=NTAP_LA
+log_archive_dest_20                  string
+log_archive_dest_21                  string
+.
+.
+
+....
 
 This completes primary database setup for Data Guard.
 
