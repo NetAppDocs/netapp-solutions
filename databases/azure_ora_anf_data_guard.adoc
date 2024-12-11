@@ -856,16 +856,16 @@ In the event of a failure, Data Guard Broker can be used to failover primary dat
 
 ====
 
-The key benefit of staging standby database on AWS FSx ONTAP in Data Guard is that it can be FlexCloned to serve many other use cases with minimal additional storage investment. In the following section, we demonstrate how to snapshot and clone the mounted and under recovery standby database volumes on FSx ONTAP for other purposes, such as DEV, TEST, REPORT, etc., using the NetApp SnapCenter tool.
+The key benefit of hosting the Oracle standby database on the ANF in the Oracle Data Guard setup is that it can be cloned to serve many other use cases with minimal additional storage investment if a thin clone is enabled. NetApp recommends to use SnapCenter UI tool to manage your Oracle DataGuard database. In the following section, we demonstrate how to snapshot and clone the mounted and under recovery standby database volumes on the ANF for other purposes, such as DEV, TEST, REPORT, etc., using the NetApp SnapCenter tool.
 
-Following are high level procedures to clone a READ/WRITE database from the managed physical standby database in Data Guard using SnapCenter. For detail instructions on how to setup and configure SnapCenter, please refer to link:hybrid_dbops_snapcenter_usecases.html[Hybrid Cloud Database Solutions with SnapCenter^] relavant Oracle sections.
+Below are high level procedures to clone a READ/WRITE database from the managed physical standby database in the Oracle Data Guard using SnapCenter. For detail instructions on how to setup and configure SnapCenter for Oracle on ANF, please refer to TR-4988 link:snapctr_ora_azure_anf.html[Oracle Database Backup, Recovery, and Clone on ANF with SnapCenter^] for details. 
 
-. We begin with creating a test table and inserting a row into the test table on primary database. We will then validate if the transaction traverse down to standby and finally the clone. 
+. We begin the usecase validation by creating a test table and inserting a row into the test table at the primary database. We will then validate that the transaction traverses down to standby and finally the clone. 
 +
 ....
-[oracle@ip-172-30-15-45 db1]$ sqlplus / as sysdba
+[oracle@orap ~]$ sqlplus / as sysdba
 
-SQL*Plus: Release 19.0.0.0.0 - Production on Thu Aug 31 16:35:53 2023
+SQL*Plus: Release 19.0.0.0.0 - Production on Wed Dec 11 16:33:17 2024
 Version 19.18.0.0.0
 
 Copyright (c) 1982, 2022, Oracle.  All rights reserved.
@@ -875,18 +875,15 @@ Connected to:
 Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
 Version 19.18.0.0.0
 
-SQL> alter session set container=db1_pdb1;
+SQL> alter session set container=ntap_pdb1;
 
 Session altered.
 
-SQL> create table test(
-  2  id integer,
-  3  dt timestamp,
-  4  event varchar(100));
+SQL> create table test(id integer, dt timestamp, event varchar(100));
 
 Table created.
 
-SQL> insert into test values(1, sysdate, 'a test transaction on primary database db1 and ec2 db host: ip-172-30-15-45.ec2.internal');
+SQL> insert into test values(1, sysdate, 'a test transaction at primary database NTAP on DB server orap.internal.cloudapp.net');
 
 1 row created.
 
@@ -903,9 +900,10 @@ DT
 EVENT
 --------------------------------------------------------------------------------
          1
-31-AUG-23 04.49.29.000000 PM
-a test transaction on primary database db1 and ec2 db host: ip-172-30-15-45.ec2.
-internal
+11-DEC-24 04.38.44.000000 PM
+a test transaction at primary database NTAP on DB server orap.internal.cloudapp.
+net
+
 
 SQL> select instance_name, host_name from v$instance;
 
@@ -913,84 +911,88 @@ INSTANCE_NAME
 ----------------
 HOST_NAME
 ----------------------------------------------------------------
-db1
-ip-172-30-15-45.ec2.internal
+NTAP
+orap
+
+
+SQL>
+
 ....
 
-. Add FSx storage cluster to `Storage Systems` in SnapCenter with FSx cluster management IP and fsxadmin credential. 
+. In SnapCenter configuration, an unix user (azureuser for demo) and an Azure credential (azure_anf for demo) has been added to `Credential` in `Settings`.
 +
-image:aws_ora_fsx_data_guard_clone_01.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_config_17.png["Screenshot showing this step in the GUI."]
 
-. Add AWS ec2-user to `Credential` in `Settings`.
+. Use azure_anf credential to add the ANF storage to `Storage Systems`. If you have multiple ANF storage accounts in your Azure subsciption, make sure click the drop down list to choose the right storage account. We have created two dedicated Oracle storage accounts for this demonstration. 
 +
-image:aws_ora_fsx_data_guard_clone_02.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_config_16.png["Screenshot showing this step in the GUI."]
 
-. Add standby EC2 DB instance and clone EC2 DB instance to `Hosts`.
+. All Oracle DB servers have been added to SnapCenter `Hosts`.
 +
-image:aws_ora_fsx_data_guard_clone_03.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_config_18.png["Screenshot showing this step in the GUI."]
 +
 [NOTE]
 
-The clone EC2 DB instance should have similar Oracle software stacks installed and configured. In our test case, the grid infrastructure and Oracle 19C installed and configured but no database created. 
-
+The clone DB server should have identtical Oracle software stacks installed and configured. In our test case, Oracle 19C software is installed and configured but no database created. 
 
 . Create a backup policy that is tailored for offline/mount full database backup.
 +
-image:aws_ora_fsx_data_guard_clone_04.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_bkup_08.png["Screenshot showing this step in the GUI."]
 
-. Apply backup policy to protect standby database in `Resources` tab.
+. Apply backup policy to protect standby database in `Resources` tab. When initially discovered, the database status shows as `Not protected`. 
 +
-image:aws_ora_fsx_data_guard_clone_05.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_bkup_09.png["Screenshot showing this step in the GUI."]
 
-. Click on database name to open the database backups page. Select a backup to be used for database clone and click on `Clone` button to launch clone workflow. 
+. You have option to either trigger a backup manually or put it on a schedule at a set time after a backup policy applied. 
 +
-image:aws_ora_fsx_data_guard_clone_06.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_bkup_15.png["Screenshot showing this step in the GUI."]
+
+. After backup, click on database name to open the database backups page. Select a backup to be used for database clone and click on `Clone` button to launch clone workflow. 
++
+image:azure_ora_anf_dg_snapctr_clone_01.png["Screenshot showing this step in the GUI."]
 
 . Select `Complete Database Clone` and name the clone instance SID.
 +
-image:aws_ora_fsx_data_guard_clone_07.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_clone_02.png["Screenshot showing this step in the GUI."]
 
-. Select the clone host, which hosts the cloned database from standby DB. Accept the default for data files, control files, and redo logs. Two ASM disk groups will be created on the clone host that are corresponding to the disk groups on standby database.
+. Select the clone host, which hosts the cloned database from standby DB. Accept the default for data files, redo logs. Put a controlfile on /u03 mount point. 
 +
-image:aws_ora_fsx_data_guard_clone_08.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_clone_03.png["Screenshot showing this step in the GUI."]
 
-. No database credentials are needed for OS based authentication. Match Oracle home setting with what is configured on the clone EC2 database instance. 
+. No database credentials are needed for OS based authentication. Match Oracle home setting with what is configured on the clone DB server. 
 +
-image:aws_ora_fsx_data_guard_clone_09.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_clone_04.png["Screenshot showing this step in the GUI."]
 
-. Change clone database parameters if needed and specify scripts to run before cloen if any.
+. Change clone database parameters if needed such as lower PGA or SGA size for a clone DB. Specify scripts to run before clone if any.
 +
-image:aws_ora_fsx_data_guard_clone_10.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_clone_05.png["Screenshot showing this step in the GUI."]
 
 . Enter SQL to run after clone. In the demo, we executed commands to turn off database archive mode for a dev/test/report database. 
 +
-image:aws_ora_fsx_data_guard_clone_11.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_clone_06_1.png["Screenshot showing this step in the GUI."]
 
 . Configure email notification if desired.
 +
-image:aws_ora_fsx_data_guard_clone_12.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_clone_07.png["Screenshot showing this step in the GUI."]
 
 . Review the summary, click `Finish` to start the clone.
 +
-image:aws_ora_fsx_data_guard_clone_13.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_clone_08.png["Screenshot showing this step in the GUI."]
 
-. Monitor clone job in `Monitor` tab. We observed that it took around 8 minutes to clone a database about 300GB in database volume size.
+. Monitor clone job in `Monitor` tab. We observed that it took around 14 minutes to clone a database about 950GB in database volume size.
 +
-image:aws_ora_fsx_data_guard_clone_14.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_clone_09.png["Screenshot showing this step in the GUI."]
 
 . Validate the clone database from SnapCenter, which is immediately registered in `Resources` tab right after clone operation.
 +
-image:aws_ora_fsx_data_guard_clone_15.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_clone_10.png["Screenshot showing this step in the GUI."]
 
-. Query the clone database from clone EC2 instance. We validated that test transaction that occurred in primary database had traversed down to clone database. 
+. Query the clone database from clone DB server. We validated that test transaction that occurred in primary database had traversed down to clone database. 
 +
 ....
-[oracle@ip-172-30-15-126 ~]$ export ORACLE_HOME=/u01/app/oracle/product/19.0.0/dev
-[oracle@ip-172-30-15-126 ~]$ export ORACLE_SID=db1dev
-[oracle@ip-172-30-15-126 ~]$ export PATH=$PATH:$ORACLE_HOME/bin
-[oracle@ip-172-30-15-126 ~]$ sqlplus / as sysdba
+[oracle@orac ~]$ sqlplus / as sysdba
 
-SQL*Plus: Release 19.0.0.0.0 - Production on Wed Sep 6 16:41:41 2023
+SQL*Plus: Release 19.0.0.0.0 - Production on Wed Dec 11 20:16:09 2024
 Version 19.18.0.0.0
 
 Copyright (c) 1982, 2022, Oracle.  All rights reserved.
@@ -1004,7 +1006,7 @@ SQL> select name, open_mode, log_mode from v$database;
 
 NAME      OPEN_MODE            LOG_MODE
 --------- -------------------- ------------
-DB1DEV    READ WRITE           NOARCHIVELOG
+NTAPDEV   READ WRITE           NOARCHIVELOG
 
 SQL> select instance_name, host_name from v$instance;
 
@@ -1012,10 +1014,20 @@ INSTANCE_NAME
 ----------------
 HOST_NAME
 ----------------------------------------------------------------
-db1dev
-ip-172-30-15-126.ec2.internal
+NTAPDEV
+orac
 
-SQL> alter session set container=db1_pdb1;
+
+SQL> alter pluggable database all open;
+
+Pluggable database altered.
+
+SQL> alter pluggable database all save state;
+
+Pluggable database altered.
+
+
+SQL> alter session set container=ntap_pdb1;
 
 Session altered.
 
@@ -1028,17 +1040,16 @@ DT
 EVENT
 --------------------------------------------------------------------------------
          1
-31-AUG-23 04.49.29.000000 PM
-a test transaction on primary database db1 and ec2 db host: ip-172-30-15-45.ec2.
-internal
+11-DEC-24 04.38.44.000000 PM
+a test transaction at primary database NTAP on DB server orap.internal.cloudapp.
+net
 
-
-SQL>
 
 ....
 
 
-This completes the clone and validation of a new Oracle database from standby database in Data Guard on FSx storage for DEV, TEST, REPORT or any other use cases. Multiple Oracle databases can be cloned off the same standby database in Data Guard.
+This completes the demonstration of the Oracle standby database clone in the Oracle Data Guard on Azure ANF storage for DEV, TEST, REPORT, or any other use cases. Multiple Oracle databases can be cloned off the same standby database in the Oracle Data Guard on ANF.
+
 
 ====
 
@@ -1047,20 +1058,20 @@ This completes the clone and validation of a new Oracle database from standby da
 
 To learn more about the information described in this document, review the following documents and/or websites:
 
-*  Data Guard Concepts and Administration
+*  Azure NetApp Files
++
+link:https://azure.microsoft.com/en-us/products/netapp[Azure NetApp Files^]
+
+
+* TR-4988: Oracle Database Backup, Recovery, and Clone on ANF with SnapCenter
++
+link:https://docs.netapp.com/us-en/netapp-solutions/databases/snapctr_ora_azure_anf.html[https://docs.netapp.com/us-en/netapp-solutions/databases/snapctr_ora_azure_anf.html^]
+
+*  Oracle Data Guard Concepts and Administration
 +
 link:https://docs.oracle.com/en/database/oracle/oracle-database/19/sbydb/index.html#Oracle%C2%AE-Data-Guard[https://docs.oracle.com/en/database/oracle/oracle-database/19/sbydb/index.html#Oracle%C2%AE-Data-Guard^]
 
-*  WP-7357: Oracle Database Deployment on EC2 and FSx Best Practices
-+
-link:aws_ora_fsx_ec2_deploy_intro.html[Introduction]
 
 
-* Amazon FSx ONTAP
-+
-link:https://aws.amazon.com/fsx/netapp-ontap/[https://aws.amazon.com/fsx/netapp-ontap/^]
 
-* Amazon EC2
-+
-link:https://aws.amazon.com/pm/ec2/?trk=36c6da98-7b20-48fa-8225-4784bced9843&sc_channel=ps&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2&ef_id=Cj0KCQiA54KfBhCKARIsAJzSrdqwQrghn6I71jiWzSeaT9Uh1-vY-VfhJixF-xnv5rWwn2S7RqZOTQ0aAh7eEALw_wcB:G:s&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2[https://aws.amazon.com/pm/ec2/?trk=36c6da98-7b20-48fa-8225-4784bced9843&sc_channel=ps&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2&ef_id=Cj0KCQiA54KfBhCKARIsAJzSrdqwQrghn6I71jiWzSeaT9Uh1-vY-VfhJixF-xnv5rWwn2S7RqZOTQ0aAh7eEALw_wcB:G:s&s_kwcid=AL!4422!3!467723097970!e!!g!!aws%20ec2^]
 
