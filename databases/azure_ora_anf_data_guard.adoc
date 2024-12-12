@@ -444,15 +444,44 @@ Oracle Data Guard requires OS kernel configuration and Oracle software stacks in
 [source, cli]
 ansible-playbook -i hosts 4-oracle_config.yml -u azureuser -e @vars/vars.yml -t software_only_install
 
-. Set oracle home and path.
+. The standby Oracle DB server configuration at standby site in the demo lab. 
++
+....
+oras.internal.cloudapp.net:
+resource group: ANFAVSRG
+Location: West US 2
+size: Standard B4ms (4 vcpus, 16 GiB memory)
+OS: Linux (redhat 8.6)
+pub_ip: 172.179.119.75
+pri_ip: 10.0.1.4
+
+[oracle@oras ~]$ df -h
+Filesystem                 Size  Used Avail Use% Mounted on
+devtmpfs                   7.7G     0  7.7G   0% /dev
+tmpfs                      7.8G     0  7.8G   0% /dev/shm
+tmpfs                      7.8G  265M  7.5G   4% /run
+tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
+/dev/mapper/rootvg-rootlv   22G  413M   22G   2% /
+/dev/mapper/rootvg-usrlv    10G  2.1G  8.0G  21% /usr
+/dev/sda1                  496M  181M  315M  37% /boot
+/dev/mapper/rootvg-varlv   8.0G  985M  7.1G  13% /var
+/dev/mapper/rootvg-homelv  2.0G   52M  2.0G   3% /home
+/dev/mapper/rootvg-tmplv    12G  120M   12G   1% /tmp
+/dev/sda15                 495M  5.8M  489M   2% /boot/efi
+/dev/sdb1                   32G   49M   30G   1% /mnt
+10.0.3.36:/oras-u01        100G  9.5G   91G  10% /u01
+10.0.3.36:/oras-u02        500G  8.1G  492G   2% /u02
+10.0.3.36:/oras-u03        450G  4.8G  446G   2% /u03
+
+....
+
+. Once Oracle software is installed and configured, set oracle home and path. Also, from standby $ORACLE_HOME dbs directory, copy oracle password from primary database if you have not done so.
 +
 [source, cli]
 export ORACLE_HOME=/u01/app/oracle/product/19.0.0/NTAP
 +
 [source, cli]
 export PATH=$PATH:$ORACLE_HOME/bin
-
-. Once Oracle software is installed and configured, from standby $ORACLE_HOME dbs directory, copy oracle password from primary database if you have not done so.
 +
 [source, cli]
 scp oracle@10.0.0.4:$ORACLE_HOME/dbs/orapwNTAP .
@@ -1062,7 +1091,7 @@ To learn more about the information described in this document, review the follo
 
 * Azure NetApp Files
 +
-link:https://azure.microsoft.com/en-us/products/netapp[Azure NetApp Files^]
+link:https://azure.microsoft.com/en-us/products/netapp[https://azure.microsoft.com/en-us/products/netapp^]
 
 
 * TR-4988: Oracle Database Backup, Recovery, and Clone on ANF with SnapCenter
