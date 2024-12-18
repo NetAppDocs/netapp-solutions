@@ -33,10 +33,10 @@ This solution addresses the following use cases:
 
 This solution is intended for the following people:
 
-* A DBA who set up Oracle Active Data Guard in Azure cloud for high availability, data protection, and disaster recovery.
+* A DBA who sets up Oracle Active Data Guard in Azure cloud for high availability, data protection, and disaster recovery.
 * A database solution architect interested in Oracle Active Data Guard configuration in the Azure cloud.
 * A storage administrator who manages Azure NetApp Files storage that supports Oracle Data Guard.
-* An application owner who like to stand up Oracle Data Guard in Azure cloud environment.
+* An application owner who likes to stand up Oracle Data Guard in an Azure cloud environment.
 
 == Solution test and validation environment
 
@@ -51,14 +51,15 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| Azure NetApp Files | Current version offered by Microsoft | Two 2 TiB Capacity Pools, Standard Service Level, Auto QoS 
-| Azure VMs for DB Servers | Standard B4ms (4 vcpus, 16 GiB memory) | Three DB VMs, one as primary DB server, one as standby DB server, and the third as a clone DB server 
+| Azure NetApp Files | Current version offered by Microsoft | Two 3 TiB Capacity Pools, Standard Service Level, Auto QoS 
+| Azure VMs for DB Servers | Standard B4ms (4 vcpus, 16 GiB memory) | Three DB VMs, one as the primary DB server, one as the standby DB server, and the third as a clone DB server 
 
 3+^| *Software*
 | RedHat Linux | Red Hat Enterprise Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 | SnapCenter | Version 6.0.1 | Build 6.0.1.4487
+| NFS | Version 3.0 | dNFS enabled for Oracle
 |===
 
 === Oracle Data Guard configuration with hypothetical NY to LA DR setup
@@ -83,15 +84,15 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 
 * *Azure VM Sizing.* In these tests and validations, we used an Azure VM - Standard_B4ms with 4 vCPUs and16 GiB memory. You need to size the Azure DB VM appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
 
-* *Azure NetApp Files Configuration.* Azure NetApp Files are allocated in the Azure NetApp storage account as `Capacity Pools`. In these tests and validations, we deployed a 2 TiB capacity pool to host Oracle primary at the East region and a standby database at the West 2 region. ANF capacity pool has three service levels: Standard, Premium, and Ultra.  The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level. For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement and sizing the database capacity pool accordingly. At a capacity pool creation, you can set QoS to Auto or Manual and data encryption at rest Single or Double.   
+* *Azure NetApp Files Configuration.* Azure NetApp Files are allocated in the Azure NetApp storage account as `Capacity Pools`. In these tests and validations, we deployed a 3 TiB capacity pool to host Oracle primary at the East region and a standby database at the West 2 region. ANF capacity pool has three service levels: Standard, Premium, and Ultra.  The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level. For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement and sizing the database capacity pool accordingly. At a capacity pool creation, you can set QoS to Auto or Manual and data encryption at rest Single or Double.   
 
 * *dNFS Configuration.* By using dNFS, an Oracle database running on an Azure Virtual Machine with ANF storage can drive significantly more I/O than the native NFS client. Automated Oracle deployment using the NetApp automation toolkit automatically configures dNFS on NFSv3.
 
 == Solution deployment
 
-It is assumed that you already have your primary Oracle database deployed in an Azure VM environment within a VNet as the starting point for setting up the Oracle Data Guard. Ideally, the primary database is deployed on ANF storage with NFS mount. Three NFS mount points are created for the Oracle database storage: mount /u01 for the Oracle binary files, mount /u02 for the Oracle data files and a control file, mount /u03 for the Oracle log files, and a redundant control file. 
+It is assumed that you already have your primary Oracle database deployed in an Azure cloud environment within a VNet as the starting point for setting up the Oracle Data Guard. Ideally, the primary database is deployed on ANF storage with NFS mount. Three NFS mount points are created for the Oracle database storage: mount /u01 for the Oracle binary files, mount /u02 for the Oracle data files and a control file, mount /u03 for the Oracle current and archived log files, and a redundant control file. 
 
-Your primary Oracle database can also be running on a NetApp ONTAP storage or any other storage of choices either within the Azure ecosystem or a private data center. The following section provides step-by-step deployment procedures for setting up Oracle Data Guard between a primary Oracle DB in Azure with ANF storage to a physical standby Oracle DB in Azure with ANF storage.    
+Your primary Oracle database can also be running on a NetApp ONTAP storage or any other storage of choices either within the Azure ecosystem or a private data center. The following section provides step-by-step deployment procedures for setting up an Oracle Data Guard between a primary Oracle DB in Azure with ANF storage to a physical standby Oracle DB in Azure with ANF storage.    
 
 === Prerequisites for deployment
 [%collapsible]
@@ -101,9 +102,9 @@ Deployment requires the following prerequisites.
 
 . An Azure cloud account has been set up, and the necessary VNet and network subnets have been created within your Azure account.
 
-. From the Azure cloud portal console, you need to deploy minimum three Azure Linux VMs, one as the primary Oracle DB server, one as standby Oracle DB server, and an clone target DB server for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the Microsoft link:https://azure.microsoft.com/en-us/products/virtual-machines[Azure Virtual Machines^] for more information. 
+. From the Azure cloud portal console, you need to deploy minimum three Azure Linux VMs, one as the primary Oracle DB server, one as the standby Oracle DB server, and a clone target DB server for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the Microsoft link:https://azure.microsoft.com/en-us/products/virtual-machines[Azure Virtual Machines^] for more information. 
 
-. The primary Oracle database should have been installed and configured in the primary Oracle DB server. On the other hand, in the standby Oracle DB server or the clone Oracle DB server, only Oracle software is installed and no Oracle databases are created. Ideally, the Oracle files directories layout should be exactly matching on all Oracle DB servers. For details on NetApp recommendation for the Oracle deployment in Azure and ANF, please refer to the following technical reports for help. 
+. The primary Oracle database should have been installed and configured in the primary Oracle DB server. On the other hand, in the standby Oracle DB server or the clone Oracle DB server, only Oracle software is installed and no Oracle databases are created. Ideally, the Oracle files directories layout should be exactly matching on all Oracle DB servers. For details on NetApp recommendation for automated Oracle deployment in the Azure cloud and ANF, please refer to the following technical reports for help. 
 
 * link:automation_ora_anf_nfs.html[TR-4987: Simplified, Automated Oracle Deployment on Azure NetApp Files with NFS^]
 +
@@ -126,7 +127,7 @@ image:azure_ora_anf_dg_vnet_02.png["Screenshot showing Azure environment configu
 Vnet gateway connection status:
 image:azure_ora_anf_dg_vnet_03.png["Screenshot showing Azure environment configuration."]
 +
-Validate the traffic flows are established (click on three dots to open the page):
+Validate that the traffic flows are established (click on three dots to open the page):
 image:azure_ora_anf_dg_vnet_04.png["Screenshot showing Azure environment configuration."]
 
 ====
@@ -221,7 +222,7 @@ Database altered.
 
 ....
 
-. From sqlplus, enable flashback on primary. Flashback allows easy reinstate primary database as a standby after a failover. 
+. From sqlplus, enable flashback on the primary DB. Flashback allows easy reinstate primary database as a standby after a failover. 
 +
 [source, cli]
 alter database flashback on;
@@ -286,7 +287,7 @@ create pfile='/home/oracle/initNTAP.ora' from spfile;
 vi /home/oracle/initNTAP.ora
 +
 ....
-Add following parameter if not exist:
+Update the following parameters if not set:
 
 DB_NAME=NTAP
 DB_UNIQUE_NAME=NTAP_NY
@@ -425,7 +426,7 @@ log_archive_dest_21                  string
 
 ....
 
-This completes primary database setup for Data Guard.
+This completes the primary database setup for Data Guard.
 
 ====
 
@@ -475,7 +476,7 @@ tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
 
 ....
 
-. Once Oracle software is installed and configured, set oracle home and path. Also, from standby $ORACLE_HOME dbs directory, copy oracle password from primary database if you have not done so.
+. Once Oracle software is installed and configured, set oracle home and path. Also, from the standby $ORACLE_HOME dbs directory, copy oracle password from primary database if you have not done so.
 +
 [source, cli]
 export ORACLE_HOME=/u01/app/oracle/product/19.0.0/NTAP
@@ -486,7 +487,7 @@ export PATH=$PATH:$ORACLE_HOME/bin
 [source, cli]
 scp oracle@10.0.0.4:$ORACLE_HOME/dbs/orapwNTAP .
 
-. Create tnsnames.ora file with following entries.
+. Update tnsnames.ora file with following entries.
 +
 [source, cli]
 vi $ORACLE_HOME/network/admin/tnsnames.ora
@@ -560,7 +561,7 @@ LISTENER =
 
 
 
-. Use dbca to instantiate standby database from primary database NTAP.
+. Launch dbca to instantiate the standby database from the primary database NTAP.
 +
 [source, cli]
 dbca -silent -createDuplicateDB -gdbName NTAP -primaryDBConnectionString orap.internal.cloudapp.net:1521/NTAP_NY.internal.cloudapp.net -sid NTAP -initParams fal_server=NTAP_NY -createAsStandby -dbUniqueName NTAP_LA
@@ -586,7 +587,7 @@ Look at the log file "/u01/app/oracle/cfgtoollogs/dbca/NTAP_LA/NTAP_LA.log" for 
 
 ....
 
-. Validate duplicated standby database. Newly duplicated standby database open in READ ONLY mode initially.
+. Validate the duplicated standby database. Newly duplicated standby database open in READ ONLY mode initially.
 +
 ....
 
@@ -716,7 +717,7 @@ SQL> select group#, type, member from v$logfile order by 2, 1;
 
 ....
 
-. Restart standby database in `mount` stage and execute following command to activate standby database managed recovery.
+. Restart the standby database in `mount` stage and execute following command to activate standby database managed recovery.
 +
 [source, cli]
 alter database recover managed standby database disconnect from session;
@@ -792,7 +793,7 @@ This completes the Data Guard protection setup for NTAP from primary to standby 
 
 Oracle Data Guard broker is a distributed management framework that automates and centralizes the creation, maintenance, and monitoring of Oracle Data Guard configurations. Following section demonstrate how to setup Data Guard Broker to manage Data Guard environment.
 
-. Start data guard broker on both primary and standby databases with following command via sqlplus.
+. Start data guard broker on both the primary and the standby databases with following command via sqlplus.
 +
 [source, cli]
 alter system set dg_broker_start=true scope=both;
@@ -842,7 +843,7 @@ SUCCESS   (status updated 3 seconds ago)
 
 ....
 
-. Validate database status within Data Guard Broker management framework.
+. Validate the database status within the Data Guard Broker management framework.
 +
 ....
 
@@ -878,7 +879,7 @@ DGMGRL>
 
 ....
 
-In the event of a failure, Data Guard Broker can be used to failover primary database to standby instantaniouly. If `Fast-Start Failover` is enabled, Data Guard Broker can failover primary database to standby when a failure is detected without an user intervention.
+In the event of a failure, Data Guard Broker can be used to failover the primary database to the standby instantaniouly. If `Fast-Start Failover` is enabled, Data Guard Broker can failover the primary database to the standby when a failure is detected without an user intervention.
 
 ====
 
@@ -887,7 +888,7 @@ In the event of a failure, Data Guard Broker can be used to failover primary dat
 
 ====
 
-The key benefit of hosting the Oracle standby database on the ANF in the Oracle Data Guard setup is that it can be cloned to serve many other use cases with minimal additional storage investment if a thin clone is enabled. NetApp recommends to use SnapCenter UI tool to manage your Oracle DataGuard database. In the following section, we demonstrate how to snapshot and clone the mounted and under recovery standby database volumes on the ANF for other purposes, such as DEV, TEST, REPORT, etc., using the NetApp SnapCenter tool.
+The key benefit of hosting the Oracle standby database on the ANF in the Oracle Data Guard setup is that it can be quickly cloned to serve many other use cases with minimal additional storage investment if a thin clone is enabled. NetApp recommends to use SnapCenter UI tool to manage your Oracle DataGuard database. In the following section, we demonstrate how to snapshot and clone the mounted and under recovery standby database volumes on the ANF for other purposes, such as DEV, TEST, REPORT, etc., using the NetApp SnapCenter tool.
 
 Below are high level procedures to clone a READ/WRITE database from the managed physical standby database in the Oracle Data Guard using SnapCenter. For detail instructions on how to setup and configure SnapCenter for Oracle on ANF, please refer to TR-4988 link:snapctr_ora_azure_anf.html[Oracle Database Backup, Recovery, and Clone on ANF with SnapCenter^] for details. 
 
@@ -968,25 +969,25 @@ The clone DB server should have identtical Oracle software stacks installed and 
 
 . Create a backup policy that is tailored for offline/mount full database backup.
 +
-image:azure_ora_anf_dg_snapctr_bkup_08.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_bkup_08.PNG["Screenshot showing this step in the GUI."]
 
 . Apply backup policy to protect standby database in `Resources` tab. When initially discovered, the database status shows as `Not protected`. 
 +
-image:azure_ora_anf_dg_snapctr_bkup_09.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_bkup_09.PNG["Screenshot showing this step in the GUI."]
 
 . You have option to either trigger a backup manually or put it on a schedule at a set time after a backup policy applied. 
 +
-image:azure_ora_anf_dg_snapctr_bkup_15.png["Screenshot showing this step in the GUI."]
+image:azure_ora_anf_dg_snapctr_bkup_15.PNG["Screenshot showing this step in the GUI."]
 
-. After backup, click on database name to open the database backups page. Select a backup to be used for database clone and click on `Clone` button to launch clone workflow. 
+. After a backup, click on database name to open the database backups page. Select a backup to be used for database clone and click on `Clone` button to launch clone workflow. 
 +
 image:azure_ora_anf_dg_snapctr_clone_01.png["Screenshot showing this step in the GUI."]
 
-. Select `Complete Database Clone` and name the clone instance SID.
+. Select the `Complete Database Clone` and name the clone instance SID.
 +
 image:azure_ora_anf_dg_snapctr_clone_02.png["Screenshot showing this step in the GUI."]
 
-. Select the clone host, which hosts the cloned database from standby DB. Accept the default for data files, redo logs. Put a controlfile on /u03 mount point. 
+. Select the clone DB server, which hosts the cloned database from the standby DB. Accept the default for data files, redo logs. Put a controlfile on /u03 mount point. 
 +
 image:azure_ora_anf_dg_snapctr_clone_03.png["Screenshot showing this step in the GUI."]
 
@@ -994,11 +995,11 @@ image:azure_ora_anf_dg_snapctr_clone_03.png["Screenshot showing this step in the
 +
 image:azure_ora_anf_dg_snapctr_clone_04.png["Screenshot showing this step in the GUI."]
 
-. Change clone database parameters if needed such as lower PGA or SGA size for a clone DB. Specify scripts to run before clone if any.
+. Change clone database parameters if needed such as lowering PGA or SGA size for a clone DB. Specify scripts to run before the clone if any.
 +
 image:azure_ora_anf_dg_snapctr_clone_05.png["Screenshot showing this step in the GUI."]
 
-. Enter SQL to run after clone. In the demo, we executed commands to turn off database archive mode for a dev/test/report database. 
+. Enter SQL to run after the clone. In the demo, we executed commands to turn off database archive mode for a dev/test/report database. 
 +
 image:azure_ora_anf_dg_snapctr_clone_06_1.png["Screenshot showing this step in the GUI."]
 
@@ -1010,7 +1011,7 @@ image:azure_ora_anf_dg_snapctr_clone_07.png["Screenshot showing this step in the
 +
 image:azure_ora_anf_dg_snapctr_clone_08.png["Screenshot showing this step in the GUI."]
 
-. Monitor clone job in `Monitor` tab. We observed that it took around 14 minutes to clone a database about 950GB in database volume size.
+. Monitor the clone job in `Monitor` tab. We observed that it took around 14 minutes to clone a database about 950GB in database volume size.
 +
 image:azure_ora_anf_dg_snapctr_clone_09.png["Screenshot showing this step in the GUI."]
 
@@ -1018,7 +1019,7 @@ image:azure_ora_anf_dg_snapctr_clone_09.png["Screenshot showing this step in the
 +
 image:azure_ora_anf_dg_snapctr_clone_10.png["Screenshot showing this step in the GUI."]
 
-. Query the clone database from clone DB server. We validated that test transaction that occurred in primary database had traversed down to clone database. 
+. Query the clone database from clone DB server. We validated that test transaction that occurred in primary database had traversed down to the clone database. 
 +
 ....
 [oracle@orac ~]$ sqlplus / as sysdba
