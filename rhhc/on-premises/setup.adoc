@@ -1,0 +1,133 @@
+---
+sidebar: sidebar
+permalink: rhhc/on-premises/setup.html
+keywords: NetApp Solutions, redhat OpenShift, red hat OpenShift, redhat openshift container platform, ocp, openshift container platform, Advanced Cluster Management, ACM, Hub Cluster, containers, container workloads, VMware, customer managed storage, ONTAP
+summary:
+---
+
+= Deploy and configure the Red Hat OpenShift Container platform on VMware
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./../../media/
+
+[.lead]
+This section describes a high-level workflow of how to set up and manage OpenShift clusters and manage stateful applications on them. It shows the use of NetApp ONTAP storage arrays with the help of Astra Trident to provide persistent volumes. Details are provided about the use of Astra Control Center to perform data protection and migration activities for the stateful applications.
+
+NOTE: There are several ways of deploying Red Hat OpenShift Container platform clusters. This high-level description of the setup provides documentation links for the specific method that was used. You can refer to the other methods in the relevant links provided in the link:../rhhc-resources.html[resources section].
+
+Here is a diagram that depicts the clusters deployed on VMware in a data center.
+
+image:rhhc-on-premises.png[]
+
+
+The setup process can be broken down into the following steps:
+
+.Deploy and configure a CentOS VM
+[%collapsible]
+====
+
+* It is deployed in the VMware vSphere environment.
+* This VM is used for deploying some components such as NetApp Astra Trident and NetApp Astra Control Center for the solution. 
+* A root user is configured on this VM during installation.
+
+====
+
+.Deploy and configure an OpenShift Container Platform cluster on VMware vSphere (Hub Cluster)
+[%collapsible]
+====
+
+Refer to the instructions for the link:https://access.redhat.com/documentation/en-us/assisted_installer_for_openshift_container_platform/2022/html/assisted_installer_for_openshift_container_platform/installing-on-vsphere#doc-wrapper/[Assisted deployment] method to deploy an OCP cluster.
+
+TIP: Remember the following:
+- Create ssh public and private key to provide to the installer. These keys will be used to login to the master and worker nodes if needed.
+- Download the installer program from the assisted installer. This program is used to boot the VMs that you create in the VMware vSphere environment for the master and worker nodes.  
+- VMs should have the minimum CPU, memory, and hard disk requirement. (Refer to the vm create commands on link:https://access.redhat.com/documentation/en-us/assisted_installer_for_openshift_container_platform/2022/html/assisted_installer_for_openshift_container_platform/installing-on-vsphere#doc-wrapper/[this] page for the master and the worker nodes which provide this information) 
+- The diskUUID should be enabled on all VMs.
+- Create a minimum of 3 nodes for master and 3 nodes for worker.
+- Once they are discovered by the installer, turn on the VMware vSphere integration toggle button.
+
+====
+
+.Install Advanced Cluster Management on the Hub cluster
+[%collapsible]
+====
+
+This is installed using the Advanced Cluster Management Operator on the Hub Cluster.
+Refer to the instructions link:https://access.redhat.com/documentation/en-us/red_hat_advanced_cluster_management_for_kubernetes/2.7/html/install/installing#doc-wrapper[here]. 	
+
+====
+
+
+.Install an internal Red Hat Quay registry on the Hub Cluster. 
+[%collapsible]
+====
+
+* An internal registry is required to push the Astra image. A Quay internal registry is installed using the Operator in the Hub cluster. 
+* Refer to the instructions link:https://access.redhat.com/documentation/en-us/red_hat_quay/2.9/html-single/deploy_red_hat_quay_on_openshift/index#installing_red_hat_quay_on_openshift[here] 
+
+====
+
+
+.Install two additional OCP clusters (Source and Destination)
+[%collapsible]
+====
+* The additional clusters can be deployed using the ACM on the Hub Cluster.
+* Refer to the instructions link:https://access.redhat.com/documentation/en-us/red_hat_advanced_cluster_management_for_kubernetes/2.7/html/clusters/cluster_mce_overview#vsphere_prerequisites[here].
+
+====
+
+.Configure NetApp ONTAP storage
+[%collapsible]
+
+====
+* Install an ONTAP cluster with connectivity to the OCP VMs in VMWare environment. 
+* Create an SVM.
+* Configure NAS data lif to access the storage in SVM.
+
+====
+
+.Install NetApp Trident on the OCP clusters
+[%collapsible]
+====
+
+* Install NetApp Trident on all three clusters: Hub, source, and destination clusters
+* Refer to the instructions link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-operator.html[here].
+* Create a storage backend for ontap-nas .
+* Create a storage class for ontap-nas.
+* Refer to instructions link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-postdeployment.html[here].
+
+====
+
+.Install NetApp Astra Control Center
+[%collapsible]
+
+====
+* NetApp Astra Control Center is installed using the Astra Operator on the Hub Cluster. 
+* Refer to the instructions link:https://docs.netapp.com/us-en/astra-control-center/get-started/acc_operatorhub_install.html[here].
+
+Points to remember:
+* Download NetApp Astra Control Center image from the support site.
+* Push the image to an internal registry. 
+* Refer to instructions here.
+
+====
+
+.Deploy an Application on Source Cluster
+[%collapsible]
+====
+Use OpenShift GitOps to deploy an application. (eg. Postgres, Ghost)
+
+====
+
+.Add the Source and Destination clusters into Astra Control Center.
+[%collapsible]
+====
+
+After you add a cluster to Astra Control management, you can install apps on the cluster (outside of Astra Control) and then go to the Applications page in Astra Control to define the apps and their resources. Refer to link:https://docs.netapp.com/us-en/astra-control-center/use/manage-apps.html[Start managing apps section of Astra Control Center].
+
+====
+
+The next step is to use the Astra Control Center for Data protection and Data migration from the source to the destination cluster.
+
