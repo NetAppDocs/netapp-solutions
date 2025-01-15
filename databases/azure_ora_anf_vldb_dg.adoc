@@ -15,17 +15,17 @@ summary: "The solution provides an overview and details for configuring high thr
 Allen Cao, Niyaz Mohamed, NetApp
 
 [.lead]
-The solution provides an overview and details for configuring high throughput Oracle Very Large Database (VLDB) on Microsoft Azure NetApp Files (ANF) with Oracle Data Guard in Azure cloud.
+The solution provides an overview and details for configuring a high-throughput Oracle Very Large Database (VLDB) on Microsoft Azure NetApp Files (ANF) with Oracle Data Guard in the Azure cloud.
 
 == Purpose
 
-High throughput Oracle VLDB put a heavy demand on backend storage for the database. This is particularly important in the public cloud in order to meet service level agreement (SLA). Azure NetApp Files
+High throughput and mission-critical Oracle VLDB put a heavy demand on backend database storage. To meet service level agreement (SLA), the database storage must deliver the required capacity and high input/output operations per second (IOPS) while maintaining sub milliseconds latency performance. This is particularly challenging when deploying such a database workload in the public cloud with a shared storage resources environment. Not all storage platforms are created equal. Premium Azure NetApp Files storage in combination with Azure infrastructure can meet the needs of such a highly demanding Oracle workload. In a validated performance benchmark (link:https://learn.microsoft.com/en-us/azure/azure-netapp-files/performance-oracle-multiple-volumes[Oracle database performance on Azure NetApp Files multiple volumes^]), ANF can deliver 2.5 million read IOPS with 700 microseconds latency in a synthetic 100% random select workload via the SLOB tool. With a standard 8k block size, this translates to about 20 GiB/s throughput.
 
-If you are keen on cutting back cost of your Oracle database operation and are planning to set up an Active Data Guard in Azure cloud, you should consider an alternative. Instead of Active Data Guard, use Data Guard to replicate from primary database to a single physical standby database on Azure NetApp Files storage. Subsequently, multiple copies of this standby database can be cloned and opened for read/write access to serve many other use cases such as reporting, development, test etc. The net results effectively deliver functionalities of Active Data Guard while eliminating Active Data Guard license. In this documentation, we demonstrate how to setup an Oracle Data Guard with your existing primary database and physical standby database on ANF storage. The standby database is backed up and cloned for read/write access for use cases as desired via NetApp SnapCenter database management tool. NetApp Solutions Engineering team also provides an automation tool kit to refresh clone on user defined schedule for a complete, automated database clone lifecycle management without needs of user intervention.
+In this documentation, we demonstrate how to set up an Oracle VLDB with Data Guard configuration on ANF storage with multiple NFS volumes and Oracle ASM for storage load balancing. The standby database can be quickly (mins) backed up and cloned for read/write access for use cases as desired via the NetApp SnapCenter database management tool. NetApp Solutions Engineering team also provides an automation toolkit to refresh clones on a user-defined schedule for a complete, automated database clone lifecycle management without user intervention.
 
 This solution addresses the following use cases:
 
-* Implementation of Oracle Data Guard between a primary database and physical standby database on Microsoft Azure NetApp Files storage across Azure regions.
+* Implementation of Oracle VLDB in a Data Guard setting on Microsoft Azure NetApp Files storage across Azure regions.
 * Backup and clone the physical standby database to serve use cases such as reporting, dev, test, etc. 
 * Oracle database clone refresh lifecycle management via automation.
 
@@ -33,10 +33,10 @@ This solution addresses the following use cases:
 
 This solution is intended for the following people:
 
-* A DBA who sets up Oracle Active Data Guard in Azure cloud for high availability, data protection, and disaster recovery.
-* A database solution architect interested in Oracle Active Data Guard configuration in the Azure cloud.
-* A storage administrator who manages Azure NetApp Files storage that supports Oracle Data Guard.
-* An application owner who likes to stand up Oracle Data Guard in an Azure cloud environment.
+* A DBA who sets up Oracle VLDB with Active Data Guard in Azure cloud for high availability, data protection, and disaster recovery.
+* A database solution architect interested in Oracle VLDB with Active Data Guard configuration in the Azure cloud.
+* A storage administrator who manages Azure NetApp Files storage that supports Oracle database.
+* An application owner who likes to stand up Oracle VLDB with Data Guard in an Azure cloud environment.
 
 == Solution test and validation environment
 
@@ -51,18 +51,20 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| Azure NetApp Files | Current version offered by Microsoft | Two 3 TiB Capacity Pools, Standard Service Level, Auto QoS 
+| Azure NetApp Files | Current version offered by Microsoft | Two 4 TiB Capacity Pools, Premium Service Level, Auto QoS 
 | Azure VMs for DB Servers | Standard B4ms (4 vcpus, 16 GiB memory) | Three DB VMs, one as the primary DB server, one as the standby DB server, and the third as a clone DB server 
 
 3+^| *Software*
 | RedHat Linux | Red Hat Enterprise Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
+| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
+| dNFS OneOff Patch | p32931941_190000_Linux-x86-64.zip | Applied to both grid and database
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 | SnapCenter | Version 6.0.1 | Build 6.0.1.4487
 | NFS | Version 3.0 | dNFS enabled for Oracle
 |===
 
-=== Oracle Data Guard configuration with hypothetical NY to LA DR setup
+=== Oracle VLDB Data Guard configuration with hypothetical NY to LA DR setup
 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
@@ -86,7 +88,7 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 
 * *Azure NetApp Files Configuration.* Azure NetApp Files are allocated in the Azure NetApp storage account as `Capacity Pools`. In these tests and validations, we deployed a 3 TiB capacity pool to host Oracle primary at the East region and a standby database at the West 2 region. ANF capacity pool has three service levels: Standard, Premium, and Ultra.  The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level. For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement and sizing the database capacity pool accordingly. At a capacity pool creation, you can set QoS to Auto or Manual and data encryption at rest Single or Double.   
 
-* *dNFS Configuration.* By using dNFS, an Oracle database running on an Azure Virtual Machine with ANF storage can drive significantly more I/O than the native NFS client. Automated Oracle deployment using the NetApp automation toolkit automatically configures dNFS on NFSv3.
+* *dNFS Configuration.* By using dNFS, an Oracle database running on an Azure Virtual Machine with ANF storage can drive significantly more I/O than the native NFS client. 
 
 == Solution deployment
 
