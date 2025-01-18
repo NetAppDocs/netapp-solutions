@@ -21,13 +21,12 @@ The solution provides an overview and details for configuring a high-throughput 
 
 High throughput and mission-critical Oracle VLDB put a heavy demand on backend database storage. To meet service level agreement (SLA), the database storage must deliver the required capacity and high input/output operations per second (IOPS) while maintaining sub milliseconds latency performance. This is particularly challenging when deploying such a database workload in the public cloud with a shared storage resources environment. Not all storage platforms are created equal. Premium Azure NetApp Files storage in combination with Azure infrastructure can meet the needs of such a highly demanding Oracle workload. In a validated performance benchmark (link:https://learn.microsoft.com/en-us/azure/azure-netapp-files/performance-oracle-multiple-volumes[Oracle database performance on Azure NetApp Files multiple volumes^]), ANF can deliver 2.5 million read IOPS with 700 microseconds latency in a synthetic 100% random select workload via the SLOB tool. With a standard 8k block size, this translates to about 20 GiB/s throughput.
 
-In this documentation, we demonstrate how to set up an Oracle VLDB with Data Guard configuration on ANF storage with multiple NFS volumes and Oracle ASM for storage load balancing. The standby database can be quickly (mins) backed up and cloned for read/write access for use cases as desired via the NetApp SnapCenter database management tool. NetApp Solutions Engineering team also provides an automation toolkit to refresh clones on a user-defined schedule for a complete, automated database clone lifecycle management without user intervention.
+In this documentation, we demonstrate how to set up an Oracle VLDB with Data Guard configuration on ANF storage with multiple NFS volumes and Oracle ASM for storage load balancing. The standby database can be quickly (mins) backed up via snapshot and cloned for read/write access for use cases as desired. NetApp Solutions Engineering team provides an automation toolkit to create and refresh clones with ease.
 
 This solution addresses the following use cases:
 
 * Implementation of Oracle VLDB in a Data Guard setting on Microsoft Azure NetApp Files storage across Azure regions.
-* Backup and clone the physical standby database to serve use cases such as reporting, dev, test, etc. 
-* Oracle database clone refresh lifecycle management via automation.
+* Snapshot backup and clone the physical standby database to serve use cases such as reporting, dev, test, etc. via automation. 
 
 == Audience
 
@@ -44,7 +43,7 @@ The testing and validation of this solution was performed in an Azure cloud lab 
 
 === Architecture
 
-image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed picture of the Oracle Data Guard implementation in Azure cloud on ANF."]
+image:azure_ora_anf_vldb_dg_architecture.png["This image provides a detailed picture of the Oracle Data Guard implementation in Azure cloud on ANF."]
 
 === Hardware and software components
 
@@ -76,25 +75,19 @@ image:azure_ora_anf_data_guard_architecture.png["This image provides a detailed 
 
 === Key factors for deployment consideration
 
-* *Standby Database Clone.* While receiving and applying transaction logs from primary database, physical standby database can be cloned and mounted on a DB VM to support other workloads such as DEV, TEST, or Report. The clone can be a thin or thick clone. At this moment, ANF only support thick clone, which is a full copy of standby database. The ANF thin clone option will be released shortly. For a thinly cloned copies of database volumes, it shares the same DB volumes of standby database and utilize copy-on-write technology to service write IOs. Thus, the clone are very storage efficient that can be used for many other use cases with minimal and incremental new storage allocation for new write IOs. This provides tremendous storage cost saving by substantially reducing Active Data Guard storage footprint. NetApp recommends to minimize FlexClone activities in the event of database switching over from primary storage to standby ANF storage in order to maintain Oracle performance at high level. 
+* *Azure NetApp Files Configuration.* Azure NetApp Files are allocated in the Azure NetApp storage account as `Capacity Pools`. In these tests and validations, we deployed a 2 TiB capacity pool to host Oracle primary at the East region and a 4 TiB capacity pool to host standby database and DB clone at the West 2 region. ANF capacity pool has three service levels: Standard, Premium, and Ultra. The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level.  At a capacity pool creation, you can set QoS to Auto or Manual and data encryption at rest Single or Double. 
 
-* *Oracle Software Requirements.* In general, a physical standby database must have the same Database Home version as the primary database including Patch Set Exceptions (PSEs), Critical Patch Updates (CPUs), and Patch Set Updates (PSUs), unless an Oracle Data Guard Standby-First Patch Apply process is in progress (as described in My Oracle Support note 1265700.1 at link:http://support.oracle.com.[support.oracle.com^]
+* *Sizing the Database Volumes.* For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement from Oracle AWR report. Take into consideration both the database size as well as the throughput requirements when size ANF volumes for database. With auto QoS configuration for ANF, the bandwidth is guaranteed at 128 MiB/s per TiB volume capacity allocated with Ultra Service Level. Higher throughput may need larger volume sizing to meet the requirement.    
 
-* *Standby Database Directory Structure Considerations.* If possible, the data files, log files, and control files on the primary and standby systems should have the same names and path names and use Optimal Flexible Architecture (OFA) naming conventions. The archival directories on the standby database should also be identical between sites, including size and structure. This strategy allows other operations such as backups, switchovers, and failovers to execute the same set of steps, reducing the maintenance complexity. 
+* *Single Volume or Multiple Volumes.* A single large volume can provide similar performance level as multiple volumes with same aggregate size as the QoS is strictly enforced based on the volume sizing and capacity pool service level. It is recommended to implement multiple volumes (multiple NFS mount points) for Oracle VLDB to better utilize shared backend ANF storage resource pool. Implement Oracle ASM for IO load balancing on multiple NFS volumes.  
 
-* *Force Logging Mode.* To protect against unlogged direct writes in the primary database that cannot be propagated to the standby database, turn on FORCE LOGGING at the primary database before performing data file backups for standby creation. 
+* *Azure VM Consideration.* In these tests and validations, we used an Azure VM - Standard_B4ms with 4 vCPUs and16 GiB memory. You need to choose the Azure DB VM appropriately for Oracle VLDB with high throughput requirement. Besides the number of vCPUs and the amount of RAM, the VM network bandwidth (ingress and egress ) can become a bottleneck before database storage capacity is reached.
 
-* *Azure VM Sizing.* In these tests and validations, we used an Azure VM - Standard_B4ms with 4 vCPUs and16 GiB memory. You need to size the Azure DB VM appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
-
-* *Azure NetApp Files Configuration.* Azure NetApp Files are allocated in the Azure NetApp storage account as `Capacity Pools`. In these tests and validations, we deployed a 3 TiB capacity pool to host Oracle primary at the East region and a standby database at the West 2 region. ANF capacity pool has three service levels: Standard, Premium, and Ultra.  The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level. For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement and sizing the database capacity pool accordingly. At a capacity pool creation, you can set QoS to Auto or Manual and data encryption at rest Single or Double.   
-
-* *dNFS Configuration.* By using dNFS, an Oracle database running on an Azure Virtual Machine with ANF storage can drive significantly more I/O than the native NFS client. 
+* *dNFS Configuration.* By using dNFS, an Oracle database running on an Azure Virtual Machine with ANF storage can drive significantly more I/O than the native NFS client. Ensure that Oracle dNFS patch p32931941 is applied to address potential bugs. 
 
 == Solution deployment
 
-It is assumed that you already have your primary Oracle database deployed in an Azure cloud environment within a VNet as the starting point for setting up the Oracle Data Guard. Ideally, the primary database is deployed on ANF storage with NFS mount. Three NFS mount points are created for the Oracle database storage: mount /u01 for the Oracle binary files, mount /u02 for the Oracle data files and a control file, mount /u03 for the Oracle current and archived log files, and a redundant control file. 
-
-Your primary Oracle database can also be running on a NetApp ONTAP storage or any other storage of choices either within the Azure ecosystem or a private data center. The following section provides step-by-step deployment procedures for setting up an Oracle Data Guard between a primary Oracle DB in Azure with ANF storage to a physical standby Oracle DB in Azure with ANF storage.    
+It is assumed that you already have your primary Oracle database deployed in an Azure cloud environment within a VNet as the starting point for setting up the Oracle Data Guard. Ideally, the primary database is deployed on ANF storage with NFS mount. Your primary Oracle database can also be running on a NetApp ONTAP storage or any other storage of choices either within the Azure ecosystem or a private data center. The following section demonstrates the configuration for Oracle VLDB on ANF in an Oracle Data Guard  setting between a primary Oracle DB in Azure with ANF storage to a physical standby Oracle DB in Azure with ANF storage.    
 
 === Prerequisites for deployment
 [%collapsible]
@@ -134,14 +127,14 @@ image:azure_ora_anf_dg_vnet_04.png["Screenshot showing Azure environment configu
 
 ====
 
-=== Prepare the primary database for Data Guard
+=== Primary Oracle VLDB configuration for Data Guard
 [%collapsible]
 
 ====
 
 In this demonstration, we have setup a primary Oracle database called NTAP on the primary Azure DB server with three NFS mount points: /u01 for the Oracle binary, /u02 for the Oracle data files, and an Oracle control file, /u03 for the Oracle active logs, archived log files, and a redundant Oracle control file. Following illustrates the detailed procedures for setting up primary database for the Oracle Data Guard protection. All steps should be executed as the Oracle database owner or the default `oracle` user.
 
-. The primary database NTAP on the primary Azure DB server orap.internal.cloudapp.net is initially deployed as a standalone database with the ANF as database storage.  
+. The primary database NTAP on the primary Azure DB server orap.internal.cloudapp.net is initially deployed as a standalone database with the ANF on NFS and ASM as database storage.  
 +
 ....
 
@@ -155,21 +148,25 @@ pri_ip: 10.0.0.4
 
 [oracle@orap ~]$ df -h
 Filesystem                 Size  Used Avail Use% Mounted on
-devtmpfs                   7.7G  4.0K  7.7G   1% /dev
-tmpfs                      7.8G     0  7.8G   0% /dev/shm
-tmpfs                      7.8G  209M  7.5G   3% /run
+devtmpfs                   7.7G     0  7.7G   0% /dev
+tmpfs                      7.8G  1.1G  6.7G  15% /dev/shm
+tmpfs                      7.8G   17M  7.7G   1% /run
 tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
-/dev/mapper/rootvg-rootlv   22G  413M   22G   2% /
-/dev/mapper/rootvg-usrlv    10G  2.1G  8.0G  21% /usr
+/dev/mapper/rootvg-rootlv   22G   20G  2.1G  91% /
+/dev/mapper/rootvg-usrlv    10G  2.3G  7.8G  23% /usr
 /dev/sda1                  496M  181M  315M  37% /boot
-/dev/mapper/rootvg-homelv  2.0G   47M  2.0G   3% /home
-/dev/sda15                 495M  5.8M  489M   2% /boot/efi
 /dev/mapper/rootvg-varlv   8.0G  1.1G  7.0G  13% /var
-/dev/mapper/rootvg-tmplv    12G  120M   12G   1% /tmp
+/dev/sda15                 495M  5.8M  489M   2% /boot/efi
+/dev/mapper/rootvg-homelv  2.0G   47M  2.0G   3% /home
+/dev/mapper/rootvg-tmplv    12G   11G  1.9G  85% /tmp
 /dev/sdb1                   32G   49M   30G   1% /mnt
-10.0.2.36:/orap-u02        500G  7.7G  493G   2% /u02
-10.0.2.36:/orap-u03        450G  6.1G  444G   2% /u03
-10.0.2.36:/orap-u01        100G  9.9G   91G  10% /u01
+10.0.2.38:/orap-u06        300G  282G   19G  94% /u06
+10.0.2.38:/orap-u04        300G  282G   19G  94% /u04
+10.0.2.36:/orap-u01        400G   21G  380G   6% /u01
+10.0.2.37:/orap-u02        300G  282G   19G  94% /u02
+10.0.2.36:/orap-u03        400G  282G  119G  71% /u03
+10.0.2.39:/orap-u05        300G  282G   19G  94% /u05
+
 
 [oracle@orap ~]$ cat /etc/oratab
 #
@@ -194,245 +191,96 @@ tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
 # Multiple entries with the same $ORACLE_SID are not allowed.
 #
 #
++ASM:/u01/app/oracle/product/19.0.0/grid:N
 NTAP:/u01/app/oracle/product/19.0.0/NTAP:N
 
 
 
 ....
 
-. Login to primary DB server as the oracle user. Login to database via sqlplus, enable forced logging on primary.
+. Login to primary DB server as the oracle user. Validate grid configuration.
 +
 [source, cli]
-alter database force logging;
+$GRID_HOME/bin/crsctl stat res -t
 +
 ....
-[oracle@orap admin]$ sqlplus / as sysdba
-
-SQL*Plus: Release 19.0.0.0.0 - Production on Tue Nov 26 20:12:02 2024
-Version 19.18.0.0.0
-
-Copyright (c) 1982, 2022, Oracle.  All rights reserved.
-
-
-Connected to:
-Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
-Version 19.18.0.0.0
-
-SQL> alter database force logging;
-
-Database altered.
+[oracle@orap ~]$ $GRID_HOME/bin/crsctl stat res -t
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DATA.dg
+               ONLINE  ONLINE       orap                     STABLE
+ora.LISTENER.lsnr
+               ONLINE  ONLINE       orap                     STABLE
+ora.LOGS.dg
+               ONLINE  ONLINE       orap                     STABLE
+ora.asm
+               ONLINE  ONLINE       orap                     Started,STABLE
+ora.ons
+               OFFLINE OFFLINE      orap                     STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.cssd
+      1        ONLINE  ONLINE       orap                     STABLE
+ora.diskmon
+      1        OFFLINE OFFLINE                               STABLE
+ora.evmd
+      1        ONLINE  ONLINE       orap                     STABLE
+ora.ntap.db
+      1        OFFLINE OFFLINE                               Instance Shutdown,ST
+                                                             ABLE
+--------------------------------------------------------------------------------
+[oracle@orap ~]$
 
 ....
 
-. From sqlplus, enable flashback on the primary DB. Flashback allows easy reinstate primary database as a standby after a failover. 
+. ASM disk group configuration.
 +
 [source, cli]
-alter database flashback on;
+asmcmd
 +
 ....
 
-SQL> alter database flashback on;
-
-Database altered.
-
-....
-
-. Configure redo transport authentication using Oracle password file - create a pwd file on the primary using orapwd utility if it is not set and copy it over to standby database $ORACLE_HOME/dbs directory.
-
-. Create standby redo logs on the primary DB with same size as current online log file. Log groups are one more than online log file groups. The primary database then can quickly transition to the standby role when a failover happens and begins to receive redo data. Repeat the following command four times to create four standby log files.
-+
-[source, cli]
-alter database add standby logfile thread 1 size 200M;
-+
-....
-SQL> alter database add standby logfile thread 1 size 200M;
-
-Database altered.
-
-SQL> /
-
-Database altered.
-
-SQL> /
-
-Database altered.
-
-SQL> /
-
-Database altered.
-
-
-SQL> set lin 200
-SQL> col member for a80
-SQL> select group#, type, member from v$logfile;
-
-    GROUP# TYPE    MEMBER
----------- ------- --------------------------------------------------------------------------------
-         3 ONLINE  /u03/orareco/NTAP/onlinelog/redo03.log
-         2 ONLINE  /u03/orareco/NTAP/onlinelog/redo02.log
-         1 ONLINE  /u03/orareco/NTAP/onlinelog/redo01.log
-         4 STANDBY /u03/orareco/NTAP/onlinelog/o1_mf_4__2m115vkv_.log
-         5 STANDBY /u03/orareco/NTAP/onlinelog/o1_mf_5__2m3c5cyd_.log
-         6 STANDBY /u03/orareco/NTAP/onlinelog/o1_mf_6__2m4d7dhh_.log
-         7 STANDBY /u03/orareco/NTAP/onlinelog/o1_mf_7__2m5ct7g1_.log
+[oracle@orap ~]$ asm
+[oracle@orap ~]$ asmcmd
+ASMCMD> lsdg
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  4194304   1146880  1136944                0         1136944              0             N  DATA/
+MOUNTED  EXTERN  N         512             512   4096  4194304    286720   283312                0          283312              0             N  LOGS/
+ASMCMD> lsdsk
+Path
+/u02/oradata/asm/orap_data_disk_01
+/u02/oradata/asm/orap_data_disk_02
+/u02/oradata/asm/orap_data_disk_03
+/u02/oradata/asm/orap_data_disk_04
+/u03/oralogs/asm/orap_logs_disk_01
+/u03/oralogs/asm/orap_logs_disk_02
+/u03/oralogs/asm/orap_logs_disk_03
+/u03/oralogs/asm/orap_logs_disk_04
+/u04/oradata/asm/orap_data_disk_05
+/u04/oradata/asm/orap_data_disk_06
+/u04/oradata/asm/orap_data_disk_07
+/u04/oradata/asm/orap_data_disk_08
+/u05/oradata/asm/orap_data_disk_09
+/u05/oradata/asm/orap_data_disk_10
+/u05/oradata/asm/orap_data_disk_11
+/u05/oradata/asm/orap_data_disk_12
+/u06/oradata/asm/orap_data_disk_13
+/u06/oradata/asm/orap_data_disk_14
+/u06/oradata/asm/orap_data_disk_15
+/u06/oradata/asm/orap_data_disk_16
+ASMCMD>
 
 ....
 
-. From the sqlplus, create a pfile from spfile for editing.
-+
-[source, cli]
-create pfile='/home/oracle/initNTAP.ora' from spfile;
 
-. Revise the pfile and add following parameters.
-+
-[source, cli]
-vi /home/oracle/initNTAP.ora
-+
-....
-Update the following parameters if not set:
-
-DB_NAME=NTAP
-DB_UNIQUE_NAME=NTAP_NY
-LOG_ARCHIVE_CONFIG='DG_CONFIG=(NTAP_NY,NTAP_LA)'
-LOG_ARCHIVE_DEST_1='LOCATION=USE_DB_RECOVERY_FILE_DEST VALID_FOR=(ALL_LOGFILES,ALL_ROLES) DB_UNIQUE_NAME=NTAP_NY'
-LOG_ARCHIVE_DEST_2='SERVICE=NTAP_LA ASYNC VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE) DB_UNIQUE_NAME=NTAP_LA'
-REMOTE_LOGIN_PASSWORDFILE=EXCLUSIVE
-FAL_SERVER=NTAP_LA
-STANDBY_FILE_MANAGEMENT=AUTO
-....
-
-. From sqlplus, recreate spfile from revised pfile to overwrite the existing spfile in $ORACLE_HOME/dbs directory.
-+
-[source, cli]
-create spfile='$ORACLE_HOME/dbs/spfileNTAP.ora' from pfile='/home/oracle/initNTAP.ora';
-
-. Modify Oracle tnsnames.ora in $ORACLE_HOME/network/admin directory to add db_unique_name for name resolution.
-+
-[source, cli]
-vi $ORACLE_HOME/network/admin/tnsnames.ora
-+
-....
-# tnsnames.ora Network Configuration File: /u01/app/oracle/product/19.0.0/NTAP/network/admin/tnsnames.ora
-# Generated by Oracle configuration tools.
-
-NTAP_NY =
-  (DESCRIPTION =
-    (ADDRESS = (PROTOCOL = TCP)(HOST = orap.internal.cloudapp.net)(PORT = 1521))
-    (CONNECT_DATA =
-      (SERVER = DEDICATED)
-      (SID = NTAP)
-    )
-  )
-
-NTAP_LA =
-  (DESCRIPTION =
-    (ADDRESS = (PROTOCOL = TCP)(HOST = oras.internal.cloudapp.net)(PORT = 1521))
-    (CONNECT_DATA =
-      (SERVER = DEDICATED)
-      (SID = NTAP)
-    )
-  )
-
-LISTENER_NTAP =
-  (ADDRESS = (PROTOCOL = TCP)(HOST = orap.internal.cloudapp.net)(PORT = 1521))
-....
-+
-[NOTE]
-If you choose to name your Azure DB server differently than the default, add the names to local host file for host name resolution.
-
-. Add data guard service name NTAP_NY_DGMGRL.internal.cloudapp.net for the primary database to listener.ora file.
-+
-[source, cli]
-vi $ORACLE_HOME/network/admin/listener.ora
-+
-....
-# listener.ora Network Configuration File: /u01/app/oracle/product/19.0.0/NTAP/network/admin/listener.ora
-# Generated by Oracle configuration tools.
-
-LISTENER.NTAP =
-  (DESCRIPTION_LIST =
-    (DESCRIPTION =
-      (ADDRESS = (PROTOCOL = TCP)(HOST = orap.internal.cloudapp.net)(PORT = 1521))
-      (ADDRESS = (PROTOCOL = IPC)(KEY = EXTPROC1521))
-    )
-  )
-
-SID_LIST_LISTENER.NTAP =
-  (SID_LIST =
-    (SID_DESC =
-      (GLOBAL_DBNAME = NTAP_NY_DGMGRL.internal.cloudapp.net)
-      (ORACLE_HOME = /u01/app/oracle/product/19.0.0/NTAP)
-      (SID_NAME = NTAP)
-    )
-  )
-
-....
-
-. Shutdown and restart database via sqlplus and validate that data guard parameters are now active.
-+
-[source, cli]
-shutdown immediate;
-+
-[source, cli]
-startup;
-+
-....
-SQL> show parameter name
-
-NAME                                 TYPE        VALUE
------------------------------------- ----------- ------------------------------
-cdb_cluster_name                     string
-cell_offloadgroup_name               string
-db_file_name_convert                 string
-db_name                              string      NTAP
-db_unique_name                       string      NTAP_NY
-global_names                         boolean     FALSE
-instance_name                        string      NTAP
-lock_name_space                      string
-log_file_name_convert                string
-pdb_file_name_convert                string
-processor_group_name                 string
-
-NAME                                 TYPE        VALUE
------------------------------------- ----------- ------------------------------
-service_names                        string      NTAP_NY.internal.cloudapp.net
-SQL> sho parameter log_archive_dest
-
-NAME                                 TYPE        VALUE
------------------------------------- ----------- ------------------------------
-log_archive_dest                     string
-log_archive_dest_1                   string      LOCATION=USE_DB_RECOVERY_FILE_
-                                                 DEST VALID_FOR=(ALL_LOGFILES,A
-                                                 LL_ROLES) DB_UNIQUE_NAME=NTAP_
-                                                 NY
-log_archive_dest_10                  string
-log_archive_dest_11                  string
-log_archive_dest_12                  string
-log_archive_dest_13                  string
-log_archive_dest_14                  string
-log_archive_dest_15                  string
-
-NAME                                 TYPE        VALUE
------------------------------------- ----------- ------------------------------
-log_archive_dest_16                  string
-log_archive_dest_17                  string
-log_archive_dest_18                  string
-log_archive_dest_19                  string
-log_archive_dest_2                   string      SERVICE=NTAP_LA ASYNC VALID_FO
-                                                 R=(ONLINE_LOGFILES,PRIMARY_ROL
-                                                 E) DB_UNIQUE_NAME=NTAP_LA
-log_archive_dest_20                  string
-log_archive_dest_21                  string
-.
-.
-
-....
-
-This completes the primary database setup for Data Guard.
 
 ====
 
-=== Prepare standby database and activate Data Guard
+=== Standby Oracle VLDB configuration for Data Guard
 [%collapsible]
 
 ====
@@ -461,20 +309,24 @@ pri_ip: 10.0.1.4
 [oracle@oras ~]$ df -h
 Filesystem                 Size  Used Avail Use% Mounted on
 devtmpfs                   7.7G     0  7.7G   0% /dev
-tmpfs                      7.8G     0  7.8G   0% /dev/shm
-tmpfs                      7.8G  265M  7.5G   4% /run
+tmpfs                      7.8G  1.1G  6.7G  15% /dev/shm
+tmpfs                      7.8G   25M  7.7G   1% /run
 tmpfs                      7.8G     0  7.8G   0% /sys/fs/cgroup
-/dev/mapper/rootvg-rootlv   22G  413M   22G   2% /
-/dev/mapper/rootvg-usrlv    10G  2.1G  8.0G  21% /usr
-/dev/sda1                  496M  181M  315M  37% /boot
-/dev/mapper/rootvg-varlv   8.0G  985M  7.1G  13% /var
+/dev/mapper/rootvg-rootlv   22G   17G  5.6G  75% /
+/dev/mapper/rootvg-usrlv    10G  2.3G  7.8G  23% /usr
+/dev/mapper/rootvg-varlv   8.0G  1.1G  7.0G  13% /var
 /dev/mapper/rootvg-homelv  2.0G   52M  2.0G   3% /home
-/dev/mapper/rootvg-tmplv    12G  120M   12G   1% /tmp
+/dev/sda1                  496M  181M  315M  37% /boot
 /dev/sda15                 495M  5.8M  489M   2% /boot/efi
+/dev/mapper/rootvg-tmplv    12G   11G  1.8G  86% /tmp
 /dev/sdb1                   32G   49M   30G   1% /mnt
-10.0.3.36:/oras-u01        100G  9.5G   91G  10% /u01
-10.0.3.36:/oras-u02        500G  8.1G  492G   2% /u02
-10.0.3.36:/oras-u03        450G  4.8G  446G   2% /u03
+10.0.3.36:/oras-u03        400G  282G  119G  71% /u03
+10.0.3.36:/oras-u04        300G  282G   19G  94% /u04
+10.0.3.36:/oras-u05        300G  282G   19G  94% /u05
+10.0.3.36:/oras-u02        300G  282G   19G  94% /u02
+10.0.3.36:/oras-u01        100G   21G   80G  21% /u01
+10.0.3.36:/oras-u06        300G  282G   19G  94% /u06
+
 
 ....
 
@@ -520,71 +372,85 @@ NTAP_LA =
 
 ....
 
-. Add DB data guard service name to listener.ora file.
+. Grid infrastructure configuration.
 +
 [source, cli]
-vi $ORACLE_HOME/network/admin/listener.ora
+$GRID_HOME/bin/crsctl stat res -t
 +
 ....
 
-# listener.ora Network Configuration File: /u01/app/oracle/product/19.0.0/NTAP/network/admin/listener.ora
-# Generated by Oracle configuration tools.
-
-LISTENER.NTAP =
-  (DESCRIPTION_LIST =
-    (DESCRIPTION =
-      (ADDRESS = (PROTOCOL = TCP)(HOST = oras.internal.cloudapp.net)(PORT = 1521))
-      (ADDRESS = (PROTOCOL = IPC)(KEY = EXTPROC1521))
-    )
-  )
-
-SID_LIST_LISTENER =
-  (SID_LIST =
-    (SID_DESC =
-      (SID_NAME = NTAP)
-    )
-  )
-
-SID_LIST_LISTENER.NTAP =
-  (SID_LIST =
-    (SID_DESC =
-      (GLOBAL_DBNAME = NTAP_LA_DGMGRL.internal.cloudapp.net)
-      (ORACLE_HOME = /u01/app/oracle/product/19.0.0/NTAP)
-      (SID_NAME = NTAP)
-    )
-  )
-
-LISTENER =
-  (ADDRESS_LIST =
-    (ADDRESS = (PROTOCOL = TCP)(HOST = oras.internal.cloudapp.net)(PORT = 1521))
-  )
+[oracle@oras ~]$ $GRID_HOME/bin/crsctl stat res -t
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DATA.dg
+               ONLINE  ONLINE       oras                     STABLE
+ora.LISTENER.lsnr
+               ONLINE  ONLINE       oras                     STABLE
+ora.LOGS.dg
+               ONLINE  ONLINE       oras                     STABLE
+ora.asm
+               ONLINE  ONLINE       oras                     Started,STABLE
+ora.ons
+               OFFLINE OFFLINE      oras                     STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.cssd
+      1        ONLINE  ONLINE       oras                     STABLE
+ora.diskmon
+      1        OFFLINE OFFLINE                               STABLE
+ora.evmd
+      1        ONLINE  ONLINE       oras                     STABLE
+ora.ntap_la.db
+      1        ONLINE  INTERMEDIATE oras                     Dismounted,Mount Ini
+                                                             tiated,HOME=/u01/app
+                                                             /oracle/product/19.0
+                                                             .0/NTAP,STABLE
+--------------------------------------------------------------------------------
+[oracle@oras ~]$
 
 ....
 
 
 
-. Launch dbca to instantiate the standby database from the primary database NTAP.
+. ASM configuration.
 +
 [source, cli]
-dbca -silent -createDuplicateDB -gdbName NTAP -primaryDBConnectionString orap.internal.cloudapp.net:1521/NTAP_NY.internal.cloudapp.net -sid NTAP -initParams fal_server=NTAP_NY -createAsStandby -dbUniqueName NTAP_LA
+asmcmd
 +
 ....
 
-[oracle@oras admin]$ dbca -silent -createDuplicateDB -gdbName NTAP -primaryDBConnectionString orap.internal.cloudapp.net:1521/NTAP_NY.internal.cloudapp.net -sid NTAP -initParams fal_server=NTAP_NY -createAsStandby -dbUniqueName NTAP_LA
-Enter SYS user password:
-
-Prepare for db operation
-22% complete
-Listener config step
-44% complete
-Auxiliary instance creation
-67% complete
-RMAN duplicate
-89% complete
-Post duplicate database operations
-100% complete
-
-Look at the log file "/u01/app/oracle/cfgtoollogs/dbca/NTAP_LA/NTAP_LA.log" for further details.
+[oracle@oras ~]$ asmcmd
+ASMCMD> lsdg
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  4194304   1146880  1136912                0         1136912              0             N  DATA/
+MOUNTED  EXTERN  N         512             512   4096  4194304    286720   284228                0          284228              0             N  LOGS/
+ASMCMD> lsdsk
+Path
+/u02/oradata/asm/oras_data_disk_01
+/u02/oradata/asm/oras_data_disk_02
+/u02/oradata/asm/oras_data_disk_03
+/u02/oradata/asm/oras_data_disk_04
+/u03/oralogs/asm/oras_logs_disk_01
+/u03/oralogs/asm/oras_logs_disk_02
+/u03/oralogs/asm/oras_logs_disk_03
+/u03/oralogs/asm/oras_logs_disk_04
+/u04/oradata/asm/oras_data_disk_05
+/u04/oradata/asm/oras_data_disk_06
+/u04/oradata/asm/oras_data_disk_07
+/u04/oradata/asm/oras_data_disk_08
+/u05/oradata/asm/oras_data_disk_09
+/u05/oradata/asm/oras_data_disk_10
+/u05/oradata/asm/oras_data_disk_11
+/u05/oradata/asm/oras_data_disk_12
+/u06/oradata/asm/oras_data_disk_13
+/u06/oradata/asm/oras_data_disk_14
+/u06/oradata/asm/oras_data_disk_15
+/u06/oradata/asm/oras_data_disk_16
+ASMCMD>
 
 
 ....
