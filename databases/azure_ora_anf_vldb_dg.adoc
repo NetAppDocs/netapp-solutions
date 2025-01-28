@@ -132,9 +132,9 @@ image:azure_ora_anf_dg_vnet_04.png["Screenshot showing Azure environment configu
 
 ====
 
-In this demonstration, we have setup a primary Oracle database called NTAP on the primary Azure DB server with six NFS mount points: /u01 for the Oracle binary, /u02, /u04, /u05, /u06 for the Oracle data files, and an Oracle control file, /u03 for the Oracle active logs, archived log files, and a redundant Oracle control file. This is provided as a reference. Your actual deployment should take into consideration of your specific needs and requirements in terms of the capacity pool sizing, the service level, the number of database volumes and the sizing of each volume.
+In this demonstration, we have setup a primary Oracle database called NTAP on the primary Azure DB server with six NFS mount points: /u01 for the Oracle binary, /u02, /u04, /u05, /u06 for the Oracle data files, and an Oracle control file, /u03 for the Oracle active logs, archived log files, and a redundant Oracle control file. This setup serves as a reference configuration. Your actual deployment should take into consideration of your specific needs and requirements in terms of the capacity pool sizing, the service level, the number of database volumes and the sizing of each volume.
 
-For detailed step by step procedures for setting up Oracle Data Guard on NFS with ASM, please referred to TR-5002 - link:https://docs.netapp.com/us-en/netapp-solutions/databases/azure_ora_anf_data_guard.html[Oracle Active Data Guard Cost Reduction with Azure NetApp Files^] and TR-4974 - link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_nfs_asm.html#purpose[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^] relevant section. Although the procedures in TR-4974 were validated on Amazon FSx ONTAP, they are equally applicable to ANF. Following illustrates the details of a primary Oracle VLDB in a Data Guard configuration. 
+For detailed step by step procedures for setting up Oracle Data Guard on NFS with ASM, please referred to TR-5002 - link:https://docs.netapp.com/us-en/netapp-solutions/databases/azure_ora_anf_data_guard.html[Oracle Active Data Guard Cost Reduction with Azure NetApp Files^] and TR-4974 - link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_nfs_asm.html#purpose[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^] relevant sections. Although the procedures in TR-4974 were validated on Amazon FSx ONTAP, they are equally applicable to ANF. Following illustrates the details of a primary Oracle VLDB in a Data Guard configuration. 
 
 . The primary database NTAP on the primary Azure DB server orap.internal.cloudapp.net is initially deployed as a standalone database with the ANF on NFS and ASM as database storage.  
 +
@@ -246,7 +246,6 @@ asmcmd
 +
 ....
 
-[oracle@orap ~]$ asm
 [oracle@orap ~]$ asmcmd
 ASMCMD> lsdg
 State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
@@ -278,7 +277,7 @@ ASMCMD>
 
 ....
 
-. Parameters setting for Data Guard on primary VLDB.
+. Parameters setting for Data Guard on primary DB.
 +
 ....
 SQL> show parameter name
@@ -332,7 +331,7 @@ log_archive_dest_22                  string
 
 ....
 
-. Primary VLDB configuration.
+. Primary DB configuration.
 +
 ....
 
@@ -452,7 +451,7 @@ DIRNAME
 
 ....
 
-
+This completes the demonstration of a Data Guard setup for VLDB NTAP at the primary site on ANF with NFS/ASM.
 
 ====
 
@@ -463,9 +462,9 @@ DIRNAME
 
 Oracle Data Guard requires OS kernel configuration and Oracle software stacks including patch sets on standby DB server to match with primary DB server. For easy management and simplicity, the database storage configuration of the standby DB server ideally should match with the primary DB server as well, such as the database directory layout and sizes of NFS mount points. 
 
-Again, for detailed step by step procedures for setting up Oracle Data Guard standby on NFS with ASM for Data Guard, please referred to TR-5002 - link:https://docs.netapp.com/us-en/netapp-solutions/databases/azure_ora_anf_data_guard.html[Oracle Active Data Guard Cost Reduction with Azure NetApp Files^] and TR-4974 - link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_nfs_asm.html#purpose[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^] relevant section. Following illustrates the detail of standby Oracle VLDB configuration on standby DB server in a Data Guard setting. 
+Again, for detailed step by step procedures for setting up Oracle Data Guard standby on NFS with ASM, please referred to TR-5002 - link:https://docs.netapp.com/us-en/netapp-solutions/databases/azure_ora_anf_data_guard.html[Oracle Active Data Guard Cost Reduction with Azure NetApp Files^] and TR-4974 - link:https://docs.netapp.com/us-en/netapp-solutions/databases/aws_ora_fsx_ec2_nfs_asm.html#purpose[Oracle 19c in Standalone Restart on AWS FSx/EC2 with NFS/ASM^] relevant sections. Following illustrates the detail of standby Oracle VLDB configuration on standby DB server in a Data Guard setting. 
 
-. The standby Oracle VLDB server configuration at standby site in the demo lab. 
+. The standby Oracle DB server configuration at standby site in the demo lab. 
 +
 ....
 oras.internal.cloudapp.net:
@@ -526,7 +525,7 @@ NTAP:/u01/app/oracle/product/19.0.0/NTAP:N              # line added by Agent
 
 ....
 
-. Grid infrastructure configuration on standby VLDB server. 
+. Grid infrastructure configuration on standby DB server. 
 +
 ....
 [oracle@oras ~]$ $GRID_HOME/bin/crsctl stat res -t
@@ -563,7 +562,7 @@ ora.ntap_la.db
 
 ....
 
-. ASM configuration on standby VLDB server.
+. ASM disk groups configuration on standby DB server.
 +
 ....
 
@@ -594,116 +593,6 @@ Path
 /u06/oradata/asm/oras_data_disk_14
 /u06/oradata/asm/oras_data_disk_15
 /u06/oradata/asm/oras_data_disk_16
-
-
-....
-. Parameters setting for Data Guard on standby VLDB.
-+
-....
-
-SQL> show parameter name
-
-NAME                                 TYPE        VALUE
------------------------------------- ----------- ------------------------------
-cdb_cluster_name                     string
-cell_offloadgroup_name               string
-db_file_name_convert                 string
-db_name                              string      NTAP
-db_unique_name                       string      NTAP_LA
-global_names                         boolean     FALSE
-instance_name                        string      NTAP
-lock_name_space                      string
-log_file_name_convert                string
-pdb_file_name_convert                string
-processor_group_name                 string
-
-NAME                                 TYPE        VALUE
------------------------------------- ----------- ------------------------------
-service_names                        string      NTAP_LA.internal.cloudapp.net
-
-
-
-....
-
-. Grid infrastructure configuration.
-+
-[source, cli]
-$GRID_HOME/bin/crsctl stat res -t
-+
-....
-
-[oracle@oras ~]$ $GRID_HOME/bin/crsctl stat res -t
---------------------------------------------------------------------------------
-Name           Target  State        Server                   State details
---------------------------------------------------------------------------------
-Local Resources
---------------------------------------------------------------------------------
-ora.DATA.dg
-               ONLINE  ONLINE       oras                     STABLE
-ora.LISTENER.lsnr
-               ONLINE  ONLINE       oras                     STABLE
-ora.LOGS.dg
-               ONLINE  ONLINE       oras                     STABLE
-ora.asm
-               ONLINE  ONLINE       oras                     Started,STABLE
-ora.ons
-               OFFLINE OFFLINE      oras                     STABLE
---------------------------------------------------------------------------------
-Cluster Resources
---------------------------------------------------------------------------------
-ora.cssd
-      1        ONLINE  ONLINE       oras                     STABLE
-ora.diskmon
-      1        OFFLINE OFFLINE                               STABLE
-ora.evmd
-      1        ONLINE  ONLINE       oras                     STABLE
-ora.ntap_la.db
-      1        ONLINE  INTERMEDIATE oras                     Dismounted,Mount Ini
-                                                             tiated,HOME=/u01/app
-                                                             /oracle/product/19.0
-                                                             .0/NTAP,STABLE
---------------------------------------------------------------------------------
-[oracle@oras ~]$
-
-....
-
-
-
-. ASM configuration.
-+
-[source, cli]
-asmcmd
-+
-....
-
-[oracle@oras ~]$ asmcmd
-ASMCMD> lsdg
-State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
-MOUNTED  EXTERN  N         512             512   4096  4194304   1146880  1136912                0         1136912              0             N  DATA/
-MOUNTED  EXTERN  N         512             512   4096  4194304    286720   284228                0          284228              0             N  LOGS/
-ASMCMD> lsdsk
-Path
-/u02/oradata/asm/oras_data_disk_01
-/u02/oradata/asm/oras_data_disk_02
-/u02/oradata/asm/oras_data_disk_03
-/u02/oradata/asm/oras_data_disk_04
-/u03/oralogs/asm/oras_logs_disk_01
-/u03/oralogs/asm/oras_logs_disk_02
-/u03/oralogs/asm/oras_logs_disk_03
-/u03/oralogs/asm/oras_logs_disk_04
-/u04/oradata/asm/oras_data_disk_05
-/u04/oradata/asm/oras_data_disk_06
-/u04/oradata/asm/oras_data_disk_07
-/u04/oradata/asm/oras_data_disk_08
-/u05/oradata/asm/oras_data_disk_09
-/u05/oradata/asm/oras_data_disk_10
-/u05/oradata/asm/oras_data_disk_11
-/u05/oradata/asm/oras_data_disk_12
-/u06/oradata/asm/oras_data_disk_13
-/u06/oradata/asm/oras_data_disk_14
-/u06/oradata/asm/oras_data_disk_15
-/u06/oradata/asm/oras_data_disk_16
-ASMCMD>
 
 
 ....
@@ -887,7 +776,7 @@ DIRNAME
 
 ....
 
-This completes the demonstration of Data Guard setup for VLDB NTAP from primary to standby with managed standby recovery enabled.
+This completes the demonstration of a Data Guard setup for VLDB NTAP with managed standby recovery enabled at standby site.
 
 ====
 
@@ -994,7 +883,7 @@ In the event of a failure, Data Guard Broker can be used to failover the primary
 
 ====
 
-Please contact NetApp Solutions Engineering team for automation toolkit to create and refresh clones.
+Please contact NetApp Solutions Engineering team for the automation toolkit to create and refresh clones for a complete clone lifecycle management.
 
 ====
 
