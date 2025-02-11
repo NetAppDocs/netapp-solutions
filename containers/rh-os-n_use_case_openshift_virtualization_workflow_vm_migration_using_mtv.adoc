@@ -13,15 +13,29 @@ summary: Red Hat OpenShift Virtualization with NetApp ONTAP
 :imagesdir: ../media/
 
 [.lead]
-This section covers the how to migrate a virtual machine between from VMware to an OpenShift Cluster using Red Hat OpenShift Virtualization migration toolkit.
+This section shows how to migrate a virtual machine from VMware to an OpenShift Cluster using Red Hat OpenShift Virtualization migration toolkit. The following types of migrations are covered: 
+
+.Cold Migration 
+[%collapsible]
+====
+This is  the default migration type. The source virtual machines are shut down while the data is copied.
+====
+
+.Warm Migration 
+[%collapsible]
+====
+In this type of migration, most of the data is copied during the precopy stage while the source virtual machines (VMs) are running. Then the VMs are shut down and the remaining data is copied during the cutover stage.
+====
+
+== Video Demonstration 
+
+The following video shows a demonstration of the cold migration of a RHEL VM from VMware to OpenShift Virtualization using ontap-san storage class for persistent storage. 
+
+video::bac58645-dd75-4e92-b5fe-b12b015dc199[panopto, title="Using Red Hat MTV to migrate VMs to OpenShift Virtualization with NetApp ONTAP Storage", width=360]
 
 == Migration of VM from VMware to OpenShift Virtualization using Migration Toolkit for Virtualization
 
 In this section, we will see how to use the Migration Toolkit for Virtualization (MTV) to migrate virtual machines from VMware to OpenShift Virtualization running on OpenShift Container platform  and integrated with NetApp ONTAP storage using Trident. 
-
-The following video shows a demonstration of the migration of a RHEL VM from VMware to OpenShift Virtualization using ontap-san storage class for persistent storage. 
-
-video::bac58645-dd75-4e92-b5fe-b12b015dc199[panopto, title="Using Red Hat MTV to migrate VMs to OpenShift Virtualization with NetApp ONTAP Storage", width=360]
 
 The following diagram shows a high level view of the migration of a VM from VMware to Red Hat OpenShift Virtualization.
 
@@ -51,7 +65,7 @@ The following installations were completed before installing MTV:
 * link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy.html[Trident 23.10]
 * Multipath on the cluster nodes enabled for iSCSI (for ontap-san storage class). See the provided yaml to create a daemon set that enables iSCSI on each node in the cluster. 
 * Trident backend and Storage class for ontap SAN using iSCSI. See the provided yaml files for trident backend and storage class.
-* link:https://docs.openshift.com/container-platform/4.13/virt/install/installing-virt-web.html[OpenShift Virtualization]  
+* link:https://docs.openshift.com/container-platform/4.13/virt/install/installing-virt-web.html[OpenShift Virtualization] 
 
 To install iscsi and multipath on the OpenShift Cluster nodes use the yaml file given below 
 **Preparing the cluster nodes for iSCSI**
@@ -152,7 +166,7 @@ parameters:
 allowVolumeExpansion: true
 ----
 
-=== *Install MTV*
+=== Install MTV
 Now you can install the Migration Toolkit for virtualization (MTV). Refer to the instructions provided link:https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization/2.5/html/installing_and_using_the_migration_toolkit_for_virtualization/installing-the-operator[here] for help with the installation.
 
 The Migration Toolkit for Virtualization (MTV) user interface is integrated into the OpenShift web console.
@@ -194,12 +208,45 @@ Once the migration plan is created, the status of the plan should show *Ready* a
 
 image:rh-os-n_use_case_vm_migration_using_mtv_plan_ready.png["Figure showing input/output dialog or representing written content"]
 
+=== Perform Cold Migration
 Clicking on *Start* will run through a sequence of steps to complete the migration of the VM.
 
 image:rh-os-n_use_case_vm_migration_using_mtv_plan_complete.png["Figure showing input/output dialog or representing written content"]
 
-When all steps are completed, you can see the migrated VMs  by clicking on the *virtual machines* under *Virtualization* in the left-side  navigation menu.
+When all steps are completed, you can see the migrated VMs by clicking on the *virtual machines* under *Virtualization* in the left-side  navigation menu.
 Instructions to access the virtual machines are provided link:https://docs.openshift.com/container-platform/4.13/virt/virtual_machines/virt-accessing-vm-consoles.html[here].
 
 You can log into the virtual machine and verify the contents of the posgresql databases. The databases, tables and the entries in the table should be the same as what was created on the source VM. 
 
+=== Perform Warm Migration 
+
+To perform a warm migration, after creating a migration plan as shown above, you need to edit the plan settings to change the default migration type.  Click on the edit icon next to the cold migration and toggle the button to set it to warm migration. Click on **Save**. Now click on **Start** to start the migration.
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_warm1.png["1"]
+
+Click on **0 of 1 vms completed**, expand the vm and you can see the progress of the migration.
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_warm2.png["2"]
+
+After some time, the disk transfer is completed, and the migration waits to proceed to the Cutover state. The DataVolume is in a Paused state. Go back to the plan and click on the **Cutover** button.
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_warm3.png["3"]
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_warm4.png["4"]
+
+The current time will be shown in the dialog box. Change the time to a future time if you want to schedule a cutover to a later time. If not, to perform a cutover now, click on **Set Cutover**.
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_warm5.png["5"]
+
+
+After a few seconds, the DataVolume goes from the paused to the ImportScheduled to ImportInProgress state when the Cutover phase  starts. 
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_warm6.png["6"]
+
+When the cutover phase is completed, the DataVolume comes to the succeeded state and the PVC is bound. 
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_warm7.png["7"]
+
+The migration plan proceeds to complete the **ImageConversion**** phase and finally, the **VirtualMachineCreation** Phase is completed. The VM comes to the running state on OpenShift Virtualization.
+
+image:rh-os-n_use_case_vm_migration_using_mtv_plan_warm8.png["8"]
