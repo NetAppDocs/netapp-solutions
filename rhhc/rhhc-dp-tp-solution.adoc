@@ -1,0 +1,313 @@
+---
+sidebar: sidebar
+permalink: rhhc/rhhc-dp-tp-solution.html
+keywords: OpenShift, OCP, Trident, Trident-protect, NetApp ONTAP, Red Hat OpenShift, app data protection, Containers
+summary: Red Hat OpenShift Container Application Data Protection using Trident protect with NetApp ONTAP
+---
+
+= Data protection for Container Apps in OpenShift Container Platform using Trident protect
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media/
+
+Author: Banu Sundhar, NetApp
+
+[.lead]
+This section of the reference document provides details for creating Snapshots and backups of Container Apps using Trident protect. 
+NetApp Trident protect provides advanced application data management capabilities that enhance the functionality and availability of stateful Kubernetes applications backed by NetApp ONTAP storage systems and the NetApp Trident CSI storage provisioner. 
+Trident protect creates application snapshots and backups, which means not only is the snapshot and backups of application data in persistent volumes are created, but snapshots and backups of application metadata are also created. The snapshots and backups created by Trident protect can be stored in any of the following Object Storage and restored from them at a later point. 
+
+* AWS S3           
+* Azure Blob storage    
+* Google Cloud Storage          
+* Ontap S3       
+* StorageGrid 
+* any other S3 compatible storage
+
+Trident protect uses the Kubernetes model of role-based access control (RBAC). 
+By default, Trident protect provides a single system namespace called trident-protect and its associated default service account. 
+If you have an organization with many users or specific security needs, you can use the RBAC features of Trident protect to gain more granular control over access to resources and namespaces.
+
+Additional information on RBAC in Trident protect can be found in the 
+link:https://docs.netapp.com/us-en/trident/trident-protect/manage-authorization-access-control.html[Trident protect documentation]
+
+NOTE: The cluster administrator has access to resources in the default trident-protect namespace and can also access resources in all other namespaces. Users cannot create application data management custom resource (CRs)  like Snapshot and Backup CRs in the trident-protect namespace. As a best practice, users will need to create those CRs in the application namespace.
+
+Trident protect can be installed This section will show the workflow for the data protection of container apps and restoration of the apps.
+1.	Snapshot creation (on demand on scheduled)
+2.	Restore from Snapshot (restore to same and different namespace)
+3.	Backup creation
+4.	Restore from Backup
+
+.Pre-requisite
+[%collapsible]
+
+====
+Prior to creating the Snapshots and backups for an application, an Object Storage must be configured in Trident protect to store the snapshots and backups. This is done using the bucket CR. Only administrators can create a bucket CR and configure it. 
+The bucket CR is known as AppVault in Trident protect. AppVault objects are the declarative Kubernetes workflow representation of a storage bucket. An AppVault CR contains the configurations necessary for a bucket to be used in protection operations, such as backups, snapshots, restore operations, and SnapMirror replication. 
+
+In this example, we will show the use of ONTAP S3 as Object storage.
+Here is the workflow for creating AppVault CR for ONTAP S3:
+1.	Create S3 object store server in the SVM in ONTAP Cluster.
+2.	Create a bucket in the Object Store Server.
+3.	Create an S3 user in the SVM. Keep the access Key and the Secret Key in a safe location.
+4.	In OpenShift, create a secret to store the ONTAP S3 credentials.
+5.	Create an AppVault Object for ONTAP S3
+
+**Configure Trident protect AppVault for ONTAP S3**
+
+***Sample yaml file for configuring Trident protect with ONTAP S3 as the AppVault***
+
+[source,yaml]
+....
+# alias tp='tridentctl-protect'
+
+appvault-secret.yaml 
+
+apiVersion: v1
+stringData:
+  accessKeyID: "<access key id created for a user to access ONTAP S3 bucket>"
+  secretAccessKey: "corresponding Secret Access Key"
+#data:
+# base 64 encoded values
+#  accessKeyID: <base64 access key id created for a user to access ONTAP S3 bucket>
+#  secretAccessKey: <base 64  Secret Access Key>
+kind: Secret
+metadata:
+  name: appvault-secret
+  namespace: trident-protect
+type: Opaque
+
+appvault.yaml
+
+apiVersion: protect.trident.netapp.io/v1
+kind: AppVault
+metadata:
+  name: ontap-s3-appvault
+  namespace: trident-protect
+spec:
+  providerConfig:
+    azure:
+      accountName: ""
+      bucketName: ""
+      endpoint: ""
+    gcp:
+      bucketName: ""
+      projectID: ""
+    s3:
+      bucketName: <bucket-name for storing the snapshots and backups>
+      endpoint: <endpoint IP for S3>
+      secure: "false"
+      skipCertValidation: "true"
+  providerCredentials:
+    accessKeyID:
+      valueFromSecret:
+        key: accessKeyID
+        name: appvault-secret
+    secretAccessKey:
+      valueFromSecret:
+        key: secretAccessKey
+        name: appvault-secret
+  providerType: OntapS3
+
+# oc create -f appvault-secret.yaml -n trident-protect
+# oc create -f appvault.yaml -n trident-protect
+....
+
+image:rhhc_dp_tp_solution_container_image1.png[AppVault created]
+
+***Sample yaml file for installing postgresql app ***
+[source,yaml]
+....
+postgres.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14
+        env:
+        - name: POSTGRES_USER
+          #value: "myuser"
+          value: "admin"
+        - name: POSTGRES_PASSWORD
+          #value: "mypassword"
+          value: "adminpass"
+        - name: POSTGRES_DB
+          value: "mydb"
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
+  type: ClusterIP
+
+Now create the Trident protect application CR for the postgres app. Include the objects in the namespace postgres and create it in the postgres namespace.
+# tp create app postgres-app --namespaces postgres -n postgres
+
+....
+
+image:rhhc_dp_tp_solution_container_image2.png[App created]
+====
+
+.Create Snapshots
+[%collapsible]
+
+====
+
+**Creating an on-demand snapshot**
+
+[source,yaml]
+....
+
+# tp create snapshot postgres-snap1 --app postgres --appvault ontap-s3-appvault -n postgres
+# tp create snapshot postgres-snap1 --app postgres-app --appvault ontap-s3-appvault -n postgres
+Snapshot "postgres-snap1" created.
+
+....
+
+image:rhhc_dp_tp_solution_container_image3.png[Snapshot created]
+
+image:rhhc_dp_tp_solution_container_image4.png[snapshot-pvc created]
+
+**Creating a Schedule**
+Using the following command, Snapshots will be created daily at 15:33 and two snapshots and backups will be retained.
+
+[source,yaml]
+....
+# tp create schedule schedule1 --app postgres-app --appvault ontap-s3-appvault --backup-retention 2 --snapshot-retention 2 --granularity Daily --hour 15 --minute 33 --data-mover Restic -n postgres
+Schedule "schedule1" created.
+....
+
+image:rhhc_dp_tp_solution_container_image5.png[Schedule1 created]
+
+**Creating a Schedule using yaml**
+
+[source,yaml]
+....
+# tp create schedule schedule2 --app postgres-app --appvault ontap-s3-appvault --backup-retention 2 --snapshot-retention 2 --granularity Daily --hour 15 --minute 33 --data-mover Restic -n postgres --dry-run > hourly-snapshotschedule.yaml
+
+cat hourly-snapshotschedule.yaml
+
+apiVersion: protect.trident.netapp.io/v1
+kind: Schedule
+metadata:
+  creationTimestamp: null
+  name: schedule2
+  namespace: postgres
+spec:
+  appVaultRef: ontap-s3-appvault
+  applicationRef: postgres-app
+  backupRetention: "2"
+  dataMover: Restic
+  dayOfMonth: ""
+  dayOfWeek: ""
+  enabled: true
+  granularity: Hourly
+  #hour: "15"
+  minute: "33"
+  recurrenceRule: ""
+  snapshotRetention: "2"
+status: {}
+....
+
+image:rhhc_dp_tp_solution_container_image6.png[Schedule2 created]
+
+You can see snapshots created on this schedule.
+
+image:rhhc_dp_tp_solution_container_image7.png[Snap created on schedule]
+
+Volume snapshots are also created.
+
+image:rhhc_dp_tp_solution_container_image8.png[PVC Snap created on schedule]
+
+====
+
+
+.Delete the Application to simulate loss of application
+[%collapsible]
+
+====
+[source,yaml]
+....
+# oc delete deployment/postgres -n postgres
+# oc get pod,pvc -n postgres
+No resources found in postgres namespace.
+....
+====
+
+.Restore from Snapshot to the same namespace
+[%collapsible]
+
+====
+[source,yaml]
+....
+# tp create sir postgres-sir --snapshot postgres/hourly-3f1ee-20250214183300 -n postgres
+SnapshotInplaceRestore "postgres-sir" created.
+....
+
+
+image:rhhc_dp_tp_solution_container_image9.png[Sir created]
+
+Application and its PVCis restored to the same namespace.
+
+image:rhhc_dp_tp_solution_container_image10.png[App restored, Sir]
+====
+
+.Restore from Snapshot to a different namespace
+[%collapsible]
+
+====
+[source,yaml]
+....
+# tp create snapshotrestore postgres-restore --snapshot postgres/hourly-3f1ee-20250214183300 --namespace-mapping postgres:postgres-restore -n postgres-restore
+SnapshotRestore "postgres-restore" created.
+....
+
+image:rhhc_dp_tp_solution_container_image11.png[snapRestore created]
+
+You can see that the application has been restored to a new namespace.
+ 
+ image:rhhc_dp_tp_solution_container_image12.png[App restored, snapRestore]
