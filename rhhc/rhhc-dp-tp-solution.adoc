@@ -202,7 +202,6 @@ image:rhhc_dp_tp_solution_container_image2.png[App created]
 [source,yaml]
 ....
 
-# tp create snapshot postgres-snap1 --app postgres --appvault ontap-s3-appvault -n postgres
 # tp create snapshot postgres-snap1 --app postgres-app --appvault ontap-s3-appvault -n postgres
 Snapshot "postgres-snap1" created.
 
@@ -310,4 +309,57 @@ image:rhhc_dp_tp_solution_container_image11.png[snapRestore created]
 
 You can see that the application has been restored to a new namespace.
  
- image:rhhc_dp_tp_solution_container_image12.png[App restored, snapRestore]
+image:rhhc_dp_tp_solution_container_image12.png[App restored, snapRestore]
+
+====
+.Create Backups
+[%collapsible]
+
+====
+
+**Creating an on-demand Backup**
+
+[source,yaml]
+....
+# tp create backup postgres-backup1 --app postgres-app --appvault ontap-s3-appvault -n postgres
+Backup "postgres-backup1" created.
+....
+
+image:rhhc_dp_tp_solution_container_image13.png[Backup created]
+
+**Creating Schedule for Backup**
+
+The daily and the hourly backups in the list above are created from the schedule set up previously.
+[source,yaml]
+....
+# tp create schedule schedule1 --app postgres-app --appvault ontap-s3-appvault --backup-retention 2 --snapshot-retention 2 --granularity Daily --hour 15 --minute 33 --data-mover Restic -n postgres
+Schedule "schedule1" created.
+....
+image:rhhc_dp_tp_solution_container_image13a.png[Schedule created previously]
+
+====
+
+.Restore from backup
+[%collapsible]
+
+====
+**Delete the application and PVCs to simulate a data loss.**
+
+image:rhhc_dp_tp_solution_container_image14.png[Schedule created previously]
+
+**Restore to same namespace**
+#tp create bir postgres-bir --backup postgres/hourly-3f1ee-20250224023300 -n postgres
+BackupInplaceRestore "postgres-bir" created.
+
+image:rhhc_dp_tp_solution_container_image15.png[restore to the same namespace]
+
+The application and the PVCs are restored in the same namespace.
+
+image:rhhc_dp_tp_solution_container_image16.png[applicatio and pvcs restore to the same namespace]
+
+**Restore to a different namespace**
+Create a new namespace.
+Restore from a backup to the new namespace.
+
+image:rhhc_dp_tp_solution_container_image17.png[restore to a different namespace]
+
