@@ -1,0 +1,98 @@
+---
+sidebar: sidebar
+permalink: vmware/vmware_vcf_nvme_scv.html
+keywords: netapp, vmware, nvme, cloud, foundation, vcf, aff, all-flash, nfs, vvol, vvols, array, ontap tools, otv, sddc, scv, workload, domain, backup
+summary:
+---
+
+= Efficient, scalable and simple data protection for VMware VCF with NVMe-based NetApp storage  
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media/
+
+NVMe (Non-Volatile Memory Express) over TCP is a cutting-edge network protocol that facilitates high-speed data transfer between VMware Cloud Foundation ESXi servers and NetApp storage, including All Flash FAS (AFF) and All SAN Array (ASA). Leveraging NVMe over TCP provides low latency and high throughput for demanding workloads. The integration of NVMe over TCP with NetApp SnapCenter Plug-in for VMware vSphere (SCV) offers a powerful combination for efficient data management, enhancing backup, restore, and cloning operations within VMware environments.
+
+==== Benefits of NVMe over TCP
+*  High Performance: Delivers exceptional performance with low latency and high data transfer rates. This is crucial for demanding applications and large-scale data operations.
+*  Scalability: Supports scalable configurations, allowing IT administrators to expand their infrastructure seamlessly as data requirements grow.
+*  Efficiency: Enables faster backup and restore operations, reducing downtime and improving overall system availability.
+
+This document provides steps on deploying and managing SCV in VMware Cloud Foundation (VCF) environments, with a focus on leveraging NVMe over TCP for optimal performance.
+
+==== Audience
+
+Solution architects or storage administrators ensuring data protection and disaster recovery for VMware VCF workload domains. 
+
+== Architecture overview
+
+SCV is a powerful tool designed to facilitate fast, space-efficient, crash-consistent, and VM-consistent backup and restore operations for VMs, datastores, and files and folders in VMware environments. SCV is deployed as a Linux virtual appliance using an OVA file and leverages a remote plug-in architecture.
+
+==== SCV deployment architecture
+* Virtual Appliance Deployment: SCV is deployed as a Linux virtual appliance using an OVA file. This deployment method ensures a streamlined and efficient setup process.
+* Remote Plug-in Architecture: SCV uses a remote plug-in architecture, allowing for scalability and flexibility in managing multiple instances.
+* One-to-One Relationship: Each VCF domain requires a dedicated SCV instance, ensuring isolated and efficient backup and restore operations.
+
+With ONTAP 9.10.1 and later versions, NetApp AFF and ASA support NVMe over TCP. Data that is on AFF, or ASA primary systems and can replicate to ONTAP AFF, or ASA secondary systems. SCV also works with SnapCenter Server to support application-based backup and restore operations in VMware environments for SnapCenter application-specific plug-ins. For more information check, link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/index.html[SnapCenter Plug-in for VMware vSphere documentation] and link:https://docs.netapp.com/us-en/netapp-solutions/vmware/vmware_vcf_aff_multi_wkld_scv.html#audience[SnapCenter Plug-in for VMware vSphere documentation and Protect VCF Management Domain and Multiple Workload Domains with NetApp SnapCenter for VMWare vSphere (SCV).]
+ 
+image:vmware-vcf-aff-image64.png[VCF multi-workload domain with SCV]
+
+The 3-2-1 backup rule is a data protection strategy that involves making three copies of data, storing them on two different types of media, and keeping one copy off-site. BlueXP backup and recovery is a cloud based tool for data management that provides a single control plane for a wide range of backup and recovery operations across both on-premises and cloud environments. Part of the NetApp BlueXP backup and recovery suite is a feature that integrates with SCV (on-premises) to extend a copy of the data to object storage in the cloud. This establishes a third copy of the data offsite that is sourced from the primary or secondary storage backups. BlueXP backup and recovery makes it easy to set up storage policies that transfer copies of your data from either of these two on-prem locations. For more details, check link:https://docs.netapp.com/us-en/netapp-solutions/ehc/bxp-scv-hybrid-solution.html[3-2-1 Data Protection for VMware with SnapCenter Plug-in and BlueXP backup and recovery for VMs.]
+
+== SCV for VCF on NVMe deployment steps
+The link:https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere/index.html[ONTAP tools for VMware vSphere] (OTV) provides a powerful and efficient solution for managing NetApp storage in VMware environments. By integrating directly with the vCenter Server, OTV simplifies storage management, enhances data protection, and optimizes performance. While optional, deploying OTV can significantly improve the management capabilities and overall efficiency of VMware environments.
+
+* link:https://docs.netapp.com/us-en/netapp-solutions/vmware/vmware_vcf_asa_supp_wkld_nvme.html#scenario-overview[Create a NVMe/TCP storage for VCF workload domains] 
+* link:https://docs.netapp.com/us-en/netapp-solutions/vmware/vmware_vcf_aff_multi_wkld_scv.html#architecture-overview[Configure NetApp SnapCenter for VMware vSphere (SCV) ]
+
+.Restore VM, datastore, virtual disk and files or folders 
+[%collapsible]
+====
+SCV provides comprehensive backup and restore capabilities for VMware environments. For VMFS environments, SCV uses clone and mount operations in conjunction with Storage VMotion to perform restore operations. This ensures efficient and seamless restoration of data. For more details check link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/scpivs44_how_restore_operations_are_performed.html[how the restore operations are performed.] 
+
+* VM restore 
+You can restore the VM to its original host within the same vCenter Server or to an alternate ESXi host managed by the same vCenter Server.
+
+. Right click a VM and select SnapCenter Plug-in for VMware vSphere in the drop-down list, and then select Restore in the secondary drop-down list to start the wizard.
+. In the Restore wizard, select the backup Snapshot that you want to restore and select Entire virtual machine in the Restore scope field, select the restore location, and then enter the destination information where the backup should be mounted. On the Select Location page, select the location for the restored datastore. Review the Summary page and click Finish.
+image:vmware-vcf-aff-image66.png[VM Restore]
+
+
+* Mount a datastore 
+You can mount a traditional datastore from a backup if you want to access files in the backup. You can either mount the backup to the same ESXi host where the backup was created or to an alternate ESXi host that has the same type of VM and host configurations. You can mount a datastore multiple times on a host.
+
+. Right-click a datastore and select select SnapCenter Plug-in for VMware vSphere > Mount Backup.
+. On the Mount Datastore page, select a backup and a backup location (primary or secondary), and then click Mount.
+
+image:vmware-vcf-aff-image67.png[Mount a Datastore]
+
+* Attach a virtual disk 
+You can attach one or more VMDKs from a backup to the parent VM, or to an alternate VM on the same ESXi host, or to an alternate VM on an alternate ESXi host managed by the same vCenter or a different vCenter in linked mode. 
+
+. Right click a VM, select SnapCenter Plug-in for VMware vSphere > Attach virtual disk(s).
+. On the Attach Virtual Disk window, select a backup and select one or more disks you want to attach and the location you want to attach from (primary or secondary). By default, the selected virtual disks are attached to the parent VM. To attach the selected virtual disks to an alternate VM in the same ESXi host, select Click here to attach to alternate VM and specify the alternate VM. Click Attach.
+
+image:vmware-vcf-aff-image68.png[Attach a Virtual Disk]
+
+* Files and folders restore steps
+Individual files and folders can be restored in a guest file restore session, which attaches a backup copy of a virtual disk and then restores the selected files or folders. Files and folders can also be restored. More details check link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/scpivs44_restore_guest_files_and_folders_overview.html[SnapCenter file and folder restore.]
+
+. When you a virtual attach disk for guest file or folder restore operations, the target VM for the attach must have credentials configured before you restore. From SnapCenter Plug-in for VMware vSphere under plug-ins, select Guest File Restore and Run As Credentials section, enter the User credentials. For Username, you must enter “Administrator”.
+image:vmware-vcf-aff-image60.png[Restore Credential]
+. Right-click on the VM from the vSphere client and select SnapCenter Plug-in for VMware vSphere > Guest File Restore. On the Restore Scope page, specify Backup Name, VMDK virtual disk and Location – primary or secondary.  Click Summery to confirm. 
+image:vmware-vcf-aff-image69.png[Files and Folder Restore]
+
+====
+
+== Monitor and report
+
+SCV provides robust monitoring and reporting capabilities to help administrators manage backup and restore operations efficiently.
+You can view status information, monitor jobs, download job logs, access reports, for more details check link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/scpivs44_view_status_information.html[SnapCenter plug-in for VMware vSphere Monitor and Report.]
+
+
+image:vmware-vcf-aff-image65.png[SCV Dashboard]
+
+
+By harnessing the power of NVMe over TCP and NetApp SnapCenter Plug-in for VMware vSphere, organizations can achieve high-performance data protection and disaster recovery for VMware Cloud Foundation workload domains. This approach ensures rapid, reliable backup and restore operations, minimizing downtime and safeguarding critical data.
+
