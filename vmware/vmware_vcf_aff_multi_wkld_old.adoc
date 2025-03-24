@@ -1,0 +1,120 @@
+---
+sidebar: sidebar
+permalink: vmware/vmware_vcf_aff_multi_wkld_scv.html
+keywords: netapp, vmware, cloud, foundation, vcf, aff, all-flash, nfs, vvol, vvols, array, ontap tools, otv, sddc, scv, workload, domain, backup
+summary:
+---
+
+= Protect VCF Multiple Workload Domains 
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media/
+
+[.lead] 
+VMware Cloud Foundation (VCF) workload domains enable organizations to logically separate resources into different domains to group different workloads, enhance security and fault tolerance. Domains can scale independently, meet specific compliances and provide multitenancy. Data Protection for VMware Cloud Foundation (VCF) is a critical aspect to ensure the availability, integrity, and recoverability of data across the management domain and workload domains. NetApp SnapCenter Plug-in for VMware vSphere (SCV) is a powerful tool that integrates NetApp’s data protection capabilities into VMware environments. It simplifies backup, restore, and cloning of VMware vSphere virtual machines (VMs) hosted on NetApp storage. 
+
+This document provides deployment steps on how to protect VCF multiple domains with SCV. 
+
+== Audience
+
+Solution architects or storage administrators ensuring data protection and disaster recovery for VMware VCF workload domains. 
+
+== Architecture Overview
+SCV is deployed as a Linux virtual appliance using an OVA file to provide fast, space-efficient, crash-consistent, and VM-consistent backup and restore operations for VMs, datastores, and files and folders. SCV uses a remote plug-in architecture. There were multiple SCVs deployed and hosted on VCF management domain vCenter. SCV and VCF domain is one to one relationship thus VCF management domain and each workload domain requires one SCV.
+
+Data that is on ONTAP FAS, AFF, or All SAN Array (ASA) primary systems and replicated to ONTAP FAS, AFF, or ASA secondary systems.  SCV also works with SnapCenter Server to support application-based backup and restore operations in VMware environments for SnapCenter application-specific plug-ins. For more information check, link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/index.html[SnapCenter Plug-in for VMware vSphere documentation.]
+
+
+image:vmware-vcf-aff-image50.png[VCF multi-workload domain with SCV]
+
+The 3-2-1 backup rule is a data protection strategy that involves making three copies of data, storing them on two different types of media, and keeping one copy off-site. BlueXP backup and recovery is a cloud based tool for data management that provides a single control plane for a wide range of backup and recovery operations across both on-premises and cloud environments. Part of the NetApp BlueXP backup and recovery suite is a feature that integrates with SCV (on-premises) to extend a copy of the data to object storage in the cloud. This establishes a third copy of the data offsite that is sourced from the primary or secondary storage backups. BlueXP backup and recovery makes it easy to set up storage policies that transfer copies of your data from either of these two on-prem locations. For more details, check link:https://docs.netapp.com/us-en/netapp-solutions/ehc/bxp-scv-hybrid-solution.html[3-2-1 Data Protection for VMware with SnapCenter Plug-in and BlueXP backup and recovery for VMs.]
+
+== Deploy a VCF with  Management Domain and Multiple Workload Domains 
+
+A VCF workload domain is a group ESXi hosts with one or more vSphere clusters, provisioned by SDDC Manager and application ready. In a VCF example below, one management domain and two workload domains were deployed. For more details on how to deploy VCF with NetApp storage, check link:https://docs.netapp.com/us-en/netapp-solutions/vmware/vmware-vcf-overview.html[NetApp VCF deployment documentation.] 
+image:vmware-vcf-aff-image51.png[VCF one management domain and two workload domains]
+
+
+== SCV Deployment, Configuration and Restoration Steps
+
+Based the number of workload domains and plus the management domain, multiple SCVs need to be deployed. With two workload domains and one management domain, the example below shows three SCVs are deployed on VCF management domain vCenter. 
+image:vmware-vcf-aff-image63.png[one to one between VCF domain and SCV]
+
+
+.Deploy SCV for management domain and each workload domain  
+[%collapsible]
+====
+. link:https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/scpivs44_download_the_ova_open_virtual_appliance.html[Download the Open Virtual Appliance (OVA).] 
++
+. Log in with the vSphere Client to the vCenter Server. Navigate to Administration > Certificates > Certificate Management. Add Trusted Root Certificates and install each certificate in the certs folder. Once the certificates are installed, OVA can be verified and deployed.
++
+. Log in to the VCF workload domain vCenter and deploy OVF Template to start the VMware deploy wizard. 
+image:vmware-vcf-aff-image52.png[Deploy SCV OVF Template]
++
+{nbsp}
++
+. Power on OVA to start SCV and then click Install VMware tools.
++
+. Generate the MFA token from the OVA console, system configuration menu. 
+image:vmware-vcf-aff-image53.png[MFA for SnapCenter management Web Interface login]
++
+{nbsp}
++
+. Log in to the SCV management GUI with the admin username and password set at the time of deployment and the MFA token generated using the maintenance console.
+`https://<appliance-IP-address>:8080` to access the management GUI. 
++
+image:vmware-vcf-aff-image54.png[NetApp SnapCenter for VMware vSphere Web COnfiguration]
+====
+
+.Configure SCV
+[%collapsible]
+====
+To backup or restore VMs, first add the storage clusters or VMs hosting the datastores,then create backup policies for retention and frequency, and set up a resource group to protect the resources. 
+image:vmware-vcf-aff-image55.png[Getting started with SCV]
+
+. Log in to vCenter web client and click Menu in the toolbar and select SnapCenter Plug-in for VMware vSphere and Add a storage. In the left navigator pane of the SCV plug-in, click Storage Systems and then select Add option. On the Add Storage System dialog box, enter the basic SVM or cluster information, and select Add. Enter NetApp storage IP address and login. 
+. To create a new backup policy, in the left navigator pane of the SCV plug-in, click Policies, and select New Policy. On the New Backup Policy page, enter the policy configuration information, and click Add.
+image:vmware-vcf-aff-image56.png[Create Backup Policy]
+. In the left navigator pane of the SCV plug-in, click Resource Groups, and then select Create. Enter the required information on each page of the Create Resource Group wizard, select VMs and datastores to be included in the resource group, and then select the backup policies to be applied to the resource group and specify the backup schedule.
+
+image:vmware-vcf-aff-image57.png[Create Resource Group]
+====
+
+.Restore VM and files or folders backup
+[%collapsible]
+====
+VMs, VMDKs, files, and folders from backups can be restored. VM can be restored to the original host or an alternate host in the same vCenter Server, or to an alternate ESXi host managed by the same vCenter. You can mount a traditional datastore from a backup if you want to access files in the backup. You can either mount the backup to the same ESXi host where the backup was created or to an alternate ESXi host that has the same type of VM and host configurations. You can mount a datastore multiple times on a host. Individual files and folders can also be restored in a guest file restore session, which attaches a backup copy of a virtual disk and then restores the selected files or folders. Files and folders can also be restored. 
+
+
+VM Restore Steps
+
+. In the VMware vSphere client GUI, click Menu in the toolbar and select VMs and Templates from the drop-down list, right click a VM, and select SnapCenter Plug-in for VMware vSphere in the drop-down list, and then select Restore in the secondary drop-down list to start the wizard.
+. In the Restore wizard, select the backup Snapshot that you want to restore and select Entire virtual machine in the Restore scope field, select the restore location, and then enter the destination information where the backup should be mounted. On the Select Location page, select the location for the restored datastore. Review the Summary page and click Finish.
+image:vmware-vcf-aff-image59.png[VM Restore]
+. Monitor the operation progress by clicking Recent Tasks at the bottom of the screen.
+
+
+Datastore Restore Steps
+
+. Right-click a datastore and select SnapCenter Plug-in for VMware vSphere > Mount Backup.
+
+. On the Mount Datastore page, select a backup and a backup location (primary or secondary), and then click Mount.
+
+image:vmware-vcf-aff-image62.png[Datastore Restore]
+
+Files and Folders Restore Steps
+
+. When you a virtual attach disk for guest file or folder restore operations, the target VM for the attach must have credentials configured before you restore. From SnapCenter Plug-in for VMware vSphere under plug-ins, select Guest File Restore and Run As Credentials section, enter the User credentials. For Username, you must enter “Administrator”.
+image:vmware-vcf-aff-image60.png[Restore Credential]
+. Right-click on the VM from the vSphere client and select SnapCenter Plug-in for VMware vSphere > Guest File Restore. On the Restore Scope page, specify Backup Name, VMDK virtual disk and Location – primary or secondary.  Click Summery to confirm. 
+image:vmware-vcf-aff-image61.png[Files and Folder Restore]
+
+====
+
+NetApp SnapCenter for VCP multi-domain centralizes data protection, efficiently reduces the time and storage space required for backups using NetApp snapshots, supports large-scale VMware environments with robust backup and replication features and allows granular recovery of entire VMs, specific VMDKs, or individual files.
+
+== Video Demo for Protect VCF Multiple Domains with SCV
+
+video::25a5a06c-1def-4aa4-ab00-b28100142194[panopto, title="Protect VMware VCF multiple domains with NetApp SCV", width=360]
