@@ -63,65 +63,23 @@ The following installations were completed before installing MTV:
 
 * OpenShift Cluster 4.13.34 
 * link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy.html[Trident 23.10]
-* Multipath on the cluster nodes enabled for iSCSI (for ontap-san storage class). See the provided yaml to create a daemon set that enables iSCSI on each node in the cluster. 
+* Multipath on the cluster nodes enabled for iSCSI (for ontap-san storage class). Multi-pathing can be enabled easily if you install Trident 25.02 using the node-prep flag. To install Trident 25.02 and preparing the worker nodes for iSCSI, you can use the following command
+
+[source,yaml]
+----
+#/tridentctl install trident n trident —node-prep=iscsi
+
+----
+NOTE: To verify that iSCSI tools have been enabled on the worker nodes of the OpenShift Cluster, log into the worker nodes and verify  you see the iscsid, multipathd active and the entries in the multipath.conf file as shown.
+
+image:rh-os-n_use_case_iscsi_node_prep1.png["iscsid active"]
+
+image:rh-os-n_use_case_iscsi_node_prep2.png["multipathd active"]
+
+image:rh-os-n_use_case_iscsi_node_prep3.png["multipath.conf file"]
+
 * Trident backend and Storage class for ontap SAN using iSCSI. See the provided yaml files for trident backend and storage class.
 * link:https://docs.openshift.com/container-platform/4.13/virt/install/installing-virt-web.html[OpenShift Virtualization] 
-
-To install iscsi and multipath on the OpenShift Cluster nodes use the yaml file given below 
-**Preparing the cluster nodes for iSCSI**
-[source,yaml]
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  namespace: trident
-  name: trident-iscsi-init
-  labels:
-    name: trident-iscsi-init
-spec:
-  selector:
-    matchLabels:
-      name: trident-iscsi-init
-  template:
-    metadata:
-      labels:
-        name: trident-iscsi-init
-    spec:
-      hostNetwork: true
-      serviceAccount: trident-node-linux
-      initContainers:
-      - name: init-node
-        command:
-          - nsenter
-          - --mount=/proc/1/ns/mnt
-          - --
-          - sh
-          - -c
-        args: ["$(STARTUP_SCRIPT)"]
-        image: alpine:3.7
-        env:
-        - name: STARTUP_SCRIPT
-          value: |
-            #! /bin/bash
-            sudo yum install -y lsscsi iscsi-initiator-utils sg3_utils device-mapper-multipath
-            rpm -q iscsi-initiator-utils
-            sudo sed -i 's/^\(node.session.scan\).*/\1 = manual/' /etc/iscsi/iscsid.conf
-            cat /etc/iscsi/initiatorname.iscsi
-            sudo mpathconf --enable --with_multipathd y --find_multipaths n
-            sudo systemctl enable --now iscsid multipathd
-            sudo systemctl enable --now iscsi
-        securityContext:
-          privileged: true
-      hostPID: true
-      containers:
-      - name: wait
-        image: k8s.gcr.io/pause:3.1
-      hostPID: true
-      hostNetwork: true
-      tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-  updateStrategy:
-    type: RollingUpdate
 
 Use the following yaml file to create trident backend configuration for using ontap san storage
 **Trident backend for iSCSI**
