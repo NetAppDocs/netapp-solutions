@@ -15,7 +15,10 @@ summary: Red Hat OpenShift Virtualization on ROSA
 [.lead]
 == Overview
 This section provides details for setting up FSx for NetApp ONTAP as the default Storage Class for the ROSA cluster, and then create a Virtual Machine that will leverage FSx ONTAP storage for its volumes. 
-We will also look into connecting to the Virtual Machine using the guest credentials, and restarting the VM. And finally, we will perform a live migration of the Virtual Machine from the current node to a new node. We will examine the contents of the disk storage after a VM restart and the live migration .
+
+We will also look into connecting to the Virtual Machine using the guest credentials, and restarting the VM. And finally, we will perform a live migration of the Virtual Machine from the current node to a new node. We will examine the contents of the disk storage after a VM restart and the live migration.
+
+Read the blog as an additional resource: link:https://community.netapp.com/t5/Tech-ONTAP-Blogs/Unlock-Seamless-iSCSI-Storage-Integration-A-Guide-to-FSxN-on-ROSA-Clusters-for/ba-p/459124[Unlock Seamless iSCSI Storage Integration: A Guide to FSxN on ROSA Clusters for iSCSI]
 
 == Prerequisites
 
@@ -31,6 +34,20 @@ We will also look into connecting to the Virtual Machine using the guest credent
 *   link:https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html[A HCP ROSA cluster] (with at least 3 bare-metal worker nodes)
 *   link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/virtualization/installing#virt-aws-bm_preparing-cluster-for-virt[OpenShift Virtualization installed on ROSA Cluster]
 *   link:https://console.redhat.com/openshift/overview[Access to Red Hat OpenShift web console]
+*   Trident 25.02 or later
+You can leverage Trident 25.02 or later releases to easily setup the worker nodes of the ROSA cluster to perform iSCSI operations on FSxN storage. Install Trident 25.02 or later on ROSA cluster using the node-prep-flag 
+[source,yaml]
+....
+#./tridentctl install trident -n trident --node-prep=iscsi
+....
+
+This will prepare the ROSA cluster worker nodes for iSCSI by starting the iscsid and multipathd services and setting the following in /etc/multipath.conf file
+
+image:rh-os-n_use_case_iscsi_node_prep1.png["iscsid active"]
+
+image:rh-os-n_use_case_iscsi_node_prep2.png["multipathd active"]
+
+image:rh-os-n_use_case_iscsi_node_prep3.png["multipath.conf file"]
 
 == Initial Setup
 
@@ -114,4 +131,4 @@ image:redhat_openshift_ocpv_rosa_image18.png[OCP-v VM fill the disk]
 Use vi to create a sample text file that we will use to test.
 image:redhat_openshift_ocpv_rosa_image19.png[OCP-v create a file]
 
-
+Read the blog as an additional resource: link:https://community.netapp.com/t5/Tech-ONTAP-Blogs/Unlock-Seamless-iSCSI-Storage-Integration-A-Guide-to-FSxN-on-ROSA-Clusters-for/ba-p/459124[Unlock Seamless iSCSI Storage Integration: A Guide to FSxN on ROSA Clusters for iSCSI]
