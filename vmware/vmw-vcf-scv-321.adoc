@@ -20,28 +20,31 @@ The 3-2-1 backup strategy is an industry accepted data protection method, provid
 
 The strategy is comprised of three fundamental rules:
 
-1. Keep at least three copies of your data. This ensures that even if one copy is lost or corrupted, you still have at least two remaining copies to fall back on.
+. Keep at least three copies of your data. This ensures that even if one copy is lost or corrupted, you still have at least two remaining copies to fall back on.
 
-2. Store two backup copies on different storage media or devices. Diversifying storage media helps protect against device-specific or media-specific failures. If one device gets damaged or one type of media fails, the other backup copy remains unaffected.
+. Store two backup copies on different storage media or devices. Diversifying storage media helps protect against device-specific or media-specific failures. If one device gets damaged or one type of media fails, the other backup copy remains unaffected.
 
-3. Finally, ensure that at least one backup copy is offsite. Offsite storage serves as a fail-safe against localized disasters like fires or floods that could render onsite copies unusable.
+. Finally, ensure that at least one backup copy is offsite. Offsite storage serves as a fail-safe against localized disasters like fires or floods that could render onsite copies unusable.
 
 This solution document covers a 3-2-1 backups solution using SnapCenter Plug-in for VMware vSphere (SCV) to create primary and secondary backups of our on-premises virtual machines and BlueXP backup and recovery for virtual machines to backup a copy of our data to cloud storage or StorageGRID.
 
-=== Use Cases
+== Use Cases
+
 This solution addresses the following use cases:
 
 * Backup and restore of on-premises virtual machines and datastores using using SnapCenter Plug-in for VMware vSphere.
 * Backup and restore of on-premises virtual machines and datastores, hosted on ONTAP clusters, and backed up to object storage using BlueXP backup and recovery for virtual machines.
 
-=== NetApp ONTAP Data Storage
+== NetApp ONTAP Data Storage
+
 ONTAP is NetApp’s industry leading storage solution that offers unified storage whether you access over SAN or NAS protocols. The 3-2-1 backup strategy ensures on-premises data is protected on more than one media type and NetApp offers platforms ranging from high-speed flash to lower-cost media. 
 
 image:bxp-scv-hybrid-40.png[ONTAP data storage]
 
 For more information on all of NetApp’s hardware platform’s check out https://www.netapp.com/data-storage/[NetApp Data Storage].
 
-=== SnapCenter Plug-in for VMware vSphere
+== SnapCenter Plug-in for VMware vSphere
+
 The SnapCenter Plugin for VMware vSphere is a data protection offering which is tightly integrated with VMware vSphere and allows easy management of backup and restores for virtual machines. As part of that solution, SnapMirror provides a fast and reliable method to create a second immutable backup copy of virtual machine data on a secondary ONTAP storage cluster. With this architecture in place, virtual machine restore operations can easily be initiated from either the primary or secondary backup locations.
 
 SCV is deployed as a linux virtual appliance using an OVA file. The plug-in now uses a remote plug-in
@@ -49,7 +52,8 @@ architecture. The remote plug-in runs outside of the vCenter server and is hoste
 
 For detailed information on SCV refer to https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/[SnapCenter Plug-in for VMware vSphere documentation].
 
-=== BlueXP backup and recovery for virtual machines
+== BlueXP backup and recovery for virtual machines
+
 BlueXP backup and recovery is a cloud based tool for data management that provides a single control plane for a wide range of backup and recovery operations across both on-premises and cloud environments. Part of the NetApp BlueXP backup and recovery suite is a feature that integrates with the SnapCenter Plugin for VMware vSphere (on-premises) to extend a copy of the data to object storage in the cloud. This establishes a third copy of the data offsite that is sourced from the primary or secondary storage backups. BlueXP backup and recovery makes it easy to set up storage policies that transfer copies of your data from either of these two on-prem locations.
 
 Choosing between the primary and secondary backups as the source in BlueXP Backup and Recovery will result in one of two topologies being implemented:
@@ -116,6 +120,7 @@ The testing / validation of this solution was performed in a lab that may or may
 image:bxp-scv-hybrid-04.png[Solution Architecture Diagram]
 
 == Solution Deployment
+
 // Describe the steps required to fully deploy the solution.
 // Please use collapsible blocks with descriptive titles to condense the content in the published HTML.
 // Include screenshots, demo videos, etc. that make the steps as simple and clear as possible.
@@ -137,7 +142,7 @@ SCV backup policies have the option of using SnapMirror or SnapVault relationshi
 
 Setting up SnapMirror relationships can be done in BlueXP where many of the steps are automated, or it can be done using System Manager and the ONTAP CLI. All of these methods are discussed below.
 
-==== Establish SnapMirror relationships with BlueXP
+=== Establish SnapMirror relationships with BlueXP
 
 The following steps must be completed from the BlueXP web console:
 
@@ -177,7 +182,8 @@ image:bxp-scv-hybrid-47.png[Select retention policy]
 image:bxp-scv-hybrid-48.png[Review and go]
 ====
 
-==== Establish SnapMirror relationships with System Manager and ONTAP CLI
+=== Establish SnapMirror relationships with System Manager and ONTAP CLI
+
 All required steps for establishing SnapMirror relationships can be accomplished with System Manager or the ONTAP CLI. The following section provides detailed information for both methods:
 
 .Record the source and destination Intercluster logical interfaces
@@ -545,6 +551,7 @@ NOTE: At this point data transfer may not immediately begin. BlueXP backup and r
 =====
 
 === Restoring Virtual Machines in the case of data loss
+
 Ensuring the safeguarding of your data is only one aspect of comprehensive data protection. Equally crucial is the ability to promptly restore data from any location in the event of data loss or a ransomware attack. This capability is vital for maintaining seamless business operations and meeting recovery point objectives.
 
 NetApp offers a highly adaptable 3-2-1 strategy, providing customized control over retention schedules at the primary, secondary, and object storage locations. This strategy provides the flexibility to tailor data protection approaches to specific needs.
@@ -552,6 +559,7 @@ NetApp offers a highly adaptable 3-2-1 strategy, providing customized control ov
 This section provides an overview of the data restoration process from both the SnapCenter Plug-in for VMware vSphere and BlueXP backup and recovery for virtual machines. 
 
 ==== Restoring Virtual Machines from SnapCenter Plug-in for VMware vSphere
+
 For this solution virtual machines were restored to original and alternate locations. Not all aspects of SCV's data restoration capabilities will be covered in this solution. For in depth information on all that SCV has to offer refer to the https://docs.netapp.com/us-en/sc-plugin-vmware-vsphere/scpivs44_restore_vms_from_backups.html[Restore VMs from backups] in the product documentation.
 
 .Restore virtual machines from SCV
@@ -581,6 +589,7 @@ image:bxp-scv-hybrid-35.png[Choose primary or secondary]
 =====
 
 ==== Restoring Virtual Machines from BlueXP backup and recovery for virtual machines
+
 BlueXP backup and recovery for virtual machines allows restores of virtual machines to their original location. Restore functions are accessed through the BlueXP web console.
 
 For more information refer to https://docs.netapp.com/us-en/bluexp-backup-recovery/task-restore-vm-data.html[Restore virtual machines data from the cloud].
