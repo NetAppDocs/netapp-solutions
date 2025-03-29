@@ -1,0 +1,66 @@
+---
+sidebar: sidebar
+permalink: vmware/vmw-vcf-mgmt-principal-nfs.html
+keywords: netapp, vmware, cloud, foundation, vcf, asa, all-flash, array, ontap tools, otv, sddc, nfs
+summary:
+---
+
+= NFS as principal storage for Management Domains
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media/
+
+[.lead]
+In this scenario we will review the use case of using using an existing NFS datastore on ONTAP for use as principal storage for a VMware Cloud Foundation (VCF) management domains. 
+
+== Introduction
+
+Where appropriate we will refer to external documentation for the steps that must be performed in VCF's SDDC Manager, and reference those steps that are specific to the storage configuration portion.
+
+For information on converting an existing NFS-based vSphere environment with ONTAP, refer to link:vmw-vcf-mgmt-nfs.html[Convert vSphere Environment (NFS datastore) to VCF Management Domain].
+
+[NOTE]
+VCF release 5.2 introduced the the capability to convert an existing vSphere 8 environment to a VCF management domain or import as VCF VI workload domains. Prior to this release, VMware vSAN was the only option for principal storage for the VCF management domain. 
+
+[NOTE]
+This solution is applicable for ONTAP platforms supporting NFS storage including NetApp AFF and FAS. 
+
+== Prerequisites
+
+The following components and configurations are used in this scenario:
+
+* NetApp storage system with a storage virtual machine (SVM) configured to allow NFS traffic.
+* Logical interface (LIF) has been created on the IP network that is to carry NFS traffic and is associated with the SVM.
+* A vSphere 8 cluster with 4 x ESXi hosts and a vCenter appliance colocated on the cluster.
+* Distributed port group configured for vMotion and NFS storage traffic on the VLANs or network segments established for this purpose.
+* Download software required for the VCF conversion.
+
+For information on configuring ONTAP storage systems refer to the link:https://docs.netapp.com/us-en/ontap[ONTAP 9 Documentation] center.
+
+For information on configuring VCF refer to link:https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html[VMware Cloud Foundation Documentation].
+
+== Deployment Steps
+
+=== Management Domain - Default Cluster
+
+NFS Principal storage on the initial cluster is only supported with VCF brownfield import tool. If VCF is deployed with Cloud Builder tool (till version 5.2.x), only VSAN is supported. 
+
+For more information on using an existing vSphere environment, refer to https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-5-2-and-earlier/5-2/map-for-administering-vcf-5-2/importing-existing-vsphere-environments-admin/convert-or-import-a-vsphere-environment-into-vmware-cloud-foundation-admin.html[converting existing vSphere environment to management domain] for more info.
+
+=== Management Domain - Additional Cluster
+
+The additional vSphere cluster on management domain can be deployed with following options:
+
+* Have additional cluster in vSphere environment and use the VCF brownfield import tool to convert the vSphere environment to Management domain. https://docs.netapp.com/us-en/ontap-tools-vmware-vsphere-10/configure/create-vvols-datastore.html[ONTAP tools for VMware vSphere] https://docs.netapp.com/us-en/ontap/san-admin/provision-storage.html[System Manager or ONTAP API] can be used to deploy the NFS datastore to vSphere cluster.
+* Use SDDC API to deploy additional cluster. The vSphere hosts should have the NFS datastore configured. Use https://docs.netapp.com/us-en/ontap/san-admin/provision-storage.html[System Manager or ONTAP API] to deploy LUN to vSphere hosts.
+* Use SDDC Manager UI to deploy additional cluster. But this option only creates vSAN datastore with releases prior to 5.2.x.
+
+== Additional information
+
+For information on configuring ONTAP storage systems refer to the link:https://docs.netapp.com/us-en/ontap[ONTAP 9 Documentation] center.
+
+For information on configuring VCF refer to link:https://techdocs.broadcom.com/us/en/vmware-cis/vcf/vcf-5-2-and-earlier/5-2.html[VMware Cloud Foundation Documentation].
+
+
