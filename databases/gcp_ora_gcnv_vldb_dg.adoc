@@ -23,7 +23,7 @@ High throughput and mission-critical Oracle VLDB put a heavy demand on backend d
 
 Leveraging the fast snapshot backup (seconds) and clone (minutes) feature of GCNV, full-size copies of the production database can be cloned from Physical Standby on the fly to serve many other use cases such as DEV, UAT, etc. You can do away with an Active Data Guard license and inefficient and complex Snapshot Standby. The cost savings can be substantial. For a nominal Oracle Data Guard setup with 64 cores CPUs on both primary and standby Oracle servers, just the Active Data Guard licensing cost saving amounts to $1,472,000 based on the latest Oracle price list.  
 
-In this documentation, we demonstrate how to set up an Oracle VLDB with Data Guard configuration on GCNVS storage with multiple NFS volumes and Oracle ASM for storage load balancing. The standby database volumes can be quickly backed up via snapshot and cloned for read/write access. NetApp Solutions Engineering team provides an automation toolkit to create and refresh clones with ease at a user-defined schedule.
+In this documentation, we demonstrate how to set up an Oracle VLDB with Data Guard configuration on GCNVS storage with multiple NFS volumes and Oracle ASM for storage load balancing. The standby database volumes can be quickly backed up via snapshot and cloned for read/write access. NetApp Solutions Engineering team provides an automation toolkit to create and refresh clones with streamlined lifecycle management.
 
 This solution addresses the following use cases:
 
@@ -77,21 +77,19 @@ image:azure_ora_anf_vldb_dg_architecture.png["This image provides a detailed pic
 
 === Key factors for deployment consideration
 
-* *Google Cloud NetApp Volumes Configuration.* GCNV are allocated in the Google cloud as `Storage Pools`. In these tests and validations, we deployed a 2 TiB storage pool to host Oracle primary database at the East 4 region and a 4 TiB storage pool to host standby database and DB clone at the West 4 region. GCNV storage pool has four service levels: Flex, Standard, Premium, and Extreme. The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level.  At a capacity pool creation, you can set QoS to Auto or Manual and data encryption at rest Single or Double. 
+* *Google Cloud NetApp Volumes Configuration.* GCNV are allocated in the Google cloud as `Storage Pools`. In these tests and validations, we deployed an 2 TiB storage pool to host Oracle primary database at the East4 region and a 4 TiB storage pool to host standby database and DB clone at the West4 region. GCNV storage pool has four service levels: Flex, Standard, Premium, and Extreme. The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level.  At a capacity pool creation, you set storage pool location, service level, availability zone, and capacity of storage pool. For Oracle Data Guard configuration, Zonal availability should be sufficient as the Data Guard provides the database failover protection due to a zone level failure.  
 
-* *Sizing the Database Volumes.* For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement from Oracle AWR report. Take into consideration both the database size as well as the throughput requirements when sizing ANF volumes for database. With auto QoS configuration for ANF, the bandwidth is guaranteed at 128 MiB/s per TiB volume capacity allocated with Ultra Service Level. Higher throughput may need larger volume sizing to meet the requirement.    
+* *Sizing the Database Volumes.* For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement from Oracle AWR report. Take into consideration the database size, the throughput requirements, and service level when designing GCNV volumes layout for VLDB database. It is recommended to use only `Premium` or `Extreme` for Oracle database. The bandwidth is guaranteed at 64 MiB/s per TiB volume capacity up to maximum of 4.5 GiBps for    `Premium` service and 128 MiB/s per TiB volume capacity up to 4.5 GiBps for `Extreme` service. Higher throughput will need larger volume sizing to meet the requirement.    
 
-* *Single Volume or Multiple Volumes.* A single large volume can provide similar performance level as multiple volumes with same aggregate size as the QoS is strictly enforced based on the volume sizing and capacity pool service level. It is recommended to implement multiple volumes (multiple NFS mount points) for Oracle VLDB to better utilize shared backend ANF storage resource pool. Implement Oracle ASM for IO load balancing on multiple NFS volumes.  
+* *Multiple Volumes and Load Balancing.* A single large volume can provide similar performance level as multiple volumes with same aggregate size as the QoS is strictly enforced based on the volume sizing and capacity pool service level. It is recommended to implement multiple volumes (multiple NFS mount points) for Oracle VLDB to better utilize shared backend GCNV storage resource pool and to meet throughput requirement exceeding 4.5 GiBps. Implement Oracle ASM for IO load balancing on multiple NFS volumes.  
 
-* *Application Volume Group.* Deploy Application Volume Group (AVG) for Oracle for performance optimization. Volumes deployed by application volume group are placed in the regional or zonal infrastructure to achieve optimized latency and throughput for the application VMs.
+* *Google Compute Engine VM Instance Consideration.* In these tests and validations, we used Compute Engine VM - N1 with 4 vCPUs and 15 GiB memory. You need to choose the Compute Engine DB VM instance appropriately for Oracle VLDB with high throughput requirement. Besides the number of vCPUs and the amount of RAM, the VM network bandwidth (ingress and egress or NIC throughput limit) can become a bottleneck before database storage capacity is reached.
 
-* *Azure VM Consideration.* In these tests and validations, we used an Azure VM - Standard_B4ms with 4 vCPUs and16 GiB memory. You need to choose the Azure DB VM appropriately for Oracle VLDB with high throughput requirement. Besides the number of vCPUs and the amount of RAM, the VM network bandwidth (ingress and egress or NIC throughput limit) can become a bottleneck before database storage capacity is reached.
-
-* *dNFS Configuration.* By using dNFS, an Oracle database running on an Azure Virtual Machine with ANF storage can drive significantly more I/O than the native NFS client. Ensure that Oracle dNFS patch p32931941 is applied to address potential bugs. 
+* *dNFS Configuration.* By using dNFS, an Oracle database running on a Google Compute Engine VM with GCNV storage can drive significantly more I/O than the native NFS client. Ensure that Oracle dNFS patch p32931941 is applied to address potential bugs. 
 
 == Solution deployment
 
-It is assumed that you already have your primary Oracle database deployed in an Azure cloud environment within a VNet as the starting point for setting up the Oracle Data Guard. Ideally, the primary database is deployed on ANF storage with NFS mount. Your primary Oracle database can also be running on a NetApp ONTAP storage or any other storage of choices either within the Azure ecosystem or a private data center. The following section demonstrates the configuration for Oracle VLDB on ANF in an Oracle Data Guard  setting between a primary Oracle DB in Azure with ANF storage to a physical standby Oracle DB in Azure with ANF storage.    
+The following section demonstrates the configuration for Oracle VLDB on GCNV in an Oracle Data Guard setting between a primary Oracle DB in Google cloud of East region with GCNV storage to a physical standby Oracle DB in Google cloud of West region with GCNV storage.    
 
 === Prerequisites for deployment
 [%collapsible%open]
@@ -99,17 +97,19 @@ It is assumed that you already have your primary Oracle database deployed in an 
 
 Deployment requires the following prerequisites.
 
-. An Azure cloud account has been set up, and the necessary VNet and network subnets have been created within your Azure account.
+. A Google cloud account has been set up and a project has been created within your Google account to deploy resources for setting up Oracle Data Guard.
 
-. From the Azure cloud portal console, you need to deploy minimum three Azure Linux VMs, one as the primary Oracle DB server, one as the standby Oracle DB server, and a clone target DB server for reporting, dev, and test etc. See the architecture diagram in the previous section for more details about the environment setup. Also review the Microsoft link:https://azure.microsoft.com/en-us/products/virtual-machines[Azure Virtual Machines^] for more information. 
+. Create a VPC and subnets that span the regions that are desired for Data Guard. For a resilient DR setup, consider to place the primary and standby DBs in different geographic locations that can tolerate major diaster in a local region.
 
-. The primary Oracle database should have been installed and configured in the primary Oracle DB server. On the other hand, in the standby Oracle DB server or the clone Oracle DB server, only Oracle software is installed and no Oracle databases are created. Ideally, the Oracle files directories layout should be exactly matching on all Oracle DB servers. For details on NetApp recommendation for automated Oracle deployment in the Azure cloud and ANF, please refer to the following technical reports for help. 
-
-* link:automation_ora_anf_nfs.html[TR-4987: Simplified, Automated Oracle Deployment on Azure NetApp Files with NFS^]
+. From the Google cloud portal console, deploy four Google compute engine Linux VM instances, one as the primary Oracle DB server, one as the standby Oracle DB server, a clone target DB server, and an Oracle Data Guard observer. See the architecture diagram in the previous section for more details about the environment setup. Follow Google documentation link:https://cloud.google.com/compute/docs/create-linux-vm-instance[Create a Linux VM instance in Compute Engine^] for detailed instructions. 
 +
 [NOTE]
 
 Ensure that you have allocated at least 128G in the Azure VMs root volume in order to have sufficient space to stage Oracle installation files.
+
+. The primary Oracle database should have been installed and configured in the primary Oracle DB server. On the other hand, in the standby Oracle DB server or the clone Oracle DB server, only Oracle software is installed and no Oracle databases are created. Ideally, the Oracle files directories layout should be exactly matching on all Oracle DB servers. For details on NetApp recommendation for automated Oracle deployment in the Azure cloud and ANF, please refer to the following technical reports for help. 
+
+* link:automation_ora_anf_nfs.html[TR-4987: Simplified, Automated Oracle Deployment on Azure NetApp Files with NFS^]
 
 . From the Azure cloud portal console, deploy two ANF storage capacity pools to host Oracle database volumes. The ANF storage capacity pools should be situated in different regions to mimic a true DataGuard configuration. If you are not familiar with the deployment of ANF storage, see the documentation link:https://learn.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-quickstart-set-up-account-create-volumes?tabs=azure-portal[Quickstart: Set up Azure NetApp Files and create an NFS volume^] for step-by-step instructions.
 +
