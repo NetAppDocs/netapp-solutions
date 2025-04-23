@@ -19,7 +19,7 @@ The solution provides an overview and details for configuring high throughput Or
 
 == Purpose
 
-High throughput and mission-critical Oracle VLDB put a heavy demand on backend database storage. To meet service level agreement (SLA), the database storage must deliver the required capacity and high input/output operations per second (IOPS) while maintaining sub milliseconds latency performance. This is particularly challenging when deploying such a database workload in the public cloud with a shared storage resources environment. Not all storage platforms are created equal. GCNV is a premium storage service offered by Google that can support mission-critical Oracle Database deployments in Google cloud requiring sustained IOPS and low-latency performance characteristics. The architecture accommodates OLTP and OLAP workloads, with configurable service tiers supporting various performance profiles. GCNV delivers blazing-fast performance with sub milliseconds latency, achieving up to 4.6 GiBps per volume throughput with mixed read/write workloads.
+High throughput and mission-critical Oracle VLDB put a heavy demand on backend database storage. To meet service level agreement (SLA), the database storage must deliver the required capacity and high input/output operations per second (IOPS) while maintaining sub milliseconds latency performance. This is particularly challenging when deploying such a database workload in the public cloud with a shared storage resources environment. Not all storage platforms are created equal. GCNV is a premium storage service offered by Google that can support mission-critical Oracle Database deployments in Google cloud requiring sustained IOPS and low-latency performance characteristics. The architecture accommodates OLTP and OLAP workloads, with configurable service tiers supporting various performance profiles. GCNV delivers blazing-fast performance with sub milliseconds latency, achieving up to 4.5 GiBps per volume throughput with mixed read/write workloads.
 
 Leveraging the fast snapshot backup (seconds) and clone (minutes) feature of GCNV, full-size copies of the production database can be cloned from Physical Standby on the fly to serve many other use cases such as DEV, UAT, etc. You can do away with an Active Data Guard license and inefficient and complex Snapshot Standby. The cost savings can be substantial. For a nominal Oracle Data Guard setup with 64 cores CPUs on both primary and standby Oracle servers, just the Active Data Guard licensing cost saving amounts to $1,472,000 based on the latest Oracle price list.  
 
@@ -79,11 +79,11 @@ image:gcnv_ora_vldb_dg_architecture.png["This image provides a detailed picture 
 
 * *Google Cloud NetApp Volumes Configuration.* GCNV are allocated in the Google cloud as `Storage Pools`. In these tests and validations, we deployed an 2 TiB storage pool to host Oracle primary database at the East4 region and a 4 TiB storage pool to host standby database and DB clone at the West4 region. GCNV storage pool has four service levels: Flex, Standard, Premium, and Extreme. The IO capacity of ANF capacity pool is based on the size of the capacity pool and its service level.  At a capacity pool creation, you set storage pool location, service level, availability zone, and capacity of storage pool. For Oracle Data Guard configuration, Zonal availability should be sufficient as the Data Guard provides the database failover protection due to a zone level failure.  
 
-* *Sizing the Database Volumes.* For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement from Oracle AWR report. Take into consideration the database size, the throughput requirements, and service level when designing GCNV volumes layout for VLDB database. It is recommended to use only `Premium` or `Extreme` for Oracle database. The bandwidth is guaranteed at 64 MiB/s per TiB volume capacity up to maximum of 4.5 GiBps for    `Premium` service and 128 MiB/s per TiB volume capacity up to 4.5 GiBps for `Extreme` service. Higher throughput will need larger volume sizing to meet the requirement.    
+* *Sizing the Database Volumes.* For production deployment, NetApp recommends taking a full assessment of your Oracle database throughput requirement from Oracle AWR report. Take into consideration the database size, the throughput requirements, and service level when designing GCNV volumes layout for VLDB database. It is recommended to use only `Premium` or `Extreme` service for Oracle database. The bandwidth is guaranteed at 64 MiB/s per TiB volume capacity up to maximum of 4.5 GiBps for    `Premium` service and 128 MiB/s per TiB volume capacity up to 4.5 GiBps for `Extreme` service. Higher throughput will need larger volume sizing to meet the requirement.    
 
-* *Multiple Volumes and Load Balancing.* A single large volume can provide similar performance level as multiple volumes with same aggregate size as the QoS is strictly enforced based on the volume sizing and capacity pool service level. It is recommended to implement multiple volumes (multiple NFS mount points) for Oracle VLDB to better utilize shared backend GCNV storage resource pool and to meet throughput requirement exceeding 4.5 GiBps. Implement Oracle ASM for IO load balancing on multiple NFS volumes.  
+* *Multiple Volumes and Load Balancing.* A single large volume can provide similar performance level as multiple volumes with same aggregate volume size as the QoS is strictly enforced based on the volume sizing and storage pool service level. It is recommended to implement multiple volumes (multiple NFS mount points) for Oracle VLDB to better utilize shared backend GCNV storage resource pool and to meet throughput requirement exceeding 4.5 GiBps. Implement Oracle ASM for IO load balancing on multiple NFS volumes.  
 
-* *Google Compute Engine VM Instance Consideration.* In these tests and validations, we used Compute Engine VM - N1 with 4 vCPUs and 15 GiB memory. You need to choose the Compute Engine DB VM instance appropriately for Oracle VLDB with high throughput requirement. Besides the number of vCPUs and the amount of RAM, the VM network bandwidth (ingress and egress or NIC throughput limit) can become a bottleneck before database storage capacity is reached.
+* *Google Compute Engine VM Instance Consideration.* In these tests and validations, we used Compute Engine VM - N1 with 4 vCPUs and 15 GiB memory. You need to choose the Compute Engine DB VM instance appropriately for Oracle VLDB with high throughput requirement. Besides the number of vCPUs and the amount of RAM, the VM network bandwidth (ingress and egress or NIC throughput limit) can become a bottleneck before database storage throughput is reached.
 
 * *dNFS Configuration.* By using dNFS, an Oracle database running on a Google Compute Engine VM with GCNV storage can drive significantly more I/O than the native NFS client. Ensure that Oracle dNFS patch p32931941 is applied to address potential bugs. 
 
@@ -105,7 +105,7 @@ Deployment requires the following prerequisites.
 +
 [NOTE]
 
-Ensure that you have allocated at least 50G in the Azure VMs root volume in order to have sufficient space to stage Oracle installation files. Google compute engine VMs are locked down at instance level by default. To enable communication between VMs, a specific firewall rules should be created to allow the traffic flow such as typical Oracle TCP port 1521. 
+Ensure that you have allocated at least 50G in the Azure VMs root volume in order to have sufficient space to stage Oracle installation files. Google compute engine VMs are locked down at instance level by default. To enable communication between VMs, a specific firewall rules should be created to open the TCP port traffic flow such as typical Oracle port 1521. 
 
 . From the Google cloud portal console, deploy two GCNV storage pools to host Oracle database volumes. Referred to documentation link:https://cloud.google.com/netapp/volumes/docs/get-started/quickstarts/create-storage-pool[Create a storage pool quickstart ^] for step-by-step instructions. Following are some screen shots for quick reference.
 +
@@ -896,6 +896,11 @@ DIRNAME
 10.165.128.196
 /oras-u03
 
+10.165.128.196
+/oras-u01
+
+
+8 rows selected.
 
 
 ....
@@ -1273,7 +1278,7 @@ DGMGRL>
 
 [NOTE]
 
-To achieve zero data loss, Oracle Data Guard protection mode needs to be set at `MaxAvailability` or `MaxProtection`. The protection mode can be changed from the Data Guard Broker interface by editing the Data Guard configuration and changing `LogXptMode` from ASYNC to SYNC. The Oracle archive log destination log mode needs to be changed accordingly.
+To achieve zero data loss, Oracle Data Guard protection mode needs to be set to `MaxAvailability` or `MaxProtection` mode. The default protection mode of `MaxPerformance` can be changed from the Data Guard Broker interface by editing the Data Guard configuration and changing `LogXptMode` from ASYNC to SYNC. The Oracle archive log destination log mode needs to be changed accordingly. When real-time log application is enabled for Data Guard as required for `MaxAvailability`, avoid rebooting the database automatically because automatic database reboot will likely open the standby database in `READ ONLY WITH APPLY` mode, which requires an Active Data Guard license. Instead, boot the database manually to ensure it remains in a `MOUNT` state with managed recovery in real time. 
 
 ====
 
