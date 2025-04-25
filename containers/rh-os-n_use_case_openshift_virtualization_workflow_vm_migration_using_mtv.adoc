@@ -67,7 +67,7 @@ The following installations were completed before installing MTV:
 
 [source,yaml]
 ----
-#/tridentctl install trident n trident —node-prep=iscsi
+#./tridentctl install trident n trident —node-prep=iscsi
 
 ----
 NOTE: To verify that iSCSI tools have been enabled on the worker nodes of the OpenShift Cluster, log into the worker nodes and verify  you see the iscsid, multipathd active and the entries in the multipath.conf file as shown.
@@ -81,8 +81,8 @@ image:rh-os-n_use_case_iscsi_node_prep3.png["multipath.conf file"]
 * Trident backend and Storage class for ontap SAN using iSCSI. See the provided yaml files for trident backend and storage class.
 * link:https://docs.openshift.com/container-platform/4.13/virt/install/installing-virt-web.html[OpenShift Virtualization] 
 
-Use the following yaml file to create trident backend configuration for using ontap san storage
 **Trident backend for iSCSI**
+Sample yaml file to create trident backend configuration for ontap san storage with iSCSI protocol
 [source,yaml]
 ----
 apiVersion: v1
@@ -107,8 +107,9 @@ spec:
   credentials:
     name: backend-tbc-ontap-san-secret
 ----
-Use the following yaml file to create trident storage class configuration for using ontap san storage
+
 **Trident storage class for iSCSI**
+Sample yaml file to create trident storage class configuration for  ontap san storage with iSCSI protocol
 [source,yaml]
 ----
 apiVersion: storage.k8s.io/v1
@@ -120,6 +121,55 @@ parameters:
   backendType: "ontap-san"
   media: "ssd"
   provisioningType: "thin"
+  snapshots: "true"
+allowVolumeExpansion: true
+----
+
+**Installing FC backend and Storage Class**
+Sample yaml file to create trident backend configuration for ontap san storage with FC protocol
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tbc-fc-secret
+type: Opaque
+stringData:
+  username: admin
+  password: <cluster password>
+---
+apiVersion: trident.netapp.io/v1
+kind: TridentBackendConfig
+metadata:
+  name: tbc-fc
+spec:
+  version: 1
+  storageDriverName: ontap-san
+  managementLIF: <cluster management lif>
+  backendName: tbc-fc
+  svm: openshift-fc
+  sanType: fcp
+  storagePrefix: demofc
+  defaults:
+    nameTemplate: "{{ .config.StoragePrefix }}_{{ .volume.Namespace }}_{{ .volume.RequestName }}"
+  credentials:
+    name: tbc-fc-secret
+----
+
+Sample yaml file to create trident storage class configuration for  ontap san storage with FC protocol
+**Trident storage class for FC**
+[source,yaml]
+----
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sc-fc
+provisioner: csi.trident.netapp.io
+parameters:
+  backendType: "ontap-san"
+  media: "ssd"
+  provisioningType: "thin"
+  fsType: ext4
   snapshots: "true"
 allowVolumeExpansion: true
 ----
