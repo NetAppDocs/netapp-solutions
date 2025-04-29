@@ -30,60 +30,19 @@ We will also look into connecting to the Virtual Machine using the guest credent
 *   link:https://console.redhat.com/openshift/downloads[OpenShift command-line interface] (oc)
 *   link:https://docs.aws.amazon.com/eks/latest/userguide/helm.html[Helm 3 documentation]
 *   link:https://docs.openshift.com/rosa/rosa_hcp/rosa-hcp-sts-creating-a-cluster-quickly.html[A HCP ROSA cluster] (with at least 3 bare-metal worker nodes)
-*   link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/virtualization/installing#virt-aws-bm_preparing-cluster-for-virt[OpenShift Virtualization installed on ROSA Cluster]
 *   link:https://console.redhat.com/openshift/overview[Access to Red Hat OpenShift web console]
 *   Trident 25.02 or later
+*   link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/virtualization/installing#virt-aws-bm_preparing-cluster-for-virt[OpenShift Virtualization installed on ROSA Cluster]
+
 Starting from Trident 25.02 release, you can easily prepare the worker nodes of the ROSA cluster(or any OpenShift cluster) to perform iSCSI operations on FSxN storage. 
 There are 2 easy ways of installing Trident 25.02 (or later) that automates worker node preparation for iSCSI.  
-1. using the node-prep-flag from the command line using tridentctl tool.
-2. Using the Red Hat certified Trident operator from the operator hub and customizing it. 
-3. Using Helm 
-
-**Method 1: Use tridentctl tool**
-
-Use the node-prep flag and install Trident as shown. 
-Prior to issuing the install command, you should have downloaded installer package. Refer to link:https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-tridentctl.html#step-1-download-the-trident-installer-package[the documentation here]. 
-
-[source,yaml]
-....
-#./tridentctl install trident -n trident --node-prep=iscsi
-....
-
-**Method 2: Use the Red Hat Certified Trident Operator and customize**
-From the OperatorHub, locate the Red Hat certified Trident operator and install it.
-
-image:rh-os-n_use_case_operator_img1.png["Operator in Operator Hub"]
-
-image:rh-os-n_use_case_operator_img2.png["Install operator 1"]
-
-image:rh-os-n_use_case_operator_img3.png["Install operator 2"]
-
-image:rh-os-n_use_case_operator_img4.png["operator installed"]
-
-Next, create the Trident Orchestrator instance. Use the YAML view to set any custom values or enable iscsi node prep during installation.
-
-image:rh-os-n_use_case_operator_img5.png["orchestrator create"]
-
-image:rh-os-n_use_case_operator_img6.png["enable NodePrep"]
-
-image:rh-os-n_use_case_operator_img7.png["orchestrator installed"]
-
-image:rh-os-n_use_case_operator_img8.png["Trident installed"]
-
-
-Installing Trident using any of the above methods will prepare the ROSA cluster worker nodes for iSCSI by starting the iscsid and multipathd services and setting the following in /etc/multipath.conf file
-
-image:rh-os-n_use_case_iscsi_node_prep1.png["iscsid active"]
-
-image:rh-os-n_use_case_iscsi_node_prep2.png["multipathd active"]
-
-image:rh-os-n_use_case_iscsi_node_prep3.png["multipath.conf file"]
+Prior to installing the OpenShift Virtualization, you should have already created the trident backend, the storage class and the volume snapshot class objects and set them up as defaults. You can refer to the link:rh-os-n_use_case_openshift_virtualization_trident_install.html[Trident installation section] for details. 
 
 == Initial Setup
 
-This section shows how to set up the trident backend and default storage class and the default VolumeSnapshotClass. Then it shows how to create a VM from a template  and then connect and login to it using the guest credentials.
+Set up the trident backend, storage class and the VolumeSnapshotClass. You can refer to the link:rh-os-n_use_case_openshift_virtualization_trident_install.html[Trident installation section] for details. 
 
-Use the following to create a trident backend object
+Sample yaml to create a trident backend object
 [source,yaml]
 ....
 cat tbc.yaml
@@ -135,20 +94,7 @@ deletionPolicy: Retain
 #oc create -f snapshot-class.yaml 
 ....
 
-
-You can set up the storage class and the volumeSnapshot class created above as the defaults either from the console or from command line
-
-[source]
-$ oc patch storageclass trident-csi -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
-
-[source]
-$ oc patch VolumeSnapshotClasses fsx-snapclass -p '{"metadata": {"annotations": {"snapshot.storage.kubernetes.io/is-default-class": "true"}}}'
-
-Ensure default Storage Class is set to trident-csi
-image:redhat_openshift_ocpv_rosa_image1.png[OCP-v default storage Class]
-
-Ensure default VolumeSnapShotClasses is set as shown
-image:redhat_openshift_ocpv_rosa_image2.png[OCP-v default VolumeSnapshot Class]
+Ensure that the  storage class and the volume snapshot class is configured as defaults before installing the OpenShift Virtualization. For details on how to set up defaults, , you can refer to the link:rh-os-n_use_case_openshift_virtualization_trident_install.html[Setting defaults with Trident Storage and Snapshot Class section] for details. 
 
 === **Create a VM from the template**
 
