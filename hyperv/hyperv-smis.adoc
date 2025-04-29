@@ -30,9 +30,13 @@ image:hyperv-smis-image1.png["NetApp SMI-S with Hyper-V architecture"]
 
 A seamless integration with existing storage systems requires proper installation and configuration of the SMI-S Provider. 
 
-* SMI-S Provider 5.2.7 supports Windows Server SCVMM 2025,2022,2019 & 2016 & Windows server 2025,2022,2019 & 2016. This release is not compatible with Windows Server 2012 or System Center Virtual Machine Manager (SCVMM) 2012.
+* SMI-S Provider 5.2.7 supports Windows Server SCVMM 2025, 2022, 2019 & 2016 & Windows server 2025,2022,2019 & 2016. This release is not compatible with Windows Server 2012 or System Center Virtual Machine Manager (SCVMM) 2012.
 * NetApp SMI-S provider supports ONTAP 9.7 and later FAS and AFF systems.
 * NetApp ONTAP ONE license covers all the SMI-S provider license requirements.
+    
+** FCP, iSCSI, or both FCP and iSCSI licenses are required for creating LUNs on the storage systems.
+** A CIFS license is required for creating file shares on supported ONTAP storage systems.
+** A FlexClone license is required to create LUN clones on clustered storage systems running supported ONTAP versions.
 
 === SMI-S virtual machine hardware requirements
 The table below shows SMI-S provider VM hardware requirements. 
@@ -60,39 +64,40 @@ image:hyperv-smis-image4.png["Register SVM"]
 === Connect SMI-S Provider with SCVMM
 
 
-. Expand “Fabric / Storage” in the navigator. Right click on Providers and click on “Add Storage Devices”. Select “SAN and NAS devices discovered and managed by a SMI-S provider”.
+. Expand Fabric > Storage in the navigator. Right click on *Providers* and click on *Add Storage Devices*. Select *SAN and NAS devices discovered and managed by a SMI-S provider*.
 image:hyperv-smis-image5.png["Add storage devices"]
-. Choose SMI-S CIMXML as protocol. Enter IP address or FQDN of the server you installed the SMI-S Agent on and enter the SMI-S account you created.
+. Choose SMI-S CIMXML as the protocol. Enter IP address or FQDN of the server you installed the SMI-S Agent on and enter the SMI-S account you created.
 image:hyperv-smis-image6.png["Install SMI-S Agent"]
-. Click Next and get a list of volumes from your NetApp storage system
-. Select storage device to use and choose a classification, review the summary and click Finish. 
+. Click *Next* and get a list of volumes from your NetApp storage system
+. Select storage devices, a classification and host groups, review the summary and click *Finish*. 
 image:hyperv-smis-image7.png["Choose classification"]
-. Click on “Storage” then “Arrays”, check NetApp storage VM capacity, pools and status.
-image:hyperv-smis-image8.png["Check SVM capacity"]
+. To review the SMI-S connection, click *Fabric* > *Overview*, check storage summary, classifications usage, logic units per array, and host group storage.
+image:hyperv-smis-image11.png["Check SVM capacity"]
 
 === Provision with SCVMM with SMI-S Provider 
 
 SCVMM uses the SMI-S Provider to interact with storage systems, allowing you to create and manage storage resources directly from SCVMM.
 
-. In the SCVMM console, go to “Fabric”. Under “Storage”, right-click on “Classifications and Pools” and select “Create Logical Unit”. Choose the storage pool and classification. Provide the necessary details such as size, name, and description for the LUN.
+==== iSCSI storage 
+. In the SCVMM console, select Fabric > Storage , right-click on *Classifications and Pools* and select *Create Logical Unit*. Choose the storage pool and classification and enter the name, description, size and host group for the logic unit.
 image:hyperv-smis-image9.png["Create Logic Unit storage"]
-. Under “Fabric and Storage”, right-click on File Servers and select Create File Share, enter Filer share path.  
-image:hyperv-smis-image10.png["Register file shares"]
-. To create a file share, go to "Fabric", "Storage", right click on "File servers", choose "Create File Share".
-image:hyperv-smis-image13.png["Create file shares]
+
+==== SMB storage
+. Select *Fabric* > *Storage* >  right click *File Servers* and choose *Create File Share*, select *File server*, enter name, storage type, storage pool and classification.  
+image:hyperv-smis-image10.png["Create file shares"]
 
 == Logs and Traces
-You can configure how SMI-S Provider manages log and trace files, such as specifying the levels of messages to be logged and the directory to which logs are saved. You also specify the components to be traced, the target to which trace messages are written, the level of tracing, and the trace file location.
+You can configure how SMI-S Provider manages logs and trace files, such as specifying the levels of messages to be logged and the directory to which logs are saved. You also specify the components to be traced, the target to which trace messages are written, the level of tracing, and the trace file location.
 
 ==== Logs setting
-By default, all system messages are logged and the system message logs are located in the logs directory in the directory in which NetApp SMI-S Provider is installed. You can change the location of and the level of system messages that are written to the CIM server log.
+By default, all system messages are logged and the system message logs are located in the logs directory in the directory in which NetApp SMI-S Provider is installed. You can change the location and the level of system messages that are written to the CIM server log.
 
-* Change the system message logging level, log Level: Trace, Information, Warning, Severe, Fatal
+* You can choose log level from Trace, Information, Warning, Severe, Fatal.
+To change the system message logging level, use the command below: 
 [source,shell]
 ====
 cimconfig -s loglevel=new_log_level -p 
 ====
-
 
 * Change the system message log directory
 [source,shell]
