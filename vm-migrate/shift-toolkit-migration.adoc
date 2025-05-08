@@ -1,0 +1,106 @@
+---
+sidebar: sidebar
+permalink: vm-migrate/shift-toolkit-migration.html
+keywords: netapp, vmware, esxi, vm, migration, openshift, virtualization, hyper-v, proxmox
+summary: 
+---
+
+= Using the Shift Toolkit to perform VM Migration
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media/
+
+[.lead]
+This section details how to perform VM migration using the Shift Toolkit..
+
+== Migration
+
+Once the blueprint is created, “Migrate” option can be exercised. During migrate option, shift toolkit performs a series of steps to convert the disk format and use the converted disk to create virtual machines on Hyper-V host as defined in the blueprint. 
+
+The high-level steps performed are as follows:
+
+Pre-requisite: Before initiating the migration, ensure that the virtual machines (VMs) are gracefully powered off, whether the migration is ad-hoc or scheduled based on the planned maintenance time. Confirm that the VMs are fully shut down; if the operating system is pending updates, trigger the migration only after the VMs have completely shut down.
+
+* Delete existing snapshots for all VMs in the blueprint 
+* Trigger VM snapshots for Blueprint – at source
+* Trigger volume snapshot before disk conversion
+* Clone and convert VMDK to VHDx format for all VMs
+* Power ON VMs in protection group – at target
+* Register the networks on each VM
+* Remove VMware tools and assign the IP addresses using trigger script or cron job depending on the OS type
+
+=== Factors to consider
+
+Before initiating the migration, make sure all the pre-requisites are met (which is covered in detail in this the pre-requisites section of this document). Here's a quick checklist for a recap:
+
+* Ensure the Shift VM is part of the domain
+* Ensure CIFS share is configured with appropriate permissions
+* The qtree used for migration or conversion have the right security style
+* As a quick test, try creating a VM using Hyper-V manager from any of the Hyper-V host within the cluster and place the VHDX on the CIFS share (referred in bullet – a). Try the same from Shift toolkit VM by adding Hyper-V management tools (either via “Programs and Features” or using “PowerShell” - add-windowsfeature rsat-hyper-v-tools)
+
+NOTE: If there are failures, link:https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/manage/remotely-manage-hyper-v-hosts[enable delegation using any authentication protocol].
+
+=== Network Tips and Considerations
+
+The following network considerations must be considered:
+
+* Ensure that the static IP addresses are available and not assigned to another VM
+
+For Windows VMs:
+
+* The prepare script makes a copy of the network config details (IP address space, Gateway address, DNS servers) and trigger script (during the migration) will reapply the network settings, be it a single NIC or multiple NICs based on the blueprint mapping. 
+* After migration, windows device manager may still display the old network adapter information from pre-migration. While this doesn't affect the new network adapter created post-migration and won't cause IP conflicts, the script doesn't currently delete this old registration, so it remains visible.
+
+For Linux VMs:
+
+* The prepare script makes a copy of the network config details (IP address space, routes, DNS servers, network device names) and depending on the Linux distro identify the networking type used and apply the IP settings. The network reassignment script is set as a cron job using crontab and triggered on boot. For instance, the cronjob will execute the script (after the migration) on the instance to reapply the network settings, be it a single NIC or multiple NICs based on the blueprint mapping.
+* In certain scenarios, the converted Hyper-V VMs will have interface names like eth0 or eth1 instead of ens192 or 33 which was on the source side. In this case, the script will update the network config details to match the new interface names. If predictable names are in use (like modern systems) and the interface name is retained on the Hyper-V side, the script will skip the network side of it and only remove VMware tools and then reboot the VM. 
+* Shift toolkit currently supports NetworkManager, Netplan and ifconfig mechanisms and retains the IP as specified in the blueprint.
+
+=== Phases and Options 
+
+Here are the key phases and options of the migration process.
+
+. Prepare VM – Prepare the VMs for the migration, ensures that all prerequisites are thoroughly completed.
+. Migrate - Once the preparation is complete, select and migrate VMware VMs to Hyper-V. After the migration is complete, verify that the VMs have booted successfully, and the data has migrated properly.
+. Test Migrate - Test migration simulates the migration by converting the VMDK to VHDX and creating Hyper-V VM by using converted VHDX file residing on the SMB share. The test migration does not permit network mapping configuration; this task should typically be performed manually to a bubble network.
+. Retry migrate – If the migration fails, the Shift toolkit provides a retry option. This feature allows the migration job to resume from the point of failure. Before retrying the operation, it's important to review and correct any error messages.
+
+NOTE: The Shift toolkit does not alter the source VM, except for copying the scripts needed for VM preparation. This allows for a swift rollback in case of conversion failures.
+
+To trigger Migrate workflow with the configuration specified in the Blueprint, click on Migrate.
+
+image:shift-toolkit-image50.png["Figure showing input/output dialog or representing written content"]
+
+Once initiated, the workflow activates, and the conversion process follows the outlined steps to register the VM. If the VMs within the blueprint are not powered off, the Shift toolkit will prompt for a graceful shutdown before proceeding.
+
+image:shift-toolkit-image51.png["Figure showing input/output dialog or representing written content"]
+
+NOTE: We recommend that no more than ten conversions be triggered in parallel from the same ESXi source to the same Hyper-V destination
+
+image:shift-toolkit-image52.png["Figure showing input/output dialog or representing written content"]
+
+The conversion of VMDK to VHDx happens in seconds which makes this approach the fastest of all the options that are available for an additional cost. This also helps to reduce VM downtime during migration.
+
+image:shift-toolkit-image53.png["Figure showing input/output dialog or representing written content"]
+
+Once the job is complete, the status of the blueprint changes to “migration Complete”.
+
+image:shift-toolkit-image54.png["Figure showing input/output dialog or representing written content"]
+
+With migration complete, it’s time to validate the VMs on Hyper-V side. Below screenshot shows the VMs running on the Hyper-V host that was specified during the blueprint creation.
+
+image:shift-toolkit-image55.png["Figure showing input/output dialog or representing written content"]
+
+NOTE: Shift toolkit uses cron job that executes on boot. There are no ssh connections or equivalent created for Linux based VMs once the VMs are bought on Hyper-V hosts.
+
+image:shift-toolkit-image56.png["Figure showing input/output dialog or representing written content"]
+
+NOTE: For windows VMs, shift toolkit uses PowerShell direct to connect to these windows-based guest VMs. PowerShell direct allows connection to windows-based guest VMs regardless of their network configuration or remote management settings.
+
+NOTE: After conversion, all the VM disks on Windows OS except for the OS disk will be offline. This is because the NewDiskPolicy parameter is set to offlineALL on VMware VMs by default. The issue is caused by the default Microsoft Windows SAN policy. This policy is designed to prevent the activation of LUNs when booting Windows Server if they are being accessed by multiple servers. This is done to avoid any potential data corruption issues. This can be handled by running a PowerShell command: Set-StorageSetting -NewDiskPolicy OnlineAll 
+
+NOTE: Utilize multiple volumes for staging the VMs, meaning the VMs should be svmotioned to different volumes as needed. If the resource group includes VMs with large VMDKs, distribute them across different volumes for conversion. This approach helps prevent snapshot busy errors by running cloning operations on separate volumes in parallel, while the clone split occurs in the background.
+
