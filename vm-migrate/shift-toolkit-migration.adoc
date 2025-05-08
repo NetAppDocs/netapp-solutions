@@ -21,7 +21,7 @@ Once the blueprint is created, “Migrate” option can be exercised. During mig
 
 The high-level steps performed are as follows:
 
-Pre-requisite: The VMs must be turned OFF gracefully as per the planned maintenance time. downtime Power OFF VMs in the protection group – at source.
+Pre-requisite: Before initiating the migration, ensure that the virtual machines (VMs) are gracefully powered off, whether the migration is ad-hoc or scheduled based on the planned maintenance time. Confirm that the VMs are fully shut down; if the operating system is pending updates, trigger the migration only after the VMs have completely shut down.
 
 * Delete existing snapshots for all VMs in the blueprint 
 * Trigger VM snapshots for Blueprint – at source
@@ -55,7 +55,7 @@ For Windows VMs:
 
 For Linux VMs:
 
-* The prepare script makes a copy of the network config details (IP address space, routes, DNS servers, network device names) and depending on the Linux distro identify the networking type used and apply the IP settings. The network reassignment script is set a cron job using crontab and triggered on boot. For instance, the cronjob will execute the script (after the migration) on the instance to reapply the network settings, be it a single NIC or multiple NICs based on the blueprint mapping. 
+* The prepare script makes a copy of the network config details (IP address space, routes, DNS servers, network device names) and depending on the Linux distro identify the networking type used and apply the IP settings. The network reassignment script is set as a cron job using crontab and triggered on boot. For instance, the cronjob will execute the script (after the migration) on the instance to reapply the network settings, be it a single NIC or multiple NICs based on the blueprint mapping.
 * In certain scenarios, the converted Hyper-V VMs will have interface names like eth0 or eth1 instead of ens192 or 33 which was on the source side. In this case, the script will update the network config details to match the new interface names. If predictable names are in use (like modern systems) and the interface name is retained on the Hyper-V side, the script will skip the network side of it and only remove VMware tools and then reboot the VM. 
 * Shift toolkit currently supports NetworkManager, Netplan and ifconfig mechanisms and retains the IP as specified in the blueprint.
 
@@ -66,6 +66,7 @@ Here are the key phases and options of the migration process.
 . Prepare VM – Prepare the VMs for the migration, ensures that all prerequisites are thoroughly completed.
 . Migrate - Once the preparation is complete, select and migrate VMware VMs to Hyper-V. After the migration is complete, verify that the VMs have booted successfully, and the data has migrated properly.
 . Test Migrate - Test migration simulates the migration by converting the VMDK to VHDX and creating Hyper-V VM by using converted VHDX file residing on the SMB share. The test migration does not permit network mapping configuration; this task should typically be performed manually to a bubble network.
+. Retry migrate – If the migration fails, the Shift toolkit provides a retry option. This feature allows the migration job to resume from the point of failure. Before retrying the operation, it's important to review and correct any error messages.
 
 NOTE: The Shift toolkit does not alter the source VM, except for copying the scripts needed for VM preparation. This allows for a swift rollback in case of conversion failures.
 
@@ -97,6 +98,9 @@ NOTE: Shift toolkit uses cron job that executes on boot. There are no ssh connec
 
 image:shift-toolkit-image56.png["Figure showing input/output dialog or representing written content"]
 
-NOTE: After migration and the windows VMs are powered ON, shift toolkit uses PowerShell direct to connect to these windows-based guest VMs. PowerShell direct allows connection to windows-based guest VMs regardless of their network configuration or remote management settings.
+NOTE: For windows VMs, shift toolkit uses PowerShell direct to connect to these windows-based guest VMs. PowerShell direct allows connection to windows-based guest VMs regardless of their network configuration or remote management settings.
 
 NOTE: After conversion, all the VM disks on Windows OS except for the OS disk will be offline. This is because the NewDiskPolicy parameter is set to offlineALL on VMware VMs by default. The issue is caused by the default Microsoft Windows SAN policy. This policy is designed to prevent the activation of LUNs when booting Windows Server if they are being accessed by multiple servers. This is done to avoid any potential data corruption issues. This can be handled by running a PowerShell command: Set-StorageSetting -NewDiskPolicy OnlineAll 
+
+NOTE: Utilize multiple volumes for staging the VMs, meaning the VMs should be svmotioned to different volumes as needed. If the resource group includes VMs with large VMDKs, distribute them across different volumes for conversion. This approach helps prevent snapshot busy errors by running cloning operations on separate volumes in parallel, while the clone split occurs in the background.
+
