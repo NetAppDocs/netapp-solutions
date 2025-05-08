@@ -1,0 +1,109 @@
+---
+sidebar: sidebar
+permalink: vm-migrate/shift-toolkit-conversion.html
+keywords: netapp, vmware, esxi, vm, migration, openshift, virtualization, hyper-v, proxmox
+summary: 
+---
+
+= Using the Shift Toolkit to perform VM Conversion
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ../media/
+
+[.lead]
+This section details how to perform VM conversion using the Shift Toolkit..
+
+== Conversion
+
+The Clone based conversion option allows to simply convert the virtual disk between hypervisors for the following disk formats: 
+
+* VMware ESX to Microsoft Hyper-V (VMDK to VHDX) 
+* VMware ESX to Red Hat KVM (VMDK to QCOW2) 
+
+The converted qcow2 files are compatible with any KVM hypervisors. For example, a qcow2 file can be utilized with RHEL-based KVM using virt-manager to create a VM, as well as with ubuntu KVM, Rocky Linux based KVM and others. The same can be used with Oracle Linux virtualization manager with a tweak and with OpenShift virtualization after importing using NetApp Trident. The goal is to provide the disk (converted in secs to mins) which can then be integrated into existing automation scripts used by organizations to provision the VM and assign the network. This approach helps reduce overall migration times, with disk conversion handled by Shift toolkit APIs and the remaining script bringing up the VMs.
+
+In future releases, Shift toolkit will support end-to-end migration from VMware to other compatible KVM hypervisors. However, with the current release, the conversion can be performed via the UI or APIs.
+
+=== Convert to QCOW2 format
+
+To convert the virtual disks to QCOW2 format with NetApp Shift toolkit, follow these high-level steps:
+
+* Create a destination site type specifying KVM as the hypervisor.
++
+NOTE: Hypervisor details are not required for KVM.
++
+image:shift-toolkit-image57.png["Figure showing input/output dialog or representing written content"]
+
+* Create a resource group with the VMs for which the disk conversion is required
++
+image:shift-toolkit-image58.png["Figure showing input/output dialog or representing written content"]
++
+image:shift-toolkit-image59.png["Figure showing input/output dialog or representing written content"]
++
+image:shift-toolkit-image60.png["Figure showing input/output dialog or representing written content"]
+
+* Create the blueprint to convert the virtual disk to QCOW2 format.
++
+image:shift-toolkit-image61.png["Figure showing input/output dialog or representing written content"]
++
+image:shift-toolkit-image62.png["Figure showing input/output dialog or representing written content"]
++
+image:shift-toolkit-image63.png["Figure showing input/output dialog or representing written content"]
+
+* Designate a slot using the scheduling option. If the conversion is to be performed on an ad-hoc basis, leave the scheduling option unchecked. 
++
+image:shift-toolkit-image64.png["Figure showing input/output dialog or representing written content"]
+
+* Once the blueprint is created, a prepareVM job is initiated and it automatically runs scripts on the source VMs to prepare them for conversion. 
++
+image:shift-toolkit-image65.png["Figure showing input/output dialog or representing written content"]
+
+* Once the prepareVM job completes successfully (as shown in the screenshot below), the VM disks associated with the VMs are ready for conversion, and the blueprint status will update to "Active."
+* Click "Convert" after scheduling the required downtime for the VMs.
++
+image:shift-toolkit-image66.png["Figure showing input/output dialog or representing written content"]
+
+* The convert operation uses a point-in-time snapshot. Power off the VM if needed and then retrigger the operation.
++
+image:shift-toolkit-image67.png["Figure showing input/output dialog or representing written content"]
+
+•	The convert operation executes each operation against the VM and respective disk to generate the appropriate format.
++
+image:shift-toolkit-image68.png["Figure showing input/output dialog or representing written content"]
+
+* Use the converted disk by manually creating the VM and attaching the disk to it.
++
+image:shift-toolkit-image69.png["Figure showing input/output dialog or representing written content"]
+
+NOTE: The Shift toolkit supports disk conversions only for the qcow2 format. It doesn't support VM creation or registration. To use the converted disk, manually create the VM and attach the disk. 
+
+=== Convert to VHDX format
+
+To convert the virtual disks to VHDX format with NetApp Shift toolkit, follow these high-level steps:
+
+* Create a destination site type specifying Hyper-V as the hypervisor.
+* Create a resource group with the VMs for which the disk conversion is required
++
+image:shift-toolkit-image70.png["Figure showing input/output dialog or representing written content"]
++
+image:shift-toolkit-image71.png["Figure showing input/output dialog or representing written content"]
+
+* Create the blueprint to convert the virtual disk to VHDX format. Once the blueprint is created, the preparation jobs will be automatically initiated. 
++
+image:shift-toolkit-image72.png["Figure showing input/output dialog or representing written content"]
+
+* Choose "Convert" once the required downtime for the VMs has been scheduled.
++
+image:shift-toolkit-image73.png["Figure showing input/output dialog or representing written content"]
+
+* The convert operation executes each operation against the VM and respective disk to generate the appropriate VHDX format.
++
+image:shift-toolkit-image74.png["Figure showing input/output dialog or representing written content"]
+
+* Use the converted disk by manually creating the VM and attaching the disk to it.
++
+image:shift-toolkit-image75.png["Figure showing input/output dialog or representing written content"]
+
+NOTE: To use the converted VHDX disk in a VM, the VM must be created manually via Hyper-V manager or PowerShell commands, and the disk must be attached to it. Along with this, network should also be mapped manually.
