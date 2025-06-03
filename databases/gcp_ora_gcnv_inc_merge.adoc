@@ -52,29 +52,32 @@ image:gcp_ora_gcnv_inc_merge_archit.png["This image provides a detailed picture 
 [width=100%,cols="33%, 33%, 33%", frame=none, grid=rows]
 |===
 3+^| *Hardware*
-| ANF storage | Current version offered by Microsoft | 2 TiB ANF capacity pool storage with Premium service level
-| Azure VM for DB server | Standard_B4ms - 4 vCPUs, 16GiB | 2 VMs, one as primary DB server and the other as a standby  
+| Google Cloud NetApp Volumes storage pools | Current services offered by Google | 2 TiB storage pool with Premium service, 2 TiB storage pool with standard service 
+| Google Compute Engine VM for DB server | N1 (4 vcpus, 15 GiB memory) | 2 VMs, one as primary DB server and the other as a standby  
 
 3+^| *Software*
-| RedHat Linux | RHEL Linux 8.6 (LVM) - x64 Gen2 | Deployed RedHat subscription for testing
+| RedHat Linux | Red Hat Enterprise Linux 8.10 (Ootpa) - x86/64 | RHEL Marketplace image, PAYG
+| Oracle Grid Infrastructure | Version 19.18 | Applied RU patch p34762026_190000_Linux-x86-64.zip
 | Oracle Database | Version 19.18 | Applied RU patch p34765931_190000_Linux-x86-64.zip
+| dNFS OneOff Patch | p32931941_190000_Linux-x86-64.zip | Applied to both grid and database
 | Oracle OPatch | Version 12.2.0.1.36 | Latest patch p6880880_190000_Linux-x86-64.zip
 | NFS | Version 3.0 | Oracle dNFS enabled
+| Ansible | Version core 2.16.2 | python version - 3.10.13
 |===
 
 === Key factors for deployment consideration
 
-* *Oracle VLDB storage layout for RMAN incremental merge.* In our tests and validations, the NFS volume for Oracle incremental backup and merge is allocated from a single ANF capacity pool, which has 100 TiB per volume, and 1000 TiB total capacity limit. For deployment over the thresholds, multiple volumes, and ANF capacity pools can be concatenated in parallel with multiple NFS mount points to provide higher capacity. 
+* *GCNV storage pool service level.* GCNV storage pool offers four service level: Standard, Premium, Extreme, and Flex. By default, an auto QoS applies to a volume created within a storage pool, which restricts the throughput on the volume based on its size as well as the service level. The throughput on a volume can also be manually set with manual QoS setting. 
 
-* *Oracle recoverability using RMAN incremental merge.* The RMAN incremental backup and merge is generally executed at user defined frequency based on your RTO and RPO objectives. If there are total loss of primary data storage and/or archived logs, the data loss can occur. The Oracle database can be recovered up to last incremental backup that is available from ANF database backup image copy. To minimize the data loss, Oracle flash recovery area can be setup on ANF NFS mount point and archived logs are backed up to ANF NFS mount along with database image copy. 
+* *Oracle VLDB in-server backup storage for RMAN incremental merge.* In our tests and validations, the NFS volume for Oracle incremental backup and merge is allocated from a single GCNV storage pool with standard service level, which has 100 TiB capacity limit. For deployment over the thresholds, multiple volumes, or GCNV storage pools implemented in parallel with multiple NFS mount points to provide higher capacity. 
 
-* *Running Oracle VLDB off ANF NFS file system.* Unlike other bulk storage for database backup, Microsoft ANF is a cloud enabled production grade storage that delivers high level of performance and storage efficiency. Once Oracle VLDB switches over from primary storage to image copy on ANF NFS file system, database performance can be maintained at high level while the primary storage failure is addressed. You can take comfort to know that user application experience does not suffer as the result of primary storage failure. 
+* *Oracle recoverability using RMAN incremental merge.* The RMAN in-server incremental backup and merge is generally executed at user defined frequency based on your RTO and RPO objectives. If there are total loss of primary data storage and/or archived logs, the data loss can occur. The Oracle database can be recovered up to last incremental backup that is available from in-server database backup image copy. To minimize the data loss, Oracle flash recovery area can be setup on GCNV NFS backup mount point and archived logs are backed up to the same NFS mount along with database image copy to roll forward database to last archived log in the event of a failure. 
 
-* *Azure compute instances.* In these tests and validations, we used Standard_B4ms Azure VMs as the Oracle database servers. There are other Azure VMs that may be optimized and better suited for database workload. You also need to size the Azure VM appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
+* *Running Oracle VLDB off NFS image backup on GCNV storage pool.* At this point, switching DB volumes service level from standard to premium or extreme is not supported. However, change of service level from premium to extreme is supported. If there is expectation to run DB on database image backup on NFS mount point for a extended period of time, it is recommended to allocate volume from premium storage pool for database image backup until switching DB volumes from standard to premium or extreme comes available. 
 
-* *ANF capacity pool service level.* ANF capacity pool offers three service level: Standard, Premium, Ultra. By default, an auto QoS applies to a volume created within a capacity pool, which restricts the throughput on the volume. The throughput on a volume can be manually adjusted based on the size of capacity pool and service level.      
-
-* *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For multiple ANF capacity pools deployment for a VLDB, dNFS multi-paths to different ANF capacity pools storage should be properly configured.   
+* *Google Compute Engine VMs.* In these tests and validations, we used N1 type of GCE VM instance as the Oracle database servers. There are other types of GCE VMs that may be optimized and better suited for database workload. You also need to size the VM appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
+ 
+* *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For the multiple GCNV storage pools deployment for a VLDB, dNFS multi-paths to different GCNV storage pools should be properly configured.   
 
 
 == Solution deployment
