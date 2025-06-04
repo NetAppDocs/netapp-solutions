@@ -646,7 +646,7 @@ RMAN>
 
 ....
 
-. List database image copy after backup to observe that a database image copy has been created in ANF NFS mount point.
+. List database image copy after backup to observe that a database image copy has been created in GCNV NFS mount point.
 +
 ....
 RMAN> list copy of database tag 'OraCopyBKUPonGCNV_level_0';
@@ -3099,7 +3099,7 @@ System altered.
 
 . If the recovery is performed on a standby DB server, ensure that it is the same OS, same version, and OS kernal were patched up as the primary DB server host. Also, the same version and patches of Oracle has been installed and configured on standby DB server with software only option. 
 
-. Configure oracle environment similiarly to the primary DB server, such as oratab, and oracle user .bash_profile etc. It is a good practice to backup those files to GCNV NFS mount point.
+. Also, configure oracle environment on the standby DB server similiarly to the primary DB server, such as oratab, and oracle user .bash_profile etc. It is a good practice to backup those files to GCNV NFS mount point.
 
 . The Oracle database backup image copy on GCNV NFS file system is then mounted on the standby DB server for recovery. The following procedures demonstrate the process details.
 +
@@ -3127,7 +3127,7 @@ sudo mount 10.165.128.5:/orap-bkup /nfsgcnv -o rw,bg,hard,vers=3,proto=tcp,timeo
 ....
 
 
-. As oracle user, create a generic Oracle init file in $ORACLE_HOME/dbs directory with proper admin directories configured. Most importantly, have Oracle `flash recovery area` point to GCNV NFS mount path as defined in primary Oracle VLDB server.  `flash recovery area` configuration is demonstrated in section `Setup Oracle RMAN incremental merge to image copy on ANF`. Set the Oracle control file to GCNV NFS backup file system.
+. As oracle user, create a generic Oracle init file in $ORACLE_HOME/dbs directory with proper admin directories configured. Most importantly, have Oracle `flash recovery area` point to GCNV NFS mount path as defined in primary Oracle VLDB server.  `flash recovery area` configuration is demonstrated in section `Setup Oracle RMAN incremental merge to image copy on GCNV for in-server VLDB backup`. Set the Oracle control file to GCNV NFS backup file system.
 +
 [source, cli]
 vi /home/oracle/initNTAP.ora
@@ -3826,13 +3826,6 @@ SQL> show pdbs
 +
 ....
 
-
-
-....
-
-. Drop invalid tempfiles and add new tempfiles to temp tablespaces.
-+
-....
 SQL> select name from v$datafile;
 
 NAME
@@ -3901,6 +3894,8 @@ NAME
 
 49 rows selected.
 
+SQL> select member from v$logfile;
+
 MEMBER
 --------------------------------------------------------------------------------
 /nfsgcnv/oracopy/group_3.264.1201727425
@@ -3911,6 +3906,7 @@ MEMBER
 /nfsgcnv/oracopy/group_1.258.1201727433
 
 6 rows selected.
+
 
 SQL> select name from v$controlfile;
 
