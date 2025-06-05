@@ -25,9 +25,9 @@ If you are keen on SLA for your VLDB and contemplating moving the Oracle databas
 
 This solution addresses the following use cases:
 
-* An Oracle VLDB image copy incremental merge via RMAN on NFS mount point off Google Cloud NetApp Volumes storage pool.  
+* Oracle database data files image copy backup via RMAN to an in-server NFS file system on a Google Cloud NetApp Volumes storage pool.  
 * Quick recovery of an Oracle VLDB in the event of a failure on the same or a standby Google Compute Engine VM.
-* Options to clone a database copy for other use cases from staging DB image copy in minutes.
+* Clone an Oracle database copy on a clone host for other use cases from the staging DB image copy in minutes.
  
 
 == Audience
@@ -53,7 +53,7 @@ image:gcp_ora_gcnv_inc_merge_archit.png["This image provides a detailed picture 
 |===
 3+^| *Hardware*
 | Google Cloud NetApp Volumes storage pools | Current services offered by Google | 2 TiB storage pool with Premium service, 2 TiB storage pool with standard service 
-| Google Compute Engine VM for DB server | N1 (4 vcpus, 15 GiB memory) | 2 VMs, one as primary DB server and the other as a standby  
+| Google Compute Engine VM for DB server | N1 (4 vcpus, 15 GiB memory) | 2 VMs, one as primary DB server and the other as a standby or clone DB server 
 
 3+^| *Software*
 | RedHat Linux | Red Hat Enterprise Linux 8.10 (Ootpa) - x86/64 | RHEL Marketplace image, PAYG
@@ -67,22 +67,22 @@ image:gcp_ora_gcnv_inc_merge_archit.png["This image provides a detailed picture 
 
 === Key factors for deployment consideration
 
-* *GCNV storage pool service level.* GCNV storage pool offers four service level: Standard, Premium, Extreme, and Flex. By default, an auto QoS applies to a volume created within a storage pool, which restricts the throughput on the volume based on its size as well as the service level. The only exception is that volumes allocated from Flex storage pool share the throughput available to the storage pool. 
+* *GCNV storage pool service level.* GCNV storage pool offers four service levels: Standard, Premium, Extreme, and Flex. By default, an auto QoS applies to a volume created within a storage pool, which restricts the throughput on the volume based on its size as well as the service level. The only exception is that volumes allocated from Flex storage pool share the throughput available to the storage pool. 
 
-* *Oracle VLDB in-server backup storage for RMAN incremental merge.* In our tests and validations, the NFS volume for Oracle incremental backup and merge is allocated from a single GCNV storage pool with standard service level, which has 100 TiB capacity limit. For deployment over the thresholds, multiple volumes, or GCNV storage pools implemented in parallel with multiple NFS mount points to provide higher capacity. 
+* *Oracle VLDB in-server backup storage limit for RMAN incremental merge.* In our test and validation, a NFS volume for Oracle incremental backup and merge is allocated from a single GCNV storage pool with standard service level, which has an 200 TiB capacity limit. For deployment over that thresholds, multiple GCNV storage pools can be implemented in parallel with multiple NFS mount points to provide higher capacity. 
 
-* *Oracle recoverability using RMAN incremental merge.* The RMAN in-server incremental backup and merge is generally executed at user defined frequency based on your RTO and RPO objectives. If there are total loss of primary data storage and/or archived logs, the data loss can occur. The Oracle database can be recovered up to last incremental backup that is available from in-server database backup image copy. To minimize the data loss, Oracle flash recovery area can be setup on GCNV NFS backup mount point and archived logs are backed up to the same NFS mount along with database image copy to roll forward database to last archived log in the event of a failure. Thus, near zero RPO is achievable.  
+* *Oracle recoverability using RMAN incremental merge.* The RMAN in-server incremental backup and merge is generally executed at a user-defined frequency based on your RTO and RPO objectives. If there is a total loss of primary database file storage and/or archived logs, data loss can occur. The Oracle database can be recovered up to the last incremental backup available from the in-server database backup image copy. To minimize data loss, the Oracle flash recovery area needs to be set up on GCNV NFS backup mount point, and archived logs are backed up to the same NFS mount along with database image copy to roll forward the database to the last archived log, in the event of a failure. Thus, near-zero RPO can be achieved.  
 
-* *Running Oracle VLDB off NFS image backup on GCNV storage pool.* At this point, switching DB volumes service level from standard to premium or extreme is not supported. However, change of service level from premium to extreme is supported. If there is expectation to run DB on database image backup on NFS mount point for a extended period of time, it is recommended to allocate volume from premium storage pool for database image backup until switching DB volumes from standard to premium or extreme comes available. 
+* *Running Oracle VLDB off NFS image backup on GCNV storage pool.* At this point, reassigning database volume service level from standard to premium or extreme is not supported. However, the reassigning of service levels from premium to extreme is supported. To run the database on image copy for an extended period after a failure, it is recommended to allocate volume from the premium storage pool for database image copy backup.
 
-* *Google Compute Engine VMs.* In these tests and validations, we used N1 type of GCE VM instance as the Oracle database servers. There are other types of GCE VMs that may be optimized and better suited for database workload. You also need to size the VM appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
+* *Google Compute Engine VMs.* In the test and validation, we used N1 type of GCE VM instance as the Oracle database servers. There are other types of GCE VMs that may be more optimized and better suited for database workload. Size the VM appropriately for the number of vCPUs and the amount of RAM based on actual workload requirements.
  
 * *dNFS configuration.* dNFS is built into Oracle kernel and is known to dramatically increase Oracle database performance when Oracle is deployed to NFS storage. dNFS is packaged into Oracle binary but is not turned on by default. It should be turned on for any Oracle database deployment on NFS. For the multiple GCNV storage pools deployment for a VLDB, dNFS multi-paths to different GCNV storage pools should be properly configured.   
 
 
 == Solution deployment
 
-The solution assumes that an Oracle VLDB is already deployed in the Google Cloud environment within a VPC. The Oracle VLDB can run on either the GCNV storage or any other storage option within the Google Cloud ecosystem. The following section provides step-by-step deployment procedures for setting up RMAN incremental merge to an Oracle VLDB backup image copy on GCNV, which also has its primary storage hosted on GCNV.   
+The solution assumes that an Oracle VLDB is already deployed in the Google Cloud environment within a VPC. The Oracle VLDB can run on either the GCNV storage or any other storage options within the Google Cloud ecosystem. The following section provides step-by-step deployment procedures for setting up an Oracle VLDB image backup and incremental merge via RMAN to a NFS file system mounted from a GCNV storage pool. The Oracle VLDB also has its primary storage hosted on a different GCNV storage pool.   
 
 === Prerequisites for deployment
 [%collapsible%open]
@@ -96,7 +96,7 @@ Deployment requires the following prerequisites.
 +
 image:gcp_ora_gcnv_inc_merge_pool_01.png[This image showcases GCNV storage pool screen from Google cloud portal console]
 
-. From the Google cloud portal console, follow documentation link:https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/create-volume[Create a volume^] to create a volume for in-server Oracle VLDB image backup. In this solution demo, the VLDB primary storage is also hosted on GCNV as shown below.
+. From the Google cloud portal console, follow documentation link:https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/create-volume[Create a volume^] to create a volume for in-server Oracle VLDB image backup. In this solution demo, the Oracle VLDB primary storage is also hosted on GCNV as shown below.
 +
 image:gcp_ora_gcnv_inc_merge_vol_02.png[This image showcases GCNV storage volumes screen from Google cloud portal console]
 
@@ -104,18 +104,18 @@ image:gcp_ora_gcnv_inc_merge_vol_02.png[This image showcases GCNV storage volume
 
 ====
 
-=== Mount NFS volume from GCNV to the primary Oracle VLDB server
+=== Mount a NFS volume from GCNV to the primary Oracle VLDB server
 [%collapsible%open]
 
 ====
 
-The GCNV volume provisioned for VLDB in-server backup ideally should be situated in the same Google Cloud zone as the primary DB server and storage for better performance. 
+The GCNV volume provisioned for the Oracle VLDB in-server backup ideally should be situated in the same Google Cloud zone as the primary DB server and the primary storage for better performance. 
 
 . Retrieve the GCNV volume NFS export path from Google cloud console. 
 +
 image:gcp_ora_gcnv_inc_merge_vol_03.png[This image showcases GCNV storage volumes screen from Google cloud portal console]
 
-. Login to primary Oracle VLDB server. As root, mount the NFS volume exported from GCNV storage. Change to your NFS server IP address and file path as needed. 
+. Login to the primary Oracle VLDB server. As root, mount the NFS volume exported from GCNV storage. Change to your NFS server IP address and file path as needed. 
 +
 [source, cli]
 sudo mkdir /nfsgcnv
@@ -123,7 +123,7 @@ sudo mkdir /nfsgcnv
 [source, cli]
 mount 10.165.128.5:/orap-bkup /nfsgcnv -o rw,bg,hard,vers=3,proto=tcp,timeo=600,rsize=262144,wsize=262144
 
-. Change mount point ownership to oracle:oisntall, change to your oracle user name and primary group as necessary.
+. Change mount point ownership to oracle:oisntall, or change to your oracle user name and primary group as necessary.
 +
 [source, cli]
 sudo chown oracle:oinstall /nfsgcnv
