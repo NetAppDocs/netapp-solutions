@@ -145,6 +145,102 @@ RMAN incremental merge updates the staging database data files image copy contin
 
 . Login to primary Oracle VLDB server as oracle user.
 
+. For this solution validation, the primary database is setup as a standalone server with grid infrastructure Restart configuration as shown below. The primary storage is hosted on GCNV storage pool with premium service. Again, this is not a requirement and the primary storage can be on any other storage option in Google cloud.
++
+....
+
+[oracle@orap ~]$ df -h
+Filesystem               Size  Used Avail Use% Mounted on
+devtmpfs                 7.2G     0  7.2G   0% /dev
+tmpfs                    7.3G  1.1G  6.2G  16% /dev/shm
+tmpfs                    7.3G  8.5M  7.2G   1% /run
+tmpfs                    7.3G     0  7.3G   0% /sys/fs/cgroup
+/dev/sda2                 50G   22G   29G  43% /
+/dev/sda1                200M  5.9M  194M   3% /boot/efi
+10.165.128.5:/orap-u02   250G  203G   48G  81% /u02
+10.165.128.5:/orap-u07   250G  203G   48G  82% /u07
+10.165.128.5:/orap-u06   250G  203G   48G  81% /u06
+10.165.128.5:/orap-u04   250G  203G   48G  81% /u04
+10.165.128.5:/orap-u05   250G  203G   48G  82% /u05
+10.165.128.5:/orap-bkup  2.0T  918G  1.2T  45% /nfsgcnv
+10.165.128.5:/orap-u03   250G  202G   49G  81% /u03
+10.165.128.4:/orap-u01   200G   21G  180G  11% /u01
+10.165.128.5:/orap-u08   300G  201G  100G  67% /u08
+tmpfs                    1.5G     0  1.5G   0% /run/user/54321
+
+[oracle@orap ~]$ crsctl stat res -t
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DATA.dg
+               ONLINE  ONLINE       orap                     STABLE
+ora.LISTENER.lsnr
+               ONLINE  ONLINE       orap                     STABLE
+ora.LOGS.dg
+               ONLINE  ONLINE       orap                     STABLE
+ora.asm
+               ONLINE  ONLINE       orap                     Started,STABLE
+ora.ons
+               OFFLINE OFFLINE      orap                     STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.cssd
+      1        ONLINE  ONLINE       orap                     STABLE
+ora.diskmon
+      1        OFFLINE OFFLINE                               STABLE
+ora.evmd
+      1        ONLINE  ONLINE       orap                     STABLE
+ora.ntap.db
+      1        ONLINE  ONLINE       orap                     Open,HOME=/u01/app/o
+                                                             racle/product/19.0.0
+                                                             /NTAP,STABLE
+--------------------------------------------------------------------------------
+
+
+[oracle@orap ~]$ asmcmd
+ASMCMD> lsdg
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  4194304   1228800  1150288                0         1150288              0             N  DATA/
+MOUNTED  EXTERN  N         512             512   4096  4194304    204800   204636                0          204636              0             N  LOGS/
+ASMCMD> lsdsk
+Path
+/u02/oradata/asm/orap_data_disk_01
+/u02/oradata/asm/orap_data_disk_02
+/u02/oradata/asm/orap_data_disk_03
+/u02/oradata/asm/orap_data_disk_04
+/u03/oradata/asm/orap_data_disk_05
+/u03/oradata/asm/orap_data_disk_06
+/u03/oradata/asm/orap_data_disk_07
+/u03/oradata/asm/orap_data_disk_08
+/u04/oradata/asm/orap_data_disk_09
+/u04/oradata/asm/orap_data_disk_10
+/u04/oradata/asm/orap_data_disk_11
+/u04/oradata/asm/orap_data_disk_12
+/u05/oradata/asm/orap_data_disk_13
+/u05/oradata/asm/orap_data_disk_14
+/u05/oradata/asm/orap_data_disk_15
+/u05/oradata/asm/orap_data_disk_16
+/u06/oradata/asm/orap_data_disk_17
+/u06/oradata/asm/orap_data_disk_18
+/u06/oradata/asm/orap_data_disk_19
+/u06/oradata/asm/orap_data_disk_20
+/u07/oradata/asm/orap_data_disk_21
+/u07/oradata/asm/orap_data_disk_22
+/u07/oradata/asm/orap_data_disk_23
+/u07/oradata/asm/orap_data_disk_24
+/u08/oralogs/asm/orap_logs_disk_01
+/u08/oralogs/asm/orap_logs_disk_02
+/u08/oralogs/asm/orap_logs_disk_03
+/u08/oralogs/asm/orap_logs_disk_04
+
+
+....
+
+
+
 . Create an oracopy directory under mount point /nfsgcnv to store oracle data files image copies and an archlog directory for Oracle flash recovery area.
 +
 [source, cli]
@@ -3928,7 +4024,7 @@ NAME
 
 ....
 
-. To reverse back to primary storage, follow exactly the same procedures as detailed in section `Reverse VLDB back to primary storage from backup copy`. If recovering on a standby DB server, the primary storage needs to be imported into standby DB server.
+. To reverse back to primary storage, follow exactly the same procedures as detailed in section `Reverse VLDB back to primary storage from backup copy`. If recovering on a standby DB server, the primary storage needs to be imported into standby DB server. There is also a need to relocate Oracle control files and current online log files from GCNV nfs mount back to the primary storage, which can be accomplished with few mins down time.
 
 This completes the Oracle VLDB database point-in-time recovery from the backup image copy on GCNV NFS file system to the same primary DB server or a standby DB server.
 
@@ -3939,9 +4035,9 @@ This completes the Oracle VLDB database point-in-time recovery from the backup i
 
 ====
 
-Clone a new Oracle VLDB from the backup image copy on GCNV would be similar to the point-in-time recovery of the primary database to a new DB server. NetApp Solutions Engineering team provides an automation toolkit to facilitate the entire processes for a fast (mins) and effortless implementation. 
+Clone a new Oracle VLDB from the backup image copy on GCNV is similar to the point-in-time recovery of the primary database to a new DB server. NetApp Solutions Engineering team provides an automation toolkit to facilitate the entire processes for a fast (mins) and effortless implementation. 
 
-Following automation toolkit contains a playbook that can be used to create or refresh clones of an Oracle VLDB from a primary database backup image copy stored on GCNV storage for a complete clone lifecycle management.
+Following automation toolkit contains a playbook that can be used to create or refresh clones of an Oracle VLDB from a primary database backup image copy stored on GCNV storage via NFS mount for a complete clone lifecycle management.
 
 [source, cli]
 https://bitbucket.ngage.netapp.com/projects/NS-BB/repos/na_oracle_clone_gcnv/browse
