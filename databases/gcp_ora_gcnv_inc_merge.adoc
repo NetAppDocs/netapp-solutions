@@ -92,11 +92,11 @@ Deployment requires the following prerequisites.
 
 . A GCP account has been set up, and the necessary VPC and network configuration have been created within a project in the Google Cloud account.
 
-. From the Google cloud portal console, follow documentation link:https://cloud.google.com/netapp/volumes/docs/configure-and-use/storage-pools/create-storage-pool[Create a storage pool^] to create a GCNV storage pool with standard service as shown below.
+. From the Google Cloud portal console, follow documentation link:https://cloud.google.com/netapp/volumes/docs/configure-and-use/storage-pools/create-storage-pool[Create a storage pool^] to create a GCNV storage pool with standard service as shown below.
 +
 image:gcp_ora_gcnv_inc_merge_pool_01.png[This image showcases GCNV storage pool screen from Google cloud portal console]
 
-. From the Google cloud portal console, follow documentation link:https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/create-volume[Create a volume^] to create a volume for in-server Oracle VLDB image backup. In this solution demo, the Oracle VLDB primary storage is also hosted on GCNV as shown below.
+. From the Google Cloud portal console, follow documentation link:https://cloud.google.com/netapp/volumes/docs/configure-and-use/volumes/create-volume[Create a volume^] to create a volume for in-server Oracle VLDB image backup. In this solution demo, the Oracle VLDB primary storage is also hosted on GCNV as shown below.
 +
 image:gcp_ora_gcnv_inc_merge_vol_02.png[This image showcases GCNV storage volumes screen from Google cloud portal console]
 
@@ -111,7 +111,7 @@ image:gcp_ora_gcnv_inc_merge_vol_02.png[This image showcases GCNV storage volume
 
 The GCNV volume provisioned for the Oracle VLDB in-server backup ideally should be situated in the same Google Cloud zone as the primary DB server and the primary storage for better performance. 
 
-. Retrieve the GCNV volume NFS export path from Google cloud console. 
+. Retrieve the GCNV volume NFS export path from Google Cloud console. 
 +
 image:gcp_ora_gcnv_inc_merge_vol_03.png[This image showcases GCNV storage volumes screen from Google cloud portal console]
 
@@ -264,7 +264,7 @@ alter system set db_recovery_file_dest='/nfsgcnv/archlog/' scope=both;
 Expected output:
 +
 ....
-[oracle@ora-01 ~]$ sqlplus / as sysdba
+[oracle@orap ~]$ sqlplus / as sysdba
 
 SQL*Plus: Release 19.0.0.0.0 - Production on Wed Mar 20 16:44:21 2024
 Version 19.18.0.0.0
@@ -330,14 +330,14 @@ rman target / nocatalog;
 
 output:
 
-[oracle@ora-01 ~]$ rman target / nocatalog
+[oracle@orap ~]$ rman target / nocatalog
 
 Recovery Manager: Release 19.0.0.0.0 - Production on Wed Mar 20 16:54:24 2024
 Version 19.18.0.0.0
 
 Copyright (c) 1982, 2019, Oracle and/or its affiliates.  All rights reserved.
 
-connected to target database: NTAP1 (DBID=2441823937)
+connected to target database: NTAP (DBID=1379265854)
 using target database control file instead of recovery catalog
 
 ....
@@ -1157,7 +1157,7 @@ echo "End Oracle DB incremental backup/merge to copy at `date +"%Y-%m%d-%H%M%S"`
 
 ....
 
-This completes the setup of an Oracle VLDB standby image copy backup and merge.
+This completes the setup of an Oracle VLDB standby image copy backup and merge on an in-server NFS mount from GCNV storage.
 
 ====
 
@@ -1194,7 +1194,11 @@ SQL> create table test(id integer, dt timestamp, event varchar(100));
 
 Table created.
 
-. Insert a row into the test table. The row was inserted after a most recent incremental backup and merge and its data was not in the backup set. The subsequent demonstration would show that the test row was recovered after database was completely recovered.  
+....
+
+. Insert a row into the test table. The row is inserted after a most recent incremental backup and merge and its data is not in the backup set. The subsequent demonstration would show that the test row is recovered after database is completely recovered.  
++
+....
 
 SQL> insert into test values (1, sysdate, 'validate a full recovery after a switch to DB backup copy on GCNV');
 
@@ -1222,7 +1226,7 @@ ORACLE instance shut down.
 
 ....
 
-. As oracle user, connect to Oracle database via RMAN to switch database to copy.
+. As the oracle user, connect to Oracle database via RMAN to switch database to copy.
 +
 ....
 
@@ -1584,7 +1588,7 @@ NAME
 
 ....
 
-. From SQL plus, validate that the test row which we have inerted after the last incremental backup and before switching over to image backup copy had been recovered.
+. From SQL plus, validate that the test row which we have inerted after the last incremental backup and before switching over to image backup copy has been recovered.
 +
 ....
 
@@ -3256,7 +3260,7 @@ With following example entries:
 +
 The above init file should be replaced by restored backup init file from primary Oracle VLDB server in the case of discrepancy. 
 
-. As oracle user, launch RMAN to run Oracle recovery on the standby DB server host. First, start the Oracle instance in `nomount` state.
+. As oracle user, launch RMAN to run Oracle recovery on the primary or standby DB server host. First, start the Oracle instance in `nomount` state.
 +
 ....
 
@@ -4018,7 +4022,7 @@ NAME
 +
 ....
 
-- Add GCNV NFS mount to fstab of the standby DB server so that the NFS file system will be mounted when DB server host rebooted.
+- Add GCNV NFS mount to fstab of the standby DB server if recovering from a standby DB server so that the NFS file system will be mounted when DB server host rebooted.
 
 - Update pfile restored to $ORACLE_HOME/dbs directory and create spfile from pfile.
 
